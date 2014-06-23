@@ -1,0 +1,35 @@
+
+GOPATH := $(shell pwd)/build
+LPUSER := $(shell bzr lp-login)
+
+PACKAGE=github.com/juju/charmstore
+DISTBRANCH=lp:~$(LPUSER)/juju-core/charmstore-sdist  # where to publish sdist
+REVISION=master  # or tree-ish, branch, whatever
+
+all: src
+
+pull-sdist:
+	if [ -d "$(GOPATH)" ]; then\
+		echo "Source distribution already exists.";\
+		exit 1;\
+	fi
+	mkdir -p $(GOPATH)
+	(cd $(GOPATH); bzr branch $(DISTBRANCH) src)
+	GOPATH=$(GOPATH) $(GOPATH)/src/.dist-scripts/unpack-vcs.sh
+
+push-sdist: src
+	GOPATH=$(GOPATH) dist-scripts/pack-vcs.sh
+	(cd $(GOPATH)/src; bzr init; bzr add .; bzr commit -m "Source distribution of $(PACKAGE) created $(shell date +%Y%m%d%H%M%S)")
+	(cd $(GOPATH)/src; bzr push --overwrite $(DISTBRANCH))
+
+src: $(GOPATH)/src/$(PACKAGE)
+
+$(GOPATH)/src/$(PACKAGE):
+	GOPATH=$(GOPATH) go get -d -t -u $(PACKAGE)/...
+	(cd $(GOPATH)/src/$(PACKAGE); git reset --hard $(REVISION))
+	GOPATH=$(GOPATH) godeps -u $(GOPATH)/src/$(PACKAGE)/dependencies.tsv
+
+clean:
+	$(RM) -r build
+
+.PHONY: all src clean push-sdist pull-sdist
