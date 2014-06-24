@@ -6,7 +6,7 @@ Store and publish Juju charms.
 
 To start using the charm store, run the following:
 
-    go get github.com/juju/charmstore
+    go get -u -v -t github.com/juju/charmstore/...
 
 ## Go dependencies
 
