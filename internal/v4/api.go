@@ -145,7 +145,15 @@ func (h *handler) metaManifest(getter router.ItemGetter, id *charm.URL, path str
 // GET id/meta/charm-actions
 // http://tinyurl.com/kfd2h34
 func (h *handler) metaCharmActions(getter router.ItemGetter, id *charm.URL, path string, flags url.Values) (interface{}, error) {
-	return nil, errNotImplemented
+	//return nil, errNotImplemented
+	var entity *mongodoc.Entity
+	err := getter.GetItem(id, &entity, "charmactions")
+	if err != nil {
+		return nil, err
+	}
+	// TODO(rog) When we have bundles, check whether the id is a bundle
+	// and return ErrMetadataNotRelevant if so.
+	return entity.CharmActions, nil
 }
 
 // GET id/meta/charm-config

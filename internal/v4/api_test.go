@@ -94,6 +94,33 @@ func (s *APISuite) TestMetaCharmMetadataFails(c *gc.C) {
 	storetesting.AssertJSONCall(c, s.srv, "GET", "http://0.1.2.3/v4/precise/wordpress-23/meta/charm-metadata", "", http.StatusInternalServerError, expected)
 }
 
+func (s *APISuite) TestMetaCharmActions(c *gc.C) {
+	url, wordpress := s.addCharmToStore(c)
+	storetesting.AssertJSONCall(c, s.srv,
+		"GET", "http://0.1.2.3/v4/precise/wordpress-23/meta/charm-actions", "",
+		http.StatusOK, wordpress.Actions())
+
+	type includeMetadata struct {
+		Id   *charm.URL
+		Meta map[string]*charm.Actions
+	}
+	storetesting.AssertJSONCall(c, s.srv,
+		"GET", "http://0.1.2.3/v4/precise/wordpress-23/meta/any?include=charm-metadata", "",
+		http.StatusOK, &includeMetadata{
+			Id: url,
+			Meta: map[string]*charm.Actions{
+				"charm-metadata": wordpress.Actions(),
+			},
+		})
+}
+
+func (s *APISuite) TestMetaCharmActionsFails(c *gc.C) {
+	expected := params.Error{Message: router.ErrNotFound.Error()}
+	storetesting.AssertJSONCall(c, s.srv,
+		"GET", "http://0.1.2.3/v4/precise/wordpress-23/meta/charm-actions", "",
+		http.StatusInternalServerError, expected)
+}
+
 func assertNotImplemented(c *gc.C, h http.Handler, path string) {
 	storetesting.AssertJSONCall(c, h, "GET", "http://0.1.2.3/v4/"+path, "", http.StatusInternalServerError, params.Error{
 		Message: "method not implemented",
