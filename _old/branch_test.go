@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"gopkg.in/juju/charm.v2"
-	charmtesting "gopkg.in/juju/charm.v2/testing"
+	"gopkg.in/juju/charm.v4"
+	charmtesting "gopkg.in/juju/charm.v4/testing"
 	gc "launchpad.net/gocheck"
 
 	"github.com/juju/charmstore"

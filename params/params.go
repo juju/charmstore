@@ -7,7 +7,7 @@
 package params
 
 import (
-	"gopkg.in/juju/charm.v3"
+	"gopkg.in/juju/charm.v4"
 )
 
 // MetaAnyResponse holds the result of a meta/any

@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gopkg.in/juju/charm.v2"
+	"gopkg.in/juju/charm.v4"
 )
 
 // PublishBazaarBranch checks out the Bazaar branch from burl and

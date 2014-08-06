@@ -13,8 +13,8 @@ import (
 
 	"github.com/juju/errgo"
 	jujutesting "github.com/juju/testing"
-	"gopkg.in/juju/charm.v3"
-	charmtesting "gopkg.in/juju/charm.v3/testing"
+	"gopkg.in/juju/charm.v4"
+	charmtesting "gopkg.in/juju/charm.v4/testing"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	gc "launchpad.net/gocheck"

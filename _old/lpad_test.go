@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	gitjujutesting "github.com/juju/testing"
-	"gopkg.in/juju/charm.v2"
+	"gopkg.in/juju/charm.v4"
 	gc "launchpad.net/gocheck"
 	"launchpad.net/lpad"
 
