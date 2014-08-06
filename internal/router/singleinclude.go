@@ -4,7 +4,7 @@ import (
 	"net/url"
 
 	"github.com/juju/errgo"
-	"gopkg.in/juju/charm.v3"
+	"gopkg.in/juju/charm.v4"
 )
 
 var _ BulkIncludeHandler = SingleIncludeHandler(nil)

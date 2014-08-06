@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/juju/loggo"
-	"gopkg.in/juju/charm.v2"
+	"gopkg.in/juju/charm.v4"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )

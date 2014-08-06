@@ -14,7 +14,7 @@ import (
 	"github.com/juju/errgo"
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
-	"gopkg.in/juju/charm.v3"
+	"gopkg.in/juju/charm.v4"
 	gc "launchpad.net/gocheck"
 
 	"github.com/juju/charmstore/internal/storetesting"

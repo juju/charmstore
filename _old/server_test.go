@@ -14,7 +14,7 @@ import (
 	"time"
 
 	jc "github.com/juju/testing/checkers"
-	"gopkg.in/juju/charm.v2"
+	"gopkg.in/juju/charm.v4"
 	"gopkg.in/mgo.v2/bson"
 	gc "launchpad.net/gocheck"
 
