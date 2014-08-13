@@ -52,12 +52,6 @@ func (h *handler) serveArchive(id *charm.Reference, w http.ResponseWriter, req *
 	return nil
 }
 
-func (h *handler) archiveName(id *charm.Reference) string {
-	// TODO provide some disambiguator for when the blob store
-	// is shared between several charm stores.
-	return id.String()
-}
-
 func (h *handler) servePostArchive(id *charm.Reference, w http.ResponseWriter, req *http.Request) (resp *params.ArchivePostResponse, err error) {
 	// Validate the request parameters.
 
