@@ -49,7 +49,7 @@ func New(store *charmstore.Store) http.Handler {
 			"charm-config":        h.entityHandler(h.metaCharmConfig, "charmconfig"),
 			"charm-actions":       h.entityHandler(h.metaCharmActions, "charmactions"),
 			"archive-size":        h.entityHandler(h.metaArchiveSize, "size"),
-			"manifest":            h.entityHandler(h.metaManifest, "blobhash"),
+			"manifest":            h.entityHandler(h.metaManifest, "blobname"),
 			"archive-upload-time": h.entityHandler(h.metaArchiveUploadTime, "uploadtime"),
 
 			// endpoints not yet implemented - use SingleIncludeHandler for the time being.
@@ -92,20 +92,54 @@ func (h *handler) resolveURL(url *charm.Reference) error {
 type entityHandlerFunc func(entity *mongodoc.Entity, id *charm.Reference, path string, method string, flags url.Values) (interface{}, error)
 
 // entityHandler returns a handler that calls f with a *mongodoc.Entity that
-// contains at least the given fields.
+// contains at least the given fields. It allows only GET requests.
 func (h *handler) entityHandler(f entityHandlerFunc, fields ...string) router.BulkIncludeHandler {
+	return h.entityHandler0(f, false, fields...)
+}
+
+// entityHandler returns a handler that calls f with a *mongodoc.Entity that
+// contains at least the given fields. It allows GET and PUT requests.
+func (h *handler) entityHandlerWithPut(f entityHandlerFunc, fields ...string) router.BulkIncludeHandler {
+	return h.entityHandler0(f, true, fields...)
+}
+
+// entityHandler0 holds the implementation for both entityHandler
+// and entityHandlerWithPut.
+func (h *handler) entityHandler0(f entityHandlerFunc, allowPut bool, fields ...string) router.BulkIncludeHandler {
 	handle := func(doc interface{}, id *charm.Reference, path string, method string, flags url.Values) (interface{}, error) {
 		edoc := doc.(*mongodoc.Entity)
 		val, err := f(edoc, id, path, method, flags)
 		return val, errgo.Mask(err, errgo.Any)
 	}
 	type entityHandlerKey struct{}
-	return router.FieldIncludeHandler(
-		entityHandlerKey{},
-		h.entityQuery,
-		fields,
-		handle,
-	)
+	return &entityHandler{
+		allowPut: allowPut,
+		BulkIncludeHandler: router.FieldIncludeHandler(
+			entityHandlerKey{},
+			h.entityQuery,
+			fields,
+			handle,
+		),
+	}
+}
+
+type entityHandler struct {
+	allowPut bool
+	router.BulkIncludeHandler
+}
+
+func (h *entityHandler) Handle(hs []router.BulkIncludeHandler, id *charm.Reference, paths []string, method string, flags url.Values) ([]interface{}, error) {
+	methodOk := method == "GET" || (h.allowPut && method == "PUT")
+	if !methodOk {
+		return nil, errgo.WithCausef(nil, params.ErrBadRequest, "method %q not allowed", method)
+	}
+	// Transform the values in the slice so that the slice
+	// is suitable for passing to the FieldIncludeHandler.
+	hs1 := make([]router.BulkIncludeHandler, len(hs))
+	for i, h := range hs {
+		hs1[i] = h.(*entityHandler).BulkIncludeHandler
+	}
+	return h.BulkIncludeHandler.Handle(hs1, id, paths, method, flags)
 }
 
 func (h *handler) entityQuery(id *charm.Reference, selector map[string]int) (interface{}, error) {
@@ -214,7 +248,7 @@ func (h *handler) metaBundleMetadata(entity *mongodoc.Entity, id *charm.Referenc
 // GET id/meta/manifest
 // http://tinyurl.com/p3xdcto
 func (h *handler) metaManifest(entity *mongodoc.Entity, id *charm.Reference, path, method string, flags url.Values) (interface{}, error) {
-	r, size, err := h.store.BlobStore.Open(entity.BlobHash)
+	r, size, err := h.store.BlobStore.Open(entity.BlobName)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot open archive data for %s", id)
 	}
