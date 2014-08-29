@@ -55,12 +55,12 @@ func New(store *charmstore.Store, config charmstore.ServerParams) http.Handler {
 			"charm-config":        h.entityHandler(h.metaCharmConfig, "charmconfig"),
 			"charm-metadata":      h.entityHandler(h.metaCharmMetadata, "charmmeta"),
 			"charm-related":       h.entityHandler(h.metaCharmRelated, "charmprovidedinterfaces", "charmrequiredinterfaces"),
+			"color":               h.entityHandler(h.metaColor, "iconbackgroundcolor"),
 			"manifest":            h.entityHandler(h.metaManifest, "blobname"),
 			"revision-info":       router.SingleIncludeHandler(h.metaRevisionInfo),
 			"stats":               h.entityHandler(h.metaStats),
 
 			// endpoints not yet implemented - use SingleIncludeHandler for the time being.
-			"color":       router.SingleIncludeHandler(h.metaColor),
 			"extra-info":  router.SingleIncludeHandler(h.metaExtraInfo),
 			"extra-info/": router.SingleIncludeHandler(h.metaExtraInfoWithKey),
 		},
@@ -297,8 +297,8 @@ func (h *handler) metaCharmConfig(entity *mongodoc.Entity, id *charm.Reference, 
 
 // GET id/meta/color
 // http://tinyurl.com/o2t3j4p
-func (h *handler) metaColor(id *charm.Reference, path string, flags url.Values) (interface{}, error) {
-	return nil, errNotImplemented
+func (h *handler) metaColor(entity *mongodoc.Entity, id *charm.Reference, path string, flags url.Values) (interface{}, error) {
+	return &params.ColorResponse{entity.IconBackgroundColor}, nil
 }
 
 // GET id/meta/archive-size

@@ -705,6 +705,54 @@ func (s *APISuite) TestMetaStats(c *gc.C) {
 	}
 }
 
+var serveMetaColorTests = []struct {
+	about  string
+	url    string
+	expect string
+	err    string
+}{{
+	about: "no entities found",
+	url:   "precise/no-such-33",
+	err:   "not found",
+}, {
+	about:  "partial url uses a default series",
+	url:    "wordpress",
+	expect: "abcdef",
+}, {
+	about:  "fully qualified url",
+	url:    "trusty/wordpress-42",
+	expect: "abcdef",
+}}
+
+func (s *APISuite) TestServeMetaColor(c *gc.C) {
+	id, _ := s.addCharm(c, "wordpress", "cs:trusty/wordpress-42")
+	var val mongodoc.Entity
+	s.store.DB.Entities().
+		Find(bson.D{{"_id", id}}).
+		One(&val)
+	val.IconBackgroundColor = "abcdef"
+	s.store.DB.Entities().Update(bson.D{{"_id", id}}, val)
+
+	for i, test := range serveMetaColorTests {
+		c.Logf("test %d: %s", i, test.about)
+		var expectStatus int
+		var expectBody interface{}
+		if test.err == "" {
+			expectStatus = http.StatusOK
+			expectBody = &params.ColorResponse{test.expect}
+		} else {
+			expectStatus = http.StatusNotFound
+			expectBody = params.Error{Message: test.err, Code: params.ErrNotFound}
+		}
+		storetesting.AssertJSONCall(c, storetesting.JSONCallParams{
+			Handler:      s.srv,
+			URL:          storeURL(test.url + "/meta/color"),
+			ExpectStatus: expectStatus,
+			ExpectBody:   expectBody,
+		})
+	}
+}
+
 func assertNotImplemented(c *gc.C, h http.Handler, path string) {
 	storetesting.AssertJSONCall(c, storetesting.JSONCallParams{
 		Handler:      h,
