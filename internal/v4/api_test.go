@@ -855,7 +855,7 @@ var serveMetaColorTests = []struct {
 }{{
 	about: "no entities found",
 	url:   "precise/no-such-33",
-	err:   "not found",
+	err:   "no matching charm or bundle for cs:precise/no-such-33",
 }, {
 	about:  "partial url uses a default series",
 	url:    "wordpress",
@@ -893,6 +893,128 @@ func (s *APISuite) TestServeMetaColor(c *gc.C) {
 			ExpectBody:   expectBody,
 		})
 	}
+}
+
+var serveMetaColorPutTests = []struct {
+	about       string
+	path        string
+	contentType string
+	body        *params.ColorResponse
+	err         string
+	tester      func(*APISuite, *charm.Reference, *gc.C)
+}{{
+	about:       "bad content type",
+	path:        "trusty/wordpress-42",
+	contentType: "",
+	body:        &params.ColorResponse{"808080"},
+	err:         `unexpected Content-Type ""; expected "application/json"`,
+}, {
+	about:       "fully qualified url",
+	path:        "trusty/wordpress-42",
+	contentType: "application/json",
+	body:        &params.ColorResponse{"808080"},
+	tester: func(s *APISuite, id *charm.Reference, c *gc.C) {
+		var val mongodoc.Entity
+		s.store.DB.Entities().
+			Find(bson.D{{"_id", id}}).
+			One(&val)
+		c.Assert(val.IconBackgroundColor, gc.Equals, "808080")
+	},
+}}
+
+func (s *APISuite) TestServeMetaColorPut(c *gc.C) {
+	id, _ := s.addCharm(c, "wordpress", "cs:trusty/wordpress-42")
+
+	for i, test := range serveMetaColorPutTests {
+		c.Logf("test %d: %s", i, test.about)
+		if test.err != "" {
+			AssertPUTCall(c, storetesting.JSONCallParams{
+				Handler: s.srv,
+				URL:     storeURL(test.path + "/meta/color"),
+				Method:  "PUT",
+				Header: http.Header{
+					"Content-Type": {test.contentType},
+				},
+				Body:         strings.NewReader(mustMarshalJSON(test.body)),
+				ExpectBody:   params.Error{Message: test.err, Code: params.ErrBadRequest},
+				ExpectStatus: http.StatusBadRequest,
+			})
+		} else {
+			AssertPUTCall(c, storetesting.JSONCallParams{
+				Handler: s.srv,
+				URL:     storeURL(test.path + "/meta/color"),
+				Method:  "PUT",
+				Header: http.Header{
+					"Content-Type": {test.contentType},
+				},
+				Body:         strings.NewReader(mustMarshalJSON(test.body)),
+				ExpectBody:   "",
+				ExpectStatus: http.StatusOK,
+			})
+		}
+		if test.tester != nil {
+			test.tester(s, id, c)
+		}
+	}
+}
+
+func AssertPUTCall(c *gc.C, p storetesting.JSONCallParams) {
+	c.Logf("PUT call, url %q", p.URL)
+	if p.ExpectStatus == 0 {
+		p.ExpectStatus = http.StatusOK
+	}
+	rec := storetesting.DoRequest(c, storetesting.DoRequestParams{
+		Handler:       p.Handler,
+		Method:        p.Method,
+		URL:           p.URL,
+		Body:          p.Body,
+		Header:        p.Header,
+		ContentLength: p.ContentLength,
+		Username:      p.Username,
+		Password:      p.Password,
+	})
+	c.Assert(rec.Code, gc.Equals, p.ExpectStatus, gc.Commentf("body: %s", rec.Body.Bytes()))
+
+	// Ensure the response includes the expected body.
+	if p.ExpectBody == nil {
+		c.Assert(rec.Body.Bytes(), gc.HasLen, 0)
+		return
+	}
+
+	// Rather than unmarshaling into something of the expected
+	// body type, we reform the expected body in JSON and
+	// back to interface{}, so we can check the whole content.
+	// Otherwise we lose information when unmarshaling.
+	expectBodyBytes, err := json.Marshal(p.ExpectBody)
+	c.Assert(err, gc.IsNil)
+	var expectBodyVal interface{}
+	err = json.Unmarshal(expectBodyBytes, &expectBodyVal)
+	c.Assert(err, gc.IsNil)
+
+	var gotBodyVal interface{}
+	bodyBytes := rec.Body.Bytes()
+	if len(bodyBytes) > 0 {
+		err = json.Unmarshal(bodyBytes, &gotBodyVal)
+		c.Assert(err, gc.IsNil, gc.Commentf("json body: %q", rec.Body.Bytes()))
+		c.Assert(gotBodyVal, jc.DeepEquals, expectBodyVal)
+	}
+}
+
+func (s *APISuite) TestColor(c *gc.C) {
+	id := "precise/wordpress-23"
+	s.addCharm(c, "wordpress", id)
+	s.assertPut(c, id+"/meta/color", map[string]string{"RGB": "123456"})
+	s.assertGet(c, id+"/meta/color", map[string]string{"RGB": "123456"})
+	s.assertPut(c, id+"/meta/any", params.MetaAnyResponse{
+		Meta: map[string]interface{}{
+			"color": map[string]string{
+				"RGB": "212121",
+			},
+		},
+	})
+	s.assertGet(c, id+"/meta/color", map[string]interface{}{
+		"RGB": "212121",
+	})
 }
 
 func assertNotImplemented(c *gc.C, h http.Handler, path string) {

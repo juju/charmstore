@@ -57,10 +57,13 @@ func New(store *charmstore.Store, config charmstore.ServerParams) http.Handler {
 			"charm-config":        h.entityHandler(h.metaCharmConfig, "charmconfig"),
 			"charm-metadata":      h.entityHandler(h.metaCharmMetadata, "charmmeta"),
 			"charm-related":       h.entityHandler(h.metaCharmRelated, "charmprovidedinterfaces", "charmrequiredinterfaces"),
-			"color":               h.entityHandler(h.metaColor, "iconbackgroundcolor"),
-			"manifest":            h.entityHandler(h.metaManifest, "blobname"),
-			"revision-info":       router.SingleIncludeHandler(h.metaRevisionInfo),
-			"stats":               h.entityHandler(h.metaStats),
+			"color": h.puttableEntityHandler(
+				h.metaColor,
+				h.putMetaColor,
+				"iconbackgroundcolor"),
+			"manifest":      h.entityHandler(h.metaManifest, "blobname"),
+			"revision-info": router.SingleIncludeHandler(h.metaRevisionInfo),
+			"stats":         h.entityHandler(h.metaStats),
 			"extra-info": h.puttableEntityHandler(
 				h.metaExtraInfo,
 				h.putMetaExtraInfo,
@@ -321,6 +324,17 @@ func (h *handler) metaCharmConfig(entity *mongodoc.Entity, id *charm.Reference, 
 // http://tinyurl.com/o2t3j4p
 func (h *handler) metaColor(entity *mongodoc.Entity, id *charm.Reference, path string, flags url.Values) (interface{}, error) {
 	return &params.ColorResponse{entity.IconBackgroundColor}, nil
+}
+
+// PUT id/meta/color
+func (h *handler) putMetaColor(id *charm.Reference, path string, val *json.RawMessage, updater *router.FieldUpdater) error {
+	var message params.ColorResponse
+	if err := json.Unmarshal(*val, &message); err != nil {
+		return err
+	} else {
+		updater.UpdateField("iconbackgroundcolor", message.RGB)
+	}
+	return nil
 }
 
 // GET id/meta/archive-size
