@@ -69,3 +69,9 @@ type RelatedResponse struct {
 type RevisionInfoResponse struct {
 	Revisions []*charm.Reference
 }
+
+// ColorResponse holds the result of an
+// id/meta/color GET request. See http://tinyurl.com/o2t3j4p
+type ColorResponse struct {
+	RGB string
+}

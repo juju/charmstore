@@ -57,9 +57,13 @@ func New(store *charmstore.Store, config charmstore.ServerParams) http.Handler {
 			"charm-config":        h.entityHandler(h.metaCharmConfig, "charmconfig"),
 			"charm-metadata":      h.entityHandler(h.metaCharmMetadata, "charmmeta"),
 			"charm-related":       h.entityHandler(h.metaCharmRelated, "charmprovidedinterfaces", "charmrequiredinterfaces"),
-			"manifest":            h.entityHandler(h.metaManifest, "blobname"),
-			"revision-info":       router.SingleIncludeHandler(h.metaRevisionInfo),
-			"stats":               h.entityHandler(h.metaStats),
+			"color": h.puttableEntityHandler(
+				h.metaColor,
+				h.putMetaColor,
+				"iconbackgroundcolor"),
+			"manifest":      h.entityHandler(h.metaManifest, "blobname"),
+			"revision-info": router.SingleIncludeHandler(h.metaRevisionInfo),
+			"stats":         h.entityHandler(h.metaStats),
 			"extra-info": h.puttableEntityHandler(
 				h.metaExtraInfo,
 				h.putMetaExtraInfo,
@@ -70,9 +74,6 @@ func New(store *charmstore.Store, config charmstore.ServerParams) http.Handler {
 				h.putMetaExtraInfoWithKey,
 				"extrainfo",
 			),
-
-			// endpoints not yet implemented - use SingleIncludeHandler for the time being.
-			"color": router.SingleIncludeHandler(h.metaColor),
 		},
 	}, h.resolveURL)
 	return h
@@ -321,8 +322,19 @@ func (h *handler) metaCharmConfig(entity *mongodoc.Entity, id *charm.Reference, 
 
 // GET id/meta/color
 // http://tinyurl.com/o2t3j4p
-func (h *handler) metaColor(id *charm.Reference, path string, flags url.Values) (interface{}, error) {
-	return nil, errNotImplemented
+func (h *handler) metaColor(entity *mongodoc.Entity, id *charm.Reference, path string, flags url.Values) (interface{}, error) {
+	return &params.ColorResponse{entity.IconBackgroundColor}, nil
+}
+
+// PUT id/meta/color
+func (h *handler) putMetaColor(id *charm.Reference, path string, val *json.RawMessage, updater *router.FieldUpdater) error {
+	var message params.ColorResponse
+	if err := json.Unmarshal(*val, &message); err != nil {
+		return err
+	} else {
+		updater.UpdateField("iconbackgroundcolor", message.RGB)
+	}
+	return nil
 }
 
 // GET id/meta/archive-size

@@ -57,6 +57,10 @@ type Entity struct {
 	// not already included.
 	BundleCharms []*charm.Reference
 
+	// IconBackgroundColor is the predominant background color of the icons of
+	// charm or bundle
+	IconBackgroundColor string
+
 	// TODO Add fields denormalized for search purposes
 	// and search ranking field(s).
 }
