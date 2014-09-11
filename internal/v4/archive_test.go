@@ -6,6 +6,7 @@ package v4_test
 import (
 	"archive/zip"
 	"bytes"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -174,7 +175,7 @@ func (s *ArchiveSuite) TestConcurrentUploads(c *gc.C) {
 	_, err = io.Copy(&buf, f)
 	c.Assert(err, gc.IsNil)
 
-	hash, _ := hashOf(bytes.NewReader(buf.Bytes()))
+	hash, _, _ := hashOf(bytes.NewReader(buf.Bytes()))
 
 	srv := httptest.NewServer(s.srv)
 	defer srv.Close()
@@ -308,7 +309,7 @@ func (s *ArchiveSuite) TestPostBundle(c *gc.C) {
 
 func (s *ArchiveSuite) TestPostHashMismatch(c *gc.C) {
 	content := []byte("some content")
-	hash, _ := hashOf(bytes.NewReader(content))
+	hash, _, _ := hashOf(bytes.NewReader(content))
 
 	// Corrupt the content.
 	copy(content, "bogus")
@@ -373,7 +374,7 @@ func (s *ArchiveSuite) TestPostFailureCounters(c *gc.C) {
 		c.Skip("MongoDB JavaScript not available")
 	}
 
-	hash, _ := hashOf(invalidZip())
+	hash, _, _ := hashOf(invalidZip())
 	doPost := func(url string, expectCode int) {
 		rec := storetesting.DoRequest(c, storetesting.DoRequestParams{
 			Handler: s.srv,
@@ -402,7 +403,7 @@ func (s *ArchiveSuite) TestPostFailureCounters(c *gc.C) {
 }
 
 func (s *ArchiveSuite) assertCannotUpload(c *gc.C, id string, content io.ReadSeeker, errorMessage string) {
-	hash, size := hashOf(content)
+	hash, _, size := hashOf(content)
 	_, err := content.Seek(0, 0)
 	c.Assert(err, gc.IsNil)
 
@@ -468,7 +469,7 @@ func (s *ArchiveSuite) assertUpload(c *gc.C, url *charm.Reference, fileName stri
 	f, err := os.Open(fileName)
 	c.Assert(err, gc.IsNil)
 	defer f.Close()
-	hash, size := hashOf(f)
+	hash, hash256, size := hashOf(f)
 	_, err = f.Seek(0, 0)
 	c.Assert(err, gc.IsNil)
 
@@ -495,6 +496,8 @@ func (s *ArchiveSuite) assertUpload(c *gc.C, url *charm.Reference, fileName stri
 	var entity mongodoc.Entity
 	err = s.store.DB.Entities().FindId(url).One(&entity)
 	c.Assert(err, gc.IsNil)
+	c.Assert(entity.BlobHash256, gc.Equals, hash256)
+
 	// Test that the expected entry has been created
 	// in the blob store.
 	r, _, err := s.store.BlobStore.Open(entity.BlobName)
@@ -774,7 +777,7 @@ func (s *ArchiveSuite) TestDeleteError(c *gc.C) {
 	// Add a charm to the database (not including the archive).
 	id := "utopic/mysql-42"
 	url := mustParseReference(id)
-	err := s.store.AddCharm(url, charmtesting.Charms.CharmArchive(c.MkDir(), "mysql"), "no-such-name", fakeBlobHash, fakeBlobSize)
+	err := s.store.AddCharm(url, charmtesting.Charms.CharmArchive(c.MkDir(), "mysql"), "no-such-name", fakeBlobHash, fakeBlobHash256, fakeBlobSize)
 	c.Assert(err, gc.IsNil)
 
 	// Try to delete the charm using the API.
@@ -910,11 +913,12 @@ func (s *ArchiveSuite) assertEntityInfo(c *gc.C, url *charm.Reference, expect en
 	})
 }
 
-func hashOf(r io.Reader) (hashSum string, size int64) {
+func hashOf(r io.Reader) (hashSum, hash256sum string, size int64) {
 	hash := blobstore.NewHash()
-	n, err := io.Copy(hash, r)
+	hash256 := sha256.New()
+	n, err := io.Copy(io.MultiWriter(hash, hash256), r)
 	if err != nil {
 		panic(err)
 	}
-	return fmt.Sprintf("%x", hash.Sum(nil)), n
+	return fmt.Sprintf("%x", hash.Sum(nil)), fmt.Sprintf("%x", hash256.Sum(nil)), n
 }

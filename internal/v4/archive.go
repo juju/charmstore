@@ -5,7 +5,9 @@ package v4
 
 import (
 	"archive/zip"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"io"
 	"mime"
 	"net/http"
@@ -114,10 +116,13 @@ func (h *Handler) servePostArchive(id *charm.Reference, w http.ResponseWriter, r
 	// Upload the actual blob, and make sure that it is removed
 	// if we fail later.
 	name := bson.NewObjectId().Hex()
-	err = h.store.BlobStore.PutUnchallenged(req.Body, name, req.ContentLength, hash)
+	hash256 := sha256.New()
+	reader := io.TeeReader(req.Body, hash256)
+	err = h.store.BlobStore.PutUnchallenged(reader, name, req.ContentLength, hash)
 	if err != nil {
 		return errgo.Notef(err, "cannot put archive blob")
 	}
+	sha256sum := fmt.Sprintf("%x", hash256.Sum(nil))
 	r, _, err := h.store.BlobStore.Open(name)
 	if err != nil {
 		return errgo.Notef(err, "cannot open newly created blob")
@@ -151,7 +156,7 @@ func (h *Handler) servePostArchive(id *charm.Reference, w http.ResponseWriter, r
 			// TODO frankban: use multiError (defined in internal/router).
 			return errgo.Notef(verificationError(err), "bundle verification failed")
 		}
-		if err := h.store.AddBundle(id, b, name, hash, req.ContentLength); err != nil {
+		if err := h.store.AddBundle(id, b, name, hash, sha256sum, req.ContentLength); err != nil {
 			return errgo.Mask(err, errgo.Is(params.ErrDuplicateUpload))
 		}
 	} else {
@@ -159,7 +164,7 @@ func (h *Handler) servePostArchive(id *charm.Reference, w http.ResponseWriter, r
 		if err != nil {
 			return errgo.Notef(err, "cannot read charm archive")
 		}
-		if err := h.store.AddCharm(id, ch, name, hash, req.ContentLength); err != nil {
+		if err := h.store.AddCharm(id, ch, name, hash, sha256sum, req.ContentLength); err != nil {
 			return errgo.Mask(err, errgo.Is(params.ErrDuplicateUpload))
 		}
 	}
