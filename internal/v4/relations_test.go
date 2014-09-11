@@ -4,6 +4,7 @@
 package v4_test
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"net/http"
 
@@ -18,11 +19,13 @@ import (
 )
 
 // Define fake blob attributes to be used in tests.
-var fakeBlobSize, fakeBlobHash = func() (int64, string) {
+var fakeBlobSize, fakeBlobHash, fakeBlobHash256 = func() (int64, string, string) {
 	b := []byte("fake content")
 	h := blobstore.NewHash()
 	h.Write(b)
-	return int64(len(b)), fmt.Sprintf("%x", h.Sum(nil))
+	h256 := sha256.New()
+	h256.Write(b)
+	return int64(len(b)), fmt.Sprintf("%x", h.Sum(nil)), fmt.Sprintf("%x", h256.Sum(nil))
 }()
 
 type RelationsSuite struct {
@@ -373,7 +376,7 @@ func (s *RelationsSuite) addCharms(c *gc.C, charms map[string]charm.Charm) {
 		// The blob related info are not used in these tests.
 		// The related charms are retrieved from the entities collection,
 		// without accessing the blob store.
-		err := s.store.AddCharm(url, ch, "blobName", fakeBlobHash, fakeBlobSize)
+		err := s.store.AddCharm(url, ch, "blobName", fakeBlobHash, fakeBlobHash256, fakeBlobSize)
 		c.Assert(err, gc.IsNil)
 	}
 }
@@ -638,7 +641,7 @@ func (s *RelationsSuite) TestMetaBundlesContaining(c *gc.C) {
 		// The blob related info are not used in these tests.
 		// The charm-bundle relations are retrieved from the entities
 		// collection, without accessing the blob store.
-		err := s.store.AddBundle(url, b, "blobName", fakeBlobHash, fakeBlobSize)
+		err := s.store.AddBundle(url, b, "blobName", fakeBlobHash, fakeBlobHash256, fakeBlobSize)
 		c.Assert(err, gc.IsNil)
 	}
 
@@ -656,7 +659,7 @@ func (s *RelationsSuite) TestMetaBundlesContaining(c *gc.C) {
 		}
 
 		// Add the charm we need bundle info on to the database.
-		err := s.store.AddCharm(url, &relationTestingCharm{}, "blobName", fakeBlobHash, fakeBlobSize)
+		err := s.store.AddCharm(url, &relationTestingCharm{}, "blobName", fakeBlobHash, fakeBlobHash256, fakeBlobSize)
 		c.Assert(err, gc.IsNil)
 
 		// Perform the request and ensure the response is what we expect.

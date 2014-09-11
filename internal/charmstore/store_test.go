@@ -5,6 +5,7 @@ package charmstore
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -46,7 +47,7 @@ func (s *StoreSuite) checkAddCharm(c *gc.C, ch charm.Charm) {
 	c.Assert(err, gc.IsNil)
 
 	// The entity doc has been correctly added to the mongo collection.
-	size, hash := mustGetSizeAndHash(ch)
+	size, hash, hash256 := mustGetSizeAndHash(ch)
 	sort.Strings(doc.CharmProvidedInterfaces)
 	sort.Strings(doc.CharmRequiredInterfaces)
 
@@ -63,6 +64,7 @@ func (s *StoreSuite) checkAddCharm(c *gc.C, ch charm.Charm) {
 		URL:                     url,
 		BaseURL:                 mustParseReference("cs:wordpress"),
 		BlobHash:                hash,
+		BlobHash256:             hash256,
 		Size:                    size,
 		CharmMeta:               ch.Meta(),
 		CharmActions:            ch.Actions(),
@@ -118,11 +120,12 @@ func (s *StoreSuite) checkAddBundle(c *gc.C, bundle charm.Bundle) {
 	doc.BlobName = ""
 
 	// The entity doc has been correctly added to the mongo collection.
-	size, hash := mustGetSizeAndHash(bundle)
+	size, hash, hash256 := mustGetSizeAndHash(bundle)
 	c.Assert(doc, jc.DeepEquals, mongodoc.Entity{
 		URL:          url,
 		BaseURL:      mustParseReference("cs:wordpress-simple"),
 		BlobHash:     hash,
+		BlobHash256:  hash256,
 		Size:         size,
 		BundleData:   bundle.Data(),
 		BundleReadMe: bundle.ReadMe(),
@@ -302,7 +305,7 @@ func (s *StoreSuite) TestBundleUnitCount(c *gc.C) {
 		// Add the bundle used for this test.
 		err := store.AddBundle(url, &testingBundle{
 			data: test.data,
-		}, "blobName", fakeBlobHash, fakeBlobSize)
+		}, "blobName", fakeBlobHash, fakeBlobHash256, fakeBlobSize)
 		c.Assert(err, gc.IsNil)
 
 		// Retrieve the bundle from the database.
@@ -626,7 +629,7 @@ func (s *StoreSuite) TestBundleMachineCount(c *gc.C) {
 		// Add the bundle used for this test.
 		err = store.AddBundle(url, &testingBundle{
 			data: test.data,
-		}, "blobName", fakeBlobHash, fakeBlobSize)
+		}, "blobName", fakeBlobHash, fakeBlobHash256, fakeBlobSize)
 		c.Assert(err, gc.IsNil)
 
 		// Retrieve the bundle from the database.
@@ -677,7 +680,7 @@ func (s *StoreSuite) TestAddBundleArchive(c *gc.C) {
 	s.checkAddBundle(c, bundleArchive)
 }
 
-func mustGetSizeAndHash(c interface{}) (int64, string) {
+func mustGetSizeAndHash(c interface{}) (size int64, hashSum, hashSum256 string) {
 	var r io.ReadWriter
 	var err error
 	switch c := c.(type) {
@@ -695,11 +698,12 @@ func mustGetSizeAndHash(c interface{}) (int64, string) {
 		panic(err)
 	}
 	hash := blobstore.NewHash()
-	size, err := io.Copy(hash, r)
+	hash256 := sha256.New()
+	size, err = io.Copy(io.MultiWriter(hash, hash256), r)
 	if err != nil {
 		panic(err)
 	}
-	return size, fmt.Sprintf("%x", hash.Sum(nil))
+	return size, fmt.Sprintf("%x", hash.Sum(nil)), fmt.Sprintf("%x", hash256.Sum(nil))
 }
 
 func mustParseReference(url string) *charm.Reference {
@@ -727,9 +731,11 @@ func (b *testingBundle) ReadMe() string {
 }
 
 // Define fake blob attributes to be used in tests.
-var fakeBlobSize, fakeBlobHash = func() (int64, string) {
+var fakeBlobSize, fakeBlobHash, fakeBlobHash256 = func() (int64, string, string) {
 	b := []byte("fake content")
 	h := blobstore.NewHash()
 	h.Write(b)
-	return int64(len(b)), fmt.Sprintf("%x", h.Sum(nil))
+	h256 := sha256.New()
+	h256.Write(b)
+	return int64(len(b)), fmt.Sprintf("%x", h.Sum(nil)), fmt.Sprintf("%x", h256.Sum(nil))
 }()

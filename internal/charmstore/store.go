@@ -4,6 +4,7 @@
 package charmstore
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"sync"
@@ -67,21 +68,23 @@ func (s *Store) ensureIndexes() error {
 	return nil
 }
 
-func (s *Store) putArchive(archive blobstore.ReadSeekCloser) (blobName, blobHash string, size int64, err error) {
+func (s *Store) putArchive(archive blobstore.ReadSeekCloser) (blobName, blobHash, blobHash256 string, size int64, err error) {
 	hash := blobstore.NewHash()
 	size, err = io.Copy(hash, archive)
 	if err != nil {
-		return "", "", 0, errgo.Mask(err)
+		return "", "", "", 0, errgo.Mask(err)
 	}
 	if _, err = archive.Seek(0, 0); err != nil {
-		return "", "", 0, errgo.Mask(err)
+		return "", "", "", 0, errgo.Mask(err)
 	}
 	blobHash = fmt.Sprintf("%x", hash.Sum(nil))
 	blobName = bson.NewObjectId().Hex()
-	if err = s.BlobStore.PutUnchallenged(archive, blobName, size, blobHash); err != nil {
-		return "", "", 0, errgo.Mask(err)
+	hash256 := sha256.New()
+	reader := io.TeeReader(archive, hash256)
+	if err = s.BlobStore.PutUnchallenged(reader, blobName, size, blobHash); err != nil {
+		return "", "", "", 0, errgo.Mask(err)
 	}
-	return blobName, blobHash, size, nil
+	return blobName, blobHash, fmt.Sprintf("%x", hash256.Sum(nil)), size, nil
 }
 
 // AddCharmWithArchive is like AddCharm but
@@ -89,11 +92,11 @@ func (s *Store) putArchive(archive blobstore.ReadSeekCloser) (blobName, blobHash
 // This method is provided principally so that
 // tests can easily create content in the store.
 func (s *Store) AddCharmWithArchive(url *charm.Reference, ch charm.Charm) error {
-	blobName, blobHash, size, err := s.uploadCharmOrBundle(ch)
+	blobName, blobHash, blobHash256, size, err := s.uploadCharmOrBundle(ch)
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	return s.AddCharm(url, ch, blobName, blobHash, size)
+	return s.AddCharm(url, ch, blobName, blobHash, blobHash256, size)
 }
 
 // AddBundleWithArchive is like AddBundle but
@@ -101,17 +104,17 @@ func (s *Store) AddCharmWithArchive(url *charm.Reference, ch charm.Charm) error 
 // This method is provided principally so that
 // tests can easily create content in the store.
 func (s *Store) AddBundleWithArchive(url *charm.Reference, b charm.Bundle) error {
-	blobName, blobHash, size, err := s.uploadCharmOrBundle(b)
+	blobName, blobHash, blobHash256, size, err := s.uploadCharmOrBundle(b)
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	return s.AddBundle(url, b, blobName, blobHash, size)
+	return s.AddBundle(url, b, blobName, blobHash, blobHash256, size)
 }
 
-func (s *Store) uploadCharmOrBundle(c interface{}) (blobName, blobHash string, size int64, err error) {
+func (s *Store) uploadCharmOrBundle(c interface{}) (blobName, blobHash, blobHash256 string, size int64, err error) {
 	archive, err := getArchive(c)
 	if err != nil {
-		return "", "", 0, errgo.Mask(err)
+		return "", "", "", 0, errgo.Mask(err)
 	}
 	defer archive.Close()
 	return s.putArchive(archive)
@@ -119,12 +122,13 @@ func (s *Store) uploadCharmOrBundle(c interface{}) (blobName, blobHash string, s
 
 // AddCharm adds a charm to the blob store and to the entities collection
 // associated with the given URL.
-func (s *Store) AddCharm(url *charm.Reference, c charm.Charm, blobName, blobHash string, blobSize int64) error {
+func (s *Store) AddCharm(url *charm.Reference, c charm.Charm, blobName, blobHash, blobHash256 string, blobSize int64) error {
 	// Add charm metadata to the entities collection.
 	err := s.DB.Entities().Insert(&mongodoc.Entity{
 		URL:                     url,
 		BaseURL:                 baseURL(url),
 		BlobHash:                blobHash,
+		BlobHash256:             blobHash256,
 		BlobName:                blobName,
 		Size:                    blobSize,
 		UploadTime:              time.Now(),
@@ -195,7 +199,7 @@ var errNotImplemented = errgo.Newf("not implemented")
 
 // AddBundle adds a bundle to the blob store and to the entities collection
 // associated with the given URL.
-func (s *Store) AddBundle(url *charm.Reference, b charm.Bundle, blobName, blobHash string, blobSize int64) error {
+func (s *Store) AddBundle(url *charm.Reference, b charm.Bundle, blobName, blobHash, blobHash256 string, blobSize int64) error {
 	bundleData := b.Data()
 	urls, err := bundleCharms(bundleData)
 	if err != nil {
@@ -205,6 +209,7 @@ func (s *Store) AddBundle(url *charm.Reference, b charm.Bundle, blobName, blobHa
 		URL:                url,
 		BaseURL:            baseURL(url),
 		BlobHash:           blobHash,
+		BlobHash256:        blobHash256,
 		BlobName:           blobName,
 		Size:               blobSize,
 		UploadTime:         time.Now(),
