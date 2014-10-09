@@ -6,6 +6,7 @@ package v4
 import (
 	"archive/zip"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/url"
 	"sort"
@@ -41,6 +42,7 @@ func New(store *charmstore.Store, config charmstore.ServerParams) *Handler {
 			"changes/published":  router.HandleJSON(h.serveChangesPublished),
 			"debug":              http.HandlerFunc(h.serveDebug),
 			"debug/status":       router.HandleJSON(h.serveDebugStatus),
+			"debug/esproxy/":     http.HandlerFunc(h.serveESProxy),
 			"search":             http.HandlerFunc(h.serveSearch),
 			"search/interesting": http.HandlerFunc(h.serveSearchInteresting),
 			"stats/":             router.NotFoundHandler(),
@@ -549,4 +551,36 @@ func (h *Handler) serveChangesPublished(w http.ResponseWriter, r *http.Request) 
 		})
 	}
 	return results, nil
+}
+
+func (h *Handler) serveESProxy(proxyResponse http.ResponseWriter, proxyRequest *http.Request) {
+	if h.store.ES.Database == nil {
+		proxyResponse.WriteHeader(http.StatusNotFound)
+		return
+	}
+	if err := h.authenticate(proxyResponse, proxyRequest); err != nil {
+		proxyResponse.WriteHeader(http.StatusForbidden)
+		return
+	}
+	target := proxyRequest.URL
+	target.Scheme = "http"
+	target.Host = h.store.ES.Database.Addr
+	req, err := http.NewRequest(proxyRequest.Method, target.String(), proxyRequest.Body)
+	if err != nil {
+		router.WriteError(proxyResponse, errgo.Newf("could not create request %v", err))
+		return
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		router.WriteError(proxyResponse, errgo.Newf("could not perform request %v", err))
+		return
+	}
+	defer resp.Body.Close()
+	for key, values := range resp.Header {
+		for _, value := range values {
+			proxyResponse.Header().Add(key, value)
+		}
+	}
+	proxyResponse.WriteHeader(resp.StatusCode)
+	io.Copy(proxyResponse, resp.Body)
 }
