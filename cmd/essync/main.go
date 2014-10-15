@@ -4,11 +4,13 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 
+	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2"
 
 	"github.com/juju/charmstore/config"
@@ -17,6 +19,8 @@ import (
 )
 
 var index = flag.String("index", "charmstore", "Name of index to populate.")
+var settings = flag.String("settings", "", "File to use to configure the index.")
+var mapping = flag.String("mapping", "", "File to use to configure the entity mapping.")
 
 func main() {
 	flag.Usage = func() {
@@ -53,5 +57,55 @@ func populate(confPath string) error {
 	if err != nil {
 		return err
 	}
+	if *settings != "" {
+		err = writeSettings(es, *index, *settings)
+		if err != nil {
+			return err
+		}
+	}
+	if *mapping != "" {
+		err = writeMapping(es, *index, "entity", *mapping)
+		if err != nil {
+			return err
+		}
+	}
 	return store.ExportToElasticSearch()
+}
+
+func writeSettings(es *elasticsearch.Database, index, fn string) error {
+	f, err := os.Open(fn)
+	if err != nil {
+		return errgo.NoteMask(err, "cannot read index settings")
+	}
+	defer f.Close()
+	dec := json.NewDecoder(f)
+	var data map[string]interface{}
+	err = dec.Decode(&data)
+	if err != nil {
+		return errgo.NoteMask(err, "cannot read index settings")
+	}
+	err = es.PutIndex(index, data)
+	if err != nil {
+		return errgo.NoteMask(err, "cannot set index settings")
+	}
+	return nil
+}
+
+func writeMapping(es *elasticsearch.Database, index, type_, fn string) error {
+	f, err := os.Open(fn)
+	if err != nil {
+		return errgo.Notef(err, "cannot read %s mapping", type_)
+	}
+	defer f.Close()
+	dec := json.NewDecoder(f)
+	var data map[string]interface{}
+	err = dec.Decode(&data)
+	if err != nil {
+		return errgo.Notef(err, "cannot read %s mapping", type_)
+	}
+	err = es.PutMapping(index, type_, data)
+	if err != nil {
+		return errgo.Notef(err, "cannot set %s mapping", type_)
+	}
+	return nil
 }

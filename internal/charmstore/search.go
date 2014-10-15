@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"net/url"
 
-	"github.com/juju/errgo"
+	"gopkg.in/errgo.v1"
 
 	"github.com/juju/charmstore/internal/elasticsearch"
 	"github.com/juju/charmstore/internal/mongodoc"
