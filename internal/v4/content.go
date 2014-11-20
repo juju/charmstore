@@ -5,6 +5,8 @@ package v4
 
 import (
 	"archive/zip"
+	"encoding/xml"
+	"fmt"
 	"io"
 	"net/http"
 	"path"
@@ -115,6 +117,58 @@ func (h *Handler) serveIcon(id *charm.Reference, fullySpecified bool, w http.Res
 	defer r.Close()
 	w.Header().Set("Content-Type", "image/svg+xml")
 	setArchiveCacheControl(w.Header(), fullySpecified)
+
+	// Ensure that the icon has a viewBox attribute set.
+	dec := xml.NewDecoder(r)
+	enc := xml.NewEncoder(w)
+TokenLoop:
+	for {
+		tok, err := dec.RawToken()
+		if err == io.EOF {
+			break TokenLoop
+		}
+		switch tok.(type) {
+		case xml.StartElement:
+			t := tok.(xml.StartElement)
+			if strings.ToLower(t.Name.Local) == "svg" {
+				var width, height string
+				needsViewbox := true
+			AttrLoop:
+				for _, attr := range t.Attr {
+					switch strings.ToLower(attr.Name.Local) {
+					case "width":
+						width = attr.Value
+					case "height":
+						height = attr.Value
+					case "viewbox":
+						needsViewbox = false
+						break AttrLoop
+					}
+				}
+				if needsViewbox {
+					t.Attr = append(t.Attr, xml.Attr{
+						Name: xml.Name{
+							Space: "",
+							Local: "viewBox",
+						},
+						Value: fmt.Sprintf("0 0 %s %s", width, height),
+					})
+				}
+				if err := enc.EncodeToken(t); err != nil {
+					return err
+				}
+				break TokenLoop
+			}
+		case xml.ProcInst:
+			// Encoding a ProcInst Token results in an error that 'xml' is an invalid target.
+			// Simply write the instead.
+			w.Write([]byte(fmt.Sprintf(`<?xml %s?>`, tok.(xml.ProcInst).Inst)))
+		default:
+			if err := enc.EncodeToken(tok); err != nil {
+				return err
+			}
+		}
+	}
 	io.Copy(w, r)
 	return nil
 }
