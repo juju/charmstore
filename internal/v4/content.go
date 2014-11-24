@@ -5,6 +5,7 @@ package v4
 
 import (
 	"archive/zip"
+	"bytes"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -117,58 +118,113 @@ func (h *Handler) serveIcon(id *charm.Reference, fullySpecified bool, w http.Res
 	defer r.Close()
 	w.Header().Set("Content-Type", "image/svg+xml")
 	setArchiveCacheControl(w.Header(), fullySpecified)
+	return processIcon(w, r)
+}
 
-	// Ensure that the icon has a viewBox attribute set.
+func processIcon(w io.Writer, r io.Reader) error {
+	var saved bytes.Buffer
+	dec := xml.NewDecoder(io.TeeReader(r, &saved))
+	found, changed := false, false
+	for !found {
+		tok, err := dec.Token()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("failed to read token: %v", err)
+		}
+		_, found, changed = ensureViewbox(tok)
+	}
+	if !found {
+		return fmt.Errorf("no svg token found")
+	}
+	// Stitch the input back together again.
+	r = io.MultiReader(&saved, r)
+	if !changed {
+		_, err := io.Copy(w, r)
+		return err
+	}
+	return processNaive(w, r)
+}
+
+func processNaive(w io.Writer, r io.Reader) error {
 	dec := xml.NewDecoder(r)
 	enc := xml.NewEncoder(w)
-TokenLoop:
 	for {
-		tok, err := dec.RawToken()
+		tok, err := dec.Token()
 		if err == io.EOF {
-			break TokenLoop
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("failed to read token: %v", err)
 		}
 		switch tok.(type) {
-		case xml.StartElement:
-			t := tok.(xml.StartElement)
-			if strings.ToLower(t.Name.Local) == "svg" {
-				var width, height string
-				needsViewbox := true
-			AttrLoop:
-				for _, attr := range t.Attr {
-					switch strings.ToLower(attr.Name.Local) {
-					case "width":
-						width = attr.Value
-					case "height":
-						height = attr.Value
-					case "viewbox":
-						needsViewbox = false
-						break AttrLoop
-					}
-				}
-				if needsViewbox {
-					t.Attr = append(t.Attr, xml.Attr{
-						Name: xml.Name{
-							Space: "",
-							Local: "viewBox",
-						},
-						Value: fmt.Sprintf("0 0 %s %s", width, height),
-					})
-				}
-				if err := enc.EncodeToken(t); err != nil {
-					return err
-				}
-				break TokenLoop
-			}
+		// Simplify processing instructions
 		case xml.ProcInst:
-			// Encoding a ProcInst Token results in an error that 'xml' is an invalid target.
-			// Simply write the instead.
-			w.Write([]byte(fmt.Sprintf(`<?xml %s?>`, tok.(xml.ProcInst).Inst)))
-		default:
+			w.Write([]byte(`<?xml version="1.0"?>`))
+			continue
+			// Wipe extraneous character data
+		case xml.CharData:
+			continue
+		}
+		tok, found, _ := ensureViewbox(tok)
+		if found {
+			writeRootToken(tok.(xml.StartElement), w)
+		} else {
 			if err := enc.EncodeToken(tok); err != nil {
-				return err
+				return fmt.Errorf("cannot encode token %#v: %v", tok, err)
 			}
 		}
 	}
-	io.Copy(w, r)
+	if err := enc.Flush(); err != nil {
+		return fmt.Errorf("cannot flush output: %v", err)
+	}
 	return nil
+}
+
+func ensureViewbox(tok0 xml.Token) (_ xml.Token, found, changed bool) {
+	tok, ok := tok0.(xml.StartElement)
+	if !ok || strings.ToLower(tok.Name.Local) != "svg" {
+		return tok0, false, false
+	}
+	var width, height string
+	for _, attr := range tok.Attr {
+		if attr.Name.Space == "_xmlns" {
+			attr.Name.Space = "xmlns"
+		}
+		switch strings.ToLower(attr.Name.Local) {
+		case "width":
+			width = attr.Value
+		case "height":
+			height = attr.Value
+		case "viewbox":
+			return tok, true, false
+		}
+	}
+	tok.Attr = append(tok.Attr, xml.Attr{
+		Name: xml.Name{
+			Space: "",
+			Local: "viewBox",
+		},
+		Value: fmt.Sprintf("0 0 %s %s", width, height),
+	})
+	return tok, true, true
+}
+
+func writeRootToken(tok xml.StartElement, w io.Writer) {
+	namespaces := map[string]string{
+		"xmlns": "xmlns",
+	}
+	w.Write([]byte(fmt.Sprintf("<%s", tok.Name.Local)))
+	for _, attr := range tok.Attr {
+		if attr.Name.Space == "xmlns" {
+			namespaces[attr.Value] = attr.Name.Local
+			w.Write([]byte(fmt.Sprintf(` xmlns:%s="%s"`, attr.Name.Local, attr.Value)))
+		} else if attr.Name.Space != "" {
+			w.Write([]byte(fmt.Sprintf(` %s:%s="%s"`, namespaces[attr.Name.Space], attr.Name.Local, attr.Value)))
+		} else {
+			w.Write([]byte(fmt.Sprintf(` %s="%s"`, attr.Name.Local, attr.Value)))
+		}
+	}
+	w.Write([]byte(">"))
 }
