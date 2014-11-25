@@ -162,9 +162,17 @@ func processNaive(w io.Writer, r io.Reader) error {
 		if alreadyProcessed {
 			// Simply encode all tokens
 			if err := enc.EncodeToken(tok); err != nil {
-				return fmt.Errorf("cannot encode token %#v: %v", tok, err)
+				// Because we generated the svg StartElement by hand, encoding
+				// the EndElement will fail.
+				if strings.ToLower(err.Error()) == "xml: end tag </svg> without start tag" {
+					w.Write([]byte("</svg>"))
+					return nil
+				} else {
+					return fmt.Errorf("cannot encode token %#v: %v", tok, err)
+				}
 			}
 			if err := enc.Flush(); err != nil {
+
 				return fmt.Errorf("cannot flush output: %v", err)
 			}
 			continue
