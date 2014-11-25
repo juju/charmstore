@@ -150,6 +150,7 @@ func processIcon(w io.Writer, r io.Reader) error {
 func processNaive(w io.Writer, r io.Reader) error {
 	dec := xml.NewDecoder(r)
 	enc := xml.NewEncoder(w)
+	alreadyProcessed := false
 	for {
 		tok, err := dec.Token()
 		if err == io.EOF {
@@ -158,22 +159,38 @@ func processNaive(w io.Writer, r io.Reader) error {
 		if err != nil {
 			return fmt.Errorf("failed to read token: %v", err)
 		}
+		if alreadyProcessed {
+			// Simply encode all tokens
+			if err := enc.EncodeToken(tok); err != nil {
+				return fmt.Errorf("cannot encode token %#v: %v", tok, err)
+			}
+			if err := enc.Flush(); err != nil {
+				return fmt.Errorf("cannot flush output: %v", err)
+			}
+			continue
+		}
+		found := false
 		switch tok.(type) {
 		// Simplify processing instructions
 		case xml.ProcInst:
 			w.Write([]byte(`<?xml version="1.0"?>`))
 			continue
-			// Wipe extraneous character data
+		// Wipe extraneous character data before root element
 		case xml.CharData:
 			continue
+		case xml.StartElement:
+			tok, found, _ = ensureViewbox(tok)
 		}
-		tok, found, _ := ensureViewbox(tok)
 		if found {
 			writeRootToken(tok.(xml.StartElement), w)
+			alreadyProcessed = true
 		} else {
 			if err := enc.EncodeToken(tok); err != nil {
 				return fmt.Errorf("cannot encode token %#v: %v", tok, err)
 			}
+		}
+		if err := enc.Flush(); err != nil {
+			return fmt.Errorf("cannot flush output: %v", err)
 		}
 	}
 	if err := enc.Flush(); err != nil {
@@ -189,9 +206,6 @@ func ensureViewbox(tok0 xml.Token) (_ xml.Token, found, changed bool) {
 	}
 	var width, height string
 	for _, attr := range tok.Attr {
-		if attr.Name.Space == "_xmlns" {
-			attr.Name.Space = "xmlns"
-		}
 		switch strings.ToLower(attr.Name.Local) {
 		case "width":
 			width = attr.Value
@@ -211,6 +225,9 @@ func ensureViewbox(tok0 xml.Token) (_ xml.Token, found, changed bool) {
 	return tok, true, true
 }
 
+// writeRootToken writes the root SVG token directly to the stream. Due to
+// a bug in encoding/xml, relying on the token encoder produces not-well-formed
+// data. See: https://code.google.com/p/go/issues/detail?id=7535
 func writeRootToken(tok xml.StartElement, w io.Writer) {
 	namespaces := map[string]string{
 		"xmlns": "xmlns",
