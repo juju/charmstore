@@ -227,7 +227,8 @@ func (s *APISuite) TestServeIcon(c *gc.C) {
 	patchArchiveCacheAges(s)
 	url := charm.MustParseReference("cs:precise/wordpress-0")
 	wordpress := storetesting.Charms.ClonedDir(c.MkDir(), "wordpress")
-	content := "<xml>an icon, really</xml>"
+	content := `<svg width="1" height="1">an icon, really</svg>`
+	expected := `<svg width="1" height="1" viewBox="0 0 1 1">an icon, really</svg>`
 	err := ioutil.WriteFile(filepath.Join(wordpress.Path, "icon.svg"), []byte(content), 0666)
 	c.Assert(err, gc.IsNil)
 
@@ -239,19 +240,37 @@ func (s *APISuite) TestServeIcon(c *gc.C) {
 		URL:     storeURL(url.Path() + "/icon.svg"),
 	})
 	c.Assert(rec.Code, gc.Equals, http.StatusOK)
-	c.Assert(rec.Body.String(), gc.Equals, content)
+	c.Assert(rec.Body.String(), gc.Equals, expected)
 	c.Assert(rec.Header().Get("Content-Type"), gc.Equals, "image/svg+xml")
 	assertCacheControl(c, rec.Header(), true)
 
+	// Test with revision -1
 	url.Revision = -1
 	rec = storetesting.DoRequest(c, storetesting.DoRequestParams{
 		Handler: s.srv,
 		URL:     storeURL(url.Path() + "/icon.svg"),
 	})
 	c.Assert(rec.Code, gc.Equals, http.StatusOK)
-	c.Assert(rec.Body.String(), gc.Equals, content)
+	c.Assert(rec.Body.String(), gc.Equals, expected)
 	c.Assert(rec.Header().Get("Content-Type"), gc.Equals, "image/svg+xml")
 	assertCacheControl(c, rec.Header(), false)
+
+	// Reload the charm with an icon that already has viewBox.
+	wordpress = storetesting.Charms.ClonedDir(c.MkDir(), "wordpress")
+	err = ioutil.WriteFile(filepath.Join(wordpress.Path, "icon.svg"), []byte(expected), 0666)
+	c.Assert(err, gc.IsNil)
+
+	err = s.store.AddCharmWithArchive(url, wordpress)
+	c.Assert(err, gc.IsNil)
+
+	// Check that we still get expected svg.
+	rec = storetesting.DoRequest(c, storetesting.DoRequestParams{
+		Handler: s.srv,
+		URL:     storeURL(url.Path() + "/icon.svg"),
+	})
+	c.Assert(rec.Code, gc.Equals, http.StatusOK)
+	c.Assert(rec.Body.String(), gc.Equals, expected)
+	c.Assert(rec.Header().Get("Content-Type"), gc.Equals, "image/svg+xml")
 }
 
 func (s *APISuite) TestServeBundleIcon(c *gc.C) {
