@@ -5,6 +5,9 @@ package v4
 
 import (
 	"archive/zip"
+	"bytes"
+	"encoding/xml"
+	"fmt"
 	"io"
 	"net/http"
 	"path"
@@ -115,6 +118,138 @@ func (h *Handler) serveIcon(id *charm.Reference, fullySpecified bool, w http.Res
 	defer r.Close()
 	w.Header().Set("Content-Type", "image/svg+xml")
 	setArchiveCacheControl(w.Header(), fullySpecified)
-	io.Copy(w, r)
+	return processIcon(w, r)
+}
+
+func processIcon(w io.Writer, r io.Reader) error {
+	var saved bytes.Buffer
+	dec := xml.NewDecoder(io.TeeReader(r, &saved))
+	found, changed := false, false
+	for !found {
+		tok, err := dec.Token()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("failed to read token: %v", err)
+		}
+		_, found, changed = ensureViewbox(tok)
+	}
+	if !found {
+		return fmt.Errorf("no svg token found")
+	}
+	// Stitch the input back together again.
+	r = io.MultiReader(&saved, r)
+	if !changed {
+		_, err := io.Copy(w, r)
+		return err
+	}
+	return processNaive(w, r)
+}
+
+func processNaive(w io.Writer, r io.Reader) error {
+	dec := xml.NewDecoder(r)
+	enc := xml.NewEncoder(w)
+	alreadyProcessed := false
+	for {
+		tok, err := dec.Token()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("failed to read token: %v", err)
+		}
+		if alreadyProcessed {
+			// Simply encode all tokens
+			if err := enc.EncodeToken(tok); err != nil {
+				// Because we generated the svg StartElement by hand, encoding
+				// the EndElement will fail.
+				if strings.ToLower(err.Error()) == "xml: end tag </svg> without start tag" {
+					w.Write([]byte("</svg>"))
+					return nil
+				} else {
+					return fmt.Errorf("cannot encode token %#v: %v", tok, err)
+				}
+			}
+			if err := enc.Flush(); err != nil {
+
+				return fmt.Errorf("cannot flush output: %v", err)
+			}
+			continue
+		}
+		found := false
+		switch tok.(type) {
+		// Simplify processing instructions
+		case xml.ProcInst:
+			w.Write([]byte(`<?xml version="1.0"?>`))
+			continue
+		// Wipe extraneous character data before root element
+		case xml.CharData:
+			continue
+		case xml.StartElement:
+			tok, found, _ = ensureViewbox(tok)
+		}
+		if found {
+			writeRootToken(tok.(xml.StartElement), w)
+			alreadyProcessed = true
+		} else {
+			if err := enc.EncodeToken(tok); err != nil {
+				return fmt.Errorf("cannot encode token %#v: %v", tok, err)
+			}
+		}
+		if err := enc.Flush(); err != nil {
+			return fmt.Errorf("cannot flush output: %v", err)
+		}
+	}
+	if err := enc.Flush(); err != nil {
+		return fmt.Errorf("cannot flush output: %v", err)
+	}
 	return nil
+}
+
+func ensureViewbox(tok0 xml.Token) (_ xml.Token, found, changed bool) {
+	tok, ok := tok0.(xml.StartElement)
+	if !ok || strings.ToLower(tok.Name.Local) != "svg" {
+		return tok0, false, false
+	}
+	var width, height string
+	for _, attr := range tok.Attr {
+		switch strings.ToLower(attr.Name.Local) {
+		case "width":
+			width = attr.Value
+		case "height":
+			height = attr.Value
+		case "viewbox":
+			return tok, true, false
+		}
+	}
+	tok.Attr = append(tok.Attr, xml.Attr{
+		Name: xml.Name{
+			Space: "",
+			Local: "viewBox",
+		},
+		Value: fmt.Sprintf("0 0 %s %s", width, height),
+	})
+	return tok, true, true
+}
+
+// writeRootToken writes the root SVG token directly to the stream. Due to
+// a bug in encoding/xml, relying on the token encoder produces not-well-formed
+// data. See: https://code.google.com/p/go/issues/detail?id=7535
+func writeRootToken(tok xml.StartElement, w io.Writer) {
+	namespaces := map[string]string{
+		"xmlns": "xmlns",
+	}
+	w.Write([]byte(fmt.Sprintf("<%s", tok.Name.Local)))
+	for _, attr := range tok.Attr {
+		if attr.Name.Space == "xmlns" {
+			namespaces[attr.Value] = attr.Name.Local
+			w.Write([]byte(fmt.Sprintf(` xmlns:%s="%s"`, attr.Name.Local, attr.Value)))
+		} else if attr.Name.Space != "" {
+			w.Write([]byte(fmt.Sprintf(` %s:%s="%s"`, namespaces[attr.Name.Space], attr.Name.Local, attr.Value)))
+		} else {
+			w.Write([]byte(fmt.Sprintf(` %s="%s"`, attr.Name.Local, attr.Value)))
+		}
+	}
+	w.Write([]byte(">"))
 }
