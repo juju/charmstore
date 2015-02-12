@@ -98,6 +98,10 @@ type Entity struct {
 	// the need to linearly read the zip file's manifest
 	// every time we access one of these files.
 	Contents map[FileId]ZipFile `json:",omitempty" bson:",omitempty"`
+
+	// PromulgatedURL specifies the URL by which this entity is also known
+	// if it is promulgated.
+	PromulgatedURL *charm.Reference
 }
 
 // BaseEntity holds metadata for a charm or bundle
@@ -124,6 +128,11 @@ type BaseEntity struct {
 	// the base entity. The permissions apply to all
 	// revisions.
 	ACLs ACL
+
+	// Promulgated specifies whether the charm or bundle
+	// is the blessed version that should be used when an
+	// owner is not specified.
+	Promulgated bool
 }
 
 // ACL holds lists of users and groups that are
