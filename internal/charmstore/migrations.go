@@ -31,6 +31,12 @@ var migrations = []migration{{
 }, {
 	name:    "write acl creation",
 	migrate: populateWriteACL,
+}, {
+	name:    "promulgated url creation",
+	migrate: populatePromulgatedURL,
+}, {
+	name:    "base entity promulgated flag creation",
+	migrate: populateBaseEntityPromulgated,
 }}
 
 // migration holds a migration function with its corresponding name.
@@ -220,5 +226,68 @@ func populateWriteACL(db StoreDatabase) error {
 		return errgo.Notef(err, "cannot iterate base entities")
 	}
 	logger.Infof("%d base entities updated", counter)
+	return nil
+}
+
+// populatePromulgatedURL adds the URL of the promulgated version
+// of an entity to owned entities which represent the same thing.
+func populatePromulgatedURL(db StoreDatabase) error {
+	entities := db.Entities()
+	var e mongodoc.Entity
+	iter := entities.Find(bson.D{{"user", ""}}).Iter()
+	defer iter.Close()
+	for iter.Next(&e) {
+		err := entities.Update(
+			bson.D{
+				{"user", bson.D{{"$ne", ""}, {"$exists", true}}},
+				{"blobhash", e.BlobHash},
+			},
+			bson.D{
+				{"$set", bson.D{{"promulgatedurl", e.URL}}},
+			},
+		)
+		if err != nil {
+			return errgo.Notef(err, "cannot update owned entity for %s", e.URL)
+		}
+	}
+	if err := iter.Close(); err != nil {
+		return errgo.Notef(err, "cannot iterate promulgated entities")
+	}
+	return nil
+}
+
+// populateBaseEntityPromulgated adds the Promulgated flag to the base entity
+// of the newest promulgated version of an entity.
+func populateBaseEntityPromulgated(db StoreDatabase) error {
+	entities := db.Entities()
+	var e mongodoc.Entity
+	iter := entities.Find(bson.D{{"promulgatedurl", bson.D{{"$ne", ""}, {"$exists", true}}}}).Iter()
+	defer iter.Close()
+	type promulgatedEntity struct {
+		revision int
+		baseURL  string
+	}
+	latest := make(map[string]promulgatedEntity)
+	for iter.Next(&e) {
+		rev := e.PromulgatedURL.Revision
+		e.PromulgatedURL.Revision = -1
+		pe, ok := latest[e.PromulgatedURL.String()]
+		if !ok || pe.revision < rev {
+			latest[e.PromulgatedURL.String()] = promulgatedEntity{
+				revision: rev,
+				baseURL:  e.BaseURL.String(),
+			}
+		}
+	}
+	if err := iter.Close(); err != nil {
+		return errgo.Notef(err, "cannot iterate promulgated entities")
+	}
+	baseEntities := db.BaseEntities()
+	for _, pe := range latest {
+		err := baseEntities.UpdateId(pe.baseURL, bson.D{{"$set", bson.D{{"promulgated", true}}}})
+		if err != nil {
+			return errgo.Notef(err, "cannot update base entity %s", pe.baseURL)
+		}
+	}
 	return nil
 }
