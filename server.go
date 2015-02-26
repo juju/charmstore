@@ -4,6 +4,7 @@
 package charmstore
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -31,6 +32,7 @@ func NewServer(store *Store) (*Server, error) {
 		mux:   http.NewServeMux(),
 	}
 	s.handle("/charm-info", s.serveInfo)
+	s.handle("/charm-list", s.serveList)
 	s.handle("/charm-event", s.serveEvent)
 	s.handle("/charm/", s.serveCharm)
 	s.handle("/stats/counter/", s.serveStats)
@@ -85,6 +87,34 @@ func (s *Server) resolveURL(url string) (*charm.URL, error) {
 		return &charm.URL{Reference: ref, Series: prefSeries[0]}, nil
 	}
 	return &charm.URL{Reference: ref, Series: series}, nil
+}
+
+type listItem struct {
+	URLs     []*charm.URL `json:"urls"`
+	Revision int          `json:"revision"` // Zero is valid. Can't omitempty.
+	Sha256   string       `json:"sha256,omitempty"`
+	Digest   string       `json:"digest,omitempty"`
+	Size     int64        `json:"size"`
+}
+
+func (s *Server) serveList(w http.ResponseWriter, r *http.Request) {
+	session := s.store.session.Copy()
+	defer session.Close()
+
+	w.Header().Set("Content-Type", "application/json")
+	bufw := bufio.NewWriter(w)
+	defer bufw.Flush()
+	enc := json.NewEncoder(bufw)
+	var doc charmDoc
+	for iter := session.Charms().Find(nil).Iter(); iter.Next(&doc); {
+		enc.Encode(listItem{
+			URLs:     doc.URLs,
+			Size:     doc.Size,
+			Sha256:   doc.Sha256,
+			Revision: doc.Revision,
+			Digest:   doc.Digest,
+		})
+	}
 }
 
 func (s *Server) serveInfo(w http.ResponseWriter, r *http.Request) {
