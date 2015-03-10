@@ -67,5 +67,5 @@ The same result can be achieved more easily by running `make server`.
 Note that this configuration *should not* be used when running
 a production server, as it uses a known password for authentication.
 
-At this point the server starts listening on port 8080 (as specified in the
+At this point the server starts listening on port 8082 (as specified in the
 config YAML file).
