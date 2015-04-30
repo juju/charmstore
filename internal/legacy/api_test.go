@@ -17,18 +17,18 @@ import (
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/juju/charm.v5"
-	"gopkg.in/juju/charm.v5/charmrepo"
+	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/juju/charmrepo.v0"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
-	"gopkg.in/juju/charmstore.v4/internal/charmstore"
-	"gopkg.in/juju/charmstore.v4/internal/legacy"
-	"gopkg.in/juju/charmstore.v4/internal/router"
-	"gopkg.in/juju/charmstore.v4/internal/storetesting"
-	"gopkg.in/juju/charmstore.v4/internal/storetesting/hashtesting"
-	"gopkg.in/juju/charmstore.v4/internal/storetesting/stats"
-	"gopkg.in/juju/charmstore.v4/params"
+	"gopkg.in/juju/charmstore.v5/internal/charmstore"
+	"gopkg.in/juju/charmstore.v5/internal/legacy"
+	"gopkg.in/juju/charmstore.v5/internal/router"
+	"gopkg.in/juju/charmstore.v5/internal/storetesting"
+	"gopkg.in/juju/charmstore.v5/internal/storetesting/hashtesting"
+	"gopkg.in/juju/charmstore.v5/internal/storetesting/stats"
+	"gopkg.in/juju/charmrepo.v0/csclient/params"
 )
 
 var serverParams = charmstore.ServerParams{

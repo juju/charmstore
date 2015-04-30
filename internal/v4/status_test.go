@@ -12,11 +12,11 @@ import (
 	"github.com/juju/testing/httptesting"
 	"github.com/juju/utils/debugstatus"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/juju/charm.v5"
+	"gopkg.in/juju/charm.v6-unstable"
 
-	"gopkg.in/juju/charmstore.v4/internal/mongodoc"
-	"gopkg.in/juju/charmstore.v4/internal/router"
-	"gopkg.in/juju/charmstore.v4/params"
+	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5/internal/router"
+	"gopkg.in/juju/charmrepo.v0/csclient/params"
 )
 
 var zeroTimeStr = time.Time{}.Format(time.RFC3339)

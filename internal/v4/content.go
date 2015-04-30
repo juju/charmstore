@@ -15,11 +15,11 @@ import (
 	"github.com/juju/jujusvg"
 	"github.com/juju/xml"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charm.v5"
+	"gopkg.in/juju/charm.v6-unstable"
 
-	"gopkg.in/juju/charmstore.v4/internal/mongodoc"
-	"gopkg.in/juju/charmstore.v4/internal/router"
-	"gopkg.in/juju/charmstore.v4/params"
+	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5/internal/router"
+	"gopkg.in/juju/charmrepo.v0/csclient/params"
 )
 
 // GET id/diagram.svg

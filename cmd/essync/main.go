@@ -13,9 +13,9 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2"
 
-	"gopkg.in/juju/charmstore.v4/config"
-	"gopkg.in/juju/charmstore.v4/internal/charmstore"
-	"gopkg.in/juju/charmstore.v4/internal/elasticsearch"
+	"gopkg.in/juju/charmstore.v5/config"
+	"gopkg.in/juju/charmstore.v5/internal/charmstore"
+	"gopkg.in/juju/charmstore.v5/internal/elasticsearch"
 )
 
 var logger = loggo.GetLogger("essync")
