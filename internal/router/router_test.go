@@ -21,9 +21,9 @@ import (
 	"github.com/juju/utils/jsonhttp"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charm.v5"
+	"gopkg.in/juju/charm.v6-unstable"
 
-	"gopkg.in/juju/charmstore.v4/params"
+	"gopkg.in/juju/charmrepo.v0/csclient/params"
 )
 
 type RouterSuite struct {

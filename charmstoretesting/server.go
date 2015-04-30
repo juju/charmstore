@@ -15,13 +15,13 @@ import (
 
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/juju/charm.v5"
+	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/macaroon-bakery.v0/httpbakery"
 	"gopkg.in/mgo.v2"
 
-	"gopkg.in/juju/charmstore.v4"
-	"gopkg.in/juju/charmstore.v4/csclient"
-	"gopkg.in/juju/charmstore.v4/params"
+	"gopkg.in/juju/charmstore.v5"
+	"gopkg.in/juju/charmrepo.v0/csclient"
+	"gopkg.in/juju/charmrepo.v0/csclient/params"
 )
 
 const (

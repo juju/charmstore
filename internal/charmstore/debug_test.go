@@ -10,9 +10,9 @@ import (
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 
-	"gopkg.in/juju/charmstore.v4/internal/router"
-	"gopkg.in/juju/charmstore.v4/params"
-	appver "gopkg.in/juju/charmstore.v4/version"
+	"gopkg.in/juju/charmstore.v5/internal/router"
+	"gopkg.in/juju/charmrepo.v0/csclient/params"
+	appver "gopkg.in/juju/charmstore.v5/version"
 )
 
 type debugSuite struct{}
