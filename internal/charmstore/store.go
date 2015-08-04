@@ -89,10 +89,10 @@ const maxAsyncGoroutines = 50
 // update.
 const jsACLCopyFunc = `
 	function(base_entity, entity) {
-		b_col = db.getCollection(base_entities_collection_name)
-		e_col = db.getCollection(entities_collection_name)
+		var b_col = db.getCollection(base_entities_collection_name)
+		var e_col = db.getCollection(entities_collection_name)
 		var be = b_col.findOne({_id: base_entity}, {acls: 1});
-		if (entity != null) {
+		if (entity !== null) {
 			e_col.update({_id: entity}, {$set: {acls: be.acls}});
 			return;
 		}
@@ -1166,12 +1166,13 @@ func (s *Store) SetPerms(id *charm.Reference, which string, acl ...string) error
 	return s.CopyACLs(bid, nil)
 }
 
-// CopyACLs does a serverside copy of the ACLs from be into e (if
-// specified). If e is nil then the copy will be performed to every
-// entity with the base entity be. The copy operation is performed server
-// side so that the entity will always be updated with the latest version
-// stored in the base entity. This stops concurrent updates being able to
-// put the database in an inconsistent state.
+// CopyACLs does a serverside copy of the ACLs from BaseEntities (be)
+// into Entities (e) (if specified). If e is nil then the copy will be
+// performed to every entity with the base entity be. The copy operation
+// is performed server side so that the entity will always be updated
+// with the latest version stored in the base entity. This stops
+// concurrent updates being able to put the database in an inconsistent
+// state.
 func (s *Store) CopyACLs(be, e *charm.Reference) error {
 	if err := s.DB.Run(bson.D{
 		{"eval", s.copyACLsFunc},

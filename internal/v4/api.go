@@ -306,7 +306,7 @@ func (h *ReqHandler) puttableBaseEntityHandler(get baseEntityHandlerFunc, handle
 		HandlePut:    handlePut,
 		Update:       h.updateBaseEntity,
 		UpdateSearch: h.updateSearchBase,
-		CopyACLs:     h.copyACLs,
+		UpdateACLs:   h.copyACLs,
 	})
 }
 
@@ -863,7 +863,7 @@ func (h *ReqHandler) putMetaPerm(id *router.ResolvedURL, path string, val *json.
 		},
 	})
 
-	updater.CopyACLs()
+	updater.UpdateACLs()
 	updater.UpdateSearch()
 	return nil
 }
@@ -912,7 +912,7 @@ func (h *ReqHandler) putMetaPermWithKey(id *router.ResolvedURL, path string, val
 			},
 		})
 		updater.UpdateField("public", isPublic, nil)
-		updater.CopyACLs()
+		updater.UpdateACLs()
 		updater.UpdateSearch()
 		return nil
 	case "/write":
@@ -923,7 +923,7 @@ func (h *ReqHandler) putMetaPermWithKey(id *router.ResolvedURL, path string, val
 				Write: perms,
 			},
 		})
-		updater.CopyACLs()
+		updater.UpdateACLs()
 		return nil
 	}
 	return errgo.WithCausef(nil, params.ErrNotFound, "unknown permission")

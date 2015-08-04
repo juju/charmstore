@@ -19,10 +19,10 @@ type FieldQueryFunc func(id *ResolvedURL, selector map[string]int, req *http.Req
 
 // FieldUpdater records field changes made by a FieldUpdateFunc.
 type FieldUpdater struct {
-	fields   map[string]interface{}
-	entries  []audit.Entry
-	search   bool
-	copyACLs bool
+	fields     map[string]interface{}
+	entries    []audit.Entry
+	search     bool
+	updateACLs bool
 }
 
 // UpdateField requests that the provided field is updated with
@@ -39,9 +39,9 @@ func (u *FieldUpdater) UpdateSearch() {
 	u.search = true
 }
 
-// CopyACLs requests that the ACL records of entities are updated.
-func (u *FieldUpdater) CopyACLs() {
-	u.copyACLs = true
+// UpdateACLs requests that the ACL records of entities are updated.
+func (u *FieldUpdater) UpdateACLs() {
+	u.updateACLs = true
 }
 
 // A FieldUpdateFunc is used to update a metadata document for the
@@ -64,9 +64,9 @@ type FieldGetFunc func(doc interface{}, id *ResolvedURL, path string, flags url.
 // after the initial prefix has been removed.
 type FieldPutFunc func(id *ResolvedURL, path string, val *json.RawMessage, updater *FieldUpdater, req *http.Request) error
 
-// CopyACLsFunc copies the ACL from then base entity id into all entities
+// UpdateACLsFunc updates the ACL from then base entity id into all entities
 // with that base entity.
-type CopyACLsFunc func(id *ResolvedURL) error
+type UpdateACLsFunc func(id *ResolvedURL) error
 
 // FieldIncludeHandlerParams specifies the parameters for NewFieldIncludeHandler.
 type FieldIncludeHandlerParams struct {
@@ -99,9 +99,9 @@ type FieldIncludeHandlerParams struct {
 	// database for PUT requests.
 	UpdateSearch FieldUpdateSearchFunc
 
-	// CopyACLs is used to copy the ACLs from base entities to
-	// entities for PUT requests.
-	CopyACLs CopyACLsFunc
+	// UpdateACLs is used to update the ACLs of documents in the
+	// database where permissions are changed.
+	UpdateACLs UpdateACLsFunc
 }
 
 type fieldIncludeHandler struct {
@@ -164,8 +164,8 @@ func (h *fieldIncludeHandler) HandlePut(hs []BulkIncludeHandler, id *ResolvedURL
 			}
 		}
 	}
-	if updater.copyACLs {
-		if err := h.p.CopyACLs(id); err != nil {
+	if updater.updateACLs {
+		if err := h.p.UpdateACLs(id); err != nil {
 			for i := range hs {
 				setError(i, err)
 			}
