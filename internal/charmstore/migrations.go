@@ -5,6 +5,7 @@ package charmstore // import "gopkg.in/juju/charmstore.v5-unstable/internal/char
 
 import (
 	"gopkg.in/errgo.v1"
+	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmrepo.v0/csclient/params"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -31,6 +32,9 @@ var migrations = []migration{{
 }, {
 	name:    "write acl creation",
 	migrate: populateWriteACL,
+}, {
+	name:    "entity acl denormalization",
+	migrate: denormalizeEntityACLs,
 }}
 
 // migration holds a migration function with its corresponding name.
@@ -220,5 +224,35 @@ func populateWriteACL(db StoreDatabase) error {
 		return errgo.Notef(err, "cannot iterate base entities")
 	}
 	logger.Infof("%d base entities updated", counter)
+	return nil
+}
+
+// denormalizeEntityACLs updates all entities with an ACL copied from the
+// base entity. This function is not supposed to be called directly.
+func denormalizeEntityACLs(db StoreDatabase) error {
+	copyACLs := bson.JavaScript{
+		Code: jsACLCopyFunc,
+		Scope: bson.D{{
+			"base_entities_collection_name", db.BaseEntities().Name,
+		}, {
+			"entities_collection_name", db.Entities().Name,
+		}},
+	}
+	iter := db.BaseEntities().Find(nil).Select(bson.D{{"_id", 1}, {"acls", 1}}).Iter()
+	defer iter.Close()
+	var be mongodoc.BaseEntity
+	for iter.Next(&be) {
+		logger.Infof("updating %s", be.URL)
+		if err := db.Run(bson.D{{
+			"eval", copyACLs,
+		}, {
+			"args", []*charm.Reference{be.URL, nil},
+		}}, nil); err != nil {
+			return errgo.Notef(err, "cannot denormalize ACLs for %s", be.URL)
+		}
+	}
+	if err := iter.Close(); err != nil {
+		return errgo.Notef(err, "cannot iterate base entities")
+	}
 	return nil
 }

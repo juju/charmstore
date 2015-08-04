@@ -235,6 +235,10 @@ func (s *migrationsSuite) TestMigrateParallelMigration(c *gc.C) {
 		Revision: 42,
 		Series:   "trusty",
 		Size:     12,
+		ACLs: mongodoc.ACL{
+			Read:  []string{"everyone"},
+			Write: []string{},
+		},
 	})
 	s.checkEntity(c, &mongodoc.Entity{
 		URL:      id2,
@@ -244,6 +248,10 @@ func (s *migrationsSuite) TestMigrateParallelMigration(c *gc.C) {
 		Revision: 47,
 		Series:   "utopic",
 		Size:     13,
+		ACLs: mongodoc.ACL{
+			Read:  []string{"everyone", "who"},
+			Write: []string{},
+		},
 	})
 }
 
@@ -793,6 +801,54 @@ func (s *migrationsSuite) TestPopulateWriteACLSomeUpdates(c *gc.C) {
 		ACLs: mongodoc.ACL{
 			Write: []string{"benjamin"},
 		},
+	})
+}
+
+func (s *migrationsSuite) TestDenormalizeEntityACLs(c *gc.C) {
+	s.patchMigrations(c, getMigrations("entity acl denormalization"))
+	id1 := charm.MustParseReference("~who/trusty/django-42")
+	id2 := charm.MustParseReference("~who/django-47")
+	id3 := charm.MustParseReference("~dalek/utopic/rails-47")
+	s.insertEntity(c, id1, "django", 12)
+	s.insertEntity(c, id2, "django", 12)
+	s.insertEntity(c, id3, "rails", 13)
+	baseId1 := baseURL(id1)
+	baseId3 := baseURL(id3)
+	acl1 := mongodoc.ACL{
+		Read:  []string{"everyone", "who"},
+		Write: []string{"who"},
+	}
+	acl3 := mongodoc.ACL{
+		Read:  []string{"dalek"},
+		Write: []string{"dalek"},
+	}
+	s.insertBaseEntity(c, baseId1, &acl1)
+	s.insertBaseEntity(c, baseId3, &acl3)
+
+	// Start the server.
+	err := s.newServer(c)
+	c.Assert(err, gc.IsNil)
+
+	s.checkEntity(c, &mongodoc.Entity{
+		URL:     id1,
+		Name:    "django",
+		Size:    12,
+		BaseURL: baseId1,
+		ACLs:    acl1,
+	})
+	s.checkEntity(c, &mongodoc.Entity{
+		URL:     id2,
+		Name:    "django",
+		Size:    12,
+		BaseURL: baseId1,
+		ACLs:    acl1,
+	})
+	s.checkEntity(c, &mongodoc.Entity{
+		URL:     id3,
+		Name:    "rails",
+		Size:    13,
+		BaseURL: baseId3,
+		ACLs:    acl3,
 	})
 }
 

@@ -108,6 +108,12 @@ type Entity struct {
 	// PromulgatedRevision holds the revision number from the promulgated URL.
 	// If the entity is not promulgated this should be set to -1.
 	PromulgatedRevision int `bson:"promulgated-revision"`
+
+	// ACLs holds permission information relevant to the base entity.
+	// It is identitcal to the same field in the relevent base
+	// entity, but is denormalized as permissions often need to be
+	// checked in the context of a single entity.
+	ACLs ACL
 }
 
 // PreferredURL returns the preferred way to refer to this entity. If
