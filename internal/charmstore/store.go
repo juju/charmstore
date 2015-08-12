@@ -46,6 +46,7 @@ type Pool struct {
 	es           *SearchIndex
 	bakeryParams *bakery.NewServiceParams
 	stats        stats
+	copyACLsFunc *bson.JavaScript
 	run          *parallel.Run
 
 	// statsCache holds a cache of AggregatedCounts
@@ -83,6 +84,22 @@ const reqStoreCacheSize = 50
 // of goroutines that will be started by Store.Go.
 const maxAsyncGoroutines = 50
 
+// jsACLCopyFunc is the text of the function run on the mongodb server to
+// copy ACLs from the base entity to an entity (or all entities) after an
+// update.
+const jsACLCopyFunc = `
+	function(base_entity, entity) {
+		var b_col = db.getCollection(base_entities_collection_name)
+		var e_col = db.getCollection(entities_collection_name)
+		var be = b_col.findOne({_id: base_entity}, {acls: 1});
+		if (entity !== null) {
+			e_col.update({_id: entity}, {$set: {acls: be.acls}});
+			return;
+		}
+		e_col.update({baseurl: base_entity}, {$set: {acls: be.acls}},{multi: true});
+	}
+`
+
 // NewPool returns a Pool that uses the given database
 // and search index. If bakeryParams is not nil,
 // the Bakery field in the resulting Store will be set
@@ -102,6 +119,14 @@ func NewPool(db *mgo.Database, si *SearchIndex, bakeryParams *bakery.NewServiceP
 		config:      config,
 		run:         parallel.NewRun(maxAsyncGoroutines),
 		auditLogger: config.AuditLogger,
+	}
+	p.copyACLsFunc = &bson.JavaScript{
+		Code: jsACLCopyFunc,
+		Scope: bson.D{{
+			"base_entities_collection_name", p.db.BaseEntities().Name,
+		}, {
+			"entities_collection_name", p.db.Entities().Name,
+		}},
 	}
 	if config.MaxMgoSessions > 0 {
 		p.reqStoreC = make(chan *Store, config.MaxMgoSessions)
@@ -223,11 +248,12 @@ func (p *Pool) requestStoreNB(always bool) (*Store, error) {
 	p.storeCount++
 	db := p.db.copy()
 	store := &Store{
-		DB:        db,
-		BlobStore: blobstore.New(db.Database, "entitystore"),
-		ES:        p.es,
-		stats:     &p.stats,
-		pool:      p,
+		DB:           db,
+		BlobStore:    blobstore.New(db.Database, "entitystore"),
+		ES:           p.es,
+		stats:        &p.stats,
+		pool:         p,
+		copyACLsFunc: p.copyACLsFunc,
 	}
 	if p.bakeryParams != nil {
 		store.Bakery = newBakery(db, *p.bakeryParams)
@@ -255,12 +281,13 @@ func newBakery(db StoreDatabase, bp bakery.NewServiceParams) *bakery.Service {
 // Store holds a connection to the underlying charm and blob
 // data stores that is appropriate for short term use.
 type Store struct {
-	DB        StoreDatabase
-	BlobStore *blobstore.Store
-	ES        *SearchIndex
-	Bakery    *bakery.Service
-	stats     *stats
-	pool      *Pool
+	DB           StoreDatabase
+	BlobStore    *blobstore.Store
+	ES           *SearchIndex
+	Bakery       *bakery.Service
+	stats        *stats
+	pool         *Pool
+	copyACLsFunc *bson.JavaScript
 }
 
 // Copy returns a new store with a lifetime
@@ -605,6 +632,9 @@ func (s *Store) insertEntity(entity *mongodoc.Entity) (err error) {
 			}
 		}
 	}()
+	if err := s.CopyACLs(entity.BaseURL, entity.URL); err != nil {
+		return errgo.Notef(err, "cannot copy ACLs")
+	}
 	// Add entity to ElasticSearch.
 	if err := s.UpdateSearch(EntityResolvedURL(entity)); err != nil {
 		return errgo.Notef(err, "cannot index %s to ElasticSearch", entity.URL)
@@ -1127,9 +1157,30 @@ func (s *Store) findZipFile(blob io.ReadSeeker, size int64, isFile func(f *zip.F
 // the given id for "which" operations ("read" or "write")
 // to the given ACL. This is mostly provided for testing.
 func (s *Store) SetPerms(id *charm.Reference, which string, acl ...string) error {
-	return s.DB.BaseEntities().UpdateId(baseURL(id), bson.D{{"$set",
+	bid := baseURL(id)
+	if err := s.DB.BaseEntities().UpdateId(bid, bson.D{{"$set",
 		bson.D{{"acls." + which, acl}},
-	}})
+	}}); err != nil {
+		return errgo.NoteMask(err, "cannot update base entity", errgo.Is(mgo.ErrNotFound))
+	}
+	return s.CopyACLs(bid, nil)
+}
+
+// CopyACLs does a serverside copy of the ACLs from BaseEntities (be)
+// into Entities (e) (if specified). If e is nil then the copy will be
+// performed to every entity with the base entity be. The copy operation
+// is performed server side so that the entity will always be updated
+// with the latest version stored in the base entity. This stops
+// concurrent updates being able to put the database in an inconsistent
+// state.
+func (s *Store) CopyACLs(be, e *charm.Reference) error {
+	if err := s.DB.Run(bson.D{
+		{"eval", s.copyACLsFunc},
+		{"args", []*charm.Reference{be, e}},
+	}, nil); err != nil {
+		return errgo.Mask(err, errgo.Is(mgo.ErrNotFound))
+	}
+	return nil
 }
 
 func newInt(x int) *int {

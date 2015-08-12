@@ -107,6 +107,10 @@ func (s *StoreSuite) checkAddCharm(c *gc.C, ch charm.Charm, addToES bool, url *r
 		CharmRequiredInterfaces: []string{"mysql", "varnish"},
 		PromulgatedURL:          url.PromulgatedURL(),
 		PromulgatedRevision:     url.PromulgatedRevision,
+		ACLs: mongodoc.ACL{
+			Read:  []string{url.URL.User},
+			Write: []string{url.URL.User},
+		},
 	})
 
 	// The charm archive has been properly added to the blob store.
@@ -199,6 +203,10 @@ func (s *StoreSuite) checkAddBundle(c *gc.C, bundle charm.Bundle, addToES bool, 
 		BundleUnitCount:     newInt(2),
 		PromulgatedURL:      url.PromulgatedURL(),
 		PromulgatedRevision: url.PromulgatedRevision,
+		ACLs: mongodoc.ACL{
+			Read:  []string{url.URL.User},
+			Write: []string{url.URL.User},
+		},
 	})
 
 	// The bundle archive has been properly added to the blob store.

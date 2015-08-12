@@ -307,6 +307,7 @@ func (h *ReqHandler) puttableBaseEntityHandler(get baseEntityHandlerFunc, handle
 		HandlePut:    handlePut,
 		Update:       h.updateBaseEntity,
 		UpdateSearch: h.updateSearchBase,
+		UpdateACLs:   h.copyACLs,
 	})
 }
 
@@ -373,6 +374,15 @@ func (h *ReqHandler) updateSearchBase(id *router.ResolvedURL, fields map[string]
 		return errgo.Mask(err)
 	}
 	return nil
+}
+
+// copyURLs copys the ACLs from id's base entity into every entity with
+// the same base entity.
+func (h *ReqHandler) copyACLs(id *router.ResolvedURL) error {
+	baseURL := id.URL
+	baseURL.Series = ""
+	baseURL.Revision = -1
+	return h.Store.CopyACLs(&baseURL, nil)
 }
 
 func (h *ReqHandler) entityExists(id *router.ResolvedURL, req *http.Request) (bool, error) {
@@ -854,6 +864,7 @@ func (h *ReqHandler) putMetaPerm(id *router.ResolvedURL, path string, val *json.
 		},
 	})
 
+	updater.UpdateACLs()
 	updater.UpdateSearch()
 	return nil
 }
@@ -902,6 +913,7 @@ func (h *ReqHandler) putMetaPermWithKey(id *router.ResolvedURL, path string, val
 			},
 		})
 		updater.UpdateField("public", isPublic, nil)
+		updater.UpdateACLs()
 		updater.UpdateSearch()
 		return nil
 	case "/write":
@@ -912,6 +924,7 @@ func (h *ReqHandler) putMetaPermWithKey(id *router.ResolvedURL, path string, val
 				Write: perms,
 			},
 		})
+		updater.UpdateACLs()
 		return nil
 	}
 	return errgo.WithCausef(nil, params.ErrNotFound, "unknown permission")

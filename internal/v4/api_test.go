@@ -596,14 +596,19 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 	// its third party caveat.
 	s.discharge = dischargeForUser("bob")
 
-	s.addPublicCharm(c, "wordpress", newResolvedURL("~charmers/precise/wordpress-23", 23))
+	wordpress23 := newResolvedURL("~charmers/precise/wordpress-23", 23)
+	s.addPublicCharm(c, "wordpress", wordpress23)
 	s.addPublicCharm(c, "wordpress", newResolvedURL("~charmers/precise/wordpress-24", 24))
 	s.addPublicCharm(c, "wordpress", newResolvedURL("~charmers/trusty/wordpress-1", 1))
 	s.assertGet(c, "wordpress/meta/perm", params.PermResponse{
 		Read:  []string{params.Everyone, "charmers"},
 		Write: []string{"charmers"},
 	})
-	e, err := s.store.FindBaseEntity(charm.MustParseReference("precise/wordpress-23"))
+	be, err := s.store.FindBaseEntity(charm.MustParseReference("precise/wordpress-23"))
+	c.Assert(err, gc.IsNil)
+	c.Assert(be.ACLs.Read, gc.DeepEquals, []string{params.Everyone, "charmers"})
+
+	e, err := s.store.FindEntity(wordpress23)
 	c.Assert(err, gc.IsNil)
 	c.Assert(e.ACLs.Read, gc.DeepEquals, []string{params.Everyone, "charmers"})
 
@@ -625,9 +630,16 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			},
 		})
 	}
-	e, err = s.store.FindBaseEntity(charm.MustParseReference("precise/wordpress-23"))
+	be, err = s.store.FindBaseEntity(charm.MustParseReference("precise/wordpress-23"))
 	c.Assert(err, gc.IsNil)
-	c.Assert(e.Public, jc.IsFalse)
+	c.Assert(be.Public, jc.IsFalse)
+	c.Assert(be.ACLs, jc.DeepEquals, mongodoc.ACL{
+		Read:  []string{"bob"},
+		Write: []string{"admin"},
+	})
+
+	e, err = s.store.FindEntity(wordpress23)
+	c.Assert(err, gc.IsNil)
 	c.Assert(e.ACLs, jc.DeepEquals, mongodoc.ACL{
 		Read:  []string{"bob"},
 		Write: []string{"admin"},
@@ -640,9 +652,16 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 		Write: []string{"admin"},
 	})
 	s.assertGet(c, "wordpress/meta/perm/read", []string{"bob", params.Everyone})
-	e, err = s.store.FindBaseEntity(charm.MustParseReference("precise/wordpress-23"))
+	be, err = s.store.FindBaseEntity(charm.MustParseReference("precise/wordpress-23"))
 	c.Assert(err, gc.IsNil)
-	c.Assert(e.Public, jc.IsTrue)
+	c.Assert(be.Public, jc.IsTrue)
+	c.Assert(be.ACLs, jc.DeepEquals, mongodoc.ACL{
+		Read:  []string{"bob", params.Everyone},
+		Write: []string{"admin"},
+	})
+
+	e, err = s.store.FindEntity(wordpress23)
+	c.Assert(err, gc.IsNil)
 	c.Assert(e.ACLs, jc.DeepEquals, mongodoc.ACL{
 		Read:  []string{"bob", params.Everyone},
 		Write: []string{"admin"},
@@ -661,9 +680,14 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Message: `unauthorized: access denied for user "bob"`,
 		},
 	})
-	e, err = s.store.FindBaseEntity(charm.MustParseReference("precise/wordpress-23"))
+	be, err = s.store.FindBaseEntity(charm.MustParseReference("precise/wordpress-23"))
 	c.Assert(err, gc.IsNil)
-	c.Assert(e.Public, jc.IsFalse)
+	c.Assert(be.Public, jc.IsFalse)
+	c.Assert(be.ACLs, jc.DeepEquals, mongodoc.ACL{})
+	c.Assert(be.ACLs.Read, gc.DeepEquals, []string{})
+
+	e, err = s.store.FindEntity(wordpress23)
+	c.Assert(err, gc.IsNil)
 	c.Assert(e.ACLs, jc.DeepEquals, mongodoc.ACL{})
 	c.Assert(e.ACLs.Read, gc.DeepEquals, []string{})
 
@@ -672,9 +696,16 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 		Read:  []string{"bob"},
 		Write: []string{"admin"},
 	})
-	e, err = s.store.FindBaseEntity(charm.MustParseReference("precise/wordpress-23"))
+	be, err = s.store.FindBaseEntity(charm.MustParseReference("precise/wordpress-23"))
 	c.Assert(err, gc.IsNil)
-	c.Assert(e.Public, jc.IsFalse)
+	c.Assert(be.Public, jc.IsFalse)
+	c.Assert(be.ACLs, jc.DeepEquals, mongodoc.ACL{
+		Read:  []string{"bob"},
+		Write: []string{"admin"},
+	})
+
+	e, err = s.store.FindEntity(wordpress23)
+	c.Assert(err, gc.IsNil)
 	c.Assert(e.ACLs, jc.DeepEquals, mongodoc.ACL{
 		Read:  []string{"bob"},
 		Write: []string{"admin"},
@@ -685,9 +716,16 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 		Read []string
 	}{Read: []string{"joe"}}
 	s.assertPut(c, "wordpress/meta/perm", readRequest)
-	e, err = s.store.FindBaseEntity(charm.MustParseReference("precise/wordpress-23"))
+	be, err = s.store.FindBaseEntity(charm.MustParseReference("precise/wordpress-23"))
 	c.Assert(err, gc.IsNil)
-	c.Assert(e.Public, jc.IsFalse)
+	c.Assert(be.Public, jc.IsFalse)
+	c.Assert(be.ACLs, jc.DeepEquals, mongodoc.ACL{
+		Read:  []string{"joe"},
+		Write: []string{},
+	})
+
+	e, err = s.store.FindEntity(wordpress23)
+	c.Assert(err, gc.IsNil)
 	c.Assert(e.ACLs, jc.DeepEquals, mongodoc.ACL{
 		Read:  []string{"joe"},
 		Write: []string{},
