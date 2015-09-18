@@ -413,6 +413,7 @@ Example: `GET /meta`
     "charm-config",
     "charm-metadata",
     "charm-related",
+    "charm-supported-series",
     "extra-info",
     "hash",
     "hash256",
@@ -425,7 +426,6 @@ Example: `GET /meta`
     "promulgated",
     "revision-info",
     "stats",
-    "supported-series",
     "tags"
 ]
 ```
@@ -569,6 +569,7 @@ Example: `GET foo/meta`
     "charm-config",
     "charm-metadata",
     "charm-related",
+    "charm-supported-series",
     "extra-info",
     "id",
     "id-name",
@@ -579,7 +580,6 @@ Example: `GET foo/meta`
     "promulgated",
     "revision-info",
     "stats",
-    "supported-series",
     "tags"
 ]
 ```
@@ -1360,12 +1360,12 @@ type StatsCount struct {
 
 If the refresh boolean parameter is non-zero, the latest stats will be returned without caching.
 
-#### GET *id*/meta/supported-series
+#### GET *id*/meta/charm-supported-series
 
-The `supported-series` path returns the OS series that are defined by the entity as
-being supported.
+The `charm-supported-series` path returns the OS series that are defined by the charm as
+being supported. If no series are declared as supported, an empty list is returned.
 
-Example: `GET trusty/wordpress-42/meta/supported-series`
+Example: `GET trusty/wordpress-42/meta/charm-supported-series`
 
 ```json
 {
@@ -1373,6 +1373,14 @@ Example: `GET trusty/wordpress-42/meta/supported-series`
         "precise",
         "trusty"
     ]
+}
+```
+
+Example: `GET trusty/wordpress-41/meta/charm-supported-series`
+
+```json
+{
+    "SupportedSeries": []
 }
 ```
 
@@ -1443,9 +1451,9 @@ The `id` path returns information on the charm or bundle id, split apart into
 its various components, including the id itself. The information is exactly
 that contained within the entity id.
 
-The request URL may omit series. For charms which support multiple series
-in metadata, the Series attribute will be the default series for the charm.
-Otherwise the Series will be set to the charm store default.
+For charms which support multiple series in metadata, the Series attribute
+will be the default series for the charm. Otherwise the Series will be set
+to the charm store default.
 
 ```go
 type Id struct {
