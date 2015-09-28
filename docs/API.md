@@ -1669,7 +1669,7 @@ whose series is 2. Available filters are:
 * promulgated - the charm has been promulgated.
 * provides - interfaces provided by the charm.
 * requires - interfaces required by the charm.
-* series - the set of series associated with the charm.
+* series - the set of series supported by the charm.
 * summary - the charm's summary text.
 * description - the charm's description text.
 * type - "charm" or "bundle" to search only one doctype or the other.
