@@ -542,7 +542,7 @@ func (s *Store) AddCharm(c charm.Charm, p AddParams) (err error) {
 		CharmRequiredInterfaces: interfacesForRelations(c.Meta().Requires),
 		Contents:                p.Contents,
 	}
-	denormalizeEntity(entity)
+	DenormalizeEntity(entity)
 
 	// Check that we're not going to create a charm that duplicates
 	// the name of a bundle. This is racy, but it's the best we can do.
@@ -561,14 +561,17 @@ func (s *Store) AddCharm(c charm.Charm, p AddParams) (err error) {
 	return nil
 }
 
-// denormalizeEntity sets all denormalized fields in e
+// DenormalizeEntity sets all denormalized fields in e
 // from their associated canonical fields.
 //
 // It is the responsibility of the caller to set e.SupportedSeries
 // if the entity URL does not contain a series. If the entity
 // URL *does* contain a series, e.SupportedSeries will
 // be overwritten.
-func denormalizeEntity(e *mongodoc.Entity) {
+//
+// This is exported for the purposes of tests that
+// need to create directly into the database.
+func DenormalizeEntity(e *mongodoc.Entity) {
 	e.BaseURL = baseURL(e.URL)
 	e.Name = e.URL.Name
 	e.User = e.URL.User
@@ -719,40 +722,92 @@ var seriesScore = map[string]int{
 	"utopic":  4,
 	"vivid":   5,
 	"wily":    6,
+	// When we find a multi-series charm (no series) we
+	// will always choose it in preference to a series-specific
+	// charm
+	"": 5000,
 }
 
 // EntitiesQuery creates a mgo.Query object that can be used to find
 // entities matching the given URL. If the given URL has no user then
 // the produced query will only match promulgated entities.
 func (s *Store) EntitiesQuery(url *charm.Reference) *mgo.Query {
-	if url.User != "" && url.Series != "" && url.Revision != -1 {
-		// Find a specific owned entity, for instance ~who/utopic/django-42.
-		return s.DB.Entities().FindId(url)
-	}
-	if url.Series != "" && url.Revision != -1 {
-		// Find a specific promulgated entity, for instance utopic/django-42.
+	entities := s.DB.Entities()
+	// TODO this could be phrased more efficiently.
+	switch {
+	case url.User != "" && url.Series == "bundle" && url.Revision != -1:
+		return entities.FindId(url)
+	case url.User != "" && url.Series == "bundle":
+		return entities.Find(bson.D{{
+			"name", url.Name,
+		}, {
+			"user", url.User,
+		}, {
+			"series", "bundle",
+		}})
+	case url.User != "" && url.Series != "" && url.Revision != -1:
+		return entities.Find(bson.D{{
+			"name", url.Name,
+		}, {
+			"user", url.User,
+		}, {
+			"supportedseries", url.Series,
+		}, {
+			"revision", url.Revision,
+		}})
+	case url.User != "" && url.Series != "":
+		return entities.Find(bson.D{{
+			"name", url.Name,
+		}, {
+			"user", url.User,
+		}, {
+			"supportedseries", url.Series,
+		}})
+	case url.User != "" && url.Revision != -1:
+		return entities.FindId(url)
+	case url.User != "":
+		return entities.Find(bson.D{{
+			"name", url.Name,
+		}, {
+			"user", url.User,
+		}})
+	case url.Series == "bundle" && url.Revision != -1:
 		return s.DB.Entities().Find(bson.D{{"promulgated-url", url}})
+	case url.Series == "bundle":
+		return entities.Find(bson.D{{
+			"promulgated-url", bson.D{{"$exists", true}},
+		}, {
+			"name", url.Name,
+		}, {
+			"series", "bundle",
+		}})
+	case url.Series != "" && url.Revision != -1:
+		return entities.Find(bson.D{{
+			"promulgated-url", bson.D{{"$exists", true}},
+		}, {
+			"name", url.Name,
+		}, {
+			"supportedseries", url.Series,
+		}, {
+			"promulgated-revision", url.Revision,
+		}})
+	case url.Series != "":
+		return entities.Find(bson.D{{
+			"promulgated-url", bson.D{{"$exists", true}},
+		}, {
+			"name", url.Name,
+		}, {
+			"supportedseries", url.Series,
+		}})
+	case url.Revision != -1:
+		return s.DB.Entities().Find(bson.D{{"promulgated-url", url}})
+	default:
+		return entities.Find(bson.D{{
+			"promulgated-url", bson.D{{"$exists", true}},
+		}, {
+			"name", url.Name,
+		}})
 	}
-	// Find all entities matching the URL.
-	q := make(bson.D, 0, 3)
-	q = append(q, bson.DocElem{"name", url.Name})
-	if url.User != "" {
-		q = append(q, bson.DocElem{"user", url.User})
-	} else {
-		// If the URL user is empty, only search the promulgated entities.
-		q = append(q, bson.DocElem{"promulgated-url", bson.D{{"$exists", true}}})
-	}
-	if url.Series != "" {
-		q = append(q, bson.DocElem{"series", url.Series})
-	}
-	if url.Revision != -1 {
-		if url.User != "" {
-			q = append(q, bson.DocElem{"revision", url.Revision})
-		} else {
-			q = append(q, bson.DocElem{"promulgated-revision", url.Revision})
-		}
-	}
-	return s.DB.Entities().Find(q)
 }
 
 // FindBaseEntity finds the base entity in the store using the given URL,
@@ -1009,7 +1064,7 @@ func (s *Store) AddBundle(b charm.Bundle, p AddParams) error {
 		Contents:           p.Contents,
 		PromulgatedURL:     p.URL.PromulgatedURL(),
 	}
-	denormalizeEntity(entity)
+	DenormalizeEntity(entity)
 
 	// Check that we're not going to create a bundle that duplicates
 	// the name of a charm. This is racy, but it's the best we can do.
