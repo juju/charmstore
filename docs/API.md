@@ -413,6 +413,7 @@ Example: `GET /meta`
     "charm-config",
     "charm-metadata",
     "charm-related",
+    "charm-supported-series",
     "extra-info",
     "hash",
     "hash256",
@@ -569,6 +570,7 @@ Example: `GET foo/meta`
     "charm-config",
     "charm-metadata",
     "charm-related",
+    "charm-supported-series",
     "extra-info",
     "id",
     "id-name",
@@ -697,9 +699,10 @@ type CharmMetadata struct {
         Subordinate bool                        `json:",omitempty"`
         // Provides and Requires map from the relation name to
         // information about the relation.
-        Provides    map[string]Relation         `json:",omitempty"`
-        Requires    map[string]Relation         `json:",omitempty"`
-        Peers       map[string]Relation         `json:",omitempty"`
+        Provides        map[string]Relation     `json:",omitempty"`
+        Requires        map[string]Relation     `json:",omitempty"`
+        Peers           map[string]Relation     `json:",omitempty"`
+        SupportedSeries []string                `json:",omitempty"`
         Tags  []string                          `json:",omitempty"`
 }
 
@@ -747,6 +750,10 @@ Example: `GET wordpress/meta/charm-metadata`
             "Scope": "global"
         }
     },
+    "SupportedSeries": [
+        "precise",
+        "trusty"
+    ]
     "Tags": [
         "applications"
     ]
@@ -1374,6 +1381,30 @@ type StatsCount struct {
 
 If the refresh boolean parameter is non-zero, the latest stats will be returned without caching.
 
+#### GET *id*/meta/charm-supported-series
+
+The `charm-supported-series` path returns the OS series that are defined by the charm as
+being supported. If no series are declared as supported, an empty list is returned.
+
+Example: `GET trusty/wordpress-42/meta/charm-supported-series`
+
+```json
+{
+    "SupportedSeries": [
+        "precise",
+        "trusty"
+    ]
+}
+```
+
+Example: `GET trusty/wordpress-41/meta/charm-supported-series`
+
+```json
+{
+    "SupportedSeries": []
+}
+```
+
 #### GET *id*/meta/tags
 
 The `tags` path returns any tags that are associated with the entity.
@@ -1397,6 +1428,10 @@ newer revisions. The fully qualified ids of those charms will be returned in an
 ordered list from newest to oldest revision. Note that the current revision
 will be included in the list as it is also an available revision.
 
+If a charm supports multiple series, and the series is not specified in the
+request URL, the returned list of ids will be expanded to include separate
+entries for each series. Results are ordered by series, most recent first.
+
 ```go
 type RevisionInfo struct {
         Revisions []*charm.Reference
@@ -1416,11 +1451,30 @@ Example: `GET trusty/wordpress-42/meta/revision-info`
 }
 ```
 
+Example: `GET wordpress/meta/revision-info`
+
+```json
+{
+    "Revisions": [
+        "cs:trusty/wordpress-43",
+        "cs:trusty/wordpress-42",
+        "cs:trusty/wordpress-41",
+        "cs:trusty/wordpress-39"
+        "cs:precise/wordpress-41",
+        "cs:precise/wordpress-39"
+    ]
+}
+```
+
 #### GET *id*/meta/id
 
 The `id` path returns information on the charm or bundle id, split apart into
 its various components, including the id itself. The information is exactly
 that contained within the entity id.
+
+For charms which support multiple series in metadata, the Series attribute
+will be the default series for the charm. Otherwise the Series will be set
+to the charm store default.
 
 ```go
 type Id struct {
@@ -1450,6 +1504,17 @@ Example: `GET precise/wordpress/meta/id`
 {
     "Id": "precise/wordpress-42",
     "Series": "precise",
+    "Name": "wordpress",
+    "Revision": 42
+}
+```
+
+Example: `GET wordpress/meta/id`
+
+```json
+{
+    "Id": "trusty/wordpress-42",
+    "Series": "trusty",
     "Name": "wordpress",
     "Revision": 42
 }
@@ -1537,6 +1602,11 @@ The `id-series` path returns information on the series in the id. This
 information is exactly that contained within the id. For bundles, this will
 return "bundle".
 
+The request URL may omit series. For charms which support multiple series
+in metadata, the returned series will be the default series for the charm.
+Otherwise the series will be set to the charm store default.
+
+
 ```go
 type Series struct {
         Series string
@@ -1544,6 +1614,14 @@ type Series struct {
 ```
 
 Example: `GET ~bob/trusty/wordpress-42/meta/id-series`
+
+```json
+{
+    "Series": "trusty"
+}
+```
+
+Example: `GET wordpress-42/meta/id-series`
 
 ```json
 {
@@ -1612,7 +1690,7 @@ whose series is 2. Available filters are:
 * promulgated - the charm has been promulgated.
 * provides - interfaces provided by the charm.
 * requires - interfaces required by the charm.
-* series - the charm's series.
+* series - the set of series supported by the charm.
 * summary - the charm's summary text.
 * description - the charm's description text.
 * type - "charm" or "bundle" to search only one doctype or the other.
@@ -1852,7 +1930,7 @@ prior authorization is required.
 This endpoint returns a macaroon in JSON format that can be passed to
 third parties to allow them to access the charm store on the user's
 behalf.  A first party "is-entity" caveat may be added to restrict those
-parties so that they can only access a given charmstore entity with a
+parties so that they can only access a given charm store entity with a
 specified id.
 
 A delegatable macaroon will only be returned to an authorized user (not
