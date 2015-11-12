@@ -1574,6 +1574,25 @@ Example: `GET bundle/mediawiki/meta/home-page`
 }
 ```
 
+#### PUT *id*/meta/home-page
+
+This request updates the home page associated with the charm or bundle.
+
+```go
+type HomePage struct {
+        HomePage string
+}
+```
+
+Example: `PUT precise/wordpress-32/meta/home-page`
+
+Request body:
+```json
+{
+    "HomePage": "http://newmediawiki.org"
+}
+```
+
 #### GET *id*/meta/bugs-url
 
 The `meta/bugs-url` path returns the url where to file bugs on the 
@@ -1587,6 +1606,25 @@ type BugsURL struct {
 
 Example: `GET bundle/mediawiki/meta/bugs-url`
 
+```json
+{
+    "BugsURL": "http://mediawiki.org/bugs"
+}
+```
+
+#### PUT *id*/meta/home-page
+
+This request updates the bugs url page associated with the charm or bundle.
+
+```go
+type BugsURL struct {
+        BugsURL string
+}
+```
+
+Example: `PUT precise/wordpress-32/meta/bugs-url`
+
+Request body:
 ```json
 {
     "BugsURL": "http://mediawiki.org/bugs"
