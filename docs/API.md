@@ -405,6 +405,7 @@ Example: `GET /meta`
 [
     "archive-size",
     "archive-upload-time",
+    "bugs-url",
     "bundle-machine-count",
     "bundle-metadata",
     "bundle-unit-count",
@@ -416,6 +417,7 @@ Example: `GET /meta`
     "extra-info",
     "hash",
     "hash256",
+    "home-page",
     "id",
     "id-name",
     "id-revision",
@@ -561,6 +563,7 @@ Example: `GET foo/meta`
 [
     "archive-size",
     "archive-upload-time",
+    "bugs-url",
     "bundle-machine-count",
     "bundle-metadata",
     "bundle-unit-count",
@@ -570,6 +573,7 @@ Example: `GET foo/meta`
     "charm-metadata",
     "charm-related",
     "extra-info",
+    "home-page",
     "id",
     "id-name",
     "id-revision",
@@ -1548,6 +1552,44 @@ Example: `GET ~bob/trusty/wordpress-42/meta/id-series`
 ```json
 {
     "Series": "trusty"
+}
+```
+
+#### GET *id*/meta/home-page
+
+The `meta/home-page` path returns the home page project of 
+the entity if any specified.
+
+```go
+type HomePageResponse struct {
+        HomePage string
+}
+```
+
+Example: `GET bundle/mediawiki/meta/home-page`
+
+```json
+{
+    "HomePage": "http://mediawiki.org"
+}
+```
+
+#### GET *id*/meta/bugs-url
+
+The `meta/bugs-url` path returns the url where to file bugs on the 
+project's entity, if any specified.
+
+```go
+type BugsURL struct {
+        BugsURL string
+}
+```
+
+Example: `GET bundle/mediawiki/meta/bugs-url`
+
+```json
+{
+    "BugsURL": "http://mediawiki.org/bugs"
 }
 ```
 

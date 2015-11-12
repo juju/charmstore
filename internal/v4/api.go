@@ -179,6 +179,8 @@ func newReqHandler() *ReqHandler {
 			"manifest":         h.entityHandler(h.metaManifest, "blobname"),
 			"perm":             h.puttableBaseEntityHandler(h.metaPerm, h.putMetaPerm, "acls"),
 			"perm/":            h.puttableBaseEntityHandler(h.metaPermWithKey, h.putMetaPermWithKey, "acls"),
+			"home-page":        h.puttableBaseEntityHandler(h.metaHomePage, h.putMetaHomePage, "homepage"),
+			"bugs-url":         h.puttableBaseEntityHandler(h.metaBugsURL, h.putMetaBugsURL, "bugsurl"),
 			"promulgated":      h.baseEntityHandler(h.metaPromulgated, "promulgated"),
 			"revision-info":    router.SingleIncludeHandler(h.metaRevisionInfo),
 			"stats":            h.entityHandler(h.metaStats),
@@ -862,6 +864,58 @@ func (h *ReqHandler) putMetaPerm(id *router.ResolvedURL, path string, val *json.
 		},
 	})
 
+	updater.UpdateSearch()
+	return nil
+}
+
+// GET id/meta/homepage
+// https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetahomepage
+func (h *ReqHandler) metaHomePage(entity *mongodoc.BaseEntity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
+	return params.HomePage {
+		HomePage: entity.HomePage.String(),
+	}, nil
+}
+
+// PUT id/meta/homepage
+// https://github.com/juju/charmstore/blob/v4/docs/API.md#put-idmeta
+func (h *ReqHandler) putMetaHomePage(id *router.ResolvedURL, path string, val *json.RawMessage, updater *router.FieldUpdater, req *http.Request) error {
+	var homePage params.HomePage
+	if err := json.Unmarshal(*val, &homePage); err != nil {
+		return errgo.Mask(err)
+	}
+
+	homeURL, err := url.Parse(homePage.HomePage)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+
+	updater.UpdateField("homepage", homeURL, nil)
+	updater.UpdateSearch()
+	return nil
+}
+
+// GET id/meta/bugsurl
+// https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetabugsurl
+func (h *ReqHandler) metaBugsURL(entity *mongodoc.BaseEntity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
+	return params.BugsURL {
+		BugsURL: entity.BugsURL.String(),
+	}, nil
+}
+
+// PUT id/meta/homepage
+// https://github.com/juju/charmstore/blob/v4/docs/API.md#put-idmeta
+func (h *ReqHandler) putMetaBugsURL(id *router.ResolvedURL, path string, val *json.RawMessage, updater *router.FieldUpdater, req *http.Request) error {
+	var request params.BugsURL
+	if err := json.Unmarshal(*val, &request); err != nil {
+		return errgo.Mask(err)
+	}
+
+	bugsURL, err := url.Parse(request.BugsURL)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+
+	updater.UpdateField("bugsurl", bugsURL, nil)
 	updater.UpdateSearch()
 	return nil
 }
