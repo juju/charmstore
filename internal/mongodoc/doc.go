@@ -9,6 +9,7 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/mgo.v2/bson"
+	"net/url"
 )
 
 // Entity holds the in-database representation of charm or bundle's
@@ -150,6 +151,12 @@ type BaseEntity struct {
 	// the base entity. The permissions apply to all
 	// revisions.
 	ACLs ACL
+
+	// HomePage represents the entity project home page.
+	HomePage url.URL
+
+	// BugsURL represents the entity project bugs page.
+	BugsURL url.URL
 
 	// Promulgated specifies whether the charm or bundle should be
 	// promulgated.

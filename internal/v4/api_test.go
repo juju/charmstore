@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"net/url"
 
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
@@ -346,6 +347,32 @@ var metaEndpoints = []metaEndpoint{{
 	checkURL: newResolvedURL("cs:~bob/utopic/wordpress-2", -1),
 	assertCheckData: func(c *gc.C, data interface{}) {
 		c.Assert(data, gc.DeepEquals, []string{params.Everyone, "bob"})
+	},
+}, {
+	name: "home-page",
+	get: func(store *charmstore.Store, url *router.ResolvedURL) (interface{}, error) {
+		e, err := store.FindBaseEntity(&url.URL)
+		if err != nil {
+			return nil, err
+		}
+		return params.HomePage{e.HomePage.String()}, nil
+	},
+	checkURL: newResolvedURL("~bob/utopic/wordpress-2", -1),
+	assertCheckData: func(c *gc.C, data interface{}) {
+		c.Assert(data, gc.DeepEquals, params.HomePage{""})
+	},
+}, {
+	name: "bugs-url",
+	get: func(store *charmstore.Store, url *router.ResolvedURL) (interface{}, error) {
+		e, err := store.FindBaseEntity(&url.URL)
+		if err != nil {
+			return nil, err
+		}
+		return params.BugsURL{e.BugsURL.String()}, nil
+	},
+	checkURL: newResolvedURL("~bob/utopic/wordpress-2", -1),
+	assertCheckData: func(c *gc.C, data interface{}) {
+		c.Assert(data, gc.DeepEquals, params.BugsURL{""})
 	},
 }, {
 	name: "tags",
@@ -723,6 +750,102 @@ func (s *APISuite) TestMetaPermPutUnauthorized(c *gc.C) {
 		Body:         strings.NewReader(`["some-user"]`),
 		ExpectStatus: http.StatusUnauthorized,
 		ExpectBody: params.Error{
+			Code:    params.ErrUnauthorized,
+			Message: "authentication failed: missing HTTP auth header",
+		},
+	})
+}
+
+func (s *APISuite) TestMetaHomePage(c *gc.C) {
+	s.addPublicCharm(c, "wordpress", newResolvedURL("~charmers/precise/wordpress-23", 23))
+	s.addPublicCharm(c, "wordpress", newResolvedURL("~charmers/precise/wordpress-24", 24))
+	s.addPublicCharm(c, "wordpress", newResolvedURL("~charmers/trusty/wordpress-1", 1))
+	s.assertGet(c, "wordpress/meta/home-page", &params.HomePage{""})
+
+	e, err := s.store.FindBaseEntity(charm.MustParseReference("precise/wordpress-23"))
+	c.Assert(err, gc.IsNil)
+	c.Assert(e.HomePage, gc.DeepEquals, url.URL{})
+
+	// Change the home page.
+	s.assertPut(c, "precise/wordpress-23/meta/home-page", &params.HomePage{"http://homepage.com"})
+
+	// Check that the perms have changed for all revisions and series.
+	for i, u := range []string{"precise/wordpress-23", "precise/wordpress-24", "trusty/wordpress-1"} {
+		c.Logf("id %d: %q", i, u)
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler: s.srv,
+			Do:      bakeryDo(nil),
+			URL:     storeURL(u + "/meta/home-page"),
+			ExpectBody: &params.HomePage{"http://homepage.com"},
+		})
+	}
+	e, err = s.store.FindBaseEntity(charm.MustParseReference("precise/wordpress-23"))
+	c.Assert(err, gc.IsNil)
+	home, err := url.Parse("http://homepage.com")
+	c.Assert(err, gc.IsNil)
+	c.Assert(e.HomePage, jc.DeepEquals, *home)
+}
+
+func (s *APISuite) TestPutMetaHomePageUnAuthorized(c *gc.C) {
+	s.addPublicCharm(c, "wordpress", newResolvedURL("~charmers/utopic/wordpress-23", 23))
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.noMacaroonSrv,
+		URL:     storeURL("~charmers/utopic/wordpress-23/meta/home-page"),
+		Method:  "PUT",
+		Header: http.Header{
+			"Content-Type": {"application/json"},
+		},
+		Body:         strings.NewReader(`{"HomePage": "http://homepage.com"}`),
+		ExpectStatus: http.StatusUnauthorized,
+		ExpectBody:   params.Error{
+			Code:    params.ErrUnauthorized,
+			Message: "authentication failed: missing HTTP auth header",
+		},
+	})
+}
+
+func (s *APISuite) TestMetaBugsURL(c *gc.C) {
+	s.addPublicCharm(c, "wordpress", newResolvedURL("~charmers/precise/wordpress-23", 23))
+	s.addPublicCharm(c, "wordpress", newResolvedURL("~charmers/precise/wordpress-24", 24))
+	s.addPublicCharm(c, "wordpress", newResolvedURL("~charmers/trusty/wordpress-1", 1))
+	s.assertGet(c, "wordpress/meta/bugs-url", &params.BugsURL{""})
+
+	e, err := s.store.FindBaseEntity(charm.MustParseReference("precise/wordpress-23"))
+	c.Assert(err, gc.IsNil)
+	c.Assert(e.BugsURL, gc.DeepEquals, url.URL{})
+
+	// Change the home page.
+	s.assertPut(c, "precise/wordpress-23/meta/bugs-url", &params.BugsURL{"http://bugs.com"})
+
+	// Check that the perms have changed for all revisions and series.
+	for i, u := range []string{"precise/wordpress-23", "precise/wordpress-24", "trusty/wordpress-1"} {
+		c.Logf("id %d: %q", i, u)
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler: s.srv,
+			Do:      bakeryDo(nil),
+			URL:     storeURL(u + "/meta/bugs-url"),
+			ExpectBody: &params.BugsURL{"http://bugs.com"},
+		})
+	}
+	e, err = s.store.FindBaseEntity(charm.MustParseReference("precise/wordpress-23"))
+	c.Assert(err, gc.IsNil)
+	bugs, err := url.Parse("http://bugs.com")
+	c.Assert(err, gc.IsNil)
+	c.Assert(e.BugsURL, jc.DeepEquals, *bugs)
+}
+
+func (s *APISuite) TestPutMetaBugsURLUnAuthorized(c *gc.C) {
+	s.addPublicCharm(c, "wordpress", newResolvedURL("~charmers/utopic/wordpress-23", 23))
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.noMacaroonSrv,
+		URL:     storeURL("~charmers/utopic/wordpress-23/meta/bugs-url"),
+		Method:  "PUT",
+		Header: http.Header{
+			"Content-Type": {"application/json"},
+		},
+		Body:         strings.NewReader(`{"BugsURL": "http://bugs.com"}`),
+		ExpectStatus: http.StatusUnauthorized,
+		ExpectBody:   params.Error{
 			Code:    params.ErrUnauthorized,
 			Message: "authentication failed: missing HTTP auth header",
 		},
