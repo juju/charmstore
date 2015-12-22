@@ -4,10 +4,17 @@
 package mongodoc // import "gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
 
 import (
+	"fmt"
+
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charm.v6-unstable/resource"
 )
+
+// NewResourceID generates the doc ID corresponding to the given info.
+func NewResourceID(curl charm.URL, res resource.Resource) string {
+	return fmt.Sprintf("resource#%s#%s#%d", curl, res.Name, res.Revision)
+}
 
 // Resource holds the in-database representation of a charm resource
 // at a particular revision.
@@ -27,7 +34,10 @@ type Resource struct {
 }
 
 // Resource2Doc converts the resource into a DB doc.
-func Resource2Doc(id string, curl charm.URL, res resource.Resource) *Resource {
+func Resource2Doc(curl charm.URL, res resource.Resource) *Resource {
+	// TODO(ericsnow) Ignore the series?
+	id := NewResourceID(curl, res)
+
 	return &Resource{
 		DocID:    id,
 		CharmURL: curl,
