@@ -21,9 +21,8 @@ var _ = gc.Suite(&ResourceSuite{})
 func (s *ResourceSuite) TestResource2Doc(c *gc.C) {
 	var curl charm.URL
 	res, expected := newResource(c, curl, "spam", "spamspamspam")
-	id := expected.DocID
 
-	doc := mongodoc.Resource2Doc(id, curl, res)
+	doc := mongodoc.Resource2Doc(curl, res)
 
 	c.Check(doc, jc.DeepEquals, &expected)
 }
