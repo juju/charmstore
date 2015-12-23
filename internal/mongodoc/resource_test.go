@@ -38,6 +38,9 @@ func (s *ResourceSuite) TestDoc2Resource(c *gc.C) {
 }
 
 func newResource(c *gc.C, curl charm.URL, name, data string) (resource.Resource, mongodoc.Resource) {
+	curl.Series = ""
+	curl.Revision = -1
+
 	path := name + ".tgz"
 	comment := "you really need this!!!"
 	revision := 1

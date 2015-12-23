@@ -35,9 +35,12 @@ type Resource struct {
 
 // Resource2Doc converts the resource into a DB doc.
 func Resource2Doc(curl charm.URL, res resource.Resource) *Resource {
-	// TODO(ericsnow) Ignore the series?
-	id := NewResourceID(curl, res)
+	// We ignore the series and revision because resources are specific
+	// to the charm rather than to any particular variation of it.
+	curl.Series = ""
+	curl.Revision = -1
 
+	id := NewResourceID(curl, res)
 	return &Resource{
 		DocID:    id,
 		CharmURL: curl,
