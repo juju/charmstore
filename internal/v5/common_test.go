@@ -236,6 +236,7 @@ func (s *commonSuite) addPublicBundle(c *gc.C, bundleName string, rurl *router.R
 func (s *commonSuite) addCharms(c *gc.C, charms map[string]charm.Charm) {
 	for id, ch := range charms {
 		url := mustParseResolvedURL(id)
+		c.Logf("adding charm %q to db", url)
 		// The blob related info are not used in these tests.
 		// The related charms are retrieved from the entities collection,
 		// without accessing the blob store.
@@ -246,6 +247,13 @@ func (s *commonSuite) addCharms(c *gc.C, charms map[string]charm.Charm) {
 			BlobSize: fakeBlobSize,
 		})
 		c.Assert(err, gc.IsNil, gc.Commentf("id %q", id))
+		channel := charmstore.StableChannel
+		if url.Development {
+			channel = charm.DevelopmentChannel
+		}
+		url.Development = false
+		err = s.store.Publish(url, channel)
+		c.Assert(err, gc.IsNil)
 		err = s.store.SetPerms(&url.URL, "read", params.Everyone, url.URL.User)
 		c.Assert(err, gc.IsNil)
 		if url.Development {

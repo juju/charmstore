@@ -150,7 +150,7 @@ func resolveURL(cache *entitycache.Cache, url *charm.URL) (*router.ResolvedURL, 
 	rurl := &router.ResolvedURL{
 		URL:                 *entity.URL,
 		PromulgatedRevision: -1,
-		Development:         url.Channel == charm.DevelopmentChannel,
+		Development:         (url.Channel == charm.DevelopmentChannel) || (entity.Development && !entity.Stable),
 	}
 	if url.User == "" {
 		rurl.PromulgatedRevision = entity.PromulgatedRevision

@@ -20,6 +20,7 @@ import (
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/blobstore"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
+	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
 )
 
@@ -396,6 +397,7 @@ var metaCharmRelatedTests = []struct {
 func (s *RelationsSuite) addCharms(c *gc.C, charms map[string]charm.Charm) {
 	for id, ch := range charms {
 		url := mustParseResolvedURL(id)
+		c.Logf("adding charm %q to db", url)
 		// The blob related info are not used in these tests.
 		// The related charms are retrieved from the entities collection,
 		// without accessing the blob store.
@@ -406,6 +408,13 @@ func (s *RelationsSuite) addCharms(c *gc.C, charms map[string]charm.Charm) {
 			BlobSize: fakeBlobSize,
 		})
 		c.Assert(err, gc.IsNil, gc.Commentf("id %q", id))
+		channel := charmstore.StableChannel
+		if url.Development {
+			channel = charm.DevelopmentChannel
+		}
+		url.Development = false
+		err = s.store.Publish(url, channel)
+		c.Assert(err, gc.IsNil)
 		err = s.store.SetPerms(&url.URL, "read", params.Everyone, url.URL.User)
 		c.Assert(err, gc.IsNil)
 	}
@@ -413,7 +422,7 @@ func (s *RelationsSuite) addCharms(c *gc.C, charms map[string]charm.Charm) {
 
 func (s *RelationsSuite) TestMetaCharmRelated(c *gc.C) {
 	for i, test := range metaCharmRelatedTests {
-		c.Logf("test %d: %s", i, test.about)
+		c.Logf("\ntest %d: %s", i, test.about)
 		s.addCharms(c, test.charms)
 		storeURL := storeURL(test.id + "/meta/charm-related" + test.querystring)
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -781,6 +790,8 @@ func (s *RelationsSuite) TestMetaBundlesContaining(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 		err = s.store.SetPerms(&rurl.URL, "read", params.Everyone, rurl.URL.User)
 		c.Assert(err, gc.IsNil)
+		err = s.store.Publish(rurl, charmstore.StableChannel)
+		c.Assert(err, gc.IsNil)
 
 		// Perform the request and ensure the response is what we expect.
 		storeURL := storeURL(test.id + "/meta/bundles-containing" + test.querystring)
@@ -791,8 +802,10 @@ func (s *RelationsSuite) TestMetaBundlesContaining(c *gc.C) {
 			ExpectBody:   sameMetaAnyResponses(test.expectBody),
 		})
 
-		// Clean up the charm entity in the store.
+		// Clean up the charm entity and base entity in the store.
 		err = s.store.DB.Entities().Remove(bson.D{{"_id", &rurl.URL}})
+		c.Assert(err, gc.IsNil)
+		err = s.store.DB.BaseEntities().Remove(bson.D{{"_id", mongodoc.BaseURL(&rurl.URL)}})
 		c.Assert(err, gc.IsNil)
 	}
 }

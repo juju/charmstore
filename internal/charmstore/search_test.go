@@ -141,9 +141,24 @@ func (s *StoreSearchSuite) TestNoExportDeprecated(c *gc.C) {
 	c.Assert(present, gc.Equals, false)
 }
 
+func (s *StoreSearchSuite) TestNoExportUnpublished(c *gc.C) {
+	rurl := router.MustNewResolvedURL("cs:~charmers/development/trusty/mysql-42", -1)
+	err := s.store.AddCharmWithArchive(rurl, storetesting.Charms.CharmDir("mysql"))
+	c.Assert(err, gc.IsNil)
+
+	var entity *mongodoc.Entity
+	err = s.store.DB.Entities().FindId(rurl.URL.String()).One(&entity)
+	c.Assert(err, gc.IsNil)
+	present, err := s.store.ES.HasDocument(s.TestIndex, typeName, s.store.ES.getID(entity.URL))
+	c.Assert(err, gc.IsNil)
+	c.Assert(present, gc.Equals, false)
+}
+
 func (s *StoreSearchSuite) TestNoExportDevelopment(c *gc.C) {
 	rurl := router.MustNewResolvedURL("cs:~charmers/development/trusty/mysql-42", -1)
 	err := s.store.AddCharmWithArchive(rurl, storetesting.Charms.CharmDir("mysql"))
+	c.Assert(err, gc.IsNil)
+	err = s.store.Publish(rurl, charm.DevelopmentChannel)
 	c.Assert(err, gc.IsNil)
 
 	var entity *mongodoc.Entity
@@ -158,6 +173,8 @@ func (s *StoreSearchSuite) TestExportOnlyLatest(c *gc.C) {
 	charmArchive := storetesting.Charms.CharmDir("wordpress")
 	url := router.MustNewResolvedURL("cs:~charmers/precise/wordpress-24", -1)
 	err := s.store.AddCharmWithArchive(url, charmArchive)
+	c.Assert(err, gc.IsNil)
+	err = s.store.Publish(url, StableChannel)
 	c.Assert(err, gc.IsNil)
 	var expected, old *mongodoc.Entity
 	var actual json.RawMessage
@@ -182,9 +199,13 @@ func (s *StoreSearchSuite) TestExportMultiSeriesCharmsCreateExpandedVersions(c *
 	url := router.MustNewResolvedURL("cs:~charmers/trusty/juju-gui-24", -1)
 	err := s.store.AddCharmWithArchive(url, charmArchive)
 	c.Assert(err, gc.IsNil)
+	err = s.store.Publish(url, StableChannel)
+	c.Assert(err, gc.IsNil)
 	charmArchive = storetesting.Charms.CharmDir("multi-series")
 	url = router.MustNewResolvedURL("cs:~charmers/juju-gui-25", -1)
 	err = s.store.AddCharmWithArchive(url, charmArchive)
+	c.Assert(err, gc.IsNil)
+	err = s.store.Publish(url, StableChannel)
 	c.Assert(err, gc.IsNil)
 	var expected, old *mongodoc.Entity
 	var actual json.RawMessage
@@ -238,10 +259,13 @@ func (s *StoreSearchSuite) addCharmsToStore(c *gc.C) {
 			tags[i] = s + "TAG"
 		}
 		charmArchive.Meta().Tags = tags
-		err := s.store.AddCharmWithArchive(EntityResolvedURL(ent), charmArchive)
+		url := EntityResolvedURL(ent)
+		err := s.store.AddCharmWithArchive(url, charmArchive)
+		c.Assert(err, gc.IsNil)
+		err = s.store.Publish(url, StableChannel)
 		c.Assert(err, gc.IsNil)
 		for i := 0; i < charmDownloadCounts[name]; i++ {
-			err := s.store.IncrementDownloadCounts(EntityResolvedURL(ent))
+			err := s.store.IncrementDownloadCounts(url)
 			c.Assert(err, gc.IsNil)
 		}
 		if ent.URL.Name == "riak" {
@@ -255,10 +279,13 @@ func (s *StoreSearchSuite) addCharmsToStore(c *gc.C) {
 	for name, ent := range exportTestBundles {
 		bundleArchive := storetesting.Charms.BundleDir(name)
 		bundleArchive.Data().Tags = strings.Split(name, "-")
-		err := s.store.AddBundleWithArchive(EntityResolvedURL(ent), bundleArchive)
+		url := EntityResolvedURL(ent)
+		err := s.store.AddBundleWithArchive(url, bundleArchive)
+		c.Assert(err, gc.IsNil)
+		err = s.store.Publish(url, StableChannel)
 		c.Assert(err, gc.IsNil)
 		for i := 0; i < charmDownloadCounts[name]; i++ {
-			err := s.store.IncrementDownloadCounts(EntityResolvedURL(ent))
+			err := s.store.IncrementDownloadCounts(url)
 			c.Assert(err, gc.IsNil)
 		}
 		err = s.store.SetPerms(ent.URL, "read", ent.URL.User, params.Everyone)
@@ -616,8 +643,11 @@ func (s *StoreSearchSuite) TestLimitTestSearch(c *gc.C) {
 func (s *StoreSearchSuite) TestPromulgatedRank(c *gc.C) {
 	charmArchive := storetesting.Charms.CharmDir("varnish")
 	ent := newEntity("cs:~charmers/trusty/varnish-1", 1)
-	s.store.AddCharmWithArchive(EntityResolvedURL(ent), charmArchive)
-	err := s.store.SetPerms(ent.URL, "read", ent.URL.User, params.Everyone)
+	url := EntityResolvedURL(ent)
+	s.store.AddCharmWithArchive(url, charmArchive)
+	err := s.store.Publish(url, StableChannel)
+	c.Assert(err, gc.IsNil)
+	err = s.store.SetPerms(ent.URL, "read", ent.URL.User, params.Everyone)
 	c.Assert(err, gc.IsNil)
 	err = s.store.UpdateSearchBaseURL(mongodoc.BaseURL(ent.URL))
 	c.Assert(err, gc.IsNil)
@@ -886,6 +916,8 @@ func (s *StoreSearchSuite) TestMultiSeriesCharmFiltersSeriesCorrectly(c *gc.C) {
 	url := router.MustNewResolvedURL("cs:~charmers/juju-gui-25", -1)
 	err := s.store.AddCharmWithArchive(url, charmArchive)
 	c.Assert(err, gc.IsNil)
+	err = s.store.Publish(url, StableChannel)
+	c.Assert(err, gc.IsNil)
 	err = s.store.SetPerms(&url.URL, "read", url.URL.User, params.Everyone)
 	c.Assert(err, gc.IsNil)
 	err = s.store.UpdateSearch(url)
@@ -924,6 +956,8 @@ func (s *StoreSearchSuite) TestMultiSeriesCharmSortsSeriesCorrectly(c *gc.C) {
 	charmArchive := storetesting.Charms.CharmDir("multi-series")
 	url := router.MustNewResolvedURL("cs:~charmers/juju-gui-25", -1)
 	err := s.store.AddCharmWithArchive(url, charmArchive)
+	c.Assert(err, gc.IsNil)
+	err = s.store.Publish(url, StableChannel)
 	c.Assert(err, gc.IsNil)
 	err = s.store.SetPerms(&url.URL, "read", url.URL.User, params.Everyone)
 	c.Assert(err, gc.IsNil)

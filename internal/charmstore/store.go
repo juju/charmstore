@@ -37,6 +37,12 @@ var (
 	ErrTooManySessions = errgo.New("too many mongo sessions in use")
 )
 
+const (
+	// StableChannel is the channel used for stable charms or bundles.
+	// TODO (frankban) move this to the charm package.
+	StableChannel charm.Channel = ""
+)
+
 // Pool holds a connection to the underlying charm and blob
 // data stores. Calling its Store method returns a new Store
 // from the pool that can be used to process short-lived requests
@@ -537,7 +543,7 @@ func (s *Store) AddCharm(c charm.Charm, p AddParams) (err error) {
 	if id.Series == "bundle" || id.User == "" || id.Revision == -1 {
 		return errgo.Newf("charm added with invalid id %v", &id)
 	}
-	logger.Infof("add charm url %s; prev %d; dev %v", &id, p.URL.PromulgatedRevision, p.URL.Development)
+	logger.Infof("add charm url %s; promulgated rev %d", &id, p.URL.PromulgatedRevision)
 	entity := &mongodoc.Entity{
 		URL:                     &id,
 		PromulgatedURL:          p.URL.DocPromulgatedURL(),
@@ -553,7 +559,6 @@ func (s *Store) AddCharm(c charm.Charm, p AddParams) (err error) {
 		CharmRequiredInterfaces: interfacesForRelations(c.Meta().Requires),
 		Contents:                p.Contents,
 		SupportedSeries:         c.Meta().Series,
-		Development:             p.URL.Development,
 	}
 	denormalizeEntity(entity)
 
@@ -622,6 +627,7 @@ func (s *Store) insertEntity(entity *mongodoc.Entity) (err error) {
 		Public:          false,
 		ACLs:            acls,
 		DevelopmentACLs: acls,
+		StableACLs:      acls,
 		Promulgated:     entity.PromulgatedURL != nil,
 	}
 	err = s.DB.BaseEntities().Insert(baseEntity)
@@ -637,20 +643,6 @@ func (s *Store) insertEntity(entity *mongodoc.Entity) (err error) {
 	if err != nil {
 		return errgo.Notef(err, "cannot insert entity")
 	}
-	// Ensure that if anything fails after this, that we delete
-	// the entity, otherwise we will be left in an internally
-	// inconsistent state.
-	defer func() {
-		if err != nil {
-			if err := s.DB.Entities().RemoveId(entity.URL); err != nil {
-				logger.Errorf("cannot remove entity after elastic search failure: %v", err)
-			}
-		}
-	}()
-	// Add entity to ElasticSearch.
-	if err := s.UpdateSearch(EntityResolvedURL(entity)); err != nil {
-		return errgo.Notef(err, "cannot index %s to ElasticSearch", entity.URL)
-	}
 	return nil
 }
 
@@ -663,6 +655,7 @@ func (s *Store) FindEntity(url *router.ResolvedURL, fields map[string]int) (*mon
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
+
 	if len(entities) == 0 {
 		return nil, errgo.WithCausef(nil, params.ErrNotFound, "entity not found")
 	}
@@ -700,6 +693,8 @@ func (s *Store) FindBestEntity(url *charm.URL, fields map[string]int) (*mongodoc
 		// TODO this would be more efficient if we used bitmasks for field selection.
 		nfields := map[string]int{
 			"_id":                  1,
+			"development":          1,
+			"stable":               1,
 			"promulgated-url":      1,
 			"promulgated-revision": 1,
 			"series":               1,
@@ -711,35 +706,68 @@ func (s *Store) FindBestEntity(url *charm.URL, fields map[string]int) (*mongodoc
 		fields = nfields
 	}
 
+	errNotFound := errgo.WithCausef(nil, params.ErrNotFound, "entity not found")
+	findEntity := func(u *charm.URL, development bool) (*mongodoc.Entity, error) {
+		entity, err := s.FindEntity(&router.ResolvedURL{
+			URL:                 *u,
+			PromulgatedRevision: -1,
+			Development:         development,
+		}, fields)
+		if err != nil {
+			// A not found error is not contemplated here, as it would mean we
+			// have an internal inconsistency in which a base entity field
+			// refers to a non existing entity.
+			return nil, errgo.Notef(err, "cannot find charm or bundle for an internal error")
+		}
+		return entity, nil
+	}
+	if url.Revision == -1 {
+		// Find the current stable or development release.
+		baseEntity, err := s.FindBaseEntity(url, FieldSelector("developmentseries", "stableseries"))
+		if err != nil {
+			if errgo.Cause(err) == params.ErrNotFound {
+				return nil, errNotFound
+			}
+			return nil, errgo.Notef(err, "cannot retrieve base entity")
+		}
+		development := url.Channel == charm.DevelopmentChannel
+		urlSeries := baseEntity.StableSeries
+		if development || len(urlSeries) == 0 {
+			urlSeries = baseEntity.DevelopmentSeries
+		}
+		if len(urlSeries) == 0 {
+			return nil, errNotFound
+		}
+		if url.Series != "" {
+			u, found := urlSeries[url.Series]
+			if !found {
+				return nil, errNotFound
+			}
+			return findEntity(u, development)
+		}
+		bestSeries := ""
+		for s := range urlSeries {
+			if bestSeries == "" || seriesScore[s] > seriesScore[bestSeries] {
+				bestSeries = s
+			}
+		}
+		return findEntity(urlSeries[bestSeries], development)
+	}
+
 	entities, err := s.FindEntities(url, fields)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
 	if len(entities) == 0 {
-		return nil, errgo.WithCausef(nil, params.ErrNotFound, "entity not found")
+		return nil, errNotFound
 	}
-	best := entities[0]
-	for _, e := range entities {
-		if seriesScore[e.Series] > seriesScore[best.Series] {
-			best = e
-			continue
-		}
-		if seriesScore[e.Series] < seriesScore[best.Series] {
-			continue
-		}
-		if url.User == "" {
-			if e.PromulgatedRevision > best.PromulgatedRevision {
-				best = e
-				continue
-			}
-		} else {
-			if e.Revision > best.Revision {
-				best = e
-				continue
-			}
+	bestEntity := entities[0]
+	for _, e := range entities[1:] {
+		if seriesScore[e.Series] > seriesScore[bestEntity.Series] {
+			bestEntity = e
 		}
 	}
-	return best, nil
+	return bestEntity, nil
 }
 
 var seriesScore = map[string]int{
@@ -770,9 +798,10 @@ func (s *Store) EntitiesQuery(url *charm.URL) *mgo.Query {
 	entities := s.DB.Entities()
 	query := make(bson.D, 1, 5)
 	query[0] = bson.DocElem{"name", url.Name}
-	if url.Channel != charm.DevelopmentChannel {
-		query = append(query, bson.DocElem{"development", false})
+	if url.Channel == charm.DevelopmentChannel {
+		query = append(query, bson.DocElem{"development", true})
 	}
+
 	if url.User == "" {
 		if url.Revision > -1 {
 			query = append(query, bson.DocElem{"promulgated-revision", url.Revision})
@@ -859,21 +888,59 @@ func (s *Store) UpdateBaseEntity(url *router.ResolvedURL, update interface{}) er
 	return nil
 }
 
-// SetDevelopment sets whether the entity corresponding to the given URL will
-// be only available in its development version (in essence, not published).
-func (s *Store) SetDevelopment(url *router.ResolvedURL, development bool) error {
-	if err := s.UpdateEntity(url, bson.D{{
-		"$set", bson.D{{"development", development}},
-	}}); err != nil {
+// Publish assigns or removes channels to the entity corresponding to the given
+// URL. An error is returned if no channels are provided. For the time being,
+// the only supported channels are "development" and "stable".
+func (s *Store) Publish(url *router.ResolvedURL, channels ...charm.Channel) error {
+	// Validate channels.
+	actual := make([]charm.Channel, 0, len(channels))
+	for _, c := range channels {
+		if c == charm.DevelopmentChannel || c == StableChannel {
+			actual = append(actual, c)
+		}
+	}
+	numChannels := len(actual)
+	if numChannels == 0 {
+		return errgo.Newf("cannot update %q: no channels provided", url)
+	}
+	fields := map[charm.Channel]string{
+		charm.DevelopmentChannel: "development",
+		StableChannel:            "stable",
+	}
+
+	// Update the entity.
+	update := make(bson.D, numChannels)
+	for i, c := range actual {
+		update[i] = bson.DocElem{fields[c], true}
+	}
+	if err := s.UpdateEntity(url, bson.D{{"$set", update}}); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	if !development {
-		// If the entity is published, update the search index.
-		rurl := *url
-		rurl.Development = development
-		if err := s.UpdateSearch(&rurl); err != nil {
-			return errgo.Notef(err, "cannot update search entities for %q", rurl)
+
+	// Update the base entity.
+	entity, err := s.FindEntity(url, FieldSelector("series", "supportedseries"))
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	series := entity.SupportedSeries
+	numSeries := len(series)
+	if numSeries == 0 {
+		series = []string{entity.Series}
+		numSeries = 1
+	}
+	update = make(bson.D, 0, numChannels*numSeries)
+	for _, c := range actual {
+		for _, s := range series {
+			update = append(update, bson.DocElem{fields[c] + "series." + s, entity.URL})
 		}
+	}
+	if err := s.UpdateBaseEntity(url, bson.D{{"$set", update}}); err != nil {
+		return errgo.Mask(err)
+	}
+
+	// Add entity to ElasticSearch.
+	if err := s.UpdateSearch(url); err != nil {
+		return errgo.Notef(err, "cannot index %s to ElasticSearch", url)
 	}
 	return nil
 }
@@ -1072,7 +1139,6 @@ func (s *Store) AddBundle(b charm.Bundle, p AddParams) error {
 		BundleCharms:       urls,
 		Contents:           p.Contents,
 		PromulgatedURL:     p.URL.DocPromulgatedURL(),
-		Development:        p.URL.Development,
 	}
 	denormalizeEntity(entity)
 
@@ -1213,12 +1279,12 @@ func (s *Store) findZipFile(blob io.ReadSeeker, size int64, isFile func(f *zip.F
 // the given id for "which" operations ("read" or "write")
 // to the given ACL. This is mostly provided for testing.
 func (s *Store) SetPerms(id *charm.URL, which string, acl ...string) error {
-	field := "acls"
+	field := "stableacls"
 	if id.Channel == charm.DevelopmentChannel {
 		field = "developmentacls"
 	}
 	return s.DB.BaseEntities().UpdateId(mongodoc.BaseURL(id), bson.D{{"$set",
-		bson.D{{field + "." + which, acl}},
+		bson.D{{"acls." + which, acl}, {field + "." + which, acl}},
 	}})
 }
 
@@ -1301,7 +1367,7 @@ func bundleCharms(data *charm.BundleData) ([]*charm.URL, error) {
 // TODO do we actually want to match dev charms here?
 func (s *Store) MatchingInterfacesQuery(required, provided []string) *mgo.Query {
 	return s.DB.Entities().Find(bson.D{{
-		"development", false,
+		"stable", true,
 	}, {
 		"$or", []bson.D{{{
 			"charmrequiredinterfaces", bson.D{{

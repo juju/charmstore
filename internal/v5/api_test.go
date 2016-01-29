@@ -683,9 +683,18 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 	// its third party caveat.
 	s.discharge = dischargeForUser("bob")
 
+	s.addPublicCharm(c, "wordpress", newResolvedURL("~charmers/precise/wordpress-22", 22))
 	s.addPublicCharm(c, "wordpress", newResolvedURL("~charmers/precise/wordpress-23", 23))
 	s.addPublicCharm(c, "wordpress", newResolvedURL("~charmers/precise/wordpress-24", 24))
 	s.addPublicCharm(c, "wordpress", newResolvedURL("~charmers/trusty/wordpress-1", 1))
+
+	// Mark the first precise revision as both stable release and the second as
+	// development release.
+	err := s.store.Publish(newResolvedURL("~charmers/precise/wordpress-22", 22), charmstore.StableChannel)
+	c.Assert(err, gc.IsNil)
+	err = s.store.Publish(newResolvedURL("~charmers/precise/wordpress-23", 23), charm.DevelopmentChannel)
+	c.Assert(err, gc.IsNil)
+
 	s.assertGet(c, "wordpress/meta/perm", params.PermResponse{
 		Read:  []string{params.Everyone, "charmers"},
 		Write: []string{"charmers"},
@@ -698,30 +707,31 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(e.ACLs.Read, gc.DeepEquals, []string{params.Everyone, "charmers"})
 
-	// Change the published read perms to only include a specific user and the
-	// published write perms to include an "admin" user.
-	s.assertPut(c, "precise/wordpress-23/meta/perm/read", []string{"bob"})
-	s.assertPut(c, "precise/wordpress-23/meta/perm/write", []string{"admin"})
+	// Change the unpublished read perms to only include a specific user and
+	// the unpublished write perms to only include an "admin" user.
+	s.assertPut(c, "precise/wordpress-24/meta/perm/read", []string{"bob"})
+	s.assertPut(c, "precise/wordpress-24/meta/perm/write", []string{"admin"})
 
-	// Check that the perms have changed for all revisions and series.
-	for i, u := range []string{"precise/wordpress-23", "precise/wordpress-24", "trusty/wordpress-1"} {
+	// Check that the perms have changed for all unpublished revisions.
+	for i, u := range []string{"precise/wordpress-24", "trusty/wordpress-1"} {
 		c.Logf("id %d: %q", i, u)
-		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-			Handler: s.srv,
-			Do:      bakeryDo(nil),
-			URL:     storeURL(u + "/meta/perm"),
-			ExpectBody: params.PermResponse{
-				Read:  []string{"bob"},
-				Write: []string{"admin"},
-			},
-		})
-		// The development perms did not mutate.
-		s.assertGet(c, "development/"+u+"/meta/perm", params.PermResponse{
-			Read:  []string{params.Everyone, "charmers"},
-			Write: []string{"charmers"},
+		s.assertGet(c, u+"/meta/perm", params.PermResponse{
+			Read:  []string{"bob"},
+			Write: []string{"admin"},
 		})
 	}
-	e, err = s.store.FindBaseEntity(charm.MustParseURL("precise/wordpress-23"), nil)
+
+	// The stable and development perms did not mutate.
+	s.assertGet(c, "precise/wordpress-22/meta/perm", params.PermResponse{
+		Read:  []string{params.Everyone, "charmers"},
+		Write: []string{"charmers"},
+	})
+	s.assertGet(c, "development/precise/wordpress-23/meta/perm", params.PermResponse{
+		Read:  []string{params.Everyone, "charmers"},
+		Write: []string{"charmers"},
+	})
+
+	e, err = s.store.FindBaseEntity(charm.MustParseURL("precise/wordpress-24"), nil)
 	c.Assert(err, gc.IsNil)
 	c.Assert(e.Public, jc.IsFalse)
 	c.Assert(e.ACLs, jc.DeepEquals, mongodoc.ACL{
@@ -732,14 +742,18 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 		Read:  []string{params.Everyone, "charmers"},
 		Write: []string{"charmers"},
 	})
+	c.Assert(e.StableACLs, jc.DeepEquals, mongodoc.ACL{
+		Read:  []string{params.Everyone, "charmers"},
+		Write: []string{"charmers"},
+	})
 
-	// Try restoring everyone's read permission on the published charm, and
+	// Try adding bob's read permission on the stable charm, and
 	// adding write permissions to bob for the development charm.
 	s.assertPut(c, "wordpress/meta/perm/read", []string{"bob", params.Everyone})
 	s.assertPut(c, "development/wordpress/meta/perm/write", []string{"bob", "admin"})
 	s.assertGet(c, "wordpress/meta/perm", params.PermResponse{
 		Read:  []string{"bob", params.Everyone},
-		Write: []string{"admin"},
+		Write: []string{"charmers"},
 	})
 	s.assertGet(c, "development/wordpress/meta/perm", params.PermResponse{
 		Read:  []string{params.Everyone, "charmers"},
@@ -751,12 +765,16 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(e.Public, jc.IsTrue)
 	c.Assert(e.ACLs, jc.DeepEquals, mongodoc.ACL{
-		Read:  []string{"bob", params.Everyone},
+		Read:  []string{"bob"},
 		Write: []string{"admin"},
 	})
 	c.Assert(e.DevelopmentACLs, jc.DeepEquals, mongodoc.ACL{
 		Read:  []string{params.Everyone, "charmers"},
 		Write: []string{"bob", "admin"},
+	})
+	c.Assert(e.StableACLs, jc.DeepEquals, mongodoc.ACL{
+		Read:  []string{"bob", params.Everyone},
+		Write: []string{"charmers"},
 	})
 
 	// Try deleting all development permissions.
@@ -774,17 +792,18 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 	})
 	e, err = s.store.FindBaseEntity(charm.MustParseURL("precise/wordpress-23"), nil)
 	c.Assert(err, gc.IsNil)
-	c.Assert(e.DevelopmentACLs, jc.DeepEquals, mongodoc.ACL{})
-	e, err = s.store.FindBaseEntity(charm.MustParseURL("precise/wordpress-23"), nil)
-	c.Assert(err, gc.IsNil)
 	c.Assert(e.Public, jc.IsTrue)
-	c.Assert(e.DevelopmentACLs, jc.DeepEquals, mongodoc.ACL{})
 	c.Assert(e.ACLs, jc.DeepEquals, mongodoc.ACL{
-		Read:  []string{"bob", params.Everyone},
+		Read:  []string{"bob"},
 		Write: []string{"admin"},
 	})
+	c.Assert(e.DevelopmentACLs, jc.DeepEquals, mongodoc.ACL{})
+	c.Assert(e.StableACLs, jc.DeepEquals, mongodoc.ACL{
+		Read:  []string{"bob", params.Everyone},
+		Write: []string{"charmers"},
+	})
 
-	// Try deleting all published permissions.
+	// Try deleting all stable permissions.
 	s.assertPut(c, "wordpress/meta/perm/read", []string{})
 	s.assertPut(c, "wordpress/meta/perm/write", []string{})
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -800,10 +819,26 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 	e, err = s.store.FindBaseEntity(charm.MustParseURL("precise/wordpress-23"), nil)
 	c.Assert(err, gc.IsNil)
 	c.Assert(e.Public, jc.IsFalse)
-	c.Assert(e.ACLs, jc.DeepEquals, mongodoc.ACL{})
-	c.Assert(e.ACLs.Read, gc.DeepEquals, []string{})
+	c.Assert(e.ACLs, jc.DeepEquals, mongodoc.ACL{
+		Read:  []string{"bob"},
+		Write: []string{"admin"},
+	})
+	c.Assert(e.DevelopmentACLs, jc.DeepEquals, mongodoc.ACL{})
+	c.Assert(e.StableACLs, jc.DeepEquals, mongodoc.ACL{})
 
-	// Try setting all published permissions in one request.
+	// Try setting all unpublished permissions in one request.
+	s.assertPut(c, "trusty/wordpress-1/meta/perm", params.PermRequest{
+		Read:  []string{"bob", "who"},
+		Write: []string{"charmers"},
+	})
+	e, err = s.store.FindBaseEntity(charm.MustParseURL("precise/wordpress-23"), nil)
+	c.Assert(err, gc.IsNil)
+	c.Assert(e.ACLs, jc.DeepEquals, mongodoc.ACL{
+		Read:  []string{"bob", "who"},
+		Write: []string{"charmers"},
+	})
+
+	// Try setting all stable permissions in one request.
 	s.assertPut(c, "wordpress/meta/perm", params.PermRequest{
 		Read:  []string{"bob"},
 		Write: []string{"admin"},
@@ -811,7 +846,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 	e, err = s.store.FindBaseEntity(charm.MustParseURL("precise/wordpress-23"), nil)
 	c.Assert(err, gc.IsNil)
 	c.Assert(e.Public, jc.IsFalse)
-	c.Assert(e.ACLs, jc.DeepEquals, mongodoc.ACL{
+	c.Assert(e.StableACLs, jc.DeepEquals, mongodoc.ACL{
 		Read:  []string{"bob"},
 		Write: []string{"admin"},
 	})
@@ -829,15 +864,15 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 		Write: []string{"who"},
 	})
 
-	// Try only read permissions to published meta/perm endpoint.
+	// Try only read permissions to stable meta/perm endpoint.
 	var readRequest = struct {
 		Read []string
 	}{Read: []string{"joe"}}
 	s.assertPut(c, "wordpress/meta/perm", readRequest)
-	e, err = s.store.FindBaseEntity(charm.MustParseURL("precise/wordpress-23"), nil)
+	e, err = s.store.FindBaseEntity(charm.MustParseURL("precise/wordpress-22"), nil)
 	c.Assert(err, gc.IsNil)
 	c.Assert(e.Public, jc.IsFalse)
-	c.Assert(e.ACLs, jc.DeepEquals, mongodoc.ACL{
+	c.Assert(e.StableACLs, jc.DeepEquals, mongodoc.ACL{
 		Read:  []string{"joe"},
 		Write: []string{},
 	})
@@ -1174,9 +1209,10 @@ func (s *APISuite) TestCommonInfo(c *gc.C) {
 	s.addPublicCharm(c, "wordpress", newResolvedURL("~charmers/precise/wordpress-23", 23))
 	s.addPublicCharm(c, "wordpress", newResolvedURL("~charmers/precise/wordpress-24", 24))
 	s.addPublicCharm(c, "wordpress", newResolvedURL("~charmers/trusty/wordpress-1", 1))
+	err := s.store.Publish(newResolvedURL("~charmers/precise/wordpress-24", 24), charmstore.StableChannel)
+	c.Assert(err, gc.IsNil)
 
 	s.assertPut(c, "wordpress/meta/common-info/key", "something")
-
 	s.assertGet(c, "wordpress/meta/common-info", map[string]string{
 		"key": "something",
 	})
@@ -1471,7 +1507,10 @@ func (s *APISuite) TestIdsAreResolved(c *gc.C) {
 	// passed to the router. Given how Router is
 	// defined, and the ResolveURL tests, this should
 	// be sufficient to "join the dots".
-	_, wordpress := s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~charmers/precise/wordpress-23", 23))
+	url := newResolvedURL("cs:~charmers/precise/wordpress-23", 23)
+	_, wordpress := s.addPublicCharm(c, "wordpress", url)
+	err := s.store.Publish(url, charmstore.StableChannel)
+	c.Assert(err, gc.IsNil)
 	s.assertGet(c, "wordpress/meta/charm-metadata", wordpress.Meta())
 }
 
@@ -1507,7 +1546,7 @@ var resolveURLTests = []struct {
 	expect: newResolvedURL("cs:~charmers/trusty/wordpress-25", 25),
 }, {
 	url:    "development/wordpress",
-	expect: newResolvedURL("cs:~charmers/development/trusty/wordpress-25", 25),
+	expect: newResolvedURL("cs:~charmers/development/trusty/wordpress-26", 26),
 }, {
 	url:    "precise/wordpress",
 	expect: newResolvedURL("cs:~charmers/precise/wordpress-24", 24),
@@ -1537,7 +1576,7 @@ var resolveURLTests = []struct {
 	expect: newResolvedURL("cs:~charmers/trusty/wordpress-25", -1),
 }, {
 	url:    "~charmers/development/wordpress",
-	expect: newResolvedURL("cs:~charmers/development/trusty/wordpress-25", -1),
+	expect: newResolvedURL("cs:~charmers/development/trusty/wordpress-26", -1),
 }, {
 	url:      "~charmers/wordpress-24",
 	notFound: true,
@@ -1549,13 +1588,16 @@ var resolveURLTests = []struct {
 	expect: newResolvedURL("cs:~bob/trusty/wordpress-1", -1),
 }, {
 	url:    "~bob/development/wordpress",
-	expect: newResolvedURL("cs:~bob/development/trusty/wordpress-1", -1),
+	expect: newResolvedURL("cs:~bob/development/precise/wordpress-2", -1),
 }, {
 	url:    "~bob/precise/wordpress",
 	expect: newResolvedURL("cs:~bob/precise/wordpress-2", -1),
 }, {
 	url:    "~bob/development/precise/wordpress",
 	expect: newResolvedURL("cs:~bob/development/precise/wordpress-2", -1),
+}, {
+	url:      "~bob/private",
+	notFound: true,
 }, {
 	url:    "bigdata",
 	expect: newResolvedURL("cs:~charmers/utopic/bigdata-10", 10),
@@ -1593,17 +1635,17 @@ var resolveURLTests = []struct {
 	url:      "development/trusty/bigdata",
 	notFound: true,
 }, {
-	url:      "~bob/wily/django-47",
-	notFound: true,
+	url:    "~bob/wily/django-47",
+	expect: newResolvedURL("cs:~bob/development/wily/django-47", -1),
 }, {
-	url:      "~bob/django",
-	notFound: true,
+	url:    "~bob/django",
+	expect: newResolvedURL("cs:~bob/development/wily/django-47", -1),
 }, {
-	url:      "wily/django",
-	notFound: true,
+	url:    "wily/django",
+	expect: newResolvedURL("cs:~bob/development/wily/django-47", 27),
 }, {
-	url:      "django",
-	notFound: true,
+	url:    "django",
+	expect: newResolvedURL("cs:~bob/development/wily/django-47", 27),
 }, {
 	url:    "~bob/development/wily/django-47",
 	expect: newResolvedURL("cs:~bob/development/wily/django-47", -1),
@@ -1623,10 +1665,10 @@ var resolveURLTests = []struct {
 	url:    "development/django",
 	expect: newResolvedURL("cs:~bob/development/wily/django-47", 27),
 }, {
-	url:      "~bob/trusty/haproxy-0",
+	url:      "~bob/trusty/haproxy-1",
 	notFound: true,
 }, {
-	url:      "~bob/haproxy",
+	url:      "~bob/haproxy-2",
 	notFound: true,
 }, {
 	url:      "trusty/haproxy",
@@ -1664,24 +1706,50 @@ var resolveURLTests = []struct {
 }}
 
 func (s *APISuite) TestResolveURL(c *gc.C) {
+	// Add the charms and bundles to the database.
 	s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~charmers/precise/wordpress-23", 23))
 	s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~charmers/precise/wordpress-24", 24))
 	s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~charmers/trusty/wordpress-24", 24))
 	s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~charmers/trusty/wordpress-25", 25))
+	s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~charmers/trusty/wordpress-26", 26))
 	s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~charmers/utopic/wordpress-10", 10))
 	s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~charmers/saucy/bigdata-99", 99))
 	s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~charmers/utopic/bigdata-10", 10))
 	s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~bob/trusty/wordpress-1", -1))
 	s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~bob/precise/wordpress-2", -1))
 	s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~bob/precise/other-2", -1))
+	s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~bob/precise/private-1", -1))
 	s.addPublicBundle(c, "wordpress-simple", newResolvedURL("cs:~charmers/bundle/bundlelovin-10", 10))
 	s.addPublicBundle(c, "wordpress-simple", newResolvedURL("cs:~charmers/bundle/wordpress-simple-10", 10))
 	s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~bob/development/wily/django-47", 27))
 	s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~bob/development/trusty/haproxy-0", -1))
 	s.addPublicCharm(c, "multi-series", newResolvedURL("cs:~bob/multi-series-0", -1))
 
+	// Mark charms and bundles as stable/development.
+	err := s.store.Publish(newResolvedURL("cs:~charmers/trusty/wordpress-25", 25), charmstore.StableChannel)
+	c.Assert(err, gc.IsNil)
+	err = s.store.Publish(newResolvedURL("cs:~charmers/trusty/wordpress-26", 26), charm.DevelopmentChannel)
+	c.Assert(err, gc.IsNil)
+	err = s.store.Publish(newResolvedURL("cs:~charmers/precise/wordpress-24", 24), charm.DevelopmentChannel, charmstore.StableChannel)
+	c.Assert(err, gc.IsNil)
+	err = s.store.Publish(newResolvedURL("cs:~charmers/utopic/bigdata-10", 10), charm.DevelopmentChannel, charmstore.StableChannel)
+	c.Assert(err, gc.IsNil)
+	err = s.store.Publish(newResolvedURL("cs:~bob/trusty/wordpress-1", -1), charmstore.StableChannel)
+	c.Assert(err, gc.IsNil)
+	err = s.store.Publish(newResolvedURL("cs:~bob/precise/wordpress-2", -1), charm.DevelopmentChannel, charmstore.StableChannel)
+	c.Assert(err, gc.IsNil)
+	err = s.store.Publish(newResolvedURL("cs:~charmers/bundle/bundlelovin-10", 10), charm.DevelopmentChannel, charmstore.StableChannel)
+	c.Assert(err, gc.IsNil)
+	err = s.store.Publish(newResolvedURL("cs:~bob/development/wily/django-47", 27), charm.DevelopmentChannel)
+	c.Assert(err, gc.IsNil)
+	err = s.store.Publish(newResolvedURL("cs:~bob/development/trusty/haproxy-0", -1), charm.DevelopmentChannel)
+	c.Assert(err, gc.IsNil)
+	err = s.store.Publish(newResolvedURL("cs:~bob/multi-series-0", -1), charmstore.StableChannel)
+	c.Assert(err, gc.IsNil)
+
+	// Run the tests.
 	for i, test := range resolveURLTests {
-		c.Logf("test %d: %s", i, test.url)
+		c.Logf("\ntest %d: %s", i, test.url)
 		url := charm.MustParseURL(test.url)
 		rurl, err := v5.ResolveURL(entitycache.New(s.store), url)
 		if test.notFound {
@@ -1705,7 +1773,10 @@ var serveExpandIdTests = []struct {
 	url:   "~charmers/trusty/wordpress-47",
 	expect: []params.ExpandedId{
 		{Id: "cs:~charmers/utopic/wordpress-42"},
+		{Id: "cs:~charmers/development/trusty/wordpress-48"},
 		{Id: "cs:~charmers/trusty/wordpress-47"},
+		{Id: "cs:~charmers/development/wordpress-7"},
+		{Id: "cs:~charmers/development/wordpress-6"},
 		{Id: "cs:~charmers/wordpress-5"},
 	},
 }, {
@@ -1835,6 +1906,7 @@ var serveMetaRevisionInfoTests = []struct {
 	url:   "trusty/wordpress-9",
 	expect: params.RevisionInfoResponse{
 		[]*charm.URL{
+			charm.MustParseURL("cs:development/trusty/wordpress-44"),
 			charm.MustParseURL("cs:trusty/wordpress-43"),
 			charm.MustParseURL("cs:trusty/wordpress-42"),
 			charm.MustParseURL("cs:trusty/wordpress-41"),
@@ -1846,17 +1918,6 @@ var serveMetaRevisionInfoTests = []struct {
 	url:   "wordpress",
 	expect: params.RevisionInfoResponse{
 		[]*charm.URL{
-			charm.MustParseURL("cs:trusty/wordpress-43"),
-			charm.MustParseURL("cs:trusty/wordpress-42"),
-			charm.MustParseURL("cs:trusty/wordpress-41"),
-			charm.MustParseURL("cs:trusty/wordpress-9"),
-		},
-	},
-}, {
-	about: "development url expands to dev and non-dev revisions",
-	url:   "development/wordpress",
-	expect: params.RevisionInfoResponse{
-		[]*charm.URL{
 			charm.MustParseURL("cs:development/trusty/wordpress-44"),
 			charm.MustParseURL("cs:trusty/wordpress-43"),
 			charm.MustParseURL("cs:trusty/wordpress-42"),
@@ -1865,15 +1926,19 @@ var serveMetaRevisionInfoTests = []struct {
 		},
 	},
 }, {
-	about: "development non-promulgated url expands to dev and non-dev revisions",
+	about: "development url only returns development revisions",
+	url:   "development/wordpress",
+	expect: params.RevisionInfoResponse{
+		[]*charm.URL{
+			charm.MustParseURL("cs:development/trusty/wordpress-44"),
+		},
+	},
+}, {
+	about: "development non-promulgated url only returns development revisions",
 	url:   "~charmers/development/wordpress",
 	expect: params.RevisionInfoResponse{
 		[]*charm.URL{
 			charm.MustParseURL("cs:~charmers/development/trusty/wordpress-44"),
-			charm.MustParseURL("cs:~charmers/trusty/wordpress-43"),
-			charm.MustParseURL("cs:~charmers/trusty/wordpress-42"),
-			charm.MustParseURL("cs:~charmers/trusty/wordpress-41"),
-			charm.MustParseURL("cs:~charmers/trusty/wordpress-9"),
 		},
 	},
 }, {
@@ -1975,8 +2040,8 @@ var serveMetaRevisionInfoTests = []struct {
 	url:   "trusty/sed-1",
 	expect: params.RevisionInfoResponse{
 		[]*charm.URL{
-			charm.MustParseURL("cs:trusty/sed-3"),
 			charm.MustParseURL("cs:trusty/sed-1"),
+			charm.MustParseURL("cs:trusty/sed-0"),
 		},
 	},
 }, {
@@ -1985,30 +2050,30 @@ var serveMetaRevisionInfoTests = []struct {
 	asUser: "bob",
 	expect: params.RevisionInfoResponse{
 		[]*charm.URL{
+			charm.MustParseURL("cs:development/trusty/sed-4"),
 			charm.MustParseURL("cs:trusty/sed-3"),
 			charm.MustParseURL("cs:trusty/sed-1"),
+			charm.MustParseURL("cs:trusty/sed-0"),
 		},
 	},
 }, {
 	about:  "promulgate charm respects permissions when owners change; alice can see alice-specific charm",
-	url:    "development/trusty/sed-1",
+	url:    "trusty/sed-0",
 	asUser: "alice",
 	expect: params.RevisionInfoResponse{
 		[]*charm.URL{
-			charm.MustParseURL("cs:trusty/sed-3"),
 			charm.MustParseURL("cs:development/trusty/sed-2"),
 			charm.MustParseURL("cs:trusty/sed-1"),
+			charm.MustParseURL("cs:trusty/sed-0"),
 		},
 	},
 }, {
 	about:  "promulgate charm respects permissions when owners change; bob can see bob-specific dev charm",
-	url:    "development/trusty/sed",
+	url:    "development/trusty/sed-4",
 	asUser: "bob",
 	expect: params.RevisionInfoResponse{
 		[]*charm.URL{
 			charm.MustParseURL("cs:development/trusty/sed-4"),
-			charm.MustParseURL("cs:trusty/sed-3"),
-			charm.MustParseURL("cs:trusty/sed-1"),
 		},
 	},
 }, {
@@ -2026,7 +2091,11 @@ func (s *APISuite) TestServeMetaRevisionInfo(c *gc.C) {
 	s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~charmers/trusty/wordpress-42", 42))
 	s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~charmers/trusty/wordpress-43", 43))
 	s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~charmers/development/trusty/wordpress-44", 44))
-	err := s.store.SetPerms(charm.MustParseURL("cs:~charmers/development/trusty/wordpress"), "read", "everyone")
+	err := s.store.Publish(newResolvedURL("cs:~charmers/trusty/wordpress-42", 42), charmstore.StableChannel)
+	c.Assert(err, gc.IsNil)
+	err = s.store.Publish(newResolvedURL("cs:~charmers/development/trusty/wordpress-44", 44), charm.DevelopmentChannel)
+	c.Assert(err, gc.IsNil)
+	err = s.store.SetPerms(charm.MustParseURL("cs:~charmers/development/trusty/wordpress"), "read", "everyone")
 	c.Assert(err, gc.IsNil)
 
 	s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~charmers/precise/wordpress-42", 42))
@@ -2040,28 +2109,50 @@ func (s *APISuite) TestServeMetaRevisionInfo(c *gc.C) {
 	s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~charmers/trusty/cinder-4", -1))
 	s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~charmers/trusty/cinder-5", 4))
 	s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~charmers/trusty/cinder-6", 5))
+	err = s.store.Publish(newResolvedURL("cs:~charmers/trusty/cinder-6", 5), charmstore.StableChannel)
+	c.Assert(err, gc.IsNil)
+	err = s.store.Publish(newResolvedURL("cs:~openstack-charmers/trusty/cinder-0", 2), charmstore.StableChannel)
+	c.Assert(err, gc.IsNil)
 
 	s.addPublicCharm(c, "multi-series", newResolvedURL("cs:~charmers/multi-series-1", 40))
 	s.addPublicCharm(c, "multi-series", newResolvedURL("cs:~charmers/multi-series-2", 41))
+	err = s.store.Publish(newResolvedURL("cs:~charmers/multi-series-2", 41), charmstore.StableChannel)
+	c.Assert(err, gc.IsNil)
 
 	s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~charmers/trusty/mixed-1", 40))
 	s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~charmers/trusty/mixed-2", 41))
 	s.addPublicCharm(c, "multi-series", newResolvedURL("cs:~charmers/mixed-3", 42))
 	s.addPublicCharm(c, "multi-series", newResolvedURL("cs:~charmers/mixed-4", 43))
+	err = s.store.Publish(newResolvedURL("cs:~charmers/mixed-3", 42), charmstore.StableChannel)
+	c.Assert(err, gc.IsNil)
 
+	s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~openstack-charmers/trusty/sed-0", 0))
+	err = s.store.Publish(newResolvedURL("cs:~openstack-charmers/trusty/sed-0", 0), charmstore.StableChannel)
+	c.Assert(err, gc.IsNil)
 	s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~charmers/trusty/sed-1", 1))
+	err = s.store.Publish(newResolvedURL("cs:~charmers/trusty/sed-1", 1), charmstore.StableChannel)
+	c.Assert(err, gc.IsNil)
 	s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~charmers/trusty/sed-2", -1))
+	err = s.store.Publish(newResolvedURL("cs:~charmers/trusty/sed-2", -1), charmstore.StableChannel)
+	c.Assert(err, gc.IsNil)
 	s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~charmers/development/trusty/sed-3", -1))
+	err = s.store.Publish(newResolvedURL("cs:~charmers/development/trusty/sed-3", -1), charm.DevelopmentChannel)
+	c.Assert(err, gc.IsNil)
 	s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~charmers/development/trusty/sed-4", 2))
+	err = s.store.Publish(newResolvedURL("cs:~charmers/development/trusty/sed-4", 2), charm.DevelopmentChannel)
+	c.Assert(err, gc.IsNil)
+
 	s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~openstack-charmers/trusty/sed-98", 3))
 	s.addPublicCharm(c, "wordpress", newResolvedURL("cs:~openstack-charmers/development/trusty/sed-99", 4))
+	err = s.store.Publish(newResolvedURL("cs:~openstack-charmers/development/trusty/sed-99", 4), charm.DevelopmentChannel)
+	c.Assert(err, gc.IsNil)
 	err = s.store.SetPerms(charm.MustParseURL("cs:~charmers/development/trusty/sed"), "read", "alice")
 	c.Assert(err, gc.IsNil)
 	err = s.store.SetPerms(charm.MustParseURL("cs:~openstack-charmers/development/trusty/sed"), "read", "bob")
 	c.Assert(err, gc.IsNil)
 
 	for i, test := range serveMetaRevisionInfoTests {
-		c.Logf("test %d: %s", i, test.about)
+		c.Logf("\ntest %d: %s", i, test.about)
 		storeURL := storeURL(test.url + "/meta/revision-info")
 		var expectStatus int
 		var expectBody interface{}
@@ -2884,7 +2975,9 @@ var promulgateTests = []struct {
 		storetesting.NewEntity("~charmers/trusty/wordpress-0").WithPromulgatedURL("trusty/wordpress-0").Build(),
 	},
 	baseEntities: []*mongodoc.BaseEntity{
-		storetesting.NewBaseEntity("~charmers/wordpress").WithPromulgated(true).Build(),
+		storetesting.NewBaseEntity("~charmers/wordpress").WithStableSeries(map[string]string{
+			"trusty": "~charmers/trusty/wordpress-0",
+		}).WithPromulgated(true).Build(),
 	},
 	id:           "~charmers/wordpress",
 	body:         storetesting.JSONReader(params.PromulgateRequest{Promulgated: false}),
@@ -2895,7 +2988,9 @@ var promulgateTests = []struct {
 		storetesting.NewEntity("~charmers/trusty/wordpress-0").WithPromulgatedURL("trusty/wordpress-0").Build(),
 	},
 	expectBaseEntities: []*mongodoc.BaseEntity{
-		storetesting.NewBaseEntity("~charmers/wordpress").Build(),
+		storetesting.NewBaseEntity("~charmers/wordpress").WithStableSeries(map[string]string{
+			"trusty": "~charmers/trusty/wordpress-0",
+		}).Build(),
 	},
 	expectUser: "admin",
 }, {
@@ -2904,7 +2999,9 @@ var promulgateTests = []struct {
 		storetesting.NewEntity("~charmers/trusty/wordpress-0").Build(),
 	},
 	baseEntities: []*mongodoc.BaseEntity{
-		storetesting.NewBaseEntity("~charmers/wordpress").Build(),
+		storetesting.NewBaseEntity("~charmers/wordpress").WithStableSeries(map[string]string{
+			"trusty": "~charmers/trusty/wordpress-0",
+		}).Build(),
 	},
 	id:           "~charmers/wordpress",
 	body:         storetesting.JSONReader(params.PromulgateRequest{Promulgated: true}),
@@ -2917,6 +3014,8 @@ var promulgateTests = []struct {
 	expectBaseEntities: []*mongodoc.BaseEntity{
 		storetesting.NewBaseEntity("~charmers/wordpress").WithACLs(mongodoc.ACL{
 			Write: []string{v5.PromulgatorsGroup},
+		}).WithStableSeries(map[string]string{
+			"trusty": "~charmers/trusty/wordpress-0",
 		}).WithPromulgated(true).Build(),
 	},
 	expectPromulgate: true,
@@ -2973,7 +3072,9 @@ var promulgateTests = []struct {
 		storetesting.NewEntity("~charmers/trusty/wordpress-0").WithPromulgatedURL("trusty/wordpress-0").Build(),
 	},
 	baseEntities: []*mongodoc.BaseEntity{
-		storetesting.NewBaseEntity("~charmers/wordpress").WithPromulgated(true).Build(),
+		storetesting.NewBaseEntity("~charmers/wordpress").WithStableSeries(map[string]string{
+			"trusty": "~charmers/trusty/wordpress-0",
+		}).WithPromulgated(true).Build(),
 	},
 	id:           "~charmers/wordpress",
 	body:         storetesting.JSONReader(params.PromulgateRequest{Promulgated: false}),
@@ -2989,7 +3090,9 @@ var promulgateTests = []struct {
 		storetesting.NewEntity("~charmers/trusty/wordpress-0").WithPromulgatedURL("trusty/wordpress-0").Build(),
 	},
 	expectBaseEntities: []*mongodoc.BaseEntity{
-		storetesting.NewBaseEntity("~charmers/wordpress").WithPromulgated(true).Build(),
+		storetesting.NewBaseEntity("~charmers/wordpress").WithStableSeries(map[string]string{
+			"trusty": "~charmers/trusty/wordpress-0",
+		}).WithPromulgated(true).Build(),
 	},
 }, {
 	about: "bad JSON",
@@ -2997,7 +3100,9 @@ var promulgateTests = []struct {
 		storetesting.NewEntity("~charmers/trusty/wordpress-0").WithPromulgatedURL("trusty/wordpress-0").Build(),
 	},
 	baseEntities: []*mongodoc.BaseEntity{
-		storetesting.NewBaseEntity("~charmers/wordpress").WithPromulgated(true).Build(),
+		storetesting.NewBaseEntity("~charmers/wordpress").WithStableSeries(map[string]string{
+			"trusty": "~charmers/trusty/wordpress-0",
+		}).WithPromulgated(true).Build(),
 	},
 	id:           "~charmers/wordpress",
 	body:         bytes.NewReader([]byte("tru")),
@@ -3012,7 +3117,9 @@ var promulgateTests = []struct {
 		storetesting.NewEntity("~charmers/trusty/wordpress-0").WithPromulgatedURL("trusty/wordpress-0").Build(),
 	},
 	expectBaseEntities: []*mongodoc.BaseEntity{
-		storetesting.NewBaseEntity("~charmers/wordpress").WithPromulgated(true).Build(),
+		storetesting.NewBaseEntity("~charmers/wordpress").WithStableSeries(map[string]string{
+			"trusty": "~charmers/trusty/wordpress-0",
+		}).WithPromulgated(true).Build(),
 	},
 }, {
 	about: "unpromulgate base entity with macaroon",
@@ -3020,7 +3127,9 @@ var promulgateTests = []struct {
 		storetesting.NewEntity("~charmers/trusty/wordpress-0").WithPromulgatedURL("trusty/wordpress-0").Build(),
 	},
 	baseEntities: []*mongodoc.BaseEntity{
-		storetesting.NewBaseEntity("~charmers/wordpress").WithPromulgated(true).Build(),
+		storetesting.NewBaseEntity("~charmers/wordpress").WithStableSeries(map[string]string{
+			"trusty": "~charmers/trusty/wordpress-0",
+		}).WithPromulgated(true).Build(),
 	},
 	id:   "~charmers/wordpress",
 	body: storetesting.JSONReader(params.PromulgateRequest{Promulgated: false}),
@@ -3032,7 +3141,9 @@ var promulgateTests = []struct {
 		storetesting.NewEntity("~charmers/trusty/wordpress-0").WithPromulgatedURL("trusty/wordpress-0").Build(),
 	},
 	expectBaseEntities: []*mongodoc.BaseEntity{
-		storetesting.NewBaseEntity("~charmers/wordpress").Build(),
+		storetesting.NewBaseEntity("~charmers/wordpress").WithStableSeries(map[string]string{
+			"trusty": "~charmers/trusty/wordpress-0",
+		}).Build(),
 	},
 	expectUser: v5.PromulgatorsGroup,
 }, {
@@ -3041,7 +3152,9 @@ var promulgateTests = []struct {
 		storetesting.NewEntity("~charmers/trusty/wordpress-0").Build(),
 	},
 	baseEntities: []*mongodoc.BaseEntity{
-		storetesting.NewBaseEntity("~charmers/wordpress").Build(),
+		storetesting.NewBaseEntity("~charmers/wordpress").WithStableSeries(map[string]string{
+			"trusty": "~charmers/trusty/wordpress-0",
+		}).Build(),
 	},
 	id:   "~charmers/wordpress",
 	body: storetesting.JSONReader(params.PromulgateRequest{Promulgated: true}),
@@ -3055,6 +3168,8 @@ var promulgateTests = []struct {
 	expectBaseEntities: []*mongodoc.BaseEntity{
 		storetesting.NewBaseEntity("~charmers/wordpress").WithACLs(mongodoc.ACL{
 			Write: []string{v5.PromulgatorsGroup},
+		}).WithStableSeries(map[string]string{
+			"trusty": "~charmers/trusty/wordpress-0",
 		}).WithPromulgated(true).Build(),
 	},
 	expectPromulgate: true,
@@ -3065,7 +3180,9 @@ var promulgateTests = []struct {
 		storetesting.NewEntity("~charmers/trusty/wordpress-0").Build(),
 	},
 	baseEntities: []*mongodoc.BaseEntity{
-		storetesting.NewBaseEntity("~charmers/wordpress").Build(),
+		storetesting.NewBaseEntity("~charmers/wordpress").WithStableSeries(map[string]string{
+			"trusty": "~charmers/trusty/wordpress-0",
+		}).Build(),
 	},
 	id:   "~charmers/wordpress",
 	body: storetesting.JSONReader(params.PromulgateRequest{Promulgated: true}),
@@ -3082,6 +3199,8 @@ var promulgateTests = []struct {
 	expectBaseEntities: []*mongodoc.BaseEntity{
 		storetesting.NewBaseEntity("~charmers/wordpress").WithACLs(mongodoc.ACL{
 			Write: []string{v5.PromulgatorsGroup},
+		}).WithStableSeries(map[string]string{
+			"trusty": "~charmers/trusty/wordpress-0",
 		}).WithPromulgated(true).Build(),
 	},
 	expectPromulgate: true,
@@ -3092,7 +3211,9 @@ var promulgateTests = []struct {
 		storetesting.NewEntity("~charmers/trusty/wordpress-0").WithPromulgatedURL("trusty/wordpress-0").Build(),
 	},
 	baseEntities: []*mongodoc.BaseEntity{
-		storetesting.NewBaseEntity("~charmers/wordpress").WithPromulgated(true).Build(),
+		storetesting.NewBaseEntity("~charmers/wordpress").WithStableSeries(map[string]string{
+			"trusty": "~charmers/trusty/wordpress-0",
+		}).WithPromulgated(true).Build(),
 	},
 	useHTTPDo:    true,
 	id:           "~charmers/wordpress",
@@ -3103,7 +3224,9 @@ var promulgateTests = []struct {
 		storetesting.NewEntity("~charmers/trusty/wordpress-0").WithPromulgatedURL("trusty/wordpress-0").Build(),
 	},
 	expectBaseEntities: []*mongodoc.BaseEntity{
-		storetesting.NewBaseEntity("~charmers/wordpress").WithPromulgated(true).Build(),
+		storetesting.NewBaseEntity("~charmers/wordpress").WithStableSeries(map[string]string{
+			"trusty": "~charmers/trusty/wordpress-0",
+		}).WithPromulgated(true).Build(),
 	},
 }, {
 	about: "promulgate base entity with unauthorized user macaroon",
@@ -3111,7 +3234,9 @@ var promulgateTests = []struct {
 		storetesting.NewEntity("~charmers/trusty/wordpress-0").Build(),
 	},
 	baseEntities: []*mongodoc.BaseEntity{
-		storetesting.NewBaseEntity("~charmers/wordpress").Build(),
+		storetesting.NewBaseEntity("~charmers/wordpress").WithStableSeries(map[string]string{
+			"trusty": "~charmers/trusty/wordpress-0",
+		}).Build(),
 	},
 	id:   "~charmers/wordpress",
 	body: storetesting.JSONReader(params.PromulgateRequest{Promulgated: true}),
@@ -3130,7 +3255,9 @@ var promulgateTests = []struct {
 		storetesting.NewEntity("~charmers/trusty/wordpress-0").Build(),
 	},
 	expectBaseEntities: []*mongodoc.BaseEntity{
-		storetesting.NewBaseEntity("~charmers/wordpress").Build(),
+		storetesting.NewBaseEntity("~charmers/wordpress").WithStableSeries(map[string]string{
+			"trusty": "~charmers/trusty/wordpress-0",
+		}).Build(),
 	},
 }}
 
@@ -3232,303 +3359,433 @@ func (s *APISuite) TestEndpointRequiringBaseEntityWithPromulgatedId(c *gc.C) {
 	})
 }
 
+type dbEntity struct {
+	url      *router.ResolvedURL
+	channels []charm.Channel
+}
+
 var publishTests = []struct {
 	about      string
-	db         []*router.ResolvedURL
+	db         []dbEntity
 	id         string
-	publish    bool
-	expectDB   []*router.ResolvedURL
+	channels   []charm.Channel
+	expectDB   map[string]string
 	expectBody params.PublishResponse
 }{{
-	about: "publish: one development charm present, fully qualified id, not promulgated",
-	db: []*router.ResolvedURL{
-		newResolvedURL("~who/development/wily/django-42", -1),
-	},
-	id:      "~who/wily/django-42",
-	publish: true,
-	expectDB: []*router.ResolvedURL{
-		newResolvedURL("~who/wily/django-42", -1),
+	about: "publish stable: one unpublished charm present, fully qualified id, not promulgated",
+	db: []dbEntity{{
+		newResolvedURL("~who/wily/django-42", -1), nil,
+	}},
+	id:       "~who/wily/django-42",
+	channels: []charm.Channel{charmstore.StableChannel},
+	expectDB: map[string]string{
+		"~who/wily/django-42": "~who/wily/django-42",
+		"~who/wily/django":    "~who/wily/django-42",
 	},
 	expectBody: params.PublishResponse{
 		Id: charm.MustParseURL("~who/wily/django-42"),
 	},
 }, {
-	about: "publish: one development charm present, fully qualified id, promulgated",
-	db: []*router.ResolvedURL{
-		newResolvedURL("~who/development/wily/django-42", 47),
+	about: "publish stable: one development charm present, fully qualified id, not promulgated",
+	db: []dbEntity{{
+		newResolvedURL("~who/wily/django-42", -1), []charm.Channel{charm.DevelopmentChannel},
+	}},
+	id:       "~who/wily/django-42",
+	channels: []charm.Channel{charmstore.StableChannel},
+	expectDB: map[string]string{
+		"~who/wily/django":             "~who/wily/django-42",
+		"~who/development/wily/django": "~who/wily/django-42",
 	},
-	id:      "wily/django-47",
-	publish: true,
-	expectDB: []*router.ResolvedURL{
-		newResolvedURL("~who/wily/django-42", 47),
+	expectBody: params.PublishResponse{
+		Id: charm.MustParseURL("~who/wily/django-42"),
+	},
+}, {
+	about: "publish stable: one unpublished charm present, fully qualified id, promulgated",
+	db: []dbEntity{{
+		newResolvedURL("~who/wily/django-42", 47), nil,
+	}},
+	id:       "wily/django-47",
+	channels: []charm.Channel{charmstore.StableChannel},
+	expectDB: map[string]string{
+		"django":           "~who/wily/django-42",
+		"wily/django":      "~who/wily/django-42",
+		"wily/django-47":   "~who/wily/django-42",
+		"~who/wily/django": "~who/wily/django-42",
 	},
 	expectBody: params.PublishResponse{
 		Id:            charm.MustParseURL("~who/wily/django-42"),
 		PromulgatedId: charm.MustParseURL("wily/django-47"),
 	},
 }, {
-	about: "publish: one development charm present, partial id, not promulgated",
-	db: []*router.ResolvedURL{
-		newResolvedURL("~who/development/wily/django-42", -1),
-	},
-	id:      "~who/wily/django",
-	publish: true,
-	expectDB: []*router.ResolvedURL{
-		newResolvedURL("~who/wily/django-42", -1),
-	},
-	expectBody: params.PublishResponse{
-		Id: charm.MustParseURL("~who/wily/django-42"),
-	},
-}, {
-	about: "publish: one development charm present, partial id, promulgated",
-	db: []*router.ResolvedURL{
-		newResolvedURL("~who/development/wily/django-42", 47),
-	},
-	id:      "django",
-	publish: true,
-	expectDB: []*router.ResolvedURL{
-		newResolvedURL("~who/wily/django-42", 47),
+	about: "publish stable: one development charm present, fully qualified id, promulgated",
+	db: []dbEntity{{
+		newResolvedURL("~who/wily/django-42", 47), []charm.Channel{charm.DevelopmentChannel},
+	}},
+	id:       "wily/django-47",
+	channels: []charm.Channel{charmstore.StableChannel},
+	expectDB: map[string]string{
+		"django":                       "~who/wily/django-42",
+		"wily/django":                  "~who/wily/django-42",
+		"wily/django-47":               "~who/wily/django-42",
+		"~who/wily/django":             "~who/wily/django-42",
+		"development/django":           "~who/wily/django-42",
+		"development/wily/django":      "~who/wily/django-42",
+		"development/wily/django-47":   "~who/wily/django-42",
+		"~who/development/wily/django": "~who/wily/django-42",
 	},
 	expectBody: params.PublishResponse{
 		Id:            charm.MustParseURL("~who/wily/django-42"),
 		PromulgatedId: charm.MustParseURL("wily/django-47"),
 	},
 }, {
-	about: "publish: one published charm present, partial id, not promulgated",
-	db: []*router.ResolvedURL{
-		newResolvedURL("~who/wily/django-1", -1),
-	},
-	id:      "~who/django",
-	publish: true,
-	expectDB: []*router.ResolvedURL{
-		newResolvedURL("~who/wily/django-1", -1),
-	},
-	expectBody: params.PublishResponse{
-		Id: charm.MustParseURL("~who/wily/django-1"),
-	},
-}, {
-	about: "publish: one published charm present, fully qualified id, promulgated",
-	db: []*router.ResolvedURL{
-		newResolvedURL("~who/wily/django-2", 0),
-	},
-	id:      "wily/django-0",
-	publish: true,
-	expectDB: []*router.ResolvedURL{
-		newResolvedURL("~who/wily/django-2", 0),
+	about: "publish stable: one stable charm present, fully qualified id, not promulgated",
+	db: []dbEntity{{
+		newResolvedURL("~who/wily/django-42", -1), []charm.Channel{charmstore.StableChannel},
+	}},
+	id:       "~who/wily/django-42",
+	channels: []charm.Channel{charmstore.StableChannel},
+	expectDB: map[string]string{
+		"~who/wily/django": "~who/wily/django-42",
 	},
 	expectBody: params.PublishResponse{
-		Id:            charm.MustParseURL("~who/wily/django-2"),
-		PromulgatedId: charm.MustParseURL("wily/django-0"),
+		Id: charm.MustParseURL("~who/wily/django-42"),
 	},
 }, {
-	about: "publish: multiple development charms present, fully qualified id, not promulgated",
-	db: []*router.ResolvedURL{
-		newResolvedURL("~who/development/wily/django-0", -1),
-		newResolvedURL("~who/development/wily/django-1", -1),
-		newResolvedURL("~who/development/wily/django-2", -1),
-		newResolvedURL("~who/development/trusty/django-1", -1),
-	},
-	id:      "~who/wily/django-1",
-	publish: true,
-	expectDB: []*router.ResolvedURL{
-		newResolvedURL("~who/development/wily/django-0", -1),
-		newResolvedURL("~who/wily/django-1", -1),
-		newResolvedURL("~who/development/wily/django-2", -1),
-		newResolvedURL("~who/development/trusty/django-1", -1),
-	},
-	expectBody: params.PublishResponse{
-		Id: charm.MustParseURL("~who/wily/django-1"),
-	},
-}, {
-	about: "publish: multiple development charms present, fully qualified id, promulgated",
-	db: []*router.ResolvedURL{
-		newResolvedURL("~who/development/wily/django-42", 10),
-		newResolvedURL("~who/development/wily/django-43", 11),
-		newResolvedURL("~who/development/wily/django-44", 12),
-		newResolvedURL("~who/development/wily/rails-100", 10),
-	},
-	id:      "wily/django-10",
-	publish: true,
-	expectDB: []*router.ResolvedURL{
-		newResolvedURL("~who/wily/django-42", 10),
-		newResolvedURL("~who/development/wily/django-43", 11),
-		newResolvedURL("~who/development/wily/django-44", 12),
-		newResolvedURL("~who/development/wily/rails-100", 10),
+	about: "publish stable: one stable charm present, fully qualified id, promulgated",
+	db: []dbEntity{{
+		newResolvedURL("~who/wily/django-42", 47), []charm.Channel{charmstore.StableChannel},
+	}},
+	id:       "wily/django-47",
+	channels: []charm.Channel{charmstore.StableChannel},
+	expectDB: map[string]string{
+		"django":           "~who/wily/django-42",
+		"wily/django":      "~who/wily/django-42",
+		"wily/django-47":   "~who/wily/django-42",
+		"~who/wily/django": "~who/wily/django-42",
 	},
 	expectBody: params.PublishResponse{
 		Id:            charm.MustParseURL("~who/wily/django-42"),
-		PromulgatedId: charm.MustParseURL("wily/django-10"),
+		PromulgatedId: charm.MustParseURL("wily/django-47"),
 	},
 }, {
-	about: "publish: multiple development charms present, fully qualified id, promulgated, last one published",
-	db: []*router.ResolvedURL{
-		newResolvedURL("~who/development/wily/django-42", 10),
-		newResolvedURL("~who/development/wily/django-43", 11),
-		newResolvedURL("~who/development/wily/django-44", 12),
-		newResolvedURL("~who/development/wily/rails-100", 10),
+	about: "publish stable: multiple development charms present, partial id, not promulgated",
+	db: []dbEntity{{
+		newResolvedURL("~who/wily/django-42", -1), []charm.Channel{charm.DevelopmentChannel},
+	}, {
+		newResolvedURL("~who/wily/django-43", -1), []charm.Channel{charm.DevelopmentChannel},
+	}, {
+		newResolvedURL("~who/wily/django-44", -1), []charm.Channel{charm.DevelopmentChannel},
+	}, {
+		newResolvedURL("~who/wily/django-45", -1), nil,
+	}},
+	id:       "~who/wily/django",
+	channels: []charm.Channel{charmstore.StableChannel},
+	expectDB: map[string]string{
+		"~who/wily/django":             "~who/wily/django-44",
+		"~who/development/wily/django": "~who/wily/django-44",
 	},
-	id:      "wily/django-12",
-	publish: true,
-	expectDB: []*router.ResolvedURL{
-		newResolvedURL("~who/development/wily/django-42", 10),
-		newResolvedURL("~who/development/wily/django-43", 11),
-		newResolvedURL("~who/wily/django-44", 12),
-		newResolvedURL("~who/development/wily/rails-100", 10),
+	expectBody: params.PublishResponse{
+		Id: charm.MustParseURL("~who/wily/django-44"),
+	},
+}, {
+	about: "publish stable: multiple development charms present, fully qualified id, not promulgated",
+	db: []dbEntity{{
+		newResolvedURL("~who/wily/django-42", -1), []charm.Channel{charm.DevelopmentChannel},
+	}, {
+		newResolvedURL("~who/wily/django-43", -1), []charm.Channel{charm.DevelopmentChannel},
+	}, {
+		newResolvedURL("~who/wily/django-44", -1), []charm.Channel{charm.DevelopmentChannel},
+	}, {
+		newResolvedURL("~who/wily/django-45", -1), nil,
+	}},
+	id:       "~who/wily/django-43",
+	channels: []charm.Channel{charmstore.StableChannel},
+	expectDB: map[string]string{
+		"~who/wily/django":             "~who/wily/django-43",
+		"~who/development/wily/django": "~who/wily/django-44",
+	},
+	expectBody: params.PublishResponse{
+		Id: charm.MustParseURL("~who/wily/django-43"),
+	},
+}, {
+	about: "publish stable: multiple development charms present, fully qualified id, promulgated",
+	db: []dbEntity{{
+		newResolvedURL("~who/wily/django-42", 0), []charm.Channel{charm.DevelopmentChannel},
+	}, {
+		newResolvedURL("~who/wily/django-43", 1), []charm.Channel{charm.DevelopmentChannel},
+	}, {
+		newResolvedURL("~who/wily/django-44", 2), []charm.Channel{charm.DevelopmentChannel},
+	}, {
+		newResolvedURL("~who/wily/django-45", 3), nil,
+	}},
+	id:       "wily/django-3",
+	channels: []charm.Channel{charmstore.StableChannel},
+	expectDB: map[string]string{
+		"django":                       "~who/wily/django-45",
+		"development/django":           "~who/wily/django-44",
+		"wily/django":                  "~who/wily/django-45",
+		"wily/django-3":                "~who/wily/django-45",
+		"development/wily/django":      "~who/wily/django-44",
+		"~who/wily/django":             "~who/wily/django-45",
+		"~who/development/wily/django": "~who/wily/django-44",
+	},
+	expectBody: params.PublishResponse{
+		Id:            charm.MustParseURL("~who/wily/django-45"),
+		PromulgatedId: charm.MustParseURL("wily/django-3"),
+	},
+}, {
+	about: "publish stable: multiple development charms present, partial id, promulgated",
+	db: []dbEntity{{
+		newResolvedURL("~who/wily/django-42", 0), []charm.Channel{charm.DevelopmentChannel},
+	}, {
+		newResolvedURL("~who/wily/django-43", 1), nil,
+	}, {
+		newResolvedURL("~who/wily/django-44", 2), []charm.Channel{charm.DevelopmentChannel},
+	}, {
+		newResolvedURL("~who/wily/django-45", 3), nil,
+	}},
+	id:       "django",
+	channels: []charm.Channel{charmstore.StableChannel},
+	expectDB: map[string]string{
+		"django":                       "~who/wily/django-44",
+		"development/django":           "~who/wily/django-44",
+		"wily/django":                  "~who/wily/django-44",
+		"wily/django-2":                "~who/wily/django-44",
+		"development/wily/django":      "~who/wily/django-44",
+		"~who/wily/django":             "~who/wily/django-44",
+		"~who/development/wily/django": "~who/wily/django-44",
 	},
 	expectBody: params.PublishResponse{
 		Id:            charm.MustParseURL("~who/wily/django-44"),
-		PromulgatedId: charm.MustParseURL("wily/django-12"),
+		PromulgatedId: charm.MustParseURL("wily/django-2"),
 	},
 }, {
-	about: "publish: multiple development charms present, partial id, not promulgated",
-	db: []*router.ResolvedURL{
-		newResolvedURL("~who/development/wily/django-0", -1),
-		newResolvedURL("~who/development/wily/django-1", -1),
-		newResolvedURL("~who/development/trusty/django-42", -1),
-		newResolvedURL("~who/development/trusty/django-47", -1),
-	},
-	id:      "~who/wily/django",
-	publish: true,
-	expectDB: []*router.ResolvedURL{
-		newResolvedURL("~who/development/wily/django-0", -1),
-		newResolvedURL("~who/wily/django-1", -1),
-		newResolvedURL("~who/development/trusty/django-42", -1),
-		newResolvedURL("~who/development/trusty/django-47", -1),
+	about: "publish stable: multiple stable charms present, fully qualified id, not promulgated",
+	db: []dbEntity{{
+		newResolvedURL("~who/wily/django-43", -1), []charm.Channel{charmstore.StableChannel},
+	}, {
+		newResolvedURL("~who/wily/django-44", -1), []charm.Channel{charmstore.StableChannel},
+	}, {
+		newResolvedURL("~who/wily/django-45", -1), nil,
+	}, {
+		newResolvedURL("~who/wily/django-46", -1), nil,
+	}},
+	id:       "~who/wily/django-45",
+	channels: []charm.Channel{charmstore.StableChannel},
+	expectDB: map[string]string{
+		"~who/wily/django": "~who/wily/django-45",
 	},
 	expectBody: params.PublishResponse{
-		Id: charm.MustParseURL("~who/wily/django-1"),
+		Id: charm.MustParseURL("~who/wily/django-45"),
 	},
 }, {
-	about: "publish: multiple development charms present, partial id, promulgated",
-	db: []*router.ResolvedURL{
-		newResolvedURL("~who/development/wily/django-0", 0),
-		newResolvedURL("~who/development/wily/django-1", 1),
-		newResolvedURL("~who/development/trusty/django-42", 10),
-		newResolvedURL("~who/development/trusty/django-47", 11),
-	},
-	id:      "django",
-	publish: true,
-	expectDB: []*router.ResolvedURL{
-		newResolvedURL("~who/development/wily/django-0", 0),
-		newResolvedURL("~who/development/wily/django-1", 1),
-		newResolvedURL("~who/development/trusty/django-42", 10),
-		newResolvedURL("~who/trusty/django-47", 11),
+	about: "publish stable: multiple stable and development charms present, fully qualified id, promulgated",
+	db: []dbEntity{{
+		newResolvedURL("~who/wily/django-42", 0), []charm.Channel{charm.DevelopmentChannel},
+	}, {
+		newResolvedURL("~who/wily/django-43", 1), []charm.Channel{charmstore.StableChannel},
+	}, {
+		newResolvedURL("~who/wily/django-44", 2), []charm.Channel{charm.DevelopmentChannel, charmstore.StableChannel},
+	}, {
+		newResolvedURL("~who/wily/django-45", 3), nil,
+	}, {
+		newResolvedURL("~who/wily/django-46", 4), []charm.Channel{charm.DevelopmentChannel},
+	}, {
+		newResolvedURL("~who/wily/django-47", 5), nil,
+	}},
+	id:       "wily/django-1",
+	channels: []charm.Channel{charmstore.StableChannel},
+	expectDB: map[string]string{
+		"django":                       "~who/wily/django-43",
+		"development/django":           "~who/wily/django-46",
+		"wily/django":                  "~who/wily/django-43",
+		"wily/django-1":                "~who/wily/django-43",
+		"development/wily/django":      "~who/wily/django-46",
+		"~who/wily/django":             "~who/wily/django-43",
+		"~who/development/wily/django": "~who/wily/django-46",
 	},
 	expectBody: params.PublishResponse{
-		Id:            charm.MustParseURL("~who/trusty/django-47"),
-		PromulgatedId: charm.MustParseURL("trusty/django-11"),
+		Id:            charm.MustParseURL("~who/wily/django-43"),
+		PromulgatedId: charm.MustParseURL("wily/django-1"),
 	},
 }, {
-	about: "publish: multiple published charms present, partial id, not promulgated",
-	db: []*router.ResolvedURL{
-		newResolvedURL("~who/wily/django-0", -1),
-		newResolvedURL("~who/development/wily/django-1", -1),
-		newResolvedURL("~who/development/wily/django-2", -1),
-	},
-	id:      "~who/wily/django",
-	publish: true,
-	expectDB: []*router.ResolvedURL{
-		newResolvedURL("~who/wily/django-0", -1),
-		newResolvedURL("~who/development/wily/django-1", -1),
-		newResolvedURL("~who/wily/django-2", -1),
+	about: "publish development: one unpublished charm present, fully qualified id, not promulgated",
+	db: []dbEntity{{
+		newResolvedURL("~who/wily/django-42", -1), nil,
+	}},
+	id:       "~who/wily/django-42",
+	channels: []charm.Channel{charm.DevelopmentChannel},
+	expectDB: map[string]string{
+		"~who/wily/django-42":             "~who/wily/django-42",
+		"~who/wily/django":                "~who/wily/django-42",
+		"~who/development/wily/django-42": "~who/wily/django-42",
+		"~who/development/wily/django":    "~who/wily/django-42",
 	},
 	expectBody: params.PublishResponse{
-		Id: charm.MustParseURL("~who/wily/django-2"),
+		Id: charm.MustParseURL("~who/wily/django-42"),
 	},
 }, {
-	about: "publish: multiple published charms present, partial id, promulgated",
-	db: []*router.ResolvedURL{
-		newResolvedURL("~who/development/trusty/django-42", 10),
-		newResolvedURL("~who/trusty/django-47", 11),
-		newResolvedURL("~who/trusty/django-48", 12),
-		newResolvedURL("~who/development/trusty/django-49", 13),
-	},
-	id:      "django",
-	publish: true,
-	expectDB: []*router.ResolvedURL{
-		newResolvedURL("~who/development/trusty/django-42", 10),
-		newResolvedURL("~who/trusty/django-47", 11),
-		newResolvedURL("~who/trusty/django-48", 12),
-		newResolvedURL("~who/trusty/django-49", 13),
+	about: "publish development: one unpublished charm present, fully qualified id, promulgated",
+	db: []dbEntity{{
+		newResolvedURL("~who/wily/django-42", 47), nil,
+	}},
+	id:       "wily/django-47",
+	channels: []charm.Channel{charm.DevelopmentChannel},
+	expectDB: map[string]string{
+		"django":                       "~who/wily/django-42",
+		"wily/django":                  "~who/wily/django-42",
+		"wily/django-47":               "~who/wily/django-42",
+		"~who/wily/django":             "~who/wily/django-42",
+		"development/django":           "~who/wily/django-42",
+		"development/wily/django":      "~who/wily/django-42",
+		"development/wily/django-47":   "~who/wily/django-42",
+		"~who/development/wily/django": "~who/wily/django-42",
 	},
 	expectBody: params.PublishResponse{
-		Id:            charm.MustParseURL("~who/trusty/django-49"),
-		PromulgatedId: charm.MustParseURL("trusty/django-13"),
+		Id:            charm.MustParseURL("~who/wily/django-42"),
+		PromulgatedId: charm.MustParseURL("wily/django-47"),
 	},
 }, {
-	about: "unpublish: one published charm present, partial id, not promulgated",
-	db: []*router.ResolvedURL{
-		newResolvedURL("~who/wily/django-1", -1),
-	},
-	id: "~who/django",
-	expectDB: []*router.ResolvedURL{
-		newResolvedURL("~who/development/wily/django-1", -1),
+	about: "publish development: one stable charm present, fully qualified id, not promulgated",
+	db: []dbEntity{{
+		newResolvedURL("~who/wily/django-42", -1), []charm.Channel{charmstore.StableChannel},
+	}},
+	id:       "~who/wily/django-42",
+	channels: []charm.Channel{charm.DevelopmentChannel},
+	expectDB: map[string]string{
+		"~who/wily/django":             "~who/wily/django-42",
+		"~who/development/wily/django": "~who/wily/django-42",
 	},
 	expectBody: params.PublishResponse{
-		Id: charm.MustParseURL("~who/development/wily/django-1"),
+		Id: charm.MustParseURL("~who/wily/django-42"),
 	},
 }, {
-	about: "unpublish: one published charm present, fully qualified id, promulgated",
-	db: []*router.ResolvedURL{
-		newResolvedURL("~who/wily/django-2", 0),
-	},
-	id: "wily/django-0",
-	expectDB: []*router.ResolvedURL{
-		newResolvedURL("~who/development/wily/django-2", 0),
+	about: "publish development: one stable charm present, fully qualified id, promulgated",
+	db: []dbEntity{{
+		newResolvedURL("~who/wily/django-42", 47), []charm.Channel{charmstore.StableChannel},
+	}},
+	id:       "wily/django-47",
+	channels: []charm.Channel{charm.DevelopmentChannel},
+	expectDB: map[string]string{
+		"django":                       "~who/wily/django-42",
+		"wily/django":                  "~who/wily/django-42",
+		"wily/django-47":               "~who/wily/django-42",
+		"~who/wily/django":             "~who/wily/django-42",
+		"development/django":           "~who/wily/django-42",
+		"development/wily/django":      "~who/wily/django-42",
+		"development/wily/django-47":   "~who/wily/django-42",
+		"~who/development/wily/django": "~who/wily/django-42",
 	},
 	expectBody: params.PublishResponse{
-		Id:            charm.MustParseURL("~who/development/wily/django-2"),
-		PromulgatedId: charm.MustParseURL("development/wily/django-0"),
+		Id:            charm.MustParseURL("~who/wily/django-42"),
+		PromulgatedId: charm.MustParseURL("wily/django-47"),
 	},
 }, {
-	about: "unpublish: multiple published charms present, partial id, not promulgated",
-	db: []*router.ResolvedURL{
-		newResolvedURL("~who/wily/django-0", -1),
-		newResolvedURL("~who/development/wily/django-1", -1),
-		newResolvedURL("~who/development/wily/django-2", -1),
-	},
-	id: "~who/wily/django",
-	expectDB: []*router.ResolvedURL{
-		newResolvedURL("~who/development/wily/django-0", -1),
-		newResolvedURL("~who/development/wily/django-1", -1),
-		newResolvedURL("~who/development/wily/django-2", -1),
+	about: "publish development: multiple stable charms present, fully qualified id, not promulgated",
+	db: []dbEntity{{
+		newResolvedURL("~who/wily/django-43", -1), []charm.Channel{charmstore.StableChannel},
+	}, {
+		newResolvedURL("~who/wily/django-44", -1), []charm.Channel{charmstore.StableChannel},
+	}, {
+		newResolvedURL("~who/wily/django-45", -1), nil,
+	}, {
+		newResolvedURL("~who/wily/django-46", -1), nil,
+	}},
+	id:       "~who/wily/django-46",
+	channels: []charm.Channel{charm.DevelopmentChannel},
+	expectDB: map[string]string{
+		"~who/wily/django":             "~who/wily/django-44",
+		"~who/development/wily/django": "~who/wily/django-46",
 	},
 	expectBody: params.PublishResponse{
-		Id: charm.MustParseURL("~who/development/wily/django-0"),
+		Id: charm.MustParseURL("~who/wily/django-46"),
 	},
 }, {
-	about: "unpublish: multiple published charms present, partial id, promulgated",
-	db: []*router.ResolvedURL{
-		newResolvedURL("~who/development/trusty/django-42", 10),
-		newResolvedURL("~who/trusty/django-47", 11),
-		newResolvedURL("~who/trusty/django-48", 12),
-		newResolvedURL("~who/development/trusty/django-49", 13),
-	},
-	id: "django",
-	expectDB: []*router.ResolvedURL{
-		newResolvedURL("~who/development/trusty/django-42", 10),
-		newResolvedURL("~who/trusty/django-47", 11),
-		newResolvedURL("~who/development/trusty/django-48", 12),
-		newResolvedURL("~who/development/trusty/django-49", 13),
+	about: "publish development: multiple stable and development charms present, fully qualified id, promulgated",
+	db: []dbEntity{{
+		newResolvedURL("~who/wily/django-42", 0), []charm.Channel{charm.DevelopmentChannel},
+	}, {
+		newResolvedURL("~who/wily/django-43", 1), []charm.Channel{charmstore.StableChannel},
+	}, {
+		newResolvedURL("~who/wily/django-44", 2), []charm.Channel{charm.DevelopmentChannel, charmstore.StableChannel},
+	}, {
+		newResolvedURL("~who/wily/django-45", 3), nil,
+	}, {
+		newResolvedURL("~who/wily/django-46", 4), []charm.Channel{charm.DevelopmentChannel},
+	}, {
+		newResolvedURL("~who/wily/django-47", 5), nil,
+	}},
+	id:       "wily/django-3",
+	channels: []charm.Channel{charm.DevelopmentChannel},
+	expectDB: map[string]string{
+		"django":                       "~who/wily/django-44",
+		"development/django":           "~who/wily/django-45",
+		"wily/django":                  "~who/wily/django-44",
+		"wily/django-2":                "~who/wily/django-44",
+		"development/wily/django":      "~who/wily/django-45",
+		"~who/wily/django":             "~who/wily/django-44",
+		"~who/development/wily/django": "~who/wily/django-45",
 	},
 	expectBody: params.PublishResponse{
-		Id:            charm.MustParseURL("~who/development/trusty/django-48"),
-		PromulgatedId: charm.MustParseURL("development/trusty/django-12"),
+		Id:            charm.MustParseURL("~who/wily/django-45"),
+		PromulgatedId: charm.MustParseURL("wily/django-3"),
+	},
+}, {
+	about: "publish both: multiple stable and development charms present, fully qualified id, not promulgated",
+	db: []dbEntity{{
+		newResolvedURL("~who/wily/django-42", -1), []charm.Channel{charm.DevelopmentChannel, charmstore.StableChannel},
+	}, {
+		newResolvedURL("~who/wily/django-43", -1), []charm.Channel{charmstore.StableChannel},
+	}, {
+		newResolvedURL("~who/wily/django-44", -1), []charm.Channel{charm.DevelopmentChannel, charmstore.StableChannel},
+	}, {
+		newResolvedURL("~who/wily/django-45", -1), nil,
+	}, {
+		newResolvedURL("~who/wily/django-46", -1), []charm.Channel{charm.DevelopmentChannel},
+	}, {
+		newResolvedURL("~who/wily/django-47", -1), nil,
+	}},
+	id:       "~who/wily/django-47",
+	channels: []charm.Channel{charm.DevelopmentChannel, charmstore.StableChannel},
+	expectDB: map[string]string{
+		"~who/wily/django":             "~who/wily/django-47",
+		"~who/development/wily/django": "~who/wily/django-47",
+	},
+	expectBody: params.PublishResponse{
+		Id: charm.MustParseURL("~who/wily/django-47"),
+	},
+}, {
+	about: "publish stable and invalid channel",
+	db: []dbEntity{{
+		newResolvedURL("~who/wily/django-42", -1), nil,
+	}},
+	id:       "~who/wily/django-42",
+	channels: []charm.Channel{charmstore.StableChannel, charm.Channel("ignored")},
+	expectDB: map[string]string{
+		"~who/wily/django-42": "~who/wily/django-42",
+		"~who/wily/django":    "~who/wily/django-42",
+	},
+	expectBody: params.PublishResponse{
+		Id: charm.MustParseURL("~who/wily/django-42"),
 	},
 }}
 
 func (s *APISuite) TestPublish(c *gc.C) {
 	for i, test := range publishTests {
-		c.Logf("test %d: %s", i, test.about)
+		c.Logf("\ntest %d: %s", i, test.about)
 
 		// Add the initial entities to the database.
-		for _, rurl := range test.db {
-			s.addPublicCharm(c, "wordpress", rurl)
+		for _, e := range test.db {
+			s.addPublicCharm(c, "wordpress", e.url)
+			if len(e.channels) != 0 {
+				err := s.store.Publish(e.url, e.channels...)
+				c.Assert(err, gc.IsNil)
+			}
 		}
 
 		// Build the proper request body.
-		body := mustMarshalJSON(params.PublishRequest{
-			Published: test.publish,
+		body := mustMarshalJSON(v5.PublishRequest{
+			Channels: test.channels,
 		})
 
 		// Check that the request/response process works as expected.
@@ -3545,10 +3802,11 @@ func (s *APISuite) TestPublish(c *gc.C) {
 		})
 
 		// Check that the database now includes the expected entities.
-		for _, rurl := range test.expectDB {
-			e, err := s.store.FindEntity(rurl, nil)
+		for id, expectId := range test.expectDB {
+			c.Logf("\nquery: %s, expected: %s", id, expectId)
+			e, err := s.store.FindBestEntity(charm.MustParseURL(id), charmstore.FieldSelector("_id"))
 			c.Assert(err, gc.IsNil)
-			c.Assert(charmstore.EntityResolvedURL(e), jc.DeepEquals, rurl)
+			c.Assert(e.URL, jc.DeepEquals, charm.MustParseURL(expectId))
 		}
 
 		// Remove all entities from the database.
@@ -3586,13 +3844,13 @@ var publishErrorsTests = []struct {
 		Message: "POST not allowed",
 	},
 }, {
-	about:        "invalid channel",
+	about:        "channel specified",
 	method:       "PUT",
 	id:           "~who/development/wily/django-42",
-	expectStatus: http.StatusForbidden,
+	expectStatus: http.StatusBadRequest,
 	expectBody: params.Error{
-		Code:    params.ErrForbidden,
-		Message: `can only set publish on published URL, "cs:~who/development/wily/django-42" provided`,
+		Code:    params.ErrBadRequest,
+		Message: "channel specified, but should not be specified",
 	},
 }, {
 	about:        "unexpected content type",
@@ -3602,7 +3860,7 @@ var publishErrorsTests = []struct {
 	expectStatus: http.StatusBadRequest,
 	expectBody: params.Error{
 		Code:    params.ErrBadRequest,
-		Message: `cannot unmarshal publish request body: cannot unmarshal into field: unexpected content type text/invalid; want application/json; content: "{\"Published\":true}"`,
+		Message: `cannot unmarshal publish request body: cannot unmarshal into field: unexpected content type text/invalid; want application/json; content: "{\"Channels\":[\"development\"]}"`,
 	},
 }, {
 	about:        "invalid body",
@@ -3621,23 +3879,21 @@ var publishErrorsTests = []struct {
 	expectStatus: http.StatusNotFound,
 	expectBody: params.Error{
 		Code:    params.ErrNotFound,
-		Message: `no matching charm or bundle for "cs:~who/development/wily/django-42"`,
+		Message: `no matching charm or bundle for "cs:~who/wily/django-42"`,
 	},
 }, {
-	about:  "entity to be unpublished not found",
-	method: "PUT",
-	id:     "~who/wily/django-42",
-	body: mustMarshalJSON(params.PublishRequest{
-		Published: false,
-	}),
-	expectStatus: http.StatusNotFound,
+	about:        "no channels provided",
+	method:       "PUT",
+	id:           "~who/trusty/wordpress-0",
+	body:         mustMarshalJSON(v5.PublishRequest{}),
+	expectStatus: http.StatusInternalServerError,
 	expectBody: params.Error{
-		Code:    params.ErrNotFound,
-		Message: `no matching charm or bundle for "cs:~who/wily/django-42"`,
+		Message: `cannot publish charm or bundle: cannot update "cs:~who/trusty/wordpress-0": no channels provided`,
 	},
 }}
 
 func (s *APISuite) TestPublishErrors(c *gc.C) {
+	s.addPublicCharm(c, "wordpress", newResolvedURL("~who/trusty/wordpress-0", -1))
 	for i, test := range publishErrorsTests {
 		c.Logf("test %d: %s", i, test.about)
 		contentType := test.contentType
@@ -3646,8 +3902,8 @@ func (s *APISuite) TestPublishErrors(c *gc.C) {
 		}
 		body := test.body
 		if body == "" {
-			body = mustMarshalJSON(params.PublishRequest{
-				Published: true,
+			body = mustMarshalJSON(v5.PublishRequest{
+				Channels: []charm.Channel{charm.DevelopmentChannel},
 			})
 		}
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{

@@ -40,7 +40,7 @@ var serveDiagramErrorsTests = []struct {
 	},
 }, {
 	about:        "diagram for a charm",
-	url:          "~charmers/wordpress/diagram.svg",
+	url:          "~charmers/trusty/wordpress-42/diagram.svg",
 	expectStatus: http.StatusNotFound,
 	expectBody: params.Error{
 		Code:    params.ErrNotFound,
@@ -100,7 +100,7 @@ func (s *APISuite) TestServeDiagram(c *gc.C) {
 
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.srv,
-		URL:     storeURL("bundle/wordpressbundle/diagram.svg"),
+		URL:     storeURL("bundle/wordpressbundle-42/diagram.svg"),
 	})
 	c.Assert(rec.Code, gc.Equals, http.StatusOK, gc.Commentf("body: %q", rec.Body.Bytes()))
 	c.Assert(rec.Header().Get("Content-Type"), gc.Equals, "image/svg+xml")
@@ -121,7 +121,7 @@ func (s *APISuite) TestServeDiagram(c *gc.C) {
 	// the relative links should change accordingly.
 	rec = httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.srv,
-		URL:     storeURL("wordpressbundle/diagram.svg"),
+		URL:     storeURL("wordpressbundle-42/diagram.svg"),
 	})
 	c.Assert(rec.Code, gc.Equals, http.StatusOK, gc.Commentf("body: %q", rec.Body.Bytes()))
 
@@ -168,7 +168,7 @@ func (s *APISuite) TestServeDiagramNoPosition(c *gc.C) {
 
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.srv,
-		URL:     storeURL("bundle/wordpressbundle/diagram.svg"),
+		URL:     storeURL("bundle/wordpressbundle-42/diagram.svg"),
 	})
 	// Check that the request succeeds and has the expected content type.
 	c.Assert(rec.Code, gc.Equals, http.StatusOK, gc.Commentf("body: %q", rec.Body.Bytes()))
@@ -256,6 +256,8 @@ func (s *APISuite) TestServeIcon(c *gc.C) {
 
 	url := newResolvedURL("cs:~charmers/precise/wordpress-0", -1)
 	err := s.store.AddCharmWithArchive(url, wordpress)
+	c.Assert(err, gc.IsNil)
+	err = s.store.Publish(url, charmstore.StableChannel)
 	c.Assert(err, gc.IsNil)
 	err = s.store.SetPerms(&url.URL, "read", params.Everyone, url.URL.User)
 	c.Assert(err, gc.IsNil)

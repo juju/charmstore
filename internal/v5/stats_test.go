@@ -133,6 +133,8 @@ func (s *StatsSuite) TestServerStatsUpdate(c *gc.C) {
 	rurl := newResolvedURL("~charmers/precise/wordpress-23", 23)
 	err := s.store.AddCharmWithArchive(rurl, ch)
 	c.Assert(err, gc.IsNil)
+	err = s.store.Publish(rurl, charmstore.StableChannel)
+	c.Assert(err, gc.IsNil)
 	err = s.store.SetPerms(&rurl.URL, "read", params.Everyone, rurl.URL.User)
 	c.Assert(err, gc.IsNil)
 

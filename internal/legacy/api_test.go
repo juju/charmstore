@@ -67,8 +67,10 @@ func newServer(c *gc.C, session *mgo.Session, config charmstore.ServerParams) (*
 }
 
 func (s *APISuite) TestCharmArchive(c *gc.C) {
-	_, wordpress := s.addPublicCharm(c, "wordpress", "cs:precise/wordpress-0")
+	url, wordpress := s.addPublicCharm(c, "wordpress", "cs:precise/wordpress-0")
 	archiveBytes, err := ioutil.ReadFile(wordpress.Path)
+	c.Assert(err, gc.IsNil)
+	err = s.store.Publish(url, charmstore.StableChannel)
 	c.Assert(err, gc.IsNil)
 
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
@@ -141,6 +143,8 @@ func (s *APISuite) TestCharmInfoNotFound(c *gc.C) {
 
 func (s *APISuite) TestServeCharmInfo(c *gc.C) {
 	wordpressURL, wordpress := s.addPublicCharm(c, "wordpress", "cs:precise/wordpress-1")
+	err := s.store.Publish(wordpressURL, charmstore.StableChannel)
+	c.Assert(err, gc.IsNil)
 	hashSum := fileSHA256(c, wordpress.Path)
 	digest, err := json.Marshal("who@canonical.com-bzr-digest")
 	c.Assert(err, gc.IsNil)
@@ -463,11 +467,17 @@ func (s *APISuite) TestServeCharmEvent(c *gc.C) {
 	mysqlUrl, _ := s.addPublicCharm(c, "mysql", "cs:trusty/mysql-2")
 	riakUrl, _ := s.addPublicCharm(c, "riak", "cs:utopic/riak-3")
 
+	// Publish the two charms.
+	err := s.store.Publish(mysqlUrl, charmstore.StableChannel)
+	c.Assert(err, gc.IsNil)
+	err = s.store.Publish(riakUrl, charmstore.StableChannel)
+	c.Assert(err, gc.IsNil)
+
 	// Update the mysql charm with a valid digest extra-info.
 	s.addExtraInfoDigest(c, mysqlUrl, "who@canonical.com-bzr-digest")
 
 	// Update the riak charm with an invalid digest extra-info.
-	err := s.store.UpdateEntity(riakUrl, bson.D{{
+	err = s.store.UpdateEntity(riakUrl, bson.D{{
 		"$set", bson.D{{"extrainfo", map[string][]byte{
 			params.BzrDigestKey: []byte(":"),
 		}}},
@@ -561,6 +571,8 @@ func (s *APISuite) TestServeCharmEvent(c *gc.C) {
 func (s *APISuite) TestServeCharmEventDigestNotFound(c *gc.C) {
 	// Add a charm without a Bazaar digest.
 	url, _ := s.addPublicCharm(c, "wordpress", "cs:trusty/wordpress-42")
+	err := s.store.Publish(url, charmstore.StableChannel)
+	c.Assert(err, gc.IsNil)
 
 	// Pretend the entity has been uploaded right now, and assume the test does
 	// not take more than two minutes to run.
@@ -594,6 +606,12 @@ func (s *APISuite) TestServeCharmEventLastRevision(c *gc.C) {
 	// Add two revisions of the same charm.
 	url1, _ := s.addPublicCharm(c, "wordpress", "cs:trusty/wordpress-1")
 	url2, _ := s.addPublicCharm(c, "wordpress", "cs:trusty/wordpress-2")
+
+	// Publish both revisions as stable charms.
+	err := s.store.Publish(url1, charmstore.StableChannel)
+	c.Assert(err, gc.IsNil)
+	err = s.store.Publish(url2, charmstore.StableChannel)
+	c.Assert(err, gc.IsNil)
 
 	// Update the resulting entities with Bazaar digests.
 	s.addExtraInfoDigest(c, url1, "digest-1")
