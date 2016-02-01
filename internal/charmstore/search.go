@@ -83,7 +83,7 @@ func (s *Store) UpdateSearch(r *router.ResolvedURL) error {
 	if s.ES == nil || s.ES.Database == nil {
 		return nil
 	}
-	if r.Development || r.URL.Series != "" && !series.Series[r.URL.Series].SearchIndex {
+	if r.URL.Series != "" && !series.Series[r.URL.Series].SearchIndex {
 		return nil
 	}
 
@@ -99,6 +99,9 @@ func (s *Store) UpdateSearch(r *router.ResolvedURL) error {
 			return errgo.WithCausef(nil, params.ErrNotFound, "entity not found %s", r)
 		}
 		return errgo.Notef(err, "cannot get %s", r)
+	}
+	if !entity.Stable {
+		return nil
 	}
 	baseEntity, err := s.FindBaseEntity(entity.BaseURL, nil)
 	if err != nil {

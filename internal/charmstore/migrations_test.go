@@ -299,13 +299,15 @@ func (s *migrationsSuite) TestMigrateParallelMigration(c *gc.C) {
 		URL:            charm.MustParseURL("~charmers/trusty/django-42"),
 		PromulgatedURL: charm.MustParseURL("trusty/django-3"),
 		Size:           12,
+		Development:    true,
 	}
 	denormalizeEntity(e1)
 	s.insertEntity(c, e1, beforeAllMigrations)
 
 	e2 := &mongodoc.Entity{
-		URL:  charm.MustParseURL("~who/utopic/rails-47"),
-		Size: 13,
+		URL:         charm.MustParseURL("~who/utopic/rails-47"),
+		Size:        13,
+		Development: true,
 	}
 	denormalizeEntity(e2)
 	s.insertEntity(c, e2, beforeAllMigrations)

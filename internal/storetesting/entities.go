@@ -31,6 +31,9 @@ func NewEntity(url string) EntityBuilder {
 			User:                URL.User,
 			BaseURL:             mongodoc.BaseURL(URL),
 			PromulgatedRevision: -1,
+			SupportedSeries:     []string{URL.Series},
+			Development:         true,
+			Stable:              true,
 		},
 	}
 }
@@ -110,10 +113,21 @@ func (b BaseEntityBuilder) WithPromulgated(promulgated bool) BaseEntityBuilder {
 	return b
 }
 
-// WithACLs sets the non-development ACLs field on the BaseEntity.
+// WithStableSeries sets the stable releases on the BaseEntity.
+func (b BaseEntityBuilder) WithStableSeries(series map[string]string) BaseEntityBuilder {
+	b = b.copy()
+	stableSeries := make(map[string]*charm.URL, len(series))
+	for s, u := range series {
+		stableSeries[s] = charm.MustParseURL(u)
+	}
+	b.baseEntity.StableSeries = stableSeries
+	return b
+}
+
+// WithACLs sets the stable ACLs field on the BaseEntity.
 func (b BaseEntityBuilder) WithACLs(acls mongodoc.ACL) BaseEntityBuilder {
 	b = b.copy()
-	b.baseEntity.ACLs = acls
+	b.baseEntity.StableACLs = acls
 	return b
 }
 

@@ -17,6 +17,7 @@ import (
 	"gopkg.in/macaroon.v1"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
+	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
 )
 
@@ -194,13 +195,16 @@ func (h *ReqHandler) entityAuthInfo(entityIds []*router.ResolvedURL) (public boo
 		if err != nil {
 			return false, nil, nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 		}
-		baseEntity, err := h.Store.FindBaseEntity(&entityId.URL, charmstore.FieldSelector("acls", "developmentacls"))
+		baseEntity, err := h.Store.FindBaseEntity(&entityId.URL, charmstore.FieldSelector("acls", "developmentacls", "stableacls"))
 		if err != nil {
 			return false, nil, nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 		}
-
 		acls[i] = baseEntity.ACLs.Read
 		if entityId.Development {
+			acls[i] = baseEntity.DevelopmentACLs.Read
+		} else if entity.Stable {
+			acls[i] = baseEntity.StableACLs.Read
+		} else if entity.Development {
 			acls[i] = baseEntity.DevelopmentACLs.Read
 		}
 
@@ -293,18 +297,42 @@ func areAllowedEntities(entityIds []*router.ResolvedURL, allowedEntities string)
 // AuthorizeEntity checks that the given HTTP request
 // can access the entity with the given id.
 func (h *ReqHandler) AuthorizeEntity(id *router.ResolvedURL, req *http.Request) error {
-	baseEntity, err := h.Cache.BaseEntity(id.UserOwnedURL(), charmstore.FieldSelector("acls", "developmentacls"))
+	baseEntity, err := h.Cache.BaseEntity(id.UserOwnedURL(), charmstore.FieldSelector("acls", "developmentacls", "stableacls"))
 	if err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
 			return errgo.WithCausef(nil, params.ErrNotFound, "entity %q not found", id)
 		}
 		return errgo.Notef(err, "cannot retrieve entity %q for authorization", id)
 	}
-	acls := baseEntity.ACLs
-	if id.Development {
-		acls = baseEntity.DevelopmentACLs
+	acls, err := h.getACLs(baseEntity, id)
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	return h.authorizeWithPerms(req, acls.Read, acls.Write, id)
+}
+
+// getACLs returns the ACLs to use for the given base entity and resolved id.
+// What ACLs apply here? If a channel has been explicitly specified in the
+// URL, then, assuming the entity has been already resolved and fond for
+// that channel, channel specific ACLs apply. Otherwise, the URL has no
+// channels, and so stable ACLs apply if the entity has been published as
+// stable, then development ACLs if the entity is in development, otherwise
+// the system falls back to unpublished ACLs.
+func (h *ReqHandler) getACLs(baseEntity *mongodoc.BaseEntity, id *router.ResolvedURL) (mongodoc.ACL, error) {
+	if id.Development {
+		return baseEntity.DevelopmentACLs, nil
+	}
+	e, err := h.Cache.Entity(id.UserOwnedURL(), charmstore.FieldSelector("development", "stable"))
+	if err != nil {
+		return mongodoc.ACL{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	if e.Stable {
+		return baseEntity.StableACLs, nil
+	}
+	if e.Development {
+		return baseEntity.DevelopmentACLs, nil
+	}
+	return baseEntity.ACLs, nil
 }
 
 func (h *ReqHandler) authorizeWithPerms(req *http.Request, read, write []string, entityId *router.ResolvedURL) error {

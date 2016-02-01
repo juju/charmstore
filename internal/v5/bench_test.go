@@ -17,7 +17,10 @@ type BenchmarkSuite struct {
 var _ = gc.Suite(&BenchmarkSuite{})
 
 func (s *BenchmarkSuite) TestBenchmarkMeta(c *gc.C) {
-	s.addPublicCharm(c, "wordpress", newResolvedURL("~charmers/precise/wordpress-23", 23))
+	u := newResolvedURL("~charmers/precise/wordpress-23", 23)
+	s.addPublicCharm(c, "wordpress", u)
+	err := s.store.Publish(u, charm.DevelopmentChannel)
+	c.Assert(err, gc.IsNil)
 	srv := httptest.NewServer(s.srv)
 	defer srv.Close()
 	url := srv.URL + storeURL("wordpress/meta/archive-size")
