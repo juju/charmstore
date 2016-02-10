@@ -321,7 +321,10 @@ func (h *ReqHandler) ServeBlobFile(w http.ResponseWriter, req *http.Request, id 
 	ctype := mime.TypeByExtension(filepath.Ext(req.URL.Path))
 	if ctype != "" {
 		w.Header().Set("Content-Type", ctype)
+	} else {
+		w.Header().Set("Content-Type", "application/octet-stream")
 	}
+	w.Header().Set("Content-Disposition", "attachment")
 	w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
 	setArchiveCacheControl(w.Header(), h.isPublic(id))
 	w.WriteHeader(http.StatusOK)
