@@ -13,7 +13,7 @@ import (
 
 // CheckResourceCharm ensures that the given entity is okay
 // to associate with a revisioned resource.
-func CheckResourceCharm(entity Entity) error {
+func CheckResourceCharm(entity *Entity) error {
 	if entity.URL.Series == "bundle" {
 		return errgo.Newf("bundles do not have resources")
 	}
@@ -48,7 +48,7 @@ type LatestResource struct {
 // NewLatestResource packs the provided data into a LatestResource. The
 // entity must not be a bundle nor unrevisioned. The charmmetadata must
 // have the resource name. The revision must be non-negative.
-func NewLatestResource(entity Entity, resName string, revision int) (*LatestResource, error) {
+func NewLatestResource(entity *Entity, resName string, revision int) (*LatestResource, error) {
 	if err := CheckResourceCharm(entity); err != nil {
 		return nil, err
 	}

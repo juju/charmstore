@@ -21,7 +21,7 @@ var _ = gc.Suite(&ResourceSuite{})
 
 func (s *ResourceSuite) TestCheckResourceCharm(c *gc.C) {
 	curl := charm.MustParseURL("cs:spam-2")
-	entity := mongodoc.Entity{
+	entity := &mongodoc.Entity{
 		URL: curl,
 	}
 
@@ -40,7 +40,7 @@ func (s *ResourceSuite) TestNewLatestResourceID(c *gc.C) {
 
 func (s *ResourceSuite) TestNewLatestResource(c *gc.C) {
 	curl := charm.MustParseURL("cs:spam-2")
-	entity := mongodoc.Entity{
+	entity := &mongodoc.Entity{
 		URL: curl,
 		CharmMeta: &charm.Meta{
 			Resources: map[string]resource.Meta{
