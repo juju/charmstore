@@ -19,17 +19,68 @@ type ResourceSuite struct{}
 
 var _ = gc.Suite(&ResourceSuite{})
 
+func (s *ResourceSuite) TestCheckResourceCharm(c *gc.C) {
+	curl := charm.MustParseURL("cs:spam-2")
+	entity := mongodoc.Entity{
+		URL: curl,
+	}
+
+	err := mongodoc.CheckResourceCharm(entity)
+
+	c.Check(err, jc.ErrorIsNil)
+}
+
+func (s *ResourceSuite) TestNewLatestResourceID(c *gc.C) {
+	curl := charm.MustParseURL("cs:trust/spam-2")
+
+	id := mongodoc.NewLatestResourceID(curl, "eggs", 3)
+
+	c.Check(id, gc.Equals, "latest-resource#cs:trust/spam-2#eggs#3")
+}
+
+func (s *ResourceSuite) TestNewLatestResource(c *gc.C) {
+	curl := charm.MustParseURL("cs:spam-2")
+	entity := mongodoc.Entity{
+		URL: curl,
+		CharmMeta: &charm.Meta{
+			Resources: map[string]resource.Meta{
+				"ham":  resource.Meta{Name: "ham"},
+				"eggs": resource.Meta{Name: "eggs"},
+			},
+		},
+	}
+
+	doc, err := mongodoc.NewLatestResource(entity, "eggs", 3)
+	c.Assert(err, jc.ErrorIsNil)
+
+	c.Check(doc, jc.DeepEquals, &mongodoc.LatestResource{
+		DocID:    "latest-resource#cs:spam-2#eggs#3",
+		CharmURL: curl,
+		Resource: "eggs",
+		Revision: 3,
+	})
+}
+
+func (s *ResourceSuite) TestNewResourceID(c *gc.C) {
+	curl := charm.MustParseURL("cs:trusty/spam-2")
+
+	id := mongodoc.NewResourceID(curl, "eggs", 3)
+
+	c.Check(id, gc.Equals, "resource#cs:spam#eggs#3")
+}
+
 func (s *ResourceSuite) TestResource2Doc(c *gc.C) {
-	var curl charm.URL
+	curl := charm.MustParseURL("cs:spam-2")
 	res, expected := newResource(c, curl, "spam", "spamspamspam")
 
-	doc := mongodoc.Resource2Doc(curl, res)
+	doc, err := mongodoc.Resource2Doc(curl, res)
+	c.Assert(err, jc.ErrorIsNil)
 
 	c.Check(doc, jc.DeepEquals, &expected)
 }
 
 func (s *ResourceSuite) TestDoc2Resource(c *gc.C) {
-	var curl charm.URL
+	curl := charm.MustParseURL("cs:spam-2")
 	expected, doc := newResource(c, curl, "spam", "spamspamspam")
 
 	res, err := mongodoc.Doc2Resource(doc)
@@ -38,7 +89,7 @@ func (s *ResourceSuite) TestDoc2Resource(c *gc.C) {
 	c.Check(res, jc.DeepEquals, expected)
 }
 
-func newResource(c *gc.C, curl charm.URL, name, data string) (resource.Resource, mongodoc.Resource) {
+func newResource(c *gc.C, curl *charm.URL, name, data string) (resource.Resource, mongodoc.Resource) {
 	curl.Series = ""
 	curl.Revision = -1
 
