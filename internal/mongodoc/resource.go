@@ -22,10 +22,10 @@ type Resource struct {
 	DocID    string    `bson:"_id"`
 	CharmURL charm.URL `bson:"charm-url"`
 
-	Name    string `bson:"name"`
-	Type    string `bson:"type"`
-	Path    string `bson:"path"`
-	Comment string `bson:"comment"`
+	Name        string `bson:"name"`
+	Type        string `bson:"type"`
+	Path        string `bson:"path"`
+	Description string `bson:"comment"`
 
 	Origin      string `bson:"origin"`
 	Revision    int    `bson:"revision"`
@@ -45,10 +45,10 @@ func Resource2Doc(curl charm.URL, res resource.Resource) *Resource {
 		DocID:    id,
 		CharmURL: curl,
 
-		Name:    res.Name,
-		Type:    res.Type.String(),
-		Path:    res.Path,
-		Comment: res.Comment,
+		Name:        res.Name,
+		Type:        res.Type.String(),
+		Path:        res.Path,
+		Description: res.Description,
 
 		Origin:      res.Origin.String(),
 		Revision:    res.Revision,
@@ -78,10 +78,10 @@ func Doc2Resource(doc Resource) (resource.Resource, error) {
 
 	res = resource.Resource{
 		Meta: resource.Meta{
-			Name:    doc.Name,
-			Type:    resType,
-			Path:    doc.Path,
-			Comment: doc.Comment,
+			Name:        doc.Name,
+			Type:        resType,
+			Path:        doc.Path,
+			Description: doc.Description,
 		},
 		Origin:      origin,
 		Revision:    doc.Revision,

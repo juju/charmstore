@@ -4,6 +4,7 @@
 package mongodoc_test // import "gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
 
 import (
+	"bytes"
 	"fmt"
 
 	jc "github.com/juju/testing/checkers"
@@ -45,16 +46,16 @@ func newResource(c *gc.C, curl charm.URL, name, data string) (resource.Resource,
 	comment := "you really need this!!!"
 	revision := 1
 
-	fp, err := resource.GenerateFingerprint([]byte(data))
+	fp, err := resource.GenerateFingerprint(bytes.NewReader([]byte(data)))
 	c.Assert(err, jc.ErrorIsNil)
 	size := int64(len(data))
 
 	res := resource.Resource{
 		Meta: resource.Meta{
-			Name:    name,
-			Type:    resource.TypeFile,
-			Path:    path,
-			Comment: comment,
+			Name:        name,
+			Type:        resource.TypeFile,
+			Path:        path,
+			Description: comment,
 		},
 		Origin:      resource.OriginStore,
 		Revision:    revision,
@@ -69,10 +70,10 @@ func newResource(c *gc.C, curl charm.URL, name, data string) (resource.Resource,
 		DocID:    id,
 		CharmURL: curl,
 
-		Name:    name,
-		Type:    "file",
-		Path:    path,
-		Comment: comment,
+		Name:        name,
+		Type:        "file",
+		Path:        path,
+		Description: comment,
 
 		Origin:      "store",
 		Revision:    revision,
