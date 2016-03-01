@@ -1708,7 +1708,7 @@ The above example is equivalent to the `meta/common-info` example above.
 Getting from this path will return metadata regarding the resources for the charm with id of `id`.
 
 ```go
-type ResourcesResponseP struct {
+type ResourcesResponse struct {
     Resources []Resource
 }
 
@@ -1723,25 +1723,13 @@ type Resource struct {
 }
 ```
 
-#### POST *id*/resources/name
+#### GET *id*/resources/*name*[/revision]
 
-Posting to the resources path creates a new version of the given resource for the charm with the given id. The request returns the new version.
+Getting from the `/resources` path retrieves a charm resource from the charm with the given id. If version is not specified, it retrieves the latest version of the resource. The SHA-384 hash of the data is specified in the HTTP response headers.
 
-```go
-type ResourcesRevision struct {
-        Revision int
-}
-```
+#### PUT *id*/resources/*name*/?sha384=hash
 
-#### GET *id*/resources/name[/revision]
-
-Getting from the `/resources` path retrieves a charm resource from the charm with the given id. If version is not specified, it retrieves the latest version of the resource. The SHA-256 hash of the data is specified in the HTTP response headers.
-
-#### PUT *id*/resources/[~user/]name/revision/?sha256=hash
-
-Putting to the `resources` path uploads a resource (an arbitrary "blob" of data) associated with the charm with id, which must not be a bundle. Revision specifies the revision of the stream that's being uploaded to.
-
-The hash value must specify the hash of the stream. If the same series, name, stream, revision combination is PUT again, it must specify the same hash.
+Putting to the `resources` path uploads a resource (an arbitrary "blob" of data) associated with the charm with id, which must not be a bundle. The hash value must specify the hash of the blob. A new revision of the resource will be created if the SHA-384 hash does not match the prior recorded version.
 
 ### Search
 
