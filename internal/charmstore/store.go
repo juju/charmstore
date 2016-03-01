@@ -949,6 +949,12 @@ func (s StoreDatabase) BaseEntities() *mgo.Collection {
 	return s.C("base_entities")
 }
 
+// Resources returns the mongo collection where resources are stored.
+func (s StoreDatabase) Resources() *mgo.Collection {
+	// TODO(ericsnow) Re-use the Entities collection?
+	return s.C("resources")
+}
+
 // Logs returns the Mongo collection where charm store logs are stored.
 func (s StoreDatabase) Logs() *mgo.Collection {
 	return s.C("logs")
@@ -972,6 +978,7 @@ var allCollections = []func(StoreDatabase) *mgo.Collection{
 	StoreDatabase.StatTokens,
 	StoreDatabase.Entities,
 	StoreDatabase.BaseEntities,
+	StoreDatabase.Resources,
 	StoreDatabase.Logs,
 	StoreDatabase.Migrations,
 }
