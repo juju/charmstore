@@ -397,6 +397,12 @@ func (s *Store) ensureIndexes() error {
 		s.DB.BaseEntities(),
 		mgo.Index{Key: []string{"name"}},
 	}, {
+		s.DB.Resources(),
+		mgo.Index{Key: []string{"charm-url", "name"}},
+	}, {
+		s.DB.Resources(),
+		mgo.Index{Key: []string{"charm-url", "name", "revision"}},
+	}, {
 		// TODO this index should be created by the mgo gridfs code.
 		s.DB.C("entitystore.files"),
 		mgo.Index{Key: []string{"filename"}},
