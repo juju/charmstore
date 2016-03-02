@@ -29,12 +29,12 @@ func (s *ResourcesSuite) TestListResourcesCharmWithResources(c *gc.C) {
 	defer store.Close()
 	curl := charm.MustParseURL("cs:~charmers/xenial/starsay-3")
 	expected := addCharmWithResources(c, store, curl)
-	sort.Sort(ByResourceName(expected))
+	resource.Sort(expected)
 
 	resources, err := store.ListResources(curl)
 	c.Assert(err, jc.ErrorIsNil)
 
-	sort.Sort(ByResourceName(resources))
+	resource.Sort(resources)
 	c.Check(resources, jc.DeepEquals, expected)
 }
 
@@ -91,7 +91,7 @@ func (s *ResourcesSuite) TestListResourcesLatestNotFound(c *gc.C) {
 	resources, err := store.ListResources(curl)
 	c.Assert(err, jc.ErrorIsNil)
 
-	sort.Sort(ByResourceName(resources))
+	resource.Sort(resources)
 	c.Check(resources, jc.DeepEquals, []resource.Resource{{
 		Meta:   ch.Meta().Resources["for-install"],
 		Origin: resource.OriginUpload,
@@ -111,7 +111,7 @@ func (s *ResourcesSuite) TestListResourcesResourceNotFound(c *gc.C) {
 	resolvedURL := MustParseResolvedURL(curl.String())
 	ch := storetesting.Charms.CharmDir(curl.Name)
 	expected := extractResources(c, ch)
-	sort.Sort(ByResourceName(expected))
+	resource.Sort(expected)
 	expected[0] = resource.Resource{
 		Meta:   expected[0].Meta,
 		Origin: resource.OriginUpload,
@@ -132,7 +132,7 @@ func (s *ResourcesSuite) TestListResourcesResourceNotFound(c *gc.C) {
 	resources, err := store.ListResources(curl)
 	c.Assert(err, jc.ErrorIsNil)
 
-	sort.Sort(ByResourceName(resources))
+	resource.Sort(resources)
 	c.Check(resources, jc.DeepEquals, expected)
 }
 
@@ -143,7 +143,7 @@ func (s *ResourcesSuite) TestListResourcesBadDoc(c *gc.C) {
 	resolvedURL := MustParseResolvedURL(curl.String())
 	ch := storetesting.Charms.CharmDir(curl.Name)
 	resources := extractResources(c, ch)
-	sort.Sort(ByResourceName(resources))
+	resource.Sort(resources)
 	resources[0].Revision = 1
 	err := store.AddCharmWithArchive(resolvedURL, ch)
 	c.Assert(err, jc.ErrorIsNil)
@@ -244,9 +244,3 @@ func extractResources(c *gc.C, ch *charm.CharmDir) []resource.Resource {
 //
 //	return res
 //}
-
-type ByResourceName []resource.Resource
-
-func (sorted ByResourceName) Len() int           { return len(sorted) }
-func (sorted ByResourceName) Swap(i, j int)      { sorted[i], sorted[j] = sorted[j], sorted[i] }
-func (sorted ByResourceName) Less(i, j int) bool { return sorted[i].Name < sorted[j].Name }

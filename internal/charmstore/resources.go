@@ -7,20 +7,19 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charm.v6-unstable/resource"
-	//"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
-	//"gopkg.in/juju/charmstore.v5-unstable/internal/blobstore"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
 )
 
 var resourceNotFound = errgo.Newf("resource not found")
 
 // ListResources returns the list of resources for the charm at the
 // latest revision for each resource.
-func (s Store) ListResources(curl *charm.URL) ([]resource.Resource, error) {
-	entity, err := s.FindBestEntity(curl, nil)
+func (s Store) ListResources(url *router.ResolvedURL) ([]resource.Resource, error) {
+	entity, err := s.FindEntity(url, nil)
 	// XXX not found...
 	if err != nil {
 		return nil, err
@@ -32,7 +31,7 @@ func (s Store) ListResources(curl *charm.URL) ([]resource.Resource, error) {
 
 	var resources []resource.Resource
 	for name, meta := range entity.CharmMeta.Resources {
-		res, err := s.latestResource(curl, name)
+		res, err := s.latestResource(&url.URL, name)
 		if err == resourceNotFound {
 			// TODO(ericsnow) Fail? At least a dummy resource *must* be
 			// in charm store?
@@ -49,6 +48,7 @@ func (s Store) ListResources(curl *charm.URL) ([]resource.Resource, error) {
 		}
 		resources = append(resources, res)
 	}
+	resource.Sort(resources)
 	return resources, nil
 }
 
@@ -95,10 +95,10 @@ func (s Store) resource(curl *charm.URL, resName string, revision int) (resource
 
 // AddResource adds the resource to the store and associates it with
 // the charm's revision.
-func (s Store) AddResource(curl *charm.URL, res resource.Resource) error {
+func (s Store) AddResource(url *router.ResolvedURL, res resource.Resource) error {
 	// TODO(ericsnow) Validate resource first?
 
-	entity, err := s.FindBestEntity(curl, nil)
+	entity, err := s.FindEntity(url, nil)
 	if err != nil {
 		return err
 	}
