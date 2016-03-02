@@ -59,7 +59,10 @@ func (s Store) latestResource(curl *charm.URL, resName string) (resource.Resourc
 		{"name", resName},
 	}
 	err := s.DB.Resources().Find(query).One(&doc)
-	// XXX not found...
+	if err == mgo.ErrNotFound {
+		// TODO(ericsnow) Fail if the resource otherwise exists?
+		err = resourceNotFound
+	}
 	if err != nil {
 		return resource.Resource{}, err
 	}
@@ -72,7 +75,10 @@ func (s Store) resource(curl *charm.URL, resName string, revision int) (resource
 	var doc mongodoc.Resource
 	id := mongodoc.NewResourceID(curl, resName, revision)
 	err := s.DB.Resources().FindId(id).One(&doc)
-	// XXX not found...
+	if err == mgo.ErrNotFound {
+		// TODO(ericsnow) Fail because "latest" points to a missing resource?
+		err = resourceNotFound
+	}
 	if err != nil {
 		return res, err
 	}
@@ -123,16 +129,7 @@ func (s Store) insertResource(entity *mongodoc.Entity, res resource.Resource) er
 		return errgo.Notef(err, "cannot insert entity")
 	}
 
-	// TODO(ericsnow) necessary?
-	// Add entity to ElasticSearch.
-	if err := s.UpdateSearch(EntityResolvedURL(entity)); err != nil {
-		if err := s.DB.Resources().RemoveId(latest.DocID); err != nil {
-			logger.Errorf("cannot remove resource after elastic search failure: %v", err)
-		}
-		if err := s.DB.Resources().RemoveId(doc.DocID); err != nil {
-			logger.Errorf("cannot remove resource after elastic search failure: %v", err)
-		}
-		return errgo.Notef(err, "cannot index %s to ElasticSearch", entity.URL)
-	}
+	// TODO(ericsnow) Add resource to ElasticSearch?
+
 	return nil
 }
