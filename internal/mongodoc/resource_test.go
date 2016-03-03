@@ -23,42 +23,21 @@ func (s *ResourceSuite) TestCheckResourceCharm(c *gc.C) {
 	curl := charm.MustParseURL("cs:spam-2")
 	entity := &mongodoc.Entity{
 		URL: curl,
-	}
-
-	err := mongodoc.CheckResourceCharm(entity)
-
-	c.Check(err, jc.ErrorIsNil)
-}
-
-func (s *ResourceSuite) TestNewLatestResourceID(c *gc.C) {
-	curl := charm.MustParseURL("cs:trust/spam-2")
-
-	id := mongodoc.NewLatestResourceID(curl, "eggs", 3)
-
-	c.Check(id, gc.Equals, "latest-resource#cs:trust/spam-2#eggs#3")
-}
-
-func (s *ResourceSuite) TestNewLatestResource(c *gc.C) {
-	curl := charm.MustParseURL("cs:spam-2")
-	entity := &mongodoc.Entity{
-		URL: curl,
 		CharmMeta: &charm.Meta{
 			Resources: map[string]resource.Meta{
-				"ham":  resource.Meta{Name: "ham"},
-				"eggs": resource.Meta{Name: "eggs"},
+				"eggs": resource.Meta{
+					Name: "eggs",
+					Type: resource.TypeFile,
+					Path: "eggs.tgz",
+				},
 			},
 		},
 	}
+	res, _ := newResource(c, curl, "eggs", "<some data>")
 
-	doc, err := mongodoc.NewLatestResource(entity, "eggs", 3)
-	c.Assert(err, jc.ErrorIsNil)
+	err := mongodoc.CheckCharmResource(entity, res)
 
-	c.Check(doc, jc.DeepEquals, &mongodoc.LatestResource{
-		DocID:    "latest-resource#cs:spam-2#eggs#3",
-		CharmURL: curl,
-		Resource: "eggs",
-		Revision: 3,
-	})
+	c.Check(err, jc.ErrorIsNil)
 }
 
 func (s *ResourceSuite) TestNewResourceID(c *gc.C) {
