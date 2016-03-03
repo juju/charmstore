@@ -118,9 +118,9 @@ func (s *ResourcesSuite) TestListResourcesResourceNotFound(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 	err = store.DB.Resources().Insert(latest)
 	c.Assert(err, jc.ErrorIsNil)
-	err = store.AddResource(resolvedURL, expected[1])
+	err = store.insertResource(entity, expected[1])
 	c.Assert(err, jc.ErrorIsNil)
-	err = store.AddResource(resolvedURL, expected[2])
+	err = store.insertResource(entity, expected[2])
 	c.Assert(err, jc.ErrorIsNil)
 
 	resources, err := store.ListResources(entity)
@@ -158,33 +158,6 @@ func (s *ResourcesSuite) TestListResourcesBadDoc(c *gc.C) {
 	c.Check(err, gc.ErrorMatches, `.*got invalid data from DB.*`)
 }
 
-func (s *ResourcesSuite) TestAddResourceNotAddedYet(c *gc.C) {
-}
-
-func (s *ResourcesSuite) TestAddResourceReplaceExisting(c *gc.C) {
-}
-
-func (s *ResourcesSuite) TestAddResourceCharmNotFound(c *gc.C) {
-}
-
-func (s *ResourcesSuite) TestAddResourceBundle(c *gc.C) {
-}
-
-func (s *ResourcesSuite) TestAddResourceRevisionCollision(c *gc.C) {
-}
-
-func (s *ResourcesSuite) TestAddResourceInvalidInfo(c *gc.C) {
-}
-
-func (s *ResourcesSuite) TestAddResourceCharmWithoutResource(c *gc.C) {
-}
-
-func (s *ResourcesSuite) TestAddResourceMissingResourceRevision(c *gc.C) {
-}
-
-func (s *ResourcesSuite) TestAddResourceCleanUpOnInsertLatestFailure(c *gc.C) {
-}
-
 func addCharmWithResources(c *gc.C, store *Store, curl *charm.URL) (*mongodoc.Entity, []resource.Resource) {
 	resolvedURL := MustParseResolvedURL(curl.String())
 	ch := storetesting.Charms.CharmDir(curl.Name)
@@ -196,7 +169,7 @@ func addCharmWithResources(c *gc.C, store *Store, curl *charm.URL) (*mongodoc.En
 
 	resources := extractResources(c, ch)
 	for _, res := range resources {
-		err = store.AddResource(resolvedURL, res)
+		err = store.insertResource(entity, res)
 		c.Assert(err, jc.ErrorIsNil)
 	}
 	return entity, resources
@@ -220,24 +193,3 @@ func extractResources(c *gc.C, ch *charm.CharmDir) []resource.Resource {
 	}
 	return resources
 }
-
-//func newResource(c *gc.C, name string, rev int, content string) resource.Resource {
-//	fp, err := resource.GenerateFingerprint(strings.NewReader(content))
-//	c.Assert(err, jc.ErrorIsNil)
-//	res := resource.Resource{
-//		Meta: resource.Meta{
-//			Name:        name,
-//			Type:        charmresource.TypeFile,
-//			Path:        name + ".tgz",
-//			Description: "resource " + name,
-//		},
-//		Origin:      resource.OriginStore,
-//		Revision:    rev,
-//		Fingerprint: fp,
-//		Size:        int64(len(content)),
-//	}
-//	err = res.Validate()
-//	c.Assert(err, jc.ErrorIsNil)
-//
-//	return res
-//}

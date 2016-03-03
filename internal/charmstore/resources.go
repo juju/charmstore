@@ -11,7 +11,6 @@ import (
 	"gopkg.in/mgo.v2/bson"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
 )
 
 var resourceNotFound = errgo.Newf("resource not found")
@@ -83,20 +82,6 @@ func (s Store) resource(curl *charm.URL, resName string, revision int) (resource
 	}
 
 	return res, nil
-}
-
-// TODO(ericsnow) Also store blob in AddResource()?
-
-// AddResource adds the resource to the store and associates it with
-// the charm's revision.
-func (s Store) AddResource(url *router.ResolvedURL, res resource.Resource) error {
-	// TODO(ericsnow) Validate resource first?
-
-	entity, err := s.FindEntity(url, nil)
-	if err != nil {
-		return err
-	}
-	return s.insertResource(entity, res)
 }
 
 func (s Store) insertResource(entity *mongodoc.Entity, res resource.Resource) error {
