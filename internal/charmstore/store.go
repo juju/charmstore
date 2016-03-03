@@ -448,7 +448,7 @@ func (s *Store) FindEntity(url *router.ResolvedURL, fields map[string]int) (*mon
 	err := q.One(&entity)
 	if err != nil {
 		if err == mgo.ErrNotFound {
-			return nil, errgo.WithCausef(nil, params.ErrNotFound, "entity not found: %#v", url)
+			return nil, errgo.WithCausef(nil, params.ErrNotFound, "entity not found")
 		}
 		return nil, errgo.Mask(err)
 	}

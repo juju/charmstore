@@ -18,20 +18,14 @@ var resourceNotFound = errgo.Newf("resource not found")
 
 // ListResources returns the list of resources for the charm at the
 // latest revision for each resource.
-func (s Store) ListResources(url *router.ResolvedURL) ([]resource.Resource, error) {
-	entity, err := s.FindEntity(url, nil)
-	// XXX not found...
-	if err != nil {
-		return nil, err
-	}
-
+func (s Store) ListResources(entity *mongodoc.Entity) ([]resource.Resource, error) {
 	if err := mongodoc.CheckResourceCharm(entity); err != nil {
 		return nil, err
 	}
 
 	var resources []resource.Resource
 	for name, meta := range entity.CharmMeta.Resources {
-		res, err := s.latestResource(&url.URL, name)
+		res, err := s.latestResource(entity.URL, name)
 		if err == resourceNotFound {
 			// TODO(ericsnow) Fail? At least a dummy resource *must* be
 			// in charm store?
