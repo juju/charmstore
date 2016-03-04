@@ -441,6 +441,7 @@ func (s *AddEntitySuite) checkAddCharm(c *gc.C, ch charm.Charm, addToES bool, ur
 		PromulgatedURL:          url.DocPromulgatedURL(),
 		SupportedSeries:         ch.Meta().Series,
 		Development:             url.Development,
+		Resources:               map[string]int{},
 	}))
 
 	// The charm archive has been properly added to the blob store.
@@ -525,6 +526,7 @@ func (s *AddEntitySuite) checkAddBundle(c *gc.C, bundle charm.Bundle, addToES bo
 		BundleUnitCount:    newInt(2),
 		PromulgatedURL:     url.DocPromulgatedURL(),
 		Development:        url.Development,
+		Resources:          map[string]int{},
 	}))
 
 	// The bundle archive has been properly added to the blob store.

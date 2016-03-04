@@ -138,6 +138,10 @@ type Entity struct {
 	// A development entity can only be referred to using URLs including the
 	// "development" channel.
 	Development bool
+
+	// Resources maps the charm's resources to the resource revisions
+	// tied to this charm revision.
+	Resources map[string]int
 }
 
 // PreferredURL returns the preferred way to refer to this entity. If
