@@ -18,13 +18,16 @@ var resourceNotFound = errgo.Newf("resource not found")
 // ListResources returns the list of resources for the charm at the
 // latest revision for each resource.
 func (s Store) ListResources(entity *mongodoc.Entity) ([]resource.Resource, error) {
-	if err := mongodoc.CheckResourceCharm(entity); err != nil {
-		return nil, err
+	if entity.URL.Series == "bundle" {
+		return nil, errgo.Newf("bundles do not have resources")
+	}
+	if entity.CharmMeta == nil {
+		return nil, errgo.Newf("entity missing charm metadata")
 	}
 
 	var resources []resource.Resource
 	for name, meta := range entity.CharmMeta.Resources {
-		res, err := s.latestResource(entity.URL, name)
+		res, err := s.latestResource(entity, name)
 		if err == resourceNotFound {
 			// TODO(ericsnow) Fail? At least a dummy resource *must* be
 			// in charm store?
@@ -45,21 +48,14 @@ func (s Store) ListResources(entity *mongodoc.Entity) ([]resource.Resource, erro
 	return resources, nil
 }
 
-func (s Store) latestResource(curl *charm.URL, resName string) (resource.Resource, error) {
-	var doc mongodoc.LatestResource
-	query := bson.D{
-		{"charm-url", curl},
-		{"name", resName},
-	}
-	err := s.DB.Resources().Find(query).One(&doc)
-	if err == mgo.ErrNotFound {
+func (s Store) latestResource(entity *mongodoc.Entity, resName string) (resource.Resource, error) {
+	revision, ok := entity.Resources[resName]
+	if !ok {
 		// TODO(ericsnow) Fail if the resource otherwise exists?
-		err = resourceNotFound
+		return resource.Resource{}, resourceNotFound
 	}
-	if err != nil {
-		return resource.Resource{}, err
-	}
-	return s.resource(curl, resName, doc.Revision)
+	// TODO(ericsnow) We need to pass in a base ID...
+	return s.resource(entity.URL, resName, revision)
 }
 
 func (s Store) resource(curl *charm.URL, resName string, revision int) (resource.Resource, error) {
@@ -84,31 +80,52 @@ func (s Store) resource(curl *charm.URL, resName string, revision int) (resource
 	return res, nil
 }
 
-func (s Store) insertResource(entity *mongodoc.Entity, res resource.Resource) error {
-	latest, err := mongodoc.NewLatestResource(entity, res.Name, res.Revision)
-	if err != nil {
+func (s Store) insertResource(entity *mongodoc.Entity, res resource.Resource, newRevision int) error {
+	res.Revision = newRevision
+	if err := mongodoc.CheckCharmResource(entity, res); err != nil {
 		return err
 	}
-
+	// TODO(ericsnow) We need to pass in a base ID...
 	doc, err := mongodoc.Resource2Doc(entity.URL, res)
 	if err != nil {
 		return err
 	}
+
 	err = s.DB.Resources().Insert(doc)
 	if err != nil && !mgo.IsDup(err) {
 		return errgo.Notef(err, "cannot insert resource")
 	}
 
-	// TODO(ericsnow) Upsert?
-	err = s.DB.Resources().Insert(latest)
+	return nil
+}
+
+// TODO(ericsnow) We will need Store.nextResourceRevision()...
+
+func (s Store) setResource(entity *mongodoc.Entity, resName string, revision int) error {
+	// TODO(ericsnow) We need to pass in a base ID...
+	res, err := s.resource(entity.URL, resName, revision)
 	if err != nil {
-		if err := s.DB.Resources().RemoveId(doc.DocID); err != nil {
-			logger.Errorf("cannot remove resource after elastic search failure: %v", err)
-		}
-		return errgo.Notef(err, "cannot insert entity")
+		return err
+	}
+	if err := mongodoc.CheckCharmResource(entity, res); err != nil {
+		return err
 	}
 
-	// TODO(ericsnow) Add resource to ElasticSearch?
+	resources := entity.Resources
+	if resources == nil {
+		resources = make(map[string]int)
+	}
+	resources[resName] = revision
+
+	resolvedURL := EntityResolvedURL(entity)
+	err = s.UpdateEntity(resolvedURL, bson.D{
+		{"$set", bson.D{
+			{"resources", resources},
+		}},
+	})
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
