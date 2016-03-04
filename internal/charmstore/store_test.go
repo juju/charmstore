@@ -3820,6 +3820,7 @@ func entity(url, purl string) *mongodoc.Entity {
 	e := &mongodoc.Entity{
 		URL:            id,
 		PromulgatedURL: pid,
+		Resources:      map[string]int{},
 	}
 	denormalizeEntity(e)
 	return e
