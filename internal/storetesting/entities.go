@@ -32,6 +32,7 @@ func NewEntity(url string) EntityBuilder {
 			User:                URL.User,
 			BaseURL:             mongodoc.BaseURL(URL),
 			PromulgatedRevision: -1,
+			Resources:           map[string]int{},
 		},
 	}
 }
