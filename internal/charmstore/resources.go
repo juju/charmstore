@@ -4,16 +4,19 @@
 package charmstore
 
 import (
+	"fmt"
 	"io"
 	"time"
 
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/juju/charm.v6-unstable/resource"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
 )
 
 var resourceNotFound = errgo.Newf("resource not found")
@@ -50,6 +53,51 @@ func (s Store) ListResources(entity *mongodoc.Entity, channel params.Channel) ([
 	}
 	mongodoc.SortResources(docs)
 	return docs, nil
+}
+
+// OpenResource returns the blob for the identified resource.
+func (s *Store) OpenResource(id *router.ResolvedURL, name string, revision int) (*mongodoc.Resource, io.ReadCloser, error) {
+	if revision < 0 {
+		return nil, nil, errgo.New("revision cannot be negative")
+	}
+	doc, err := s.resource(&id.URL, name, revision)
+	if err != nil {
+		return nil, nil, errgo.Mask(err, errgo.Is(resourceNotFound))
+	}
+	r, err := s.openResource(doc)
+	if err != nil {
+		return nil, nil, errgo.Mask(err)
+	}
+	return doc, r, nil
+}
+
+// OpenResource returns the blob for the latest revision of the identified resource.
+func (s *Store) OpenLatestResource(id *router.ResolvedURL, channel params.Channel, name string) (*mongodoc.Resource, io.ReadCloser, error) {
+	entity, err := s.FindEntity(id, nil)
+	if err != nil {
+		return nil, nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	revision, err := s.latestResourceRevision(entity, channel, name)
+	if err != nil {
+		return nil, nil, errgo.Mask(err, errgo.Is(resourceNotFound))
+	}
+	doc, reader, err := s.OpenResource(id, name, revision)
+	if err != nil {
+		return nil, nil, errgo.Mask(err, errgo.Is(resourceNotFound))
+	}
+	return doc, reader, nil
+}
+
+func (s *Store) openResource(doc *mongodoc.Resource) (io.ReadCloser, error) {
+	r, size, err := s.BlobStore.Open(doc.BlobName)
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot open resource data for %s", doc.Name)
+	}
+	if size != doc.Size {
+		return nil, errgo.Newf("resource size mismatch")
+	}
+	// TODO(ericsnow) Verify that the hash matches?
+	return r, nil
 }
 
 // ResourceBlob holds the information specific to a single resource blob.
@@ -109,9 +157,29 @@ func (s Store) insertResource(doc *mongodoc.Resource) error {
 }
 
 func (s Store) storeResource(blob ResourceBlob) (string, error) {
-	name := bson.NewObjectId().Hex()
-	// TODO(ericsnow) We will finish this in a follow-up patch.
-	return name, nil
+	blobName := bson.NewObjectId().Hex()
+
+	// Calculate the SHA384 hash while uploading the blob in the blob store.
+	fpHash := resource.NewFingerprintHash()
+	blobReader := io.TeeReader(blob, fpHash)
+
+	// Upload the actual blob, and make sure that it is removed
+	// if we fail later.
+	hash := fmt.Sprintf("%x", blob.Fingerprint)
+	err := s.BlobStore.PutUnchallenged(blobReader, blobName, blob.Size, hash)
+	if err != nil {
+		return "", errgo.Notef(err, "cannot put archive blob")
+	}
+
+	fp := fpHash.Fingerprint()
+	if fp.String() != hash {
+		if err := s.BlobStore.Remove(blobName); err != nil {
+			logger.Errorf("cannot remove blob %s after error: %v", blobName, err)
+		}
+		return "", errgo.Newf("resource hash mismatch")
+	}
+
+	return blobName, nil
 }
 
 func (s Store) setResource(entity *mongodoc.Entity, channel params.Channel, resName string, revision int) error {

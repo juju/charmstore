@@ -88,6 +88,53 @@ func (s *ResourcesSuite) TestListResourcesResourceNotFound(c *gc.C) {
 	checkResourceDocs(c, docs, expected)
 }
 
+func (s *ResourcesSuite) TestOpenResource(c *gc.C) {
+	store := s.newStore(c, false)
+	defer store.Close()
+	curl := charm.MustParseURL("cs:~charmers/xenial/starsay-3")
+	resolvedURL := MustParseResolvedURL(curl.String())
+	entity, ch := addCharm(c, store, curl)
+	allExpected := addResources(c, store, curl, params.UnpublishedChannel, entity, ch)
+	mongodoc.SortResources(allExpected)
+	expected := allExpected[1]
+	meta := ch.Meta().Resources["for-store"]
+	expectedData, err := ioutil.ReadFile(filepath.Join(ch.Path, meta.Path))
+
+	doc, reader, err := store.OpenResource(resolvedURL, meta.Name, 1)
+	c.Assert(err, jc.ErrorIsNil)
+	defer reader.Close()
+
+	adjustExpectedResource(doc, expected)
+	c.Check(doc, jc.DeepEquals, expected)
+	data, err := ioutil.ReadAll(reader)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Check(data, jc.DeepEquals, expectedData)
+}
+
+func (s *ResourcesSuite) TestOpenLatestResource(c *gc.C) {
+	store := s.newStore(c, false)
+	defer store.Close()
+	channel := params.StableChannel
+	curl := charm.MustParseURL("cs:~charmers/xenial/starsay-3")
+	resolvedURL := MustParseResolvedURL(curl.String())
+	entity, ch := addCharm(c, store, curl)
+	allExpected := addResources(c, store, curl, channel, entity, ch)
+	mongodoc.SortResources(allExpected)
+	expected := allExpected[1]
+	meta := ch.Meta().Resources["for-store"]
+	expectedData, err := ioutil.ReadFile(filepath.Join(ch.Path, meta.Path))
+
+	doc, reader, err := store.OpenLatestResource(resolvedURL, channel, meta.Name)
+	c.Assert(err, jc.ErrorIsNil)
+	defer reader.Close()
+
+	adjustExpectedResource(doc, expected)
+	c.Check(doc, jc.DeepEquals, expected)
+	data, err := ioutil.ReadAll(reader)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Check(data, jc.DeepEquals, expectedData)
+}
+
 func addResources(c *gc.C, store *Store, curl *charm.URL, channel params.Channel, entity *mongodoc.Entity, ch *charm.CharmDir) []*mongodoc.Resource {
 	docs := extractResources(c, curl, ch)
 	for i, doc := range docs {
