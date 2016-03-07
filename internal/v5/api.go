@@ -1346,6 +1346,11 @@ func (h *ReqHandler) servePublish(id *charm.URL, w http.ResponseWriter, req *htt
 		return errgo.Mask(err, errgo.Any)
 	}
 
+	// TODO(ericsnow) Actually handle the resources.
+	if len(publish.Resources) > 0 {
+		return errNotImplemented
+	}
+
 	// Update the entity.
 	if err := h.Store.SetDevelopment(rurl, !publish.Published); err != nil {
 		return errgo.NoteMask(err, "cannot publish or unpublish charm or bundle", errgo.Is(params.ErrNotFound))
