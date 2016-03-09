@@ -235,7 +235,7 @@ func RouterHandlers(h *ReqHandler) *router.Handlers {
 			"perm":             h.puttableBaseEntityHandler(h.metaPerm, h.putMetaPerm, "acls", "developmentacls"),
 			"perm/":            h.puttableBaseEntityHandler(h.metaPermWithKey, h.putMetaPermWithKey, "acls", "developmentacls"),
 			"promulgated":      h.baseEntityHandler(h.metaPromulgated, "promulgated"),
-			"resources":        h.EntityHandler(h.metaResources, "_id", "charmmeta"),
+			"resources":        h.EntityHandler(h.metaResources, "charmmeta"),
 			"revision-info":    router.SingleIncludeHandler(h.metaRevisionInfo),
 			"stats":            h.EntityHandler(h.metaStats),
 			"supported-series": h.EntityHandler(h.metaSupportedSeries, "supportedseries"),
