@@ -489,6 +489,7 @@ Example: `GET /meta`
     "id-user",
     "manifest",
     "promulgated",
+    "resources",
     "revision-info",
     "stats",
     "supported-series",
@@ -1702,34 +1703,33 @@ The above example is equivalent to the `meta/common-info` example above.
 
 **Not yet implemented**
 
-#### POST *id*/resources/name.stream
+#### GET *id*/meta/resources
 
-Posting to the resources path creates a new version of the given stream
-for the charm with the given id. The request returns the new version.
+Getting from this path will return metadata regarding the resources for the charm with id of `id`.
 
 ```go
-type ResourcesRevision struct {
-        Revision int
+type ResourcesResponse struct {
+    Resources []Resource
+}
+
+type Resource struct {
+    Name        string
+    Type        string
+    Path        string
+    Description string
+    Revision    int
+    Fingerprint string
+    Size        int64
 }
 ```
 
-#### GET *id*/resources/name.stream[-revision]/arch/filename
+#### GET *id*/resources/*name*[/revision]
 
-Getting from the `/resources` path retrieves a charm resource from the charm
-with the given id. If version is not specified, it retrieves the latest version
-of the resource. The SHA-256 hash of the data is specified in the HTTP response
-headers.
+Getting from the `/resources` path retrieves a charm resource from the charm with the given id. If version is not specified, it retrieves the latest version of the resource. The SHA-384 hash of the data is specified in the HTTP response headers.
 
-#### PUT *id*/resources/[~user/]series/name.stream-revision/arch?sha256=hash
+#### PUT *id*/resources/*name*/?sha384=hash
 
-Putting to the `resources` path uploads a resource (an arbitrary "blob" of
-data) associated with the charm with id series/name, which must not be a
-bundle. Stream and arch specify which of the charms resource streams and which
-architecture the resource will be associated with, respectively. Revision
-specifies the revision of the stream that's being uploaded to.
-
-The hash value must specify the hash of the stream. If the same series, name,
-stream, revision combination is PUT again, it must specify the same hash.
+Putting to the `resources` path uploads a resource (an arbitrary "blob" of data) associated with the charm with id, which must not be a bundle. The hash value must specify the hash of the blob. A new revision of the resource will be created if the SHA-384 hash does not match the prior recorded version.
 
 ### Search
 
