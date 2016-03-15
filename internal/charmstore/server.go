@@ -133,8 +133,12 @@ func NewServer(db *mgo.Database, si *SearchIndex, config ServerParams, versions 
 		pool: pool,
 		mux:  router.NewServeMux(),
 	}
-	// Version independent API.
-	handle(srv.mux, "/debug", newServiceDebugHandler(pool, config, srv.mux))
+	// Version independent debug API.
+	handle(srv.mux, "/debug", newDebugHandler(debugParams{
+		ServerParams:    config,
+		pool:            pool,
+		loopbackHandler: srv.mux,
+	}))
 	for vers, newAPI := range versions {
 		root := "/" + vers
 		h := newAPI(pool, config, root)

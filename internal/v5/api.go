@@ -203,8 +203,6 @@ func RouterHandlers(h *ReqHandler) *router.Handlers {
 		Global: map[string]http.Handler{
 			"changes/published":    router.HandleJSON(h.serveChangesPublished),
 			"debug":                http.HandlerFunc(h.serveDebug),
-			"debug/pprof/":         newPprofHandler(h),
-			"debug/status":         router.HandleJSON(h.serveDebugStatus),
 			"list":                 router.HandleJSON(h.serveList),
 			"log":                  router.HandleErrors(h.serveLog),
 			"logout":               http.HandlerFunc(logout),

@@ -3187,46 +3187,6 @@ func (s *APISuite) publishCharmsAtKnownTimes(c *gc.C, charms []publishSpec) {
 	}
 }
 
-var debugPprofTests = []struct {
-	path  string
-	match string
-}{{
-	path:  "debug/pprof/",
-	match: `(?s).*profiles:.*heap.*`,
-}, {
-	path:  "debug/pprof/goroutine?debug=2",
-	match: "(?s)goroutine [0-9]+.*",
-}, {
-	path:  "debug/pprof/cmdline",
-	match: ".+charmstore.+",
-}}
-
-func (s *APISuite) TestDebugPprof(c *gc.C) {
-	for i, test := range debugPprofTests {
-		c.Logf("test %d: %s", i, test.path)
-
-		rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
-			Handler: s.srv,
-			Header:  basicAuthHeader(testUsername, testPassword),
-			URL:     storeURL(test.path),
-		})
-		c.Assert(rec.Code, gc.Equals, http.StatusOK, gc.Commentf("body: %s", rec.Body.String()))
-		c.Assert(rec.Body.String(), gc.Matches, test.match)
-	}
-}
-
-func (s *APISuite) TestDebugPprofFailsWithoutAuth(c *gc.C) {
-	for i, test := range debugPprofTests {
-		c.Logf("test %d: %s", i, test.path)
-		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-			Handler:      s.srv,
-			URL:          storeURL(test.path),
-			ExpectStatus: http.StatusProxyAuthRequired,
-			ExpectBody:   dischargeRequiredBody,
-		})
-	}
-}
-
 func (s *APISuite) TestHash256Laziness(c *gc.C) {
 	// TODO frankban: remove this test after updating entities in the
 	// production db with their SHA256 hash value. Entities are updated by

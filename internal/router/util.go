@@ -21,7 +21,7 @@ import (
 var logger = loggo.GetLogger("charmstore.internal.router")
 
 // WriteError can be used to write an error response.
-var WriteError = errorToResp.WriteError
+var WriteError = ErrorToResp.WriteError
 
 // JSONHandler represents a handler that returns a JSON value.
 // The provided header can be used to set response headers.
@@ -32,10 +32,10 @@ type ErrorHandler func(http.ResponseWriter, *http.Request) error
 
 // HandleJSON converts from a JSONHandler function to an http.Handler.
 func HandleJSON(h JSONHandler) http.Handler {
-	// We can't use errorToResp.HandleJSON directly because
+	// We can't use ErrorToResp.HandleJSON directly because
 	// we still use old-style handlers in charmstore, so we
 	// insert shim functions to do the conversion.
-	handleJSON := errorToResp.HandleJSON(
+	handleJSON := ErrorToResp.HandleJSON(
 		func(p httprequest.Params) (interface{}, error) {
 			return h(p.Response.Header(), p.Request)
 		},
@@ -47,10 +47,10 @@ func HandleJSON(h JSONHandler) http.Handler {
 
 // HandleJSON converts from a ErrorHandler function to an http.Handler.
 func HandleErrors(h ErrorHandler) http.Handler {
-	// We can't use errorToResp.HandleErrors directly because
+	// We can't use ErrorToResp.HandleErrors directly because
 	// we still use old-style handlers in charmstore, so we
 	// insert shim functions to do the conversion.
-	handleErrors := errorToResp.HandleErrors(
+	handleErrors := ErrorToResp.HandleErrors(
 		func(p httprequest.Params) error {
 			return h(p.Response, p.Request)
 		},
@@ -60,7 +60,7 @@ func HandleErrors(h ErrorHandler) http.Handler {
 	})
 }
 
-var errorToResp httprequest.ErrorMapper = func(err error) (int, interface{}) {
+var ErrorToResp httprequest.ErrorMapper = func(err error) (int, interface{}) {
 	status, body := errorToResp1(err)
 	logger.Infof("error response %d; %s", status, errgo.Details(err))
 	return status, body
