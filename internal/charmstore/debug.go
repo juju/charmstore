@@ -31,16 +31,30 @@ import (
 type debugParams struct {
 	ServerParams
 	pool            *Pool
+
+	// loopbackHandler contains the handler for / it is used by
+	// /debug/fullcheck when performing tests.
 	loopbackHandler http.Handler
 }
 
 type debugHandler struct {
+	// router contains an httprouter.Router that is used to process
+	// calls to the debug endpoints.
 	router    *httprouter.Router
+
+	// params containst the parameters that the debugHandler was
+	// created with.
 	params    debugParams
+
+	// checks contains the list of checks used in /debug/check.
 	checks    map[string]func() error
+
+	// openPaths contains the /debug endpoints that are not protected
+	// by authorization.
 	openPaths map[string]bool
 }
 
+// newDebugHandler creates a new handler for serving the /debug tree.
 func newDebugHandler(p debugParams) *debugHandler {
 	hnd := debugHandler{
 		router: httprouter.New(),
@@ -77,6 +91,9 @@ func (h *debugHandler) handle(p httprequest.Params) (*debugReqHandler, error) {
 	return &rh, nil
 }
 
+// authorized checks the debug requests for the required authorization.
+// If openPaths is true for the requested path, then no authorization
+// will occur.
 func (h *debugHandler) authorized(r *http.Request) error {
 	if h.openPaths[r.URL.Path] {
 		return nil
@@ -94,7 +111,8 @@ func (h *debugHandler) authorized(r *http.Request) error {
 
 func (h *debugHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// The charmstore router will have stripped "/debug" off the
-	// front of the path, put it back.
+	// front of the path; put it back so that the router can route
+	// the paths from debugstatus.Handler correctly.
 	r.URL.Path = "/debug" + r.URL.Path
 	h.router.ServeHTTP(w, r)
 }
@@ -115,6 +133,7 @@ func (h *debugReqHandler) Close() error {
 	return nil
 }
 
+// store lazily retrieves a store from the pool.
 func (h *debugReqHandler) store() (*Store, error) {
 	if h.store_ == nil && h.storeError == nil {
 		h.store_, h.storeError = h.h.params.pool.RequestStore()
@@ -122,6 +141,8 @@ func (h *debugReqHandler) store() (*Store, error) {
 	return h.store_, h.storeError
 }
 
+// check implements the Check function that is used with
+// debugstatus.Handler.Check.
 func (h *debugReqHandler) check() map[string]debugstatus.CheckResult {
 	checkers := []debugstatus.CheckerFunc{
 		debugstatus.ServerStartTime,
@@ -157,6 +178,7 @@ func (h *debugReqHandler) check() map[string]debugstatus.CheckResult {
 	return debugstatus.Check(checkers...)
 }
 
+// checkElasticSearch checks the elasticsearch connection for /debug/status.
 func (h *debugReqHandler) checkElasticSearch() (key string, result debugstatus.CheckResult) {
 	key = "elasticsearch"
 	result.Name = "Elastic search is running"
@@ -176,6 +198,7 @@ func (h *debugReqHandler) checkElasticSearch() (key string, result debugstatus.C
 	return key, result
 }
 
+// checkEntities checks the entities database for consistency.
 func (h *debugReqHandler) checkEntities() (key string, result debugstatus.CheckResult) {
 	result.Name = "Entities in charm store"
 	charms, err := h.store_.DB.Entities().Find(bson.D{{"series", bson.D{{"$ne", "bundle"}}}}).Count()
@@ -198,6 +221,7 @@ func (h *debugReqHandler) checkEntities() (key string, result debugstatus.CheckR
 	return "entities", result
 }
 
+// checkBaseEntities checks the base entities database for consistency.
 func (h *debugReqHandler) checkBaseEntities() (key string, result debugstatus.CheckResult) {
 	resultKey := "base_entities"
 	result.Name = "Base entities in charm store"
@@ -221,6 +245,8 @@ func (h *debugReqHandler) checkBaseEntities() (key string, result debugstatus.Ch
 	return resultKey, result
 }
 
+// checkLogs creates a function that will check for the last time the
+// logs contain a start and end for an operation.
 func (h *debugReqHandler) checkLogs(
 	resultKey, resultName string,
 	logType mongodoc.LogType,
@@ -270,11 +296,13 @@ func (h *debugReqHandler) findTimesInLogs(logType mongodoc.LogType, startPrefix,
 	return
 }
 
+// debugCheckRequest represents a request to the /debug/check endpoint. 
 type debugCheckRequest struct {
 	httprequest.Route `httprequest:"GET /debug/check"`
 }
 
-// GET /debug/check.
+// Check handles a request to the /debug/check endpoint. These are very
+// simple checks that check the connection to external services are up.
 func (h *debugReqHandler) Check(*debugCheckRequest) (map[string]string, error) {
 	n := len(h.h.checks)
 	type result struct {
@@ -314,6 +342,7 @@ func (h *debugReqHandler) Check(*debugCheckRequest) (map[string]string, error) {
 	return results, nil
 }
 
+// checkDB checks the connection to a mongodb database.
 func checkDB(db *mgo.Database) func() error {
 	return func() error {
 		s := db.Session.Copy()
@@ -323,6 +352,7 @@ func checkDB(db *mgo.Database) func() error {
 	}
 }
 
+// checkES checks the connection to an elasticsearch database.
 func checkES(si *SearchIndex) func() error {
 	if si == nil || si.Database == nil {
 		return func() error {
@@ -335,11 +365,14 @@ func checkES(si *SearchIndex) func() error {
 	}
 }
 
+// debugFullCheckRequest represents a request to the /debug/fullcheck endpoint.
 type debugFullCheckRequest struct {
 	httprequest.Route `httprequest:"GET /debug/fullcheck"`
 }
 
-// GET /debug/fullcheck
+// FullCheck handles a request to the /debug/fullcheck endpoint. This
+// does a comprehensive check of a number of operations on the charm
+// store.
 func (h *debugReqHandler) FullCheck(p httprequest.Params, _ *debugFullCheckRequest) {
 	w := p.Response
 	hnd := h.h.params.loopbackHandler
@@ -456,6 +489,7 @@ func (h *debugReqHandler) FullCheck(p httprequest.Params, _ *debugFullCheckReque
 	code = http.StatusOK
 }
 
+// get is a helper function for FullCheck that performs get requests on a handler.
 func get(h http.Handler, url string, body interface{}) error {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
