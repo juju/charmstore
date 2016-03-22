@@ -27,11 +27,22 @@ func NewResourceQuery(cURL *charm.URL, resName string, revision int) bson.D {
 // Resource holds the in-database representation of a charm resource
 // at a particular revision.
 type Resource struct {
-	CharmURL    *charm.URL `bson:"charm-url"`
-	Name        string     `bson:"name"`
-	Revision    int        `bson:"revision"`
-	Fingerprint []byte     `bson:"fingerprint"`
-	Size        int64      `bson:"size"`
+	// CharmURL identifies the unresolved charm associated with this
+	// resource.
+	CharmURL *charm.URL `bson:"charm-url"`
+
+	// Name is the name of the resource as defined in the charm
+	// metadata.
+	Name string `bson:"name"`
+
+	// Revision identifies the specific revision of the resource.
+	Revision int `bson:"revision"`
+
+	// Fingerprint is the checksum of the resource file.
+	Fingerprint []byte `bson:"fingerprint"`
+
+	// Size is the size of the resource file, in bytes.
+	Size int64 `bson:"size"`
 }
 
 // Validate ensures that the doc is valid.
