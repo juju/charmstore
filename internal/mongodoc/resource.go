@@ -106,5 +106,33 @@ type Resources struct {
 
 	// Revisions maps the charm's resources, by name, to the resource
 	// revisions tied to the resolved charm ID.
-	Revisions map[string]int `bson:"resource-revisions"`
+	Revisions map[string]int `bson:"resource-revisions,omitempty"`
+}
+
+// Validate ensures that the doc is valid.
+func (doc Resources) Validate() error {
+	if doc.Channel == params.NoChannel {
+		return errgo.New("missing channel")
+	}
+
+	if doc.CharmURL == nil {
+		return errgo.New("missing charm URL")
+	}
+	if doc.CharmURL.Revision == -1 {
+		return errgo.New("unresolved charm URLs not supported")
+	}
+	if doc.CharmURL.Series == "" {
+		return errgo.New("series missing")
+	}
+
+	for name, revision := range doc.Revisions {
+		if name == "" {
+			return errgo.New("missing resource name")
+		}
+		if revision < 0 {
+			return errgo.Newf("got negative revision %d for resource %q", revision, name)
+		}
+	}
+
+	return nil
 }

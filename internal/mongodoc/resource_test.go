@@ -180,3 +180,117 @@ func (s *ResourcesSuite) TestNewResourcesQuery(c *gc.C) {
 		{"resolved-charm-url", cURL},
 	})
 }
+
+func (s *ResourcesSuite) TestValidateFull(c *gc.C) {
+	doc := mongodoc.Resources{
+		Channel:  params.StableChannel,
+		CharmURL: charm.MustParseURL("cs:trusty/spam-2"),
+		Revisions: map[string]int{
+			"eggs": 1,
+			"ham":  17,
+		},
+	}
+
+	err := doc.Validate()
+
+	c.Check(err, jc.ErrorIsNil)
+}
+
+func (s *ResourcesSuite) TestValidateZeroValue(c *gc.C) {
+	var doc mongodoc.Resources
+
+	err := doc.Validate()
+
+	c.Check(err, gc.NotNil)
+}
+
+func (s *ResourcesSuite) TestValidateMissingChannel(c *gc.C) {
+	doc := mongodoc.Resources{
+		Channel:  "",
+		CharmURL: charm.MustParseURL("cs:trusty/spam-2"),
+		Revisions: map[string]int{
+			"eggs": 1,
+			"ham":  17,
+		},
+	}
+
+	err := doc.Validate()
+
+	c.Check(err, gc.ErrorMatches, `missing channel`)
+}
+
+func (s *ResourcesSuite) TestValidateMissingCharmURL(c *gc.C) {
+	doc := mongodoc.Resources{
+		Channel:  params.StableChannel,
+		CharmURL: nil,
+		Revisions: map[string]int{
+			"eggs": 1,
+			"ham":  17,
+		},
+	}
+
+	err := doc.Validate()
+
+	c.Check(err, gc.ErrorMatches, `missing charm URL`)
+}
+
+func (s *ResourcesSuite) TestValidateMissingCharmRevision(c *gc.C) {
+	doc := mongodoc.Resources{
+		Channel:  params.StableChannel,
+		CharmURL: charm.MustParseURL("cs:trusty/spam"),
+		Revisions: map[string]int{
+			"eggs": 1,
+			"ham":  17,
+		},
+	}
+
+	err := doc.Validate()
+
+	c.Check(err, gc.ErrorMatches, `unresolved charm URLs not supported`)
+}
+
+func (s *ResourcesSuite) TestValidateMissingCharmSeries(c *gc.C) {
+	doc := mongodoc.Resources{
+		Channel:  params.StableChannel,
+		CharmURL: charm.MustParseURL("cs:spam-2"),
+		Revisions: map[string]int{
+			"eggs": 1,
+			"ham":  17,
+		},
+	}
+
+	err := doc.Validate()
+
+	c.Check(err, gc.ErrorMatches, `series missing`)
+}
+
+func (s *ResourcesSuite) TestValidateMissingName(c *gc.C) {
+	doc := mongodoc.Resources{
+		Channel:  params.StableChannel,
+		CharmURL: charm.MustParseURL("cs:trusty/spam-2"),
+		Revisions: map[string]int{
+			"eggs": 1,
+			"":     42,
+			"ham":  17,
+		},
+	}
+
+	err := doc.Validate()
+
+	c.Check(err, gc.ErrorMatches, `missing resource name`)
+}
+
+func (s *ResourcesSuite) TestValidateNegativeRevision(c *gc.C) {
+	doc := mongodoc.Resources{
+		Channel:  params.StableChannel,
+		CharmURL: charm.MustParseURL("cs:trusty/spam-2"),
+		Revisions: map[string]int{
+			"eggs": -1,
+			"ham":  17,
+		},
+	}
+
+	err := doc.Validate()
+
+	c.Check(err, gc.ErrorMatches, `got negative revision -1 for resource "eggs"`)
+}
