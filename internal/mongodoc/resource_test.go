@@ -19,14 +19,8 @@ var _ = gc.Suite(&ResourceSuite{})
 
 func (s *ResourceSuite) TestValidateFull(c *gc.C) {
 	doc := mongodoc.Resource{
-		CharmURL: charm.MustParseURL("cs:spam"),
-
+		CharmURL:    charm.MustParseURL("cs:spam"),
 		Name:        "spam",
-		Type:        "file",
-		Path:        "spam.tgz",
-		Description: "you really need this!!!",
-
-		Origin:      "store",
 		Revision:    1,
 		Fingerprint: []byte(fingerprint),
 		Size:        12,
@@ -45,72 +39,10 @@ func (s *ResourceSuite) TestValidateZeroValue(c *gc.C) {
 	c.Check(err, gc.NotNil)
 }
 
-func (s *ResourceSuite) TestValidateBadResource(c *gc.C) {
-	doc := mongodoc.Resource{
-		CharmURL: charm.MustParseURL("cs:spam"),
-
-		Name: "",
-		Type: "file",
-		Path: "spam.tgz",
-
-		Origin:      "store",
-		Revision:    1,
-		Fingerprint: []byte(fingerprint),
-		Size:        12,
-	}
-
-	err := doc.Validate()
-
-	c.Check(err, gc.NotNil)
-}
-
-func (s *ResourceSuite) TestValidateUnexpectedOrigin(c *gc.C) {
-	doc := mongodoc.Resource{
-		CharmURL: charm.MustParseURL("cs:spam"),
-
-		Name: "spam",
-		Type: "file",
-		Path: "spam.tgz",
-
-		Origin:      "upload",
-		Revision:    0,
-		Fingerprint: []byte(fingerprint),
-		Size:        12,
-	}
-
-	err := doc.Validate()
-
-	c.Check(err, gc.ErrorMatches, `unexpected origin "upload"`)
-}
-
-func (s *ResourceSuite) TestValidateMissingFingerprint(c *gc.C) {
-	doc := mongodoc.Resource{
-		CharmURL: charm.MustParseURL("cs:spam"),
-
-		Name: "spam",
-		Type: "file",
-		Path: "spam.tgz",
-
-		Origin:      "store",
-		Revision:    1,
-		Fingerprint: nil,
-		Size:        0,
-	}
-
-	err := doc.Validate()
-
-	c.Check(err, gc.ErrorMatches, `missing fingerprint`)
-}
-
 func (s *ResourceSuite) TestValidateMissingCharmURL(c *gc.C) {
 	doc := mongodoc.Resource{
-		CharmURL: nil,
-
-		Name: "spam",
-		Type: "file",
-		Path: "spam.tgz",
-
-		Origin:      "store",
+		CharmURL:    nil,
+		Name:        "spam",
 		Revision:    1,
 		Fingerprint: []byte(fingerprint),
 		Size:        12,
@@ -121,15 +53,10 @@ func (s *ResourceSuite) TestValidateMissingCharmURL(c *gc.C) {
 	c.Check(err, gc.ErrorMatches, `missing charm URL`)
 }
 
-func (s *ResourceSuite) TestValidateUnexpectedRevision(c *gc.C) {
+func (s *ResourceSuite) TestValidateUnexpectedCharmRevision(c *gc.C) {
 	doc := mongodoc.Resource{
-		CharmURL: charm.MustParseURL("cs:spam-2"),
-
-		Name: "spam",
-		Type: "file",
-		Path: "spam.tgz",
-
-		Origin:      "store",
+		CharmURL:    charm.MustParseURL("cs:spam-2"),
+		Name:        "spam",
 		Revision:    1,
 		Fingerprint: []byte(fingerprint),
 		Size:        12,
@@ -140,15 +67,10 @@ func (s *ResourceSuite) TestValidateUnexpectedRevision(c *gc.C) {
 	c.Check(err, gc.ErrorMatches, `resolved charm URLs not supported \(got revision 2\)`)
 }
 
-func (s *ResourceSuite) TestValidateUnexpectedSeries(c *gc.C) {
+func (s *ResourceSuite) TestValidateUnexpectedCharmSeries(c *gc.C) {
 	doc := mongodoc.Resource{
-		CharmURL: charm.MustParseURL("cs:trusty/spam"),
-
-		Name: "spam",
-		Type: "file",
-		Path: "spam.tgz",
-
-		Origin:      "store",
+		CharmURL:    charm.MustParseURL("cs:trusty/spam"),
+		Name:        "spam",
 		Revision:    1,
 		Fingerprint: []byte(fingerprint),
 		Size:        12,
@@ -157,4 +79,74 @@ func (s *ResourceSuite) TestValidateUnexpectedSeries(c *gc.C) {
 	err := doc.Validate()
 
 	c.Check(err, gc.ErrorMatches, `series should not be set \(got "trusty"\)`)
+}
+
+func (s *ResourceSuite) TestValidateMissingName(c *gc.C) {
+	doc := mongodoc.Resource{
+		CharmURL:    charm.MustParseURL("cs:spam"),
+		Name:        "",
+		Revision:    1,
+		Fingerprint: []byte(fingerprint),
+		Size:        12,
+	}
+
+	err := doc.Validate()
+
+	c.Check(err, gc.ErrorMatches, `missing name`)
+}
+
+func (s *ResourceSuite) TestValidateNegativeRevision(c *gc.C) {
+	doc := mongodoc.Resource{
+		CharmURL:    charm.MustParseURL("cs:spam"),
+		Name:        "spam",
+		Revision:    -1,
+		Fingerprint: []byte(fingerprint),
+		Size:        12,
+	}
+
+	err := doc.Validate()
+
+	c.Check(err, gc.ErrorMatches, `got negative revision -1`)
+}
+
+func (s *ResourceSuite) TestValidateMissingFingerprint(c *gc.C) {
+	doc := mongodoc.Resource{
+		CharmURL:    charm.MustParseURL("cs:spam"),
+		Name:        "spam",
+		Revision:    1,
+		Fingerprint: nil,
+		Size:        0,
+	}
+
+	err := doc.Validate()
+
+	c.Check(err, gc.ErrorMatches, `missing fingerprint`)
+}
+
+func (s *ResourceSuite) TestValidateBadFingerprint(c *gc.C) {
+	doc := mongodoc.Resource{
+		CharmURL:    charm.MustParseURL("cs:spam"),
+		Name:        "spam",
+		Revision:    1,
+		Fingerprint: []byte(fingerprint + "0"),
+		Size:        12,
+	}
+
+	err := doc.Validate()
+
+	c.Check(err, gc.ErrorMatches, `bad fingerprint.*`)
+}
+
+func (s *ResourceSuite) TestValidateNegativeSize(c *gc.C) {
+	doc := mongodoc.Resource{
+		CharmURL:    charm.MustParseURL("cs:spam"),
+		Name:        "spam",
+		Revision:    1,
+		Fingerprint: []byte(fingerprint),
+		Size:        -1,
+	}
+
+	err := doc.Validate()
+
+	c.Check(err, gc.ErrorMatches, `got negative size -1`)
 }

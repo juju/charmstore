@@ -12,17 +12,11 @@ import (
 // Resource holds the in-database representation of a charm resource
 // at a particular revision.
 type Resource struct {
-	CharmURL *charm.URL `bson:"charm-url"`
-
-	Name        string `bson:"name"`
-	Type        string `bson:"type"`
-	Path        string `bson:"path"`
-	Description string `bson:"comment"`
-
-	Origin      string `bson:"origin"`
-	Revision    int    `bson:"revision"`
-	Fingerprint []byte `bson:"fingerprint"`
-	Size        int64  `bson:"size"`
+	CharmURL    *charm.URL `bson:"charm-url"`
+	Name        string     `bson:"name"`
+	Revision    int        `bson:"revision"`
+	Fingerprint []byte     `bson:"fingerprint"`
+	Size        int64      `bson:"size"`
 }
 
 // Validate ensures that the doc is valid.
@@ -36,53 +30,28 @@ func (doc Resource) Validate() error {
 	if doc.CharmURL.Series != "" {
 		return errgo.Newf("series should not be set (got %q)", doc.CharmURL.Series)
 	}
-	if doc.Origin != resource.OriginStore.String() {
-		return errgo.Newf("unexpected origin %q", doc.Origin)
+
+	if doc.Name == "" {
+		return errgo.New("missing name")
 	}
+	if doc.Revision < 0 {
+		return errgo.Newf("got negative revision %d", doc.Revision)
+	}
+
 	if len(doc.Fingerprint) == 0 {
 		return errgo.New("missing fingerprint")
 	}
-
-	_, err := doc2Resource(doc)
-	if err != nil {
-		return errgo.Mask(err)
-	}
-	return nil
-}
-
-// doc2Resource returns the resource.Resource represented by the doc.
-func doc2Resource(doc Resource) (resource.Resource, error) {
-	var res resource.Resource
-
-	resType, err := resource.ParseType(doc.Type)
-	if err != nil {
-		return res, errgo.Mask(err)
-	}
-
-	origin, err := resource.ParseOrigin(doc.Origin)
-	if err != nil {
-		return res, errgo.Mask(err)
-	}
-
 	fp, err := resource.NewFingerprint(doc.Fingerprint)
 	if err != nil {
-		return res, errgo.Mask(err)
+		return errgo.Notef(err, "bad fingerprint")
+	}
+	if err := fp.Validate(); err != nil {
+		return errgo.Notef(err, "bad fingerprint")
 	}
 
-	res = resource.Resource{
-		Meta: resource.Meta{
-			Name:        doc.Name,
-			Type:        resType,
-			Path:        doc.Path,
-			Description: doc.Description,
-		},
-		Origin:      origin,
-		Revision:    doc.Revision,
-		Fingerprint: fp,
-		Size:        doc.Size,
+	if doc.Size < 0 {
+		return errgo.Newf("got negative size %d", doc.Size)
 	}
-	if err := res.Validate(); err != nil {
-		return res, errgo.Mask(err)
-	}
-	return res, nil
+
+	return nil
 }
