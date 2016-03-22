@@ -83,6 +83,16 @@ func (doc Resource) Validate() error {
 	return nil
 }
 
+// NewResourcesQuery formats the provided details into a mongo query
+// for the resource revisions associated with the identified *resolved*
+// charm URL (in the given channel).
+func NewResourcesQuery(channel params.Channel, cURL *charm.URL) bson.D {
+	return bson.D{
+		{"channel", channel},
+		{"resolved-charm-url", cURL},
+	}
+}
+
 // Resources identifies the set of resource revisions for a resolved
 // charm, relative to a specific channel,
 type Resources struct {

@@ -7,6 +7,7 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 	"gopkg.in/mgo.v2/bson"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
@@ -14,9 +15,12 @@ import (
 
 const fingerprint = "0123456789abcdef0123456789abcdef0123456789abcdef"
 
-type ResourceSuite struct{}
+var (
+	_ = gc.Suite(&ResourceSuite{})
+	_ = gc.Suite(&ResourcesSuite{})
+)
 
-var _ = gc.Suite(&ResourceSuite{})
+type ResourceSuite struct{}
 
 func (s *ResourceSuite) TestNewResourceQuery(c *gc.C) {
 	cURL := charm.MustParseURL("cs:trusty/spam-2")
@@ -162,4 +166,17 @@ func (s *ResourceSuite) TestValidateNegativeSize(c *gc.C) {
 	err := doc.Validate()
 
 	c.Check(err, gc.ErrorMatches, `got negative size -1`)
+}
+
+type ResourcesSuite struct{}
+
+func (s *ResourcesSuite) TestNewResourcesQuery(c *gc.C) {
+	cURL := charm.MustParseURL("cs:trusty/spam-2")
+
+	query := mongodoc.NewResourcesQuery(params.StableChannel, cURL)
+
+	c.Check(query, jc.DeepEquals, bson.D{
+		{"channel", params.StableChannel},
+		{"resolved-charm-url", cURL},
+	})
 }
