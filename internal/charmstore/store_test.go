@@ -3820,7 +3820,6 @@ func entity(url, purl string) *mongodoc.Entity {
 	e := &mongodoc.Entity{
 		URL:            id,
 		PromulgatedURL: pid,
-		Resources:      map[string]int{},
 	}
 	denormalizeEntity(e)
 	return e
@@ -3842,8 +3841,5 @@ func baseEntity(url string, promulgated bool) *mongodoc.BaseEntity {
 func denormalizedEntity(e *mongodoc.Entity) *mongodoc.Entity {
 	e1 := *e
 	denormalizeEntity(&e1)
-	if e1.Resources == nil {
-		e1.Resources = map[string]int{}
-	}
 	return &e1
 }

@@ -360,7 +360,6 @@ func (s *AddEntitySuite) checkAddCharm(c *gc.C, ch charm.Charm, url *router.Reso
 		CharmRequiredInterfaces: []string{"mysql", "varnish"},
 		PromulgatedURL:          url.PromulgatedURL(),
 		SupportedSeries:         ch.Meta().Series,
-		Resources:               map[string]int{},
 	}))
 
 	// The charm archive has been properly added to the blob store.
@@ -424,7 +423,6 @@ func (s *AddEntitySuite) checkAddBundle(c *gc.C, bundle charm.Bundle, url *route
 		BundleMachineCount: newInt(2),
 		BundleUnitCount:    newInt(2),
 		PromulgatedURL:     url.PromulgatedURL(),
-		Resources:          map[string]int{},
 	}))
 
 	// The bundle archive has been properly added to the blob store.

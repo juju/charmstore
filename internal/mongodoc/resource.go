@@ -7,6 +7,7 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charm.v6-unstable/resource"
+	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -80,4 +81,20 @@ func (doc Resource) Validate() error {
 	}
 
 	return nil
+}
+
+// Resources identifies the set of resource revisions for a resolved
+// charm, relative to a specific channel,
+type Resources struct {
+	// Channel is the channel to which the charm was published with
+	// these particular resource revisions.
+	Channel params.Channel `bson:"channel"`
+
+	// CharmURL is the resolved charm ID with which these particular
+	// resource revisions were published.
+	CharmURL *charm.URL `bson:"resolved-charm-url"`
+
+	// Revisions maps the charm's resources, by name, to the resource
+	// revisions tied to the resolved charm ID.
+	Revisions map[string]int `bson:"resource-revisions"`
 }

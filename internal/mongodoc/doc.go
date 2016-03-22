@@ -145,10 +145,6 @@ type Entity struct {
 	// Stable holds whether the entity has been published in the
 	// "stable" channel.
 	Stable bool
-
-	// Resources maps the charm's resources to the resource revisions
-	// tied to this charm revision.
-	Resources map[string]int
 }
 
 // PreferredURL returns the preferred way to refer to this entity. If
