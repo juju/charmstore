@@ -24,7 +24,7 @@ func (doc Resource) Validate() error {
 	if doc.CharmURL == nil {
 		return errgo.New("missing charm URL")
 	}
-	if doc.CharmURL.Revision >= 0 {
+	if doc.CharmURL.Revision != -1 {
 		return errgo.Newf("resolved charm URLs not supported (got revision %d)", doc.CharmURL.Revision)
 	}
 	if doc.CharmURL.Series != "" {
