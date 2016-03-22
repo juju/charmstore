@@ -41,6 +41,7 @@ func (s *ResourceSuite) TestValidateFull(c *gc.C) {
 		Revision:    1,
 		Fingerprint: []byte(fingerprint),
 		Size:        12,
+		BlobName:    bson.NewObjectId().Hex(),
 	}
 
 	err := doc.Validate()
@@ -63,6 +64,7 @@ func (s *ResourceSuite) TestValidateMissingCharmURL(c *gc.C) {
 		Revision:    1,
 		Fingerprint: []byte(fingerprint),
 		Size:        12,
+		BlobName:    bson.NewObjectId().Hex(),
 	}
 
 	err := doc.Validate()
@@ -77,6 +79,7 @@ func (s *ResourceSuite) TestValidateUnexpectedCharmRevision(c *gc.C) {
 		Revision:    1,
 		Fingerprint: []byte(fingerprint),
 		Size:        12,
+		BlobName:    bson.NewObjectId().Hex(),
 	}
 
 	err := doc.Validate()
@@ -91,6 +94,7 @@ func (s *ResourceSuite) TestValidateUnexpectedCharmSeries(c *gc.C) {
 		Revision:    1,
 		Fingerprint: []byte(fingerprint),
 		Size:        12,
+		BlobName:    bson.NewObjectId().Hex(),
 	}
 
 	err := doc.Validate()
@@ -105,6 +109,7 @@ func (s *ResourceSuite) TestValidateMissingName(c *gc.C) {
 		Revision:    1,
 		Fingerprint: []byte(fingerprint),
 		Size:        12,
+		BlobName:    bson.NewObjectId().Hex(),
 	}
 
 	err := doc.Validate()
@@ -119,6 +124,7 @@ func (s *ResourceSuite) TestValidateNegativeRevision(c *gc.C) {
 		Revision:    -1,
 		Fingerprint: []byte(fingerprint),
 		Size:        12,
+		BlobName:    bson.NewObjectId().Hex(),
 	}
 
 	err := doc.Validate()
@@ -133,6 +139,7 @@ func (s *ResourceSuite) TestValidateMissingFingerprint(c *gc.C) {
 		Revision:    1,
 		Fingerprint: nil,
 		Size:        0,
+		BlobName:    bson.NewObjectId().Hex(),
 	}
 
 	err := doc.Validate()
@@ -147,6 +154,7 @@ func (s *ResourceSuite) TestValidateBadFingerprint(c *gc.C) {
 		Revision:    1,
 		Fingerprint: []byte(fingerprint + "0"),
 		Size:        12,
+		BlobName:    bson.NewObjectId().Hex(),
 	}
 
 	err := doc.Validate()
@@ -161,11 +169,27 @@ func (s *ResourceSuite) TestValidateNegativeSize(c *gc.C) {
 		Revision:    1,
 		Fingerprint: []byte(fingerprint),
 		Size:        -1,
+		BlobName:    bson.NewObjectId().Hex(),
 	}
 
 	err := doc.Validate()
 
 	c.Check(err, gc.ErrorMatches, `got negative size -1`)
+}
+
+func (s *ResourceSuite) TestValidateMissingBlobName(c *gc.C) {
+	doc := mongodoc.Resource{
+		CharmURL:    charm.MustParseURL("cs:spam"),
+		Name:        "spam",
+		Revision:    1,
+		Fingerprint: []byte(fingerprint),
+		Size:        12,
+		BlobName:    "",
+	}
+
+	err := doc.Validate()
+
+	c.Check(err, gc.ErrorMatches, `missing blob name`)
 }
 
 type ResourcesSuite struct{}

@@ -44,6 +44,10 @@ type Resource struct {
 
 	// Size is the size of the resource file, in bytes.
 	Size int64 `bson:"size"`
+
+	// BlobName holds the name that the resource blob is given in the
+	// blob store.
+	BlobName string
 }
 
 // Validate ensures that the doc is valid.
@@ -78,6 +82,10 @@ func (doc Resource) Validate() error {
 
 	if doc.Size < 0 {
 		return errgo.Newf("got negative size %d", doc.Size)
+	}
+
+	if doc.BlobName == "" {
+		return errgo.Newf("missing blob name")
 	}
 
 	return nil
