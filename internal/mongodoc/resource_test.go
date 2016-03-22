@@ -5,7 +5,6 @@ package mongodoc_test // import "gopkg.in/juju/charmstore.v5-unstable/internal/m
 
 import (
 	"bytes"
-	"fmt"
 
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
@@ -38,14 +37,6 @@ func (s *ResourceSuite) TestCheckResourceCharm(c *gc.C) {
 	err := mongodoc.CheckCharmResource(entity, res)
 
 	c.Check(err, jc.ErrorIsNil)
-}
-
-func (s *ResourceSuite) TestNewResourceID(c *gc.C) {
-	curl := charm.MustParseURL("cs:trusty/spam-2")
-
-	id := mongodoc.NewResourceID(curl, "eggs", 3)
-
-	c.Check(id, gc.Equals, "resource#cs:spam#eggs#3")
 }
 
 func (s *ResourceSuite) TestResource2Doc(c *gc.C) {
@@ -95,9 +86,7 @@ func newResource(c *gc.C, curl *charm.URL, name, data string) (resource.Resource
 	err = res.Validate()
 	c.Assert(err, jc.ErrorIsNil)
 
-	id := fmt.Sprintf("resource#%s#%s#%d", curl, name, revision)
 	doc := mongodoc.Resource{
-		DocID:    id,
 		CharmURL: curl,
 
 		Name:        name,

@@ -4,8 +4,6 @@
 package mongodoc // import "gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
 
 import (
-	"fmt"
-
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charm.v6-unstable/resource"
@@ -42,19 +40,9 @@ func charmHasResource(meta *charm.Meta, resName string) bool {
 	return false
 }
 
-// NewResourceID generates the doc ID corresponding to the given info.
-func NewResourceID(curl *charm.URL, resName string, revision int) string {
-	// We ignore the series and revision because resources are specific
-	// to the charm rather than to any particular variation of it.
-	curl = curl.WithRevision(-1)
-	curl.Series = ""
-	return fmt.Sprintf("resource#%s#%s#%d", curl, resName, revision)
-}
-
 // Resource holds the in-database representation of a charm resource
 // at a particular revision.
 type Resource struct {
-	DocID    string     `bson:"_id"`
 	CharmURL *charm.URL `bson:"charm-url"`
 
 	Name        string `bson:"name"`
@@ -79,9 +67,7 @@ func Resource2Doc(curl *charm.URL, res resource.Resource) (*Resource, error) {
 	curl = curl.WithRevision(-1)
 	curl.Series = ""
 
-	id := NewResourceID(curl, res.Name, res.Revision)
 	doc := &Resource{
-		DocID:    id,
 		CharmURL: curl,
 
 		Name:        res.Name,
