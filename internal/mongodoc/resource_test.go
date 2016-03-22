@@ -4,6 +4,8 @@
 package mongodoc_test // import "gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
 
 import (
+	"time"
+
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6-unstable"
@@ -42,6 +44,7 @@ func (s *ResourceSuite) TestValidateFull(c *gc.C) {
 		Fingerprint: []byte(fingerprint),
 		Size:        12,
 		BlobName:    bson.NewObjectId().Hex(),
+		UploadTime:  time.Now().UTC(),
 	}
 
 	err := doc.Validate()
@@ -65,6 +68,7 @@ func (s *ResourceSuite) TestValidateMissingCharmURL(c *gc.C) {
 		Fingerprint: []byte(fingerprint),
 		Size:        12,
 		BlobName:    bson.NewObjectId().Hex(),
+		UploadTime:  time.Now().UTC(),
 	}
 
 	err := doc.Validate()
@@ -80,6 +84,7 @@ func (s *ResourceSuite) TestValidateUnexpectedCharmRevision(c *gc.C) {
 		Fingerprint: []byte(fingerprint),
 		Size:        12,
 		BlobName:    bson.NewObjectId().Hex(),
+		UploadTime:  time.Now().UTC(),
 	}
 
 	err := doc.Validate()
@@ -95,6 +100,7 @@ func (s *ResourceSuite) TestValidateUnexpectedCharmSeries(c *gc.C) {
 		Fingerprint: []byte(fingerprint),
 		Size:        12,
 		BlobName:    bson.NewObjectId().Hex(),
+		UploadTime:  time.Now().UTC(),
 	}
 
 	err := doc.Validate()
@@ -110,6 +116,7 @@ func (s *ResourceSuite) TestValidateMissingName(c *gc.C) {
 		Fingerprint: []byte(fingerprint),
 		Size:        12,
 		BlobName:    bson.NewObjectId().Hex(),
+		UploadTime:  time.Now().UTC(),
 	}
 
 	err := doc.Validate()
@@ -125,6 +132,7 @@ func (s *ResourceSuite) TestValidateNegativeRevision(c *gc.C) {
 		Fingerprint: []byte(fingerprint),
 		Size:        12,
 		BlobName:    bson.NewObjectId().Hex(),
+		UploadTime:  time.Now().UTC(),
 	}
 
 	err := doc.Validate()
@@ -140,6 +148,7 @@ func (s *ResourceSuite) TestValidateMissingFingerprint(c *gc.C) {
 		Fingerprint: nil,
 		Size:        0,
 		BlobName:    bson.NewObjectId().Hex(),
+		UploadTime:  time.Now().UTC(),
 	}
 
 	err := doc.Validate()
@@ -155,6 +164,7 @@ func (s *ResourceSuite) TestValidateBadFingerprint(c *gc.C) {
 		Fingerprint: []byte(fingerprint + "0"),
 		Size:        12,
 		BlobName:    bson.NewObjectId().Hex(),
+		UploadTime:  time.Now().UTC(),
 	}
 
 	err := doc.Validate()
@@ -170,6 +180,7 @@ func (s *ResourceSuite) TestValidateNegativeSize(c *gc.C) {
 		Fingerprint: []byte(fingerprint),
 		Size:        -1,
 		BlobName:    bson.NewObjectId().Hex(),
+		UploadTime:  time.Now().UTC(),
 	}
 
 	err := doc.Validate()
@@ -185,11 +196,28 @@ func (s *ResourceSuite) TestValidateMissingBlobName(c *gc.C) {
 		Fingerprint: []byte(fingerprint),
 		Size:        12,
 		BlobName:    "",
+		UploadTime:  time.Now().UTC(),
 	}
 
 	err := doc.Validate()
 
 	c.Check(err, gc.ErrorMatches, `missing blob name`)
+}
+
+func (s *ResourceSuite) TestValidateMissingUploadTime(c *gc.C) {
+	doc := mongodoc.Resource{
+		CharmURL:    charm.MustParseURL("cs:spam"),
+		Name:        "spam",
+		Revision:    1,
+		Fingerprint: []byte(fingerprint),
+		Size:        12,
+		BlobName:    bson.NewObjectId().Hex(),
+		UploadTime:  time.Time{},
+	}
+
+	err := doc.Validate()
+
+	c.Check(err, gc.ErrorMatches, `missing upload timestamp`)
 }
 
 type ResourcesSuite struct{}

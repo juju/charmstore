@@ -4,6 +4,8 @@
 package mongodoc // import "gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
 
 import (
+	"time"
+
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charm.v6-unstable/resource"
@@ -48,6 +50,10 @@ type Resource struct {
 	// BlobName holds the name that the resource blob is given in the
 	// blob store.
 	BlobName string
+
+	// UploadTime is the UTC timestamp from when the resource file was
+	// stored in the blob store.
+	UploadTime time.Time
 }
 
 // Validate ensures that the doc is valid.
@@ -85,7 +91,11 @@ func (doc Resource) Validate() error {
 	}
 
 	if doc.BlobName == "" {
-		return errgo.Newf("missing blob name")
+		return errgo.New("missing blob name")
+	}
+
+	if doc.UploadTime.IsZero() {
+		return errgo.New("missing upload timestamp")
 	}
 
 	return nil
