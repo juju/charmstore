@@ -3842,5 +3842,8 @@ func baseEntity(url string, promulgated bool) *mongodoc.BaseEntity {
 func denormalizedEntity(e *mongodoc.Entity) *mongodoc.Entity {
 	e1 := *e
 	denormalizeEntity(&e1)
+	if e1.Resources == nil {
+		e1.Resources = map[string]int{}
+	}
 	return &e1
 }
