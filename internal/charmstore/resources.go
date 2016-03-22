@@ -100,7 +100,7 @@ func (s Store) resourceDoc(curl *charm.URL, resName string, revision int) (mongo
 
 func (s Store) addResource(entity *mongodoc.Entity, res resource.Resource, blob io.Reader, newRevision int) error {
 	blobName, err := s.storeResource(entity, res, blob)
-	if err := mongodoc.CheckCharmResource(entity, res); err != nil {
+	if err := checkCharmResource(entity, res); err != nil {
 		return err
 	}
 	if s.insertResource(entity, res, blobName, newRevision); err != nil {
@@ -114,7 +114,7 @@ func (s Store) addResource(entity *mongodoc.Entity, res resource.Resource, blob 
 
 func (s Store) insertResource(entity *mongodoc.Entity, res resource.Resource, blobName string, newRevision int) error {
 	res.Revision = newRevision
-	if err := mongodoc.CheckCharmResource(entity, res); err != nil {
+	if err := checkCharmResource(entity, res); err != nil {
 		return err
 	}
 	// TODO(ericsnow) We need to pass in a base ID...
@@ -146,7 +146,7 @@ func (s Store) setResource(entity *mongodoc.Entity, resName string, revision int
 	if err != nil {
 		return err
 	}
-	if err := mongodoc.CheckCharmResource(entity, res); err != nil {
+	if err := checkCharmResource(entity, res); err != nil {
 		return err
 	}
 
@@ -167,4 +167,35 @@ func (s Store) setResource(entity *mongodoc.Entity, resName string, revision int
 	}
 
 	return nil
+}
+
+// checkCharmResource ensures that the given entity is okay
+// to associate with a revisioned resource.
+func checkCharmResource(entity *mongodoc.Entity, res resource.Resource) error {
+	// TODO(ericsnow) Verify that the revisioned resources is in the DB.
+
+	if err := res.Validate(); err != nil {
+		return err
+	}
+	if res.Fingerprint.IsZero() {
+		return errgo.Newf("resources must have a fingerprint")
+	}
+
+	if entity.URL.Series == "bundle" {
+		return errgo.Newf("bundles do not have resources")
+	}
+	if !charmHasResource(entity.CharmMeta, res.Name) {
+		return errgo.Newf("charm does not have resource %q", res.Name)
+	}
+
+	return nil
+}
+
+func charmHasResource(meta *charm.Meta, resName string) bool {
+	for name := range meta.Resources {
+		if resName == name {
+			return true
+		}
+	}
+	return false
 }

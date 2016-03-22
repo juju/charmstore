@@ -15,37 +15,6 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-// CheckCharmResource ensures that the given entity is okay
-// to associate with a revisioned resource.
-func CheckCharmResource(entity *Entity, res resource.Resource) error {
-	// TODO(ericsnow) Verify that the revisioned resources is in the DB.
-
-	if err := res.Validate(); err != nil {
-		return err
-	}
-	if res.Fingerprint.IsZero() {
-		return errgo.Newf("resources must have a fingerprint")
-	}
-
-	if entity.URL.Series == "bundle" {
-		return errgo.Newf("bundles do not have resources")
-	}
-	if !charmHasResource(entity.CharmMeta, res.Name) {
-		return errgo.Newf("charm does not have resource %q", res.Name)
-	}
-
-	return nil
-}
-
-func charmHasResource(meta *charm.Meta, resName string) bool {
-	for name := range meta.Resources {
-		if resName == name {
-			return true
-		}
-	}
-	return false
-}
-
 // NewResourceQuery formats the provided details into a mongo query for
 // the identified resource.
 func NewResourceQuery(cURL *charm.URL, resName string, revision int) bson.D {

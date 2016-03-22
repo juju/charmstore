@@ -9,7 +9,6 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6-unstable"
-	"gopkg.in/juju/charm.v6-unstable/resource"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 	"gopkg.in/mgo.v2/bson"
 
@@ -24,39 +23,6 @@ var (
 )
 
 type ResourceSuite struct{}
-
-func (s *ResourceSuite) TestCheckResourceCharm(c *gc.C) {
-	curl := charm.MustParseURL("cs:spam-2")
-	entity := &mongodoc.Entity{
-		URL: curl,
-		CharmMeta: &charm.Meta{
-			Resources: map[string]resource.Meta{
-				"eggs": resource.Meta{
-					Name: "eggs",
-					Type: resource.TypeFile,
-					Path: "eggs.tgz",
-				},
-			},
-		},
-	}
-	fp, err := resource.NewFingerprint([]byte(fingerprint))
-	c.Assert(err, jc.ErrorIsNil)
-	res := resource.Resource{
-		Meta: resource.Meta{
-			Name: "eggs",
-			Type: resource.TypeFile,
-			Path: "eggs.tgz",
-		},
-		Origin:      resource.OriginStore,
-		Revision:    1,
-		Fingerprint: fp,
-		Size:        12,
-	}
-
-	err = mongodoc.CheckCharmResource(entity, res)
-
-	c.Check(err, jc.ErrorIsNil)
-}
 
 func (s *ResourceSuite) TestNewResourceQueryWithRevision(c *gc.C) {
 	cURL := charm.MustParseURL("cs:trusty/spam-2")
