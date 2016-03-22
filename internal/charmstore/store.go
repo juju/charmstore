@@ -398,10 +398,10 @@ func (s *Store) ensureIndexes() error {
 		mgo.Index{Key: []string{"name"}},
 	}, {
 		s.DB.Resources(),
-		mgo.Index{Key: []string{"charm-url", "name"}},
+		mgo.Index{Key: []string{"unresolved-charm-url", "name"}},
 	}, {
 		s.DB.Resources(),
-		mgo.Index{Key: []string{"charm-url", "name", "revision"}},
+		mgo.Index{Key: []string{"unresolved-charm-url", "name", "revision"}},
 	}, {
 		s.DB.Resources(),
 		mgo.Index{Key: []string{"channel", "resolved-charm-url"}},
