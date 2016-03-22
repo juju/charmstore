@@ -24,7 +24,7 @@ func (s *ResourceSuite) TestNewResourceQuery(c *gc.C) {
 	query := mongodoc.NewResourceQuery(cURL, "eggs", 3)
 
 	c.Check(query, jc.DeepEquals, bson.D{
-		{"charm-url", charm.MustParseURL("cs:spam")},
+		{"unresolved-charm-url", charm.MustParseURL("cs:spam")},
 		{"name", "eggs"},
 		{"revision", 3},
 	})

@@ -19,7 +19,7 @@ func NewResourceQuery(cURL *charm.URL, resName string, revision int) bson.D {
 	cURL.Revision = -1
 	cURL.Series = ""
 	return bson.D{
-		{"charm-url", cURL},
+		{"unresolved-charm-url", cURL},
 		{"name", resName},
 		{"revision", revision},
 	}
@@ -30,7 +30,7 @@ func NewResourceQuery(cURL *charm.URL, resName string, revision int) bson.D {
 type Resource struct {
 	// CharmURL identifies the unresolved charm associated with this
 	// resource.
-	CharmURL *charm.URL `bson:"charm-url"`
+	CharmURL *charm.URL `bson:"unresolved-charm-url"`
 
 	// Name is the name of the resource as defined in the charm
 	// metadata.
