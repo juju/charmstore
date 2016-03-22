@@ -4,80 +4,157 @@
 package mongodoc_test // import "gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
 
 import (
-	"bytes"
-
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6-unstable"
-	"gopkg.in/juju/charm.v6-unstable/resource"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
 )
+
+const fingerprint = "0123456789abcdef0123456789abcdef0123456789abcdef"
 
 type ResourceSuite struct{}
 
 var _ = gc.Suite(&ResourceSuite{})
 
-func (s *ResourceSuite) TestResource2Doc(c *gc.C) {
-	curl := charm.MustParseURL("cs:spam-2")
-	res, expected := newResource(c, curl, "spam", "spamspamspam")
-
-	doc, err := mongodoc.Resource2Doc(curl, res)
-	c.Assert(err, jc.ErrorIsNil)
-
-	c.Check(doc, jc.DeepEquals, &expected)
-}
-
-func (s *ResourceSuite) TestDoc2Resource(c *gc.C) {
-	curl := charm.MustParseURL("cs:spam-2")
-	expected, doc := newResource(c, curl, "spam", "spamspamspam")
-
-	res, err := mongodoc.Doc2Resource(doc)
-	c.Assert(err, jc.ErrorIsNil)
-
-	c.Check(res, jc.DeepEquals, expected)
-}
-
-func newResource(c *gc.C, curl *charm.URL, name, data string) (resource.Resource, mongodoc.Resource) {
-	curl.Series = ""
-	curl.Revision = -1
-
-	path := name + ".tgz"
-	comment := "you really need this!!!"
-	revision := 1
-
-	fp, err := resource.GenerateFingerprint(bytes.NewReader([]byte(data)))
-	c.Assert(err, jc.ErrorIsNil)
-	size := int64(len(data))
-
-	res := resource.Resource{
-		Meta: resource.Meta{
-			Name:        name,
-			Type:        resource.TypeFile,
-			Path:        path,
-			Description: comment,
-		},
-		Origin:      resource.OriginStore,
-		Revision:    revision,
-		Fingerprint: fp,
-		Size:        size,
-	}
-	err = res.Validate()
-	c.Assert(err, jc.ErrorIsNil)
-
+func (s *ResourceSuite) TestValidateFull(c *gc.C) {
 	doc := mongodoc.Resource{
-		CharmURL: curl,
+		CharmURL: charm.MustParseURL("cs:spam"),
 
-		Name:        name,
+		Name:        "spam",
 		Type:        "file",
-		Path:        path,
-		Description: comment,
+		Path:        "spam.tgz",
+		Description: "you really need this!!!",
 
 		Origin:      "store",
-		Revision:    revision,
-		Fingerprint: fp.Bytes(),
-		Size:        size,
+		Revision:    1,
+		Fingerprint: []byte(fingerprint),
+		Size:        12,
 	}
 
-	return res, doc
+	err := doc.Validate()
+
+	c.Check(err, jc.ErrorIsNil)
+}
+
+func (s *ResourceSuite) TestValidateZeroValue(c *gc.C) {
+	var doc mongodoc.Resource
+
+	err := doc.Validate()
+
+	c.Check(err, gc.NotNil)
+}
+
+func (s *ResourceSuite) TestValidateBadResource(c *gc.C) {
+	doc := mongodoc.Resource{
+		CharmURL: charm.MustParseURL("cs:spam"),
+
+		Name: "",
+		Type: "file",
+		Path: "spam.tgz",
+
+		Origin:      "store",
+		Revision:    1,
+		Fingerprint: []byte(fingerprint),
+		Size:        12,
+	}
+
+	err := doc.Validate()
+
+	c.Check(err, gc.NotNil)
+}
+
+func (s *ResourceSuite) TestValidateUnexpectedOrigin(c *gc.C) {
+	doc := mongodoc.Resource{
+		CharmURL: charm.MustParseURL("cs:spam"),
+
+		Name: "spam",
+		Type: "file",
+		Path: "spam.tgz",
+
+		Origin:      "upload",
+		Revision:    0,
+		Fingerprint: []byte(fingerprint),
+		Size:        12,
+	}
+
+	err := doc.Validate()
+
+	c.Check(err, gc.ErrorMatches, `unexpected origin "upload"`)
+}
+
+func (s *ResourceSuite) TestValidateMissingFingerprint(c *gc.C) {
+	doc := mongodoc.Resource{
+		CharmURL: charm.MustParseURL("cs:spam"),
+
+		Name: "spam",
+		Type: "file",
+		Path: "spam.tgz",
+
+		Origin:      "store",
+		Revision:    1,
+		Fingerprint: nil,
+		Size:        0,
+	}
+
+	err := doc.Validate()
+
+	c.Check(err, gc.ErrorMatches, `missing fingerprint`)
+}
+
+func (s *ResourceSuite) TestValidateMissingCharmURL(c *gc.C) {
+	doc := mongodoc.Resource{
+		CharmURL: nil,
+
+		Name: "spam",
+		Type: "file",
+		Path: "spam.tgz",
+
+		Origin:      "store",
+		Revision:    1,
+		Fingerprint: []byte(fingerprint),
+		Size:        12,
+	}
+
+	err := doc.Validate()
+
+	c.Check(err, gc.ErrorMatches, `missing charm URL`)
+}
+
+func (s *ResourceSuite) TestValidateUnexpectedRevision(c *gc.C) {
+	doc := mongodoc.Resource{
+		CharmURL: charm.MustParseURL("cs:spam-2"),
+
+		Name: "spam",
+		Type: "file",
+		Path: "spam.tgz",
+
+		Origin:      "store",
+		Revision:    1,
+		Fingerprint: []byte(fingerprint),
+		Size:        12,
+	}
+
+	err := doc.Validate()
+
+	c.Check(err, gc.ErrorMatches, `resolved charm URLs not supported \(got revision 2\)`)
+}
+
+func (s *ResourceSuite) TestValidateUnexpectedSeries(c *gc.C) {
+	doc := mongodoc.Resource{
+		CharmURL: charm.MustParseURL("cs:trusty/spam"),
+
+		Name: "spam",
+		Type: "file",
+		Path: "spam.tgz",
+
+		Origin:      "store",
+		Revision:    1,
+		Fingerprint: []byte(fingerprint),
+		Size:        12,
+	}
+
+	err := doc.Validate()
+
+	c.Check(err, gc.ErrorMatches, `series should not be set \(got "trusty"\)`)
 }

@@ -25,50 +25,48 @@ type Resource struct {
 	Size        int64  `bson:"size"`
 }
 
-// Resource2Doc converts the resource into a DB doc.
-func Resource2Doc(curl *charm.URL, res resource.Resource) (*Resource, error) {
-	if curl.Series == "bundle" {
-		return nil, errgo.Newf("bundles do not have resources")
+// Validate ensures that the doc is valid.
+func (doc Resource) Validate() error {
+	if doc.CharmURL == nil {
+		return errgo.New("missing charm URL")
+	}
+	if doc.CharmURL.Revision >= 0 {
+		return errgo.Newf("resolved charm URLs not supported (got revision %d)", doc.CharmURL.Revision)
+	}
+	if doc.CharmURL.Series != "" {
+		return errgo.Newf("series should not be set (got %q)", doc.CharmURL.Series)
+	}
+	if doc.Origin != resource.OriginStore.String() {
+		return errgo.Newf("unexpected origin %q", doc.Origin)
+	}
+	if len(doc.Fingerprint) == 0 {
+		return errgo.New("missing fingerprint")
 	}
 
-	// We ignore the series and revision because resources are specific
-	// to the charm rather than to any particular variation of it.
-	curl = curl.WithRevision(-1)
-	curl.Series = ""
-
-	doc := &Resource{
-		CharmURL: curl,
-
-		Name:        res.Name,
-		Type:        res.Type.String(),
-		Path:        res.Path,
-		Description: res.Description,
-
-		Origin:      res.Origin.String(),
-		Revision:    res.Revision,
-		Fingerprint: res.Fingerprint.Bytes(),
-		Size:        res.Size,
+	_, err := doc2Resource(doc)
+	if err != nil {
+		return errgo.Mask(err)
 	}
-	return doc, nil
+	return nil
 }
 
-// Doc2Resource returns the resource.Resource represented by the doc.
-func Doc2Resource(doc Resource) (resource.Resource, error) {
+// doc2Resource returns the resource.Resource represented by the doc.
+func doc2Resource(doc Resource) (resource.Resource, error) {
 	var res resource.Resource
 
 	resType, err := resource.ParseType(doc.Type)
 	if err != nil {
-		return res, errgo.Notef(err, "got invalid data from DB")
+		return res, errgo.Mask(err)
 	}
 
 	origin, err := resource.ParseOrigin(doc.Origin)
 	if err != nil {
-		return res, errgo.Notef(err, "got invalid data from DB")
+		return res, errgo.Mask(err)
 	}
 
 	fp, err := resource.NewFingerprint(doc.Fingerprint)
 	if err != nil {
-		return res, errgo.Notef(err, "got invalid data from DB")
+		return res, errgo.Mask(err)
 	}
 
 	res = resource.Resource{
@@ -84,7 +82,7 @@ func Doc2Resource(doc Resource) (resource.Resource, error) {
 		Size:        doc.Size,
 	}
 	if err := res.Validate(); err != nil {
-		return res, errgo.Notef(err, "got invalid data from DB")
+		return res, errgo.Mask(err)
 	}
 	return res, nil
 }
