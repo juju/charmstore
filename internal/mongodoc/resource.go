@@ -7,7 +7,22 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charm.v6-unstable/resource"
+	"gopkg.in/mgo.v2/bson"
 )
+
+// NewResourceQuery formats the provided details into a mongo query for
+// the identified resource.
+func NewResourceQuery(cURL *charm.URL, resName string, revision int) bson.D {
+	copied := *cURL
+	cURL = &copied
+	cURL.Revision = -1
+	cURL.Series = ""
+	return bson.D{
+		{"charm-url", cURL},
+		{"name", resName},
+		{"revision", revision},
+	}
+}
 
 // Resource holds the in-database representation of a charm resource
 // at a particular revision.

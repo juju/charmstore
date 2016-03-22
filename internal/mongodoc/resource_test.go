@@ -7,6 +7,7 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/mgo.v2/bson"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
 )
@@ -16,6 +17,18 @@ const fingerprint = "0123456789abcdef0123456789abcdef0123456789abcdef"
 type ResourceSuite struct{}
 
 var _ = gc.Suite(&ResourceSuite{})
+
+func (s *ResourceSuite) TestNewResourceQuery(c *gc.C) {
+	cURL := charm.MustParseURL("cs:trusty/spam-2")
+
+	query := mongodoc.NewResourceQuery(cURL, "eggs", 3)
+
+	c.Check(query, jc.DeepEquals, bson.D{
+		{"charm-url", charm.MustParseURL("cs:spam")},
+		{"name", "eggs"},
+		{"revision", 3},
+	})
+}
 
 func (s *ResourceSuite) TestValidateFull(c *gc.C) {
 	doc := mongodoc.Resource{
