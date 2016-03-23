@@ -135,6 +135,63 @@ func (s *ResourcesSuite) TestOpenLatestResource(c *gc.C) {
 	c.Check(data, jc.DeepEquals, expectedData)
 }
 
+func (s *ResourcesSuite) TestAddResourceNew(c *gc.C) {
+	store := s.newStore(c, false)
+	defer store.Close()
+	curl := charm.MustParseURL("cs:~charmers/xenial/starsay-3")
+	entity, ch := addCharm(c, store, curl)
+	docs := extractResources(c, curl, ch)
+	mongodoc.SortResources(docs)
+	expectedDoc := docs[1] // "for-store"
+	meta := ch.Meta().Resources["for-store"]
+	blob, err := os.Open(filepath.Join(ch.Path, meta.Path))
+	c.Assert(err, jc.ErrorIsNil)
+
+	revision, err := store.AddResource(entity, "for-store", ResourceBlob{
+		Reader:      blob,
+		Fingerprint: expectedDoc.Fingerprint,
+		Size:        expectedDoc.Size,
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	c.Check(revision, gc.Equals, 0)
+	doc, r, err := store.OpenResource(MustParseResolvedURL(curl.String()), "for-store", revision)
+	r.Close()
+	expectedDoc.Revision = revision
+	adjustExpectedResource(doc, expectedDoc)
+	c.Check(doc, jc.DeepEquals, expectedDoc)
+}
+
+func (s *ResourcesSuite) TestAddResourceExists(c *gc.C) {
+	store := s.newStore(c, false)
+	defer store.Close()
+	curl := charm.MustParseURL("cs:~charmers/xenial/starsay-3")
+	entity, ch := addCharm(c, store, curl)
+	docs := extractResources(c, curl, ch)
+	mongodoc.SortResources(docs)
+	expectedDoc := docs[1] // "for-store"
+	meta := ch.Meta().Resources["for-store"]
+	blob, err := os.Open(filepath.Join(ch.Path, meta.Path))
+	c.Assert(err, jc.ErrorIsNil)
+	expected := addResource(c, store, entity, params.UnpublishedChannel, expectedDoc, blob)
+	_, err = blob.Seek(0, os.SEEK_SET)
+	c.Assert(err, jc.ErrorIsNil)
+
+	revision, err := store.AddResource(entity, "for-store", ResourceBlob{
+		Reader:      blob,
+		Fingerprint: expectedDoc.Fingerprint,
+		Size:        expectedDoc.Size,
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	c.Check(revision, gc.Equals, expected+1)
+	doc, r, err := store.OpenResource(MustParseResolvedURL(curl.String()), "for-store", revision)
+	r.Close()
+	expectedDoc.Revision = revision
+	adjustExpectedResource(doc, expectedDoc)
+	c.Check(doc, jc.DeepEquals, expectedDoc)
+}
+
 func addResources(c *gc.C, store *Store, curl *charm.URL, channel params.Channel, entity *mongodoc.Entity, ch *charm.CharmDir) []*mongodoc.Resource {
 	docs := extractResources(c, curl, ch)
 	for i, doc := range docs {

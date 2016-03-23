@@ -111,8 +111,30 @@ type ResourceBlob struct {
 	Size int64
 }
 
-// TODO(ericsnow) We will need Store.nextResourceRevision() to get the
-// value to pass to addResource().
+// AddResource adds the resource to the resources collection and stores
+// its blob.
+func (s *Store) AddResource(entity *mongodoc.Entity, name string, blob ResourceBlob) (revision int, err error) {
+	revision, err = s.nextResourceRevision(entity, name)
+	if err != nil {
+		return -1, errgo.Mask(err)
+	}
+
+	if err := s.addResource(entity, name, blob, revision); err != nil {
+		return -1, errgo.Mask(err)
+	}
+	return revision, nil
+}
+
+func (s Store) nextResourceRevision(entity *mongodoc.Entity, name string) (int, error) {
+	latest, err := s.latestResourceRevision(entity, params.UnpublishedChannel, name)
+	if errgo.Cause(err) == resourceNotFound {
+		return 0, nil
+	}
+	if err != nil {
+		return -1, errgo.Mask(err)
+	}
+	return latest + 1, nil
+}
 
 func (s Store) addResource(entity *mongodoc.Entity, name string, blob ResourceBlob, newRevision int) error {
 	if !charmHasResource(entity.CharmMeta, name) {
