@@ -8,7 +8,6 @@ import (
 
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
-	"gopkg.in/juju/charm.v6-unstable/resource"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
@@ -19,7 +18,7 @@ var resourceNotFound = errgo.Newf("resource not found")
 
 // ListResources returns the list of resources for the charm at the
 // latest revision for each resource.
-func (s Store) ListResources(entity *mongodoc.Entity) ([]resource.Resource, error) {
+func (s Store) ListResources(entity *mongodoc.Entity) ([]*mongodoc.Resource, error) {
 	if entity.URL.Series == "bundle" {
 		return nil, errgo.Newf("bundles do not have resources")
 	}
@@ -27,37 +26,36 @@ func (s Store) ListResources(entity *mongodoc.Entity) ([]resource.Resource, erro
 		return nil, errgo.Newf("entity missing charm metadata")
 	}
 
-	var resources []resource.Resource
+	var docs []*mongodoc.Resource
 	for name, meta := range entity.CharmMeta.Resources {
-		res, err := s.latestResource(entity, name)
+		doc, err := s.latestResource(entity, name)
 		if err == resourceNotFound {
 			// TODO(ericsnow) Fail? At least a dummy resource *must* be
 			// in charm store?
 			// We default to upload and set it to "store" once the resource
 			// has been uploaded to the store.
-			resOrigin := resource.OriginUpload
-			res = resource.Resource{
-				Meta:   meta,
-				Origin: resOrigin,
-				// Revision, Fingerprint, and Size are not set.
+			doc = &mongodoc.Resource{
+				CharmURL: entity.BaseURL,
+				Name:     meta.Name,
+				// Revision, Fingerprint, etc. are not set.
 			}
 		} else if err != nil {
 			return nil, errgo.Notef(err, "failed to get resource")
 		}
-		resources = append(resources, res)
+		docs = append(docs, doc)
 	}
-	resource.Sort(resources)
-	return resources, nil
+	mongodoc.SortResources(docs)
+	return docs, nil
 }
 
-func (s Store) latestResource(entity *mongodoc.Entity, resName string) (resource.Resource, error) {
+func (s Store) latestResource(entity *mongodoc.Entity, resName string) (*mongodoc.Resource, error) {
 	revision, err := s.latestResourceRevision(entity, resName)
 	if err != nil {
-		return resource.Resource{}, err
+		return nil, err
 	}
 	// TODO(ericsnow) We need to pass in a base ID...
-	res, _, err := s.resource(entity.URL, resName, revision)
-	return res, err
+	doc, err := s.resource(entity.URL, resName, revision)
+	return doc, err
 }
 
 func (s Store) latestResourceRevision(entity *mongodoc.Entity, resName string) (int, error) {
@@ -69,70 +67,68 @@ func (s Store) latestResourceRevision(entity *mongodoc.Entity, resName string) (
 	return latest, nil
 }
 
-func (s Store) resource(curl *charm.URL, resName string, revision int) (res resource.Resource, blobname string, err error) {
+func (s Store) resource(curl *charm.URL, resName string, revision int) (*mongodoc.Resource, error) {
+	query := mongodoc.NewResourceQuery(curl, resName, revision)
 	var doc mongodoc.Resource
-	id := mongodoc.NewResourceID(curl, resName, revision)
-	err = s.DB.Resources().FindId(id).One(&doc)
+	err := s.DB.Resources().Find(query).One(&doc)
 	if err == mgo.ErrNotFound {
-		// TODO(ericsnow) Fail because "latest" points to a missing resource?
 		err = resourceNotFound
 	}
 	if err != nil {
-		return resource.Resource{}, "", err
+		return nil, err
 	}
-	res, err = mongodoc.Doc2Resource(doc)
+	if err := doc.Validate(); err != nil {
+		return nil, errgo.Notef(err, "got bad data from DB")
+	}
+	return &doc, nil
+}
+
+func (s *Store) openResource(doc *mongodoc.Resource) (io.ReadCloser, error) {
+	r, size, err := s.BlobStore.Open(doc.BlobName)
 	if err != nil {
-		return res, "", errgo.Notef(err, "failed to convert resource doc")
+		return nil, errgo.Notef(err, "cannot open resource data for %s", doc.Name)
 	}
-	return res, doc.BlobName, nil
+	if size != doc.Size {
+		return nil, errgo.Newf("resource size mismatch")
+	}
+	// TODO(ericsnow) Verify that the hash matches?
+	return r, nil
 }
 
-func (s Store) resourceDoc(curl *charm.URL, resName string, revision int) (mongodoc.Resource, error) {
-	var doc mongodoc.Resource
-	id := mongodoc.NewResourceID(curl, resName, revision)
-	err := s.DB.Resources().FindId(id).One(&doc)
-	if err == mgo.ErrNotFound {
-		// TODO(ericsnow) Fail because "latest" points to a missing resource?
-		err = resourceNotFound
-	}
-	return doc, err
-}
-
-func (s Store) addResource(entity *mongodoc.Entity, res resource.Resource, blob io.Reader, newRevision int) error {
-	blobName, err := s.storeResource(entity, res, blob)
-	if err := checkCharmResource(entity, res); err != nil {
+func (s Store) addResource(entity *mongodoc.Entity, doc *mongodoc.Resource, blob io.Reader, newRevision int) error {
+	copied := *doc
+	doc = &copied
+	blobName, err := s.storeResource(entity, doc, blob)
+	if err := checkCharmResource(entity, doc); err != nil {
 		return err
 	}
-	if s.insertResource(entity, res, blobName, newRevision); err != nil {
-		if err := s.BlobStore.Remove(blobName); err != nil {
-			logger.Errorf("cannot remove blob %s after error: %v", blobName, err)
+	doc.BlobName = blobName
+	doc.Revision = newRevision
+	if s.insertResource(entity, doc); err != nil {
+		if err := s.BlobStore.Remove(doc.BlobName); err != nil {
+			logger.Errorf("cannot remove blob %s after error: %v", doc.BlobName, err)
 		}
 		return err
 	}
 	return nil
 }
 
-func (s Store) insertResource(entity *mongodoc.Entity, res resource.Resource, blobName string, newRevision int) error {
-	res.Revision = newRevision
-	if err := checkCharmResource(entity, res); err != nil {
+func (s Store) insertResource(entity *mongodoc.Entity, doc *mongodoc.Resource) error {
+	if err := checkCharmResource(entity, doc); err != nil {
 		return err
 	}
 	// TODO(ericsnow) We need to pass in a base ID...
-	doc, err := mongodoc.Resource2Doc(entity.URL, res)
-	if err != nil {
-		return err
-	}
-	doc.BlobName = blobName
 
-	err = s.DB.Resources().Insert(doc)
+	err := s.DB.Resources().Insert(doc)
 	if err != nil && !mgo.IsDup(err) {
 		return errgo.Notef(err, "cannot insert resource")
 	}
+	// TODO(ericsnow) Also fail for dupe?
 
 	return nil
 }
 
-func (s Store) storeResource(entity *mongodoc.Entity, res resource.Resource, blob io.Reader) (string, error) {
+func (s Store) storeResource(entity *mongodoc.Entity, doc *mongodoc.Resource, blob io.Reader) (string, error) {
 	name := bson.NewObjectId().Hex()
 	// TODO(ericsnow) We will finish this in a follow-up patch.
 	return name, nil
@@ -142,11 +138,12 @@ func (s Store) storeResource(entity *mongodoc.Entity, res resource.Resource, blo
 
 func (s Store) setResource(entity *mongodoc.Entity, resName string, revision int) error {
 	// TODO(ericsnow) We need to pass in a base ID...
-	res, _, err := s.resource(entity.URL, resName, revision)
+	doc, err := s.resource(entity.URL, resName, revision)
 	if err != nil {
 		return err
 	}
-	if err := checkCharmResource(entity, res); err != nil {
+
+	if err := checkCharmResource(entity, doc); err != nil {
 		return err
 	}
 
@@ -171,21 +168,15 @@ func (s Store) setResource(entity *mongodoc.Entity, resName string, revision int
 
 // checkCharmResource ensures that the given entity is okay
 // to associate with a revisioned resource.
-func checkCharmResource(entity *mongodoc.Entity, res resource.Resource) error {
+func checkCharmResource(entity *mongodoc.Entity, doc *mongodoc.Resource) error {
 	// TODO(ericsnow) Verify that the revisioned resources is in the DB.
 
-	if err := res.Validate(); err != nil {
+	if err := doc.Validate(); err != nil {
 		return err
 	}
-	if res.Fingerprint.IsZero() {
-		return errgo.Newf("resources must have a fingerprint")
-	}
 
-	if entity.URL.Series == "bundle" {
-		return errgo.Newf("bundles do not have resources")
-	}
-	if !charmHasResource(entity.CharmMeta, res.Name) {
-		return errgo.Newf("charm does not have resource %q", res.Name)
+	if !charmHasResource(entity.CharmMeta, doc.Name) {
+		return errgo.Newf("charm does not have resource %q", doc.Name)
 	}
 
 	return nil
