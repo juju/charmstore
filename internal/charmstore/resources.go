@@ -49,6 +49,9 @@ func (s Store) ListResources(entity *mongodoc.Entity, channel params.Channel) ([
 	return docs, nil
 }
 
+// TODO(ericsnow) We will need Store.nextResourceRevision() to get the
+// value to pass to addResource().
+
 func (s Store) addResource(entity *mongodoc.Entity, doc *mongodoc.Resource, blob io.Reader, newRevision int) error {
 	copied := *doc
 	doc = &copied
@@ -71,7 +74,6 @@ func (s Store) insertResource(entity *mongodoc.Entity, doc *mongodoc.Resource) e
 	if err := checkCharmResource(entity, doc); err != nil {
 		return err
 	}
-	// TODO(ericsnow) We need to pass in a base ID...
 
 	err := s.DB.Resources().Insert(doc)
 	if err != nil && !mgo.IsDup(err) {
@@ -87,8 +89,6 @@ func (s Store) storeResource(entity *mongodoc.Entity, doc *mongodoc.Resource, bl
 	// TODO(ericsnow) We will finish this in a follow-up patch.
 	return name, nil
 }
-
-// TODO(ericsnow) We will need Store.nextResourceRevision()...
 
 func (s Store) setResource(entity *mongodoc.Entity, channel params.Channel, resName string, revision int) error {
 	doc, err := s.resource(entity.URL, resName, revision)
@@ -174,7 +174,7 @@ func (s Store) resources(channel params.Channel, curl *charm.URL) (*mongodoc.Res
 // checkCharmResource ensures that the given entity is okay
 // to associate with a revisioned resource.
 func checkCharmResource(entity *mongodoc.Entity, doc *mongodoc.Resource) error {
-	// TODO(ericsnow) Verify that the revisioned resources is in the DB.
+	// TODO(ericsnow) Verify that the revisioned resource is in the DB.
 
 	if err := doc.Validate(); err != nil {
 		return err
