@@ -35,11 +35,10 @@ func (s *ResourcesSuite) TestListResourcesCharmWithResources(c *gc.C) {
 	expected := addResources(c, store, curl, entity, ch)
 	mongodoc.SortResources(expected)
 
-	resources, err := store.ListResources(entity)
+	docs, err := store.ListResources(entity)
 	c.Assert(err, jc.ErrorIsNil)
 
-	mongodoc.SortResources(resources)
-	c.Check(resources, jc.DeepEquals, expected)
+	checkResourceDocs(c, docs, expected)
 }
 
 func (s *ResourcesSuite) TestListResourcesCharmWithoutResources(c *gc.C) {
@@ -82,8 +81,7 @@ func (s *ResourcesSuite) TestListResourcesResourceNotFound(c *gc.C) {
 	docs, err := store.ListResources(entity)
 	c.Assert(err, jc.ErrorIsNil)
 
-	mongodoc.SortResources(docs)
-	c.Check(docs, jc.DeepEquals, expected)
+	checkResourceDocs(c, docs, expected)
 }
 
 func addResources(c *gc.C, store *Store, curl *charm.URL, entity *mongodoc.Entity, ch *charm.CharmDir) []*mongodoc.Resource {
@@ -136,4 +134,17 @@ func extractResources(c *gc.C, cURL *charm.URL, ch *charm.CharmDir) []*mongodoc.
 		docs = append(docs, doc)
 	}
 	return docs
+}
+
+func checkResourceDocs(c *gc.C, docs, expected []*mongodoc.Resource) {
+	mongodoc.SortResources(docs)
+	for i, doc := range docs {
+		adjustExpectedResource(doc, expected[i])
+	}
+	c.Check(docs, jc.DeepEquals, expected)
+}
+
+func adjustExpectedResource(doc, expected *mongodoc.Resource) {
+	expected.BlobName = doc.BlobName
+	expected.UploadTime = doc.UploadTime
 }
