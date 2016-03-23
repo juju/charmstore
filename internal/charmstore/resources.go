@@ -19,7 +19,7 @@ var resourceNotFound = errgo.Newf("resource not found")
 
 // ListResources returns the list of resources for the charm at the
 // latest revision for each resource.
-func (s Store) ListResources(entity *mongodoc.Entity) ([]*mongodoc.Resource, error) {
+func (s Store) ListResources(entity *mongodoc.Entity, channel params.Channel) ([]*mongodoc.Resource, error) {
 	if entity.URL.Series == "bundle" {
 		return nil, errgo.Newf("bundles do not have resources")
 	}
@@ -29,7 +29,7 @@ func (s Store) ListResources(entity *mongodoc.Entity) ([]*mongodoc.Resource, err
 
 	var docs []*mongodoc.Resource
 	for name, meta := range entity.CharmMeta.Resources {
-		doc, err := s.latestResource(entity, name)
+		doc, err := s.latestResource(entity, channel, name)
 		if err == resourceNotFound {
 			// TODO(ericsnow) Fail? At least a dummy resource *must* be
 			// in charm store?
@@ -90,7 +90,7 @@ func (s Store) storeResource(entity *mongodoc.Entity, doc *mongodoc.Resource, bl
 
 // TODO(ericsnow) We will need Store.nextResourceRevision()...
 
-func (s Store) setResource(entity *mongodoc.Entity, resName string, revision int) error {
+func (s Store) setResource(entity *mongodoc.Entity, channel params.Channel, resName string, revision int) error {
 	doc, err := s.resource(entity.URL, resName, revision)
 	if err != nil {
 		return err
@@ -100,7 +100,6 @@ func (s Store) setResource(entity *mongodoc.Entity, resName string, revision int
 		return err
 	}
 
-	channel := decideChannel(entity)
 	resourcesDoc, err := s.resources(channel, entity.URL)
 	if err != nil {
 		return err
@@ -115,8 +114,8 @@ func (s Store) setResource(entity *mongodoc.Entity, resName string, revision int
 	return nil
 }
 
-func (s Store) latestResource(entity *mongodoc.Entity, resName string) (*mongodoc.Resource, error) {
-	revision, err := s.latestResourceRevision(entity, resName)
+func (s Store) latestResource(entity *mongodoc.Entity, channel params.Channel, resName string) (*mongodoc.Resource, error) {
+	revision, err := s.latestResourceRevision(entity, channel, resName)
 	if err != nil {
 		return nil, err
 	}
@@ -124,8 +123,7 @@ func (s Store) latestResource(entity *mongodoc.Entity, resName string) (*mongodo
 	return doc, err
 }
 
-func (s Store) latestResourceRevision(entity *mongodoc.Entity, resName string) (int, error) {
-	channel := decideChannel(entity)
+func (s Store) latestResourceRevision(entity *mongodoc.Entity, channel params.Channel, resName string) (int, error) {
 	doc, err := s.resources(channel, entity.URL)
 	if err != nil {
 		return -1, err
@@ -171,16 +169,6 @@ func (s Store) resources(channel params.Channel, curl *charm.URL) (*mongodoc.Res
 		return nil, errgo.Notef(err, "got bad data from DB")
 	}
 	return &doc, nil
-}
-
-func decideChannel(entity *mongodoc.Entity) params.Channel {
-	if entity.Stable {
-		return params.StableChannel
-	}
-	if entity.Development {
-		return params.DevelopmentChannel
-	}
-	return params.NoChannel
 }
 
 // checkCharmResource ensures that the given entity is okay

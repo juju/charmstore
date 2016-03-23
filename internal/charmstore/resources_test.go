@@ -30,12 +30,13 @@ var _ = gc.Suite(&ResourcesSuite{})
 func (s *ResourcesSuite) TestListResourcesCharmWithResources(c *gc.C) {
 	store := s.newStore(c, false)
 	defer store.Close()
+	channel := params.StableChannel
 	curl := charm.MustParseURL("cs:~charmers/xenial/starsay-3")
-	entity, ch := addCharm(c, store, curl, params.StableChannel)
-	expected := addResources(c, store, curl, entity, ch)
+	entity, ch := addCharm(c, store, curl)
+	expected := addResources(c, store, curl, channel, entity, ch)
 	mongodoc.SortResources(expected)
 
-	docs, err := store.ListResources(entity)
+	docs, err := store.ListResources(entity, channel)
 	c.Assert(err, jc.ErrorIsNil)
 
 	checkResourceDocs(c, docs, expected)
@@ -44,10 +45,11 @@ func (s *ResourcesSuite) TestListResourcesCharmWithResources(c *gc.C) {
 func (s *ResourcesSuite) TestListResourcesCharmWithoutResources(c *gc.C) {
 	store := s.newStore(c, false)
 	defer store.Close()
+	channel := params.StableChannel
 	curl := charm.MustParseURL("cs:~charmers/precise/wordpress-23")
-	entity, _ := addCharm(c, store, curl, params.StableChannel)
+	entity, _ := addCharm(c, store, curl)
 
-	resources, err := store.ListResources(entity)
+	resources, err := store.ListResources(entity, channel)
 	c.Assert(err, jc.ErrorIsNil)
 
 	c.Check(resources, gc.HasLen, 0)
@@ -56,10 +58,11 @@ func (s *ResourcesSuite) TestListResourcesCharmWithoutResources(c *gc.C) {
 func (s *ResourcesSuite) TestListResourcesBundle(c *gc.C) {
 	store := s.newStore(c, false)
 	defer store.Close()
+	channel := params.StableChannel
 	curl := charm.MustParseURL("cs:~charmers/bundle/wordpress-simple-0")
 	entity := addBundle(c, store, curl)
 
-	_, err := store.ListResources(entity)
+	_, err := store.ListResources(entity, channel)
 
 	c.Check(err, gc.ErrorMatches, `bundles do not have resources`)
 }
@@ -67,35 +70,36 @@ func (s *ResourcesSuite) TestListResourcesBundle(c *gc.C) {
 func (s *ResourcesSuite) TestListResourcesResourceNotFound(c *gc.C) {
 	store := s.newStore(c, false)
 	defer store.Close()
+	channel := params.StableChannel
 	curl := charm.MustParseURL("cs:~charmers/xenial/starsay-3")
-	entity, ch := addCharm(c, store, curl, params.StableChannel)
+	entity, ch := addCharm(c, store, curl)
 	expected := extractResources(c, curl, ch)
 	mongodoc.SortResources(expected)
 	expected[0] = &mongodoc.Resource{
 		CharmURL: expected[0].CharmURL,
 		Name:     expected[0].Name,
 	}
-	expected[1].Revision = addResource(c, store, entity, expected[1], nil)
-	expected[2].Revision = addResource(c, store, entity, expected[2], nil)
+	expected[1].Revision = addResource(c, store, entity, channel, expected[1], nil)
+	expected[2].Revision = addResource(c, store, entity, channel, expected[2], nil)
 
-	docs, err := store.ListResources(entity)
+	docs, err := store.ListResources(entity, channel)
 	c.Assert(err, jc.ErrorIsNil)
 
 	checkResourceDocs(c, docs, expected)
 }
 
-func addResources(c *gc.C, store *Store, curl *charm.URL, entity *mongodoc.Entity, ch *charm.CharmDir) []*mongodoc.Resource {
+func addResources(c *gc.C, store *Store, curl *charm.URL, channel params.Channel, entity *mongodoc.Entity, ch *charm.CharmDir) []*mongodoc.Resource {
 	docs := extractResources(c, curl, ch)
 	for i, doc := range docs {
 		meta := ch.Meta().Resources[doc.Name]
 		blob, err := os.Open(filepath.Join(ch.Path, meta.Path))
 		c.Assert(err, jc.ErrorIsNil)
-		docs[i].Revision = addResource(c, store, entity, doc, blob)
+		docs[i].Revision = addResource(c, store, entity, channel, doc, blob)
 	}
 	return docs
 }
 
-func addResource(c *gc.C, store *Store, entity *mongodoc.Entity, doc *mongodoc.Resource, blob io.Reader) int {
+func addResource(c *gc.C, store *Store, entity *mongodoc.Entity, channel params.Channel, doc *mongodoc.Resource, blob io.Reader) int {
 	revision := doc.Revision + 1
 	var err error
 	if blob != nil {
@@ -106,7 +110,7 @@ func addResource(c *gc.C, store *Store, entity *mongodoc.Entity, doc *mongodoc.R
 		err := store.insertResource(entity, doc)
 		c.Assert(err, jc.ErrorIsNil)
 	}
-	err = store.setResource(entity, doc.Name, revision)
+	err = store.setResource(entity, channel, doc.Name, revision)
 	c.Assert(err, jc.ErrorIsNil)
 	return revision
 }
