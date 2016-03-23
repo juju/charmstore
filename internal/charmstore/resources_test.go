@@ -18,7 +18,6 @@ import (
 	"gopkg.in/mgo.v2/bson"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
 )
 
 type ResourcesSuite struct {
@@ -31,7 +30,8 @@ func (s *ResourcesSuite) TestListResourcesCharmWithResources(c *gc.C) {
 	store := s.newStore(c, false)
 	defer store.Close()
 	curl := charm.MustParseURL("cs:~charmers/xenial/starsay-3")
-	entity, expected := addCharmWithResources(c, store, curl)
+	entity, ch := addCharm(c, store, curl)
+	expected := addResources(c, store, curl, entity, ch)
 	mongodoc.SortResources(expected)
 
 	resources, err := store.ListResources(entity)
@@ -45,12 +45,7 @@ func (s *ResourcesSuite) TestListResourcesCharmWithoutResources(c *gc.C) {
 	store := s.newStore(c, false)
 	defer store.Close()
 	curl := charm.MustParseURL("cs:~charmers/precise/wordpress-23")
-	resolvedURL := MustParseResolvedURL(curl.String())
-	ch := storetesting.Charms.CharmDir(curl.Name)
-	err := store.AddCharmWithArchive(resolvedURL, ch)
-	c.Assert(err, jc.ErrorIsNil)
-	entity, err := store.FindEntity(resolvedURL, nil)
-	c.Assert(err, jc.ErrorIsNil)
+	entity, _ := addCharm(c, store, curl)
 
 	resources, err := store.ListResources(entity)
 	c.Assert(err, jc.ErrorIsNil)
@@ -62,15 +57,9 @@ func (s *ResourcesSuite) TestListResourcesBundle(c *gc.C) {
 	store := s.newStore(c, false)
 	defer store.Close()
 	curl := charm.MustParseURL("cs:~charmers/bundle/wordpress-simple-0")
-	resolvedURL := MustParseResolvedURL(curl.String())
-	b := storetesting.Charms.BundleDir(curl.Name)
-	s.addRequiredCharms(c, b)
-	err := store.AddBundleWithArchive(resolvedURL, b)
-	c.Assert(err, jc.ErrorIsNil)
-	entity, err := store.FindEntity(resolvedURL, nil)
-	c.Assert(err, jc.ErrorIsNil)
+	entity := addBundle(c, store, curl)
 
-	_, err = store.ListResources(entity)
+	_, err := store.ListResources(entity)
 
 	c.Check(err, gc.ErrorMatches, `bundles do not have resources`)
 }
@@ -79,18 +68,13 @@ func (s *ResourcesSuite) TestListResourcesResourceNotFound(c *gc.C) {
 	store := s.newStore(c, false)
 	defer store.Close()
 	curl := charm.MustParseURL("cs:~charmers/xenial/starsay-3")
-	resolvedURL := MustParseResolvedURL(curl.String())
-	ch := storetesting.Charms.CharmDir(curl.Name)
+	entity, ch := addCharm(c, store, curl)
 	expected := extractResources(c, curl, ch)
 	mongodoc.SortResources(expected)
 	expected[0] = &mongodoc.Resource{
 		CharmURL: expected[0].CharmURL,
 		Name:     expected[0].Name,
 	}
-	err := store.AddCharmWithArchive(resolvedURL, ch)
-	c.Assert(err, jc.ErrorIsNil)
-	entity, err := store.FindEntity(resolvedURL, nil)
-	c.Assert(err, jc.ErrorIsNil)
 	expected[1].Revision = addResource(c, store, entity, expected[1], nil)
 	expected[2].Revision = addResource(c, store, entity, expected[2], nil)
 
@@ -101,15 +85,7 @@ func (s *ResourcesSuite) TestListResourcesResourceNotFound(c *gc.C) {
 	c.Check(docs, jc.DeepEquals, expected)
 }
 
-func addCharmWithResources(c *gc.C, store *Store, curl *charm.URL) (*mongodoc.Entity, []*mongodoc.Resource) {
-	resolvedURL := MustParseResolvedURL(curl.String())
-	ch := storetesting.Charms.CharmDir(curl.Name)
-	err := store.AddCharmWithArchive(resolvedURL, ch)
-	c.Assert(err, jc.ErrorIsNil)
-
-	entity, err := store.FindEntity(resolvedURL, nil)
-	c.Assert(err, jc.ErrorIsNil)
-
+func addResources(c *gc.C, store *Store, curl *charm.URL, entity *mongodoc.Entity, ch *charm.CharmDir) []*mongodoc.Resource {
 	docs := extractResources(c, curl, ch)
 	for i, doc := range docs {
 		meta := ch.Meta().Resources[doc.Name]
@@ -117,7 +93,7 @@ func addCharmWithResources(c *gc.C, store *Store, curl *charm.URL) (*mongodoc.En
 		c.Assert(err, jc.ErrorIsNil)
 		docs[i].Revision = addResource(c, store, entity, doc, blob)
 	}
-	return entity, docs
+	return docs
 }
 
 func addResource(c *gc.C, store *Store, entity *mongodoc.Entity, doc *mongodoc.Resource, blob io.Reader) int {
