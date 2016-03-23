@@ -4,6 +4,7 @@
 package mongodoc // import "gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
 
 import (
+	"sort"
 	"time"
 
 	"gopkg.in/errgo.v1"
@@ -99,6 +100,25 @@ func (doc Resource) Validate() error {
 	}
 
 	return nil
+}
+
+// SortResources sorts the provided resource docs.
+func SortResources(resources []*Resource) {
+	sort.Sort(resourcesByName(resources))
+}
+
+type resourcesByName []*Resource
+
+func (sorted resourcesByName) Len() int      { return len(sorted) }
+func (sorted resourcesByName) Swap(i, j int) { sorted[i], sorted[j] = sorted[j], sorted[i] }
+func (sorted resourcesByName) Less(i, j int) bool {
+	if sorted[i].Name < sorted[j].Name {
+		return true
+	}
+	if sorted[i].Name == sorted[j].Name && sorted[i].Revision < sorted[j].Revision {
+		return true
+	}
+	return false
 }
 
 // NewResourcesQuery formats the provided details into a mongo query
