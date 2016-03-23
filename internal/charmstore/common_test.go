@@ -40,10 +40,12 @@ func (s *commonSuite) newStore(c *gc.C, withES bool) *Store {
 	return store
 }
 
-func addCharm(c *gc.C, store *Store, curl *charm.URL) (*mongodoc.Entity, *charm.CharmDir) {
+func addCharm(c *gc.C, store *Store, curl *charm.URL, channels ...params.Channel) (*mongodoc.Entity, *charm.CharmDir) {
 	resolvedURL := MustParseResolvedURL(curl.String())
 	ch := storetesting.Charms.CharmDir(curl.Name)
 	err := store.AddCharmWithArchive(resolvedURL, ch)
+	c.Assert(err, jc.ErrorIsNil)
+	err = store.Publish(resolvedURL, channels...)
 	c.Assert(err, jc.ErrorIsNil)
 	entity, err := store.FindEntity(resolvedURL, nil)
 	c.Assert(err, jc.ErrorIsNil)

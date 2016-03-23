@@ -15,6 +15,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charm.v6-unstable/resource"
+	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 	"gopkg.in/mgo.v2/bson"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
@@ -30,7 +31,7 @@ func (s *ResourcesSuite) TestListResourcesCharmWithResources(c *gc.C) {
 	store := s.newStore(c, false)
 	defer store.Close()
 	curl := charm.MustParseURL("cs:~charmers/xenial/starsay-3")
-	entity, ch := addCharm(c, store, curl)
+	entity, ch := addCharm(c, store, curl, params.StableChannel)
 	expected := addResources(c, store, curl, entity, ch)
 	mongodoc.SortResources(expected)
 
@@ -45,7 +46,7 @@ func (s *ResourcesSuite) TestListResourcesCharmWithoutResources(c *gc.C) {
 	store := s.newStore(c, false)
 	defer store.Close()
 	curl := charm.MustParseURL("cs:~charmers/precise/wordpress-23")
-	entity, _ := addCharm(c, store, curl)
+	entity, _ := addCharm(c, store, curl, params.StableChannel)
 
 	resources, err := store.ListResources(entity)
 	c.Assert(err, jc.ErrorIsNil)
@@ -68,7 +69,7 @@ func (s *ResourcesSuite) TestListResourcesResourceNotFound(c *gc.C) {
 	store := s.newStore(c, false)
 	defer store.Close()
 	curl := charm.MustParseURL("cs:~charmers/xenial/starsay-3")
-	entity, ch := addCharm(c, store, curl)
+	entity, ch := addCharm(c, store, curl, params.StableChannel)
 	expected := extractResources(c, curl, ch)
 	mongodoc.SortResources(expected)
 	expected[0] = &mongodoc.Resource{
