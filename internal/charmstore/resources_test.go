@@ -88,6 +88,22 @@ func (s *ResourcesSuite) TestListResourcesResourceNotFound(c *gc.C) {
 	checkResourceDocs(c, docs, expected)
 }
 
+func (s *ResourcesSuite) TestResourceInfo(c *gc.C) {
+	store := s.newStore(c, false)
+	defer store.Close()
+	curl := charm.MustParseURL("cs:~charmers/xenial/starsay-3")
+	entity, ch := addCharm(c, store, curl)
+	docs := addResources(c, store, curl, params.UnpublishedChannel, entity, ch)
+	mongodoc.SortResources(docs)
+	expected := docs[1] // "for-store"
+
+	doc, err := store.ResourceInfo(entity, "for-store", 1)
+	c.Assert(err, jc.ErrorIsNil)
+
+	adjustExpectedResource(doc, expected)
+	c.Check(doc, jc.DeepEquals, expected)
+}
+
 func (s *ResourcesSuite) TestOpenResource(c *gc.C) {
 	store := s.newStore(c, false)
 	defer store.Close()

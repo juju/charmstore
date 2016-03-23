@@ -55,8 +55,20 @@ func (s Store) ListResources(entity *mongodoc.Entity, channel params.Channel) ([
 	return docs, nil
 }
 
+// ResourceInfo returns the info for the identified resource.
+func (s Store) ResourceInfo(entity *mongodoc.Entity, name string, revision int) (*mongodoc.Resource, error) {
+	if revision < 0 {
+		return nil, errgo.New("revision cannot be negative")
+	}
+	doc, err := s.resource(entity.BaseURL, name, revision)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return doc, nil
+}
+
 // OpenResource returns the blob for the identified resource.
-func (s *Store) OpenResource(id *router.ResolvedURL, name string, revision int) (*mongodoc.Resource, io.ReadCloser, error) {
+func (s Store) OpenResource(id *router.ResolvedURL, name string, revision int) (*mongodoc.Resource, io.ReadCloser, error) {
 	if revision < 0 {
 		return nil, nil, errgo.New("revision cannot be negative")
 	}
@@ -72,7 +84,7 @@ func (s *Store) OpenResource(id *router.ResolvedURL, name string, revision int) 
 }
 
 // OpenResource returns the blob for the latest revision of the identified resource.
-func (s *Store) OpenLatestResource(id *router.ResolvedURL, channel params.Channel, name string) (*mongodoc.Resource, io.ReadCloser, error) {
+func (s Store) OpenLatestResource(id *router.ResolvedURL, channel params.Channel, name string) (*mongodoc.Resource, io.ReadCloser, error) {
 	entity, err := s.FindEntity(id, nil)
 	if err != nil {
 		return nil, nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
@@ -88,7 +100,7 @@ func (s *Store) OpenLatestResource(id *router.ResolvedURL, channel params.Channe
 	return doc, reader, nil
 }
 
-func (s *Store) openResource(doc *mongodoc.Resource) (io.ReadCloser, error) {
+func (s Store) openResource(doc *mongodoc.Resource) (io.ReadCloser, error) {
 	r, size, err := s.BlobStore.Open(doc.BlobName)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot open resource data for %s", doc.Name)
@@ -113,7 +125,7 @@ type ResourceBlob struct {
 
 // AddResource adds the resource to the resources collection and stores
 // its blob.
-func (s *Store) AddResource(entity *mongodoc.Entity, name string, blob ResourceBlob) (revision int, err error) {
+func (s Store) AddResource(entity *mongodoc.Entity, name string, blob ResourceBlob) (revision int, err error) {
 	revision, err = s.nextResourceRevision(entity, name)
 	if err != nil {
 		return -1, errgo.Mask(err)
