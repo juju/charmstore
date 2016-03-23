@@ -8,6 +8,7 @@ import (
 
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
@@ -46,53 +47,6 @@ func (s Store) ListResources(entity *mongodoc.Entity) ([]*mongodoc.Resource, err
 	}
 	mongodoc.SortResources(docs)
 	return docs, nil
-}
-
-func (s Store) latestResource(entity *mongodoc.Entity, resName string) (*mongodoc.Resource, error) {
-	revision, err := s.latestResourceRevision(entity, resName)
-	if err != nil {
-		return nil, err
-	}
-	// TODO(ericsnow) We need to pass in a base ID...
-	doc, err := s.resource(entity.URL, resName, revision)
-	return doc, err
-}
-
-func (s Store) latestResourceRevision(entity *mongodoc.Entity, resName string) (int, error) {
-	latest, ok := entity.Resources[resName]
-	if !ok {
-		// TODO(ericsnow) Fail if the resource otherwise exists?
-		return -1, resourceNotFound
-	}
-	return latest, nil
-}
-
-func (s Store) resource(curl *charm.URL, resName string, revision int) (*mongodoc.Resource, error) {
-	query := mongodoc.NewResourceQuery(curl, resName, revision)
-	var doc mongodoc.Resource
-	err := s.DB.Resources().Find(query).One(&doc)
-	if err == mgo.ErrNotFound {
-		err = resourceNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-	if err := doc.Validate(); err != nil {
-		return nil, errgo.Notef(err, "got bad data from DB")
-	}
-	return &doc, nil
-}
-
-func (s *Store) openResource(doc *mongodoc.Resource) (io.ReadCloser, error) {
-	r, size, err := s.BlobStore.Open(doc.BlobName)
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot open resource data for %s", doc.Name)
-	}
-	if size != doc.Size {
-		return nil, errgo.Newf("resource size mismatch")
-	}
-	// TODO(ericsnow) Verify that the hash matches?
-	return r, nil
 }
 
 func (s Store) addResource(entity *mongodoc.Entity, doc *mongodoc.Resource, blob io.Reader, newRevision int) error {
@@ -137,7 +91,6 @@ func (s Store) storeResource(entity *mongodoc.Entity, doc *mongodoc.Resource, bl
 // TODO(ericsnow) We will need Store.nextResourceRevision()...
 
 func (s Store) setResource(entity *mongodoc.Entity, resName string, revision int) error {
-	// TODO(ericsnow) We need to pass in a base ID...
 	doc, err := s.resource(entity.URL, resName, revision)
 	if err != nil {
 		return err
@@ -147,23 +100,87 @@ func (s Store) setResource(entity *mongodoc.Entity, resName string, revision int
 		return err
 	}
 
-	resources := entity.Resources
-	if resources == nil {
-		resources = make(map[string]int)
-	}
-	resources[resName] = revision
-
-	resolvedURL := EntityResolvedURL(entity)
-	err = s.UpdateEntity(resolvedURL, bson.D{
-		{"$set", bson.D{
-			{"resources", resources},
-		}},
-	})
+	channel := decideChannel(entity)
+	resourcesDoc, err := s.resources(channel, entity.URL)
 	if err != nil {
 		return err
 	}
+	resourcesDoc.Revisions[resName] = revision
+
+	query := mongodoc.NewResourcesQuery(entity.URL, channel)
+	if _, err := s.DB.Resources().Upsert(query, resourcesDoc); err != nil {
+		return errgo.Notef(err, "cannot set resource")
+	}
 
 	return nil
+}
+
+func (s Store) latestResource(entity *mongodoc.Entity, resName string) (*mongodoc.Resource, error) {
+	revision, err := s.latestResourceRevision(entity, resName)
+	if err != nil {
+		return nil, err
+	}
+	doc, err := s.resource(entity.URL, resName, revision)
+	return doc, err
+}
+
+func (s Store) latestResourceRevision(entity *mongodoc.Entity, resName string) (int, error) {
+	channel := decideChannel(entity)
+	doc, err := s.resources(channel, entity.URL)
+	if err != nil {
+		return -1, err
+	}
+	latest, ok := doc.Revisions[resName]
+	if !ok {
+		// TODO(ericsnow) Fail if the resource otherwise exists?
+		return -1, resourceNotFound
+	}
+	return latest, nil
+}
+
+func (s Store) resource(curl *charm.URL, resName string, revision int) (*mongodoc.Resource, error) {
+	query := mongodoc.NewResourceQuery(curl, resName, revision)
+	var doc mongodoc.Resource
+	err := s.DB.Resources().Find(query).One(&doc)
+	if err == mgo.ErrNotFound {
+		err = resourceNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := doc.Validate(); err != nil {
+		return nil, errgo.Notef(err, "got bad data from DB")
+	}
+	return &doc, nil
+}
+
+func (s Store) resources(channel params.Channel, curl *charm.URL) (*mongodoc.Resources, error) {
+	query := mongodoc.NewResourcesQuery(curl, channel)
+	var doc mongodoc.Resources
+	err := s.DB.Resources().Find(query).One(&doc)
+	if err == mgo.ErrNotFound {
+		doc = mongodoc.Resources{
+			CharmURL:  curl,
+			Channel:   channel,
+			Revisions: make(map[string]int),
+		}
+	} else if err != nil {
+		return nil, err
+	}
+	if err := doc.Validate(); err != nil {
+		return nil, errgo.Notef(err, "got bad data from DB")
+	}
+	return &doc, nil
+}
+
+func decideChannel(entity *mongodoc.Entity) params.Channel {
+	if entity.Stable {
+		return params.StableChannel
+	}
+	if entity.Development {
+		return params.DevelopmentChannel
+	}
+	return params.NoChannel
 }
 
 // checkCharmResource ensures that the given entity is okay
