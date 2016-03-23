@@ -11,10 +11,10 @@ github.com/juju/loggo	git	8477fc936adf0e382d680310047ca27e128a309a	2015-05-27T03
 github.com/juju/mempool	git	24974d6c264fe5a29716e7d56ea24c4bd904b7cc	2016-02-05T10:49:27Z
 github.com/juju/names	git	ef19de31613af3735aa69ba3b40accce2faf7316	2016-03-01T22:07:10Z
 github.com/juju/schema	git	1e25943f8c6fd6815282d6f1ac87091d21e14e19	2016-03-01T11:16:46Z
-github.com/juju/testing	git	4d5a7d64948aae30698f5d97b4c0d1a85a4504b7	2016-03-07T02:41:09Z
+github.com/juju/testing	git	f60b1354ea9f3bfc08f1a1b18494540d9aad0c95	2016-03-23T11:34:08Z
 github.com/juju/txn	git	99ec629d0066a4d73c54d8e021a7fc1dc07df614	2015-06-09T16:58:27Z
-github.com/juju/utils	git	0cac78a34dd1c42d2f2dc718c345fd13e3a264fc	2016-01-29T15:50:19Z
-github.com/juju/version	git	102b12db83e38cb2ce7003544092ea7b0ca59e92	2015-11-07T04:32:11Z
+github.com/juju/utils	git	af32cfaf28093965fdf63373d8447c489efb2875	2016-03-09T18:28:39Z
+github.com/juju/version	git	ef897ad7f130870348ce306f61332f5335355063	2015-11-27T20:34:00Z
 github.com/juju/webbrowser	git	54b8c57083b4afb7dc75da7f13e2967b2606a507	2016-03-09T14:36:29Z
 github.com/juju/xml	git	eb759a627588d35166bc505fceb51b88500e291e	2015-04-13T13:11:21Z
 github.com/juju/zip	git	f6b1e93fa2e29a1d7d49b566b2b51efb060c982a	2016-02-05T10:52:21Z
@@ -23,8 +23,8 @@ golang.org/x/crypto	git	aedad9a179ec1ea11b7064c57cbc6dc30d7724ec	2015-08-30T18:0
 golang.org/x/net	git	ea47fc708ee3e20177f3ca3716217c4ab75942cb	2015-08-29T23:03:18Z
 gopkg.in/check.v1	git	4f90aeace3a26ad7021961c297b22c42160c7b25	2016-01-05T16:49:36Z
 gopkg.in/errgo.v1	git	66cb46252b94c1f3d65646f54ee8043ab38d766c	2015-10-07T15:31:57Z
-gopkg.in/juju/charm.v6-unstable	git	4ad4f4ba39affe67785e385c1f49e7ec4206896f	2016-03-09T11:06:06Z
-gopkg.in/juju/charmrepo.v2-unstable	git	0e86a44c1b8c4bfe3b5c9227a3223fc4c0e947fb	2016-03-16T15:33:12Z
+gopkg.in/juju/charm.v6-unstable	git	99f7bb76910980b2e38fb9d3466d6a8ed163d1bf	2016-03-23T13:17:50Z
+gopkg.in/juju/charmrepo.v2-unstable	git	40c5e122c8596b0ba28e6f05688fa2ebabf27719	2016-03-17T09:00:15Z
 gopkg.in/juju/jujusvg.v1	git	a60359df348ef2ca40ec3bcd58a01de54f05658e	2016-02-11T10:02:50Z
 gopkg.in/macaroon-bakery.v1	git	6bce7a1e7399542cbafe16cbbb1dfe4591fcafe7	2016-03-16T08:34:47Z
 gopkg.in/macaroon.v1	git	ab3940c6c16510a850e1c2dd628b919f0f3f1464	2015-01-21T11:42:31Z
@@ -32,5 +32,5 @@ gopkg.in/mgo.v2	git	4d04138ffef2791c479c0c8bbffc30b34081b8d9	2015-10-26T16:34:53
 gopkg.in/natefinch/lumberjack.v2	git	514cbda263a734ae8caac038dadf05f8f3f9f738	2016-01-25T11:17:49Z
 gopkg.in/tomb.v2	git	14b3d72120e8d10ea6e6b7f87f7175734b1faab8	2014-06-26T14:46:23Z
 gopkg.in/yaml.v1	git	9f9df34309c04878acc86042b16630b0f696e1de	2014-09-24T16:16:07Z
-gopkg.in/yaml.v2	git	53feefa2559fb8dfa8d81baad31be332c97d6c77	2015-09-24T14:23:14Z
+gopkg.in/yaml.v2	git	a83829b6f1293c91addabc89d0571c246397bbf4	2016-03-01T20:40:22Z
 launchpad.net/tomb	bzr	gustavo@niemeyer.net-20140529072043-hzcrlnl3ygvg914q	18
