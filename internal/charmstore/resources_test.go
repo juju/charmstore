@@ -101,7 +101,6 @@ func addResources(c *gc.C, store *Store, curl *charm.URL, channel params.Channel
 
 func addResource(c *gc.C, store *Store, entity *mongodoc.Entity, channel params.Channel, doc *mongodoc.Resource, blob io.Reader) int {
 	revision := doc.Revision + 1
-	var err error
 	if blob != nil {
 		err := store.addResource(entity, doc, blob, revision)
 		c.Assert(err, jc.ErrorIsNil)
@@ -110,8 +109,10 @@ func addResource(c *gc.C, store *Store, entity *mongodoc.Entity, channel params.
 		err := store.insertResource(entity, doc)
 		c.Assert(err, jc.ErrorIsNil)
 	}
-	err = store.setResource(entity, channel, doc.Name, revision)
-	c.Assert(err, jc.ErrorIsNil)
+	if channel != params.UnpublishedChannel {
+		err := store.setResource(entity, channel, doc.Name, revision)
+		c.Assert(err, jc.ErrorIsNil)
+	}
 	return revision
 }
 

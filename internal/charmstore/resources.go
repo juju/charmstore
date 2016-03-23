@@ -30,18 +30,15 @@ func (s Store) ListResources(entity *mongodoc.Entity, channel params.Channel) ([
 	var docs []*mongodoc.Resource
 	for name, meta := range entity.CharmMeta.Resources {
 		doc, err := s.latestResource(entity, channel, name)
-		if err == resourceNotFound {
-			// TODO(ericsnow) Fail? At least a dummy resource *must* be
-			// in charm store?
-			// We default to upload and set it to "store" once the resource
-			// has been uploaded to the store.
+		if errgo.Cause(err) == resourceNotFound {
+			// Stick in a placeholder.
 			doc = &mongodoc.Resource{
 				CharmURL: entity.BaseURL,
 				Name:     meta.Name,
 				// Revision, Fingerprint, etc. are not set.
 			}
 		} else if err != nil {
-			return nil, errgo.Notef(err, "failed to get resource")
+			return nil, errgo.Notef(err, "failed to get resource %q", name)
 		}
 		docs = append(docs, doc)
 	}
@@ -56,8 +53,11 @@ func (s Store) addResource(entity *mongodoc.Entity, doc *mongodoc.Resource, blob
 	copied := *doc
 	doc = &copied
 	blobName, err := s.storeResource(entity, doc, blob)
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(resourceNotFound))
+	}
 	if err := checkCharmResource(entity, doc); err != nil {
-		return err
+		return errgo.Mask(err)
 	}
 	doc.BlobName = blobName
 	doc.Revision = newRevision
@@ -65,14 +65,14 @@ func (s Store) addResource(entity *mongodoc.Entity, doc *mongodoc.Resource, blob
 		if err := s.BlobStore.Remove(doc.BlobName); err != nil {
 			logger.Errorf("cannot remove blob %s after error: %v", doc.BlobName, err)
 		}
-		return err
+		return errgo.Mask(err)
 	}
 	return nil
 }
 
 func (s Store) insertResource(entity *mongodoc.Entity, doc *mongodoc.Resource) error {
 	if err := checkCharmResource(entity, doc); err != nil {
-		return err
+		return errgo.Mask(err)
 	}
 
 	err := s.DB.Resources().Insert(doc)
@@ -91,18 +91,31 @@ func (s Store) storeResource(entity *mongodoc.Entity, doc *mongodoc.Resource, bl
 }
 
 func (s Store) setResource(entity *mongodoc.Entity, channel params.Channel, resName string, revision int) error {
+	if channel == params.NoChannel {
+		return errgo.New("missing channel")
+	}
+	if channel == params.UnpublishedChannel {
+		return errgo.New("cannot publish to unpublished channel")
+	}
+
 	doc, err := s.resource(entity.URL, resName, revision)
 	if err != nil {
-		return err
+		return errgo.Mask(err, errgo.Is(resourceNotFound))
 	}
 
 	if err := checkCharmResource(entity, doc); err != nil {
-		return err
+		return errgo.Mask(err)
 	}
 
-	resourcesDoc, err := s.resources(channel, entity.URL)
-	if err != nil {
-		return err
+	resourcesDoc, err := s.publishedResources(entity.URL, channel)
+	if errgo.Cause(err) == resourceNotFound {
+		resourcesDoc = &mongodoc.Resources{
+			CharmURL:  entity.URL,
+			Channel:   channel,
+			Revisions: make(map[string]int),
+		}
+	} else if err != nil {
+		return errgo.Mask(err)
 	}
 	resourcesDoc.Revisions[resName] = revision
 
@@ -117,21 +130,40 @@ func (s Store) setResource(entity *mongodoc.Entity, channel params.Channel, resN
 func (s Store) latestResource(entity *mongodoc.Entity, channel params.Channel, resName string) (*mongodoc.Resource, error) {
 	revision, err := s.latestResourceRevision(entity, channel, resName)
 	if err != nil {
-		return nil, err
+		return nil, errgo.Mask(err, errgo.Is(resourceNotFound))
 	}
 	doc, err := s.resource(entity.URL, resName, revision)
-	return doc, err
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(resourceNotFound))
+	}
+	return doc, nil
 }
 
 func (s Store) latestResourceRevision(entity *mongodoc.Entity, channel params.Channel, resName string) (int, error) {
-	doc, err := s.resources(channel, entity.URL)
+	if channel == params.UnpublishedChannel {
+		docs, err := s.resources(entity.BaseURL, resName)
+		if err != nil {
+			return -1, errgo.Mask(err, errgo.Is(resourceNotFound))
+		}
+		if len(docs) == 0 {
+			err := resourceNotFound
+			return -1, errgo.WithCausef(err, err, "")
+		}
+		mongodoc.SortResources(docs)
+		latest := docs[len(docs)-1].Revision
+		return latest, nil
+	}
+
+	doc, err := s.publishedResources(entity.URL, channel)
 	if err != nil {
-		return -1, err
+		return -1, errgo.Mask(err, errgo.Is(resourceNotFound))
 	}
 	latest, ok := doc.Revisions[resName]
 	if !ok {
 		// TODO(ericsnow) Fail if the resource otherwise exists?
-		return -1, resourceNotFound
+		// Fall back to the latest unpublished one?
+		err := resourceNotFound
+		return -1, errgo.WithCausef(err, err, "")
 	}
 	return latest, nil
 }
@@ -142,9 +174,10 @@ func (s Store) resource(curl *charm.URL, resName string, revision int) (*mongodo
 	err := s.DB.Resources().Find(query).One(&doc)
 	if err == mgo.ErrNotFound {
 		err = resourceNotFound
+		return nil, errgo.WithCausef(err, err, "")
 	}
 	if err != nil {
-		return nil, err
+		return nil, errgo.Mask(err)
 	}
 	if err := doc.Validate(); err != nil {
 		return nil, errgo.Notef(err, "got bad data from DB")
@@ -152,18 +185,42 @@ func (s Store) resource(curl *charm.URL, resName string, revision int) (*mongodo
 	return &doc, nil
 }
 
-func (s Store) resources(channel params.Channel, curl *charm.URL) (*mongodoc.Resources, error) {
+func (s Store) resources(curl *charm.URL, resName string) ([]*mongodoc.Resource, error) {
+	query := mongodoc.NewResourceQuery(curl, resName, -1)
+	var docs []*mongodoc.Resource
+	// TODO(ericsnow) Does All() fail with mgo.ErrNotFound when empty?
+	err := s.DB.Resources().Find(query).All(&docs)
+	if err == mgo.ErrNotFound {
+		err = resourceNotFound
+		return nil, errgo.WithCausef(err, err, "")
+	}
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	// TODO(ericsnow) Validate each of the results.
+	return docs, nil
+}
+
+func (s Store) publishedResources(curl *charm.URL, channel params.Channel) (*mongodoc.Resources, error) {
+	if channel == params.NoChannel {
+		return nil, errgo.New("missing channel")
+	}
+	if channel == params.UnpublishedChannel {
+		return nil, errgo.Newf("%q channel not supported", channel)
+	}
+
 	query := mongodoc.NewResourcesQuery(curl, channel)
 	var doc mongodoc.Resources
 	err := s.DB.Resources().Find(query).One(&doc)
 	if err == mgo.ErrNotFound {
+		// Return a placeholder.
 		doc = mongodoc.Resources{
 			CharmURL:  curl,
 			Channel:   channel,
 			Revisions: make(map[string]int),
 		}
 	} else if err != nil {
-		return nil, err
+		return nil, errgo.Mask(err)
 	}
 	if err := doc.Validate(); err != nil {
 		return nil, errgo.Notef(err, "got bad data from DB")
@@ -177,7 +234,7 @@ func checkCharmResource(entity *mongodoc.Entity, doc *mongodoc.Resource) error {
 	// TODO(ericsnow) Verify that the revisioned resource is in the DB.
 
 	if err := doc.Validate(); err != nil {
-		return err
+		return errgo.Mask(err)
 	}
 
 	if !charmHasResource(entity.CharmMeta, doc.Name) {
