@@ -9,11 +9,13 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"time"
 
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charm.v6-unstable/resource"
+	"gopkg.in/mgo.v2/bson"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
@@ -151,6 +153,8 @@ func extractResources(c *gc.C, cURL *charm.URL, ch *charm.CharmDir) []*mongodoc.
 			Revision:    0,
 			Fingerprint: fp.Bytes(),
 			Size:        int64(len(data)),
+			BlobName:    bson.NewObjectId().Hex(),
+			UploadTime:  time.Now().UTC(),
 		}
 		docs = append(docs, doc)
 	}
