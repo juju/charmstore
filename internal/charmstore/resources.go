@@ -216,7 +216,9 @@ func (s Store) storeResource(blob ResourceBlob) (string, error) {
 	return blobName, nil
 }
 
-func (s Store) setResource(entity *mongodoc.Entity, channel params.Channel, resName string, revision int) error {
+// SetResource sets the revision of the identified resource for
+// a specific charm revision in the given channel.
+func (s Store) SetResource(entity *mongodoc.Entity, channel params.Channel, resName string, revision int) error {
 	if channel == params.NoChannel {
 		return errgo.New("missing channel")
 	}
@@ -277,7 +279,7 @@ func (s Store) latestResourceRevision(entity *mongodoc.Entity, channel params.Ch
 		}
 		if len(docs) == 0 {
 			err := resourceNotFound
-			return -1, errgo.WithCausef(err, err, "")
+			return -1, errgo.WithCausef(nil, err, "")
 		}
 		mongodoc.SortResources(docs)
 		latest := docs[len(docs)-1].Revision
@@ -296,7 +298,7 @@ func (s Store) latestResourceRevision(entity *mongodoc.Entity, channel params.Ch
 		// unpublished revision. However, doing so would imply a
 		// published revision when there actually wasn't one.
 		err := resourceNotFound
-		return -1, errgo.WithCausef(err, err, "")
+		return -1, errgo.WithCausef(nil, err, "")
 	}
 	return latest, nil
 }
@@ -307,7 +309,7 @@ func (s Store) resource(curl *charm.URL, resName string, revision int) (*mongodo
 	err := s.DB.Resources().Find(query).One(&doc)
 	if err == mgo.ErrNotFound {
 		err = resourceNotFound
-		return nil, errgo.WithCausef(err, err, "")
+		return nil, errgo.WithCausef(nil, err, "")
 	}
 	if err != nil {
 		return nil, errgo.Mask(err)
@@ -330,7 +332,7 @@ func (s Store) resources(curl *charm.URL, resName string) ([]*mongodoc.Resource,
 	}
 	if len(docs) == 0 {
 		err = resourceNotFound
-		return nil, errgo.WithCausef(err, err, "")
+		return nil, errgo.WithCausef(nil, err, "")
 	}
 	for _, doc := range docs {
 		if err := doc.Validate(); err != nil {

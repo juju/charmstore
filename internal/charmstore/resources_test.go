@@ -208,6 +208,39 @@ func (s *ResourcesSuite) TestAddResourceExists(c *gc.C) {
 	c.Check(doc, jc.DeepEquals, expectedDoc)
 }
 
+func (s *ResourcesSuite) TestSetResource(c *gc.C) {
+	store := s.newStore(c, false)
+	defer store.Close()
+	curl := charm.MustParseURL("cs:~charmers/xenial/starsay-3")
+	channel := params.StableChannel
+	entity, ch := addCharm(c, store, curl)
+	before, err := store.ListResources(entity, channel)
+	c.Assert(err, jc.ErrorIsNil)
+	mongodoc.SortResources(before)
+	c.Assert(before, jc.DeepEquals, []*mongodoc.Resource{{
+		CharmURL: charm.MustParseURL("cs:~charmers/starsay"),
+		Name:     "for-install",
+	}, {
+		CharmURL: charm.MustParseURL("cs:~charmers/starsay"),
+		Name:     "for-store",
+	}, {
+		CharmURL: charm.MustParseURL("cs:~charmers/starsay"),
+		Name:     "for-upload",
+	}})
+	actual := addResources(c, store, curl, params.UnpublishedChannel, entity, ch)
+	mongodoc.SortResources(actual)
+	expected := before
+	expected[1] = actual[1] // "for-install"
+	revision := 1
+
+	err = store.SetResource(entity, channel, "for-store", revision)
+	c.Assert(err, jc.ErrorIsNil)
+
+	after, err := store.ListResources(entity, channel)
+	c.Assert(err, jc.ErrorIsNil)
+	checkResourceDocs(c, after, expected)
+}
+
 func addResources(c *gc.C, store *Store, curl *charm.URL, channel params.Channel, entity *mongodoc.Entity, ch *charm.CharmDir) []*mongodoc.Resource {
 	docs := extractResources(c, curl, ch)
 	for i, doc := range docs {
@@ -235,7 +268,7 @@ func addResource(c *gc.C, store *Store, entity *mongodoc.Entity, channel params.
 		c.Assert(err, jc.ErrorIsNil)
 	}
 	if channel != params.UnpublishedChannel {
-		err := store.setResource(entity, channel, doc.Name, revision)
+		err := store.SetResource(entity, channel, doc.Name, revision)
 		c.Assert(err, jc.ErrorIsNil)
 	}
 	return revision
