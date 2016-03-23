@@ -5,6 +5,7 @@ package charmstore // import "gopkg.in/juju/charmstore.v5-unstable/internal/char
 
 import (
 	"io"
+	"time"
 
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
@@ -46,45 +47,61 @@ func (s Store) ListResources(entity *mongodoc.Entity, channel params.Channel) ([
 	return docs, nil
 }
 
+// ResourceBlob holds the information specific to a single resource blob.
+type ResourceBlob struct {
+	io.Reader
+
+	//Fingerprint is the SHA-384 checksum of the blob.
+	Fingerprint []byte
+
+	// Size is the size of the blob in bytes.
+	Size int64
+}
+
 // TODO(ericsnow) We will need Store.nextResourceRevision() to get the
 // value to pass to addResource().
 
-func (s Store) addResource(entity *mongodoc.Entity, doc *mongodoc.Resource, blob io.Reader, newRevision int) error {
-	copied := *doc
-	doc = &copied
-	blobName, err := s.storeResource(entity, doc, blob)
+func (s Store) addResource(entity *mongodoc.Entity, name string, blob ResourceBlob, newRevision int) error {
+	if !charmHasResource(entity.CharmMeta, name) {
+		return errgo.Newf("charm does not have resource %q", name)
+	}
+
+	blobName, err := s.storeResource(blob)
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(resourceNotFound))
 	}
-	if err := checkCharmResource(entity, doc); err != nil {
-		return errgo.Mask(err)
+
+	doc := &mongodoc.Resource{
+		CharmURL:    entity.BaseURL,
+		Name:        name,
+		Revision:    newRevision,
+		Fingerprint: blob.Fingerprint,
+		Size:        blob.Size,
+		BlobName:    blobName,
+		UploadTime:  time.Now().UTC(),
 	}
-	doc.BlobName = blobName
-	doc.Revision = newRevision
-	if s.insertResource(entity, doc); err != nil {
-		if err := s.BlobStore.Remove(doc.BlobName); err != nil {
-			logger.Errorf("cannot remove blob %s after error: %v", doc.BlobName, err)
+	if s.insertResource(doc); err != nil {
+		if err := s.BlobStore.Remove(blobName); err != nil {
+			logger.Errorf("cannot remove blob %s after error: %v", blobName, err)
 		}
 		return errgo.Mask(err)
 	}
 	return nil
 }
 
-func (s Store) insertResource(entity *mongodoc.Entity, doc *mongodoc.Resource) error {
-	if err := checkCharmResource(entity, doc); err != nil {
+func (s Store) insertResource(doc *mongodoc.Resource) error {
+	if err := doc.Validate(); err != nil {
 		return errgo.Mask(err)
 	}
-
 	err := s.DB.Resources().Insert(doc)
 	if err != nil && !mgo.IsDup(err) {
 		return errgo.Notef(err, "cannot insert resource")
 	}
 	// TODO(ericsnow) Also fail for dupe?
-
 	return nil
 }
 
-func (s Store) storeResource(entity *mongodoc.Entity, doc *mongodoc.Resource, blob io.Reader) (string, error) {
+func (s Store) storeResource(blob ResourceBlob) (string, error) {
 	name := bson.NewObjectId().Hex()
 	// TODO(ericsnow) We will finish this in a follow-up patch.
 	return name, nil
@@ -98,12 +115,12 @@ func (s Store) setResource(entity *mongodoc.Entity, channel params.Channel, resN
 		return errgo.New("cannot publish to unpublished channel")
 	}
 
-	doc, err := s.resource(entity.URL, resName, revision)
+	doc, err := s.resource(entity.BaseURL, resName, revision)
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(resourceNotFound))
 	}
 
-	if err := checkCharmResource(entity, doc); err != nil {
+	if !charmHasResource(entity.CharmMeta, doc.Name) {
 		return errgo.Mask(err)
 	}
 
@@ -226,22 +243,6 @@ func (s Store) publishedResources(curl *charm.URL, channel params.Channel) (*mon
 		return nil, errgo.Notef(err, "got bad data from DB")
 	}
 	return &doc, nil
-}
-
-// checkCharmResource ensures that the given entity is okay
-// to associate with a revisioned resource.
-func checkCharmResource(entity *mongodoc.Entity, doc *mongodoc.Resource) error {
-	// TODO(ericsnow) Verify that the revisioned resource is in the DB.
-
-	if err := doc.Validate(); err != nil {
-		return errgo.Mask(err)
-	}
-
-	if !charmHasResource(entity.CharmMeta, doc.Name) {
-		return errgo.Newf("charm does not have resource %q", doc.Name)
-	}
-
-	return nil
 }
 
 func charmHasResource(meta *charm.Meta, resName string) bool {

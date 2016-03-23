@@ -99,14 +99,19 @@ func addResources(c *gc.C, store *Store, curl *charm.URL, channel params.Channel
 	return docs
 }
 
-func addResource(c *gc.C, store *Store, entity *mongodoc.Entity, channel params.Channel, doc *mongodoc.Resource, blob io.Reader) int {
+func addResource(c *gc.C, store *Store, entity *mongodoc.Entity, channel params.Channel, doc *mongodoc.Resource, blobReader io.Reader) int {
 	revision := doc.Revision + 1
-	if blob != nil {
-		err := store.addResource(entity, doc, blob, revision)
+	if blobReader != nil {
+		blob := ResourceBlob{
+			Reader:      blobReader,
+			Fingerprint: doc.Fingerprint,
+			Size:        doc.Size,
+		}
+		err := store.addResource(entity, doc.Name, blob, revision)
 		c.Assert(err, jc.ErrorIsNil)
 	} else {
 		doc.Revision = revision
-		err := store.insertResource(entity, doc)
+		err := store.insertResource(doc)
 		c.Assert(err, jc.ErrorIsNil)
 	}
 	if channel != params.UnpublishedChannel {
