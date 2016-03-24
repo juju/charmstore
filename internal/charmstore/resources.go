@@ -4,6 +4,8 @@
 package charmstore // import "gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
 
 import (
+	"io"
+
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charm.v6-unstable/resource"
@@ -49,18 +51,43 @@ func (s Store) ListResources(entity *mongodoc.Entity) ([]resource.Resource, erro
 }
 
 func (s Store) latestResource(entity *mongodoc.Entity, resName string) (resource.Resource, error) {
-	revision, ok := entity.Resources[resName]
-	if !ok {
-		// TODO(ericsnow) Fail if the resource otherwise exists?
-		return resource.Resource{}, resourceNotFound
+	revision, err := s.latestResourceRevision(entity, resName)
+	if err != nil {
+		return resource.Resource{}, err
 	}
 	// TODO(ericsnow) We need to pass in a base ID...
-	return s.resource(entity.URL, resName, revision)
+	res, _, err := s.resource(entity.URL, resName, revision)
+	return res, err
 }
 
-func (s Store) resource(curl *charm.URL, resName string, revision int) (resource.Resource, error) {
-	var res resource.Resource
+func (s Store) latestResourceRevision(entity *mongodoc.Entity, resName string) (int, error) {
+	latest, ok := entity.Resources[resName]
+	if !ok {
+		// TODO(ericsnow) Fail if the resource otherwise exists?
+		return -1, resourceNotFound
+	}
+	return latest, nil
+}
 
+func (s Store) resource(curl *charm.URL, resName string, revision int) (res resource.Resource, blobname string, err error) {
+	var doc mongodoc.Resource
+	id := mongodoc.NewResourceID(curl, resName, revision)
+	err = s.DB.Resources().FindId(id).One(&doc)
+	if err == mgo.ErrNotFound {
+		// TODO(ericsnow) Fail because "latest" points to a missing resource?
+		err = resourceNotFound
+	}
+	if err != nil {
+		return resource.Resource{}, "", err
+	}
+	res, err = mongodoc.Doc2Resource(doc)
+	if err != nil {
+		return res, "", errgo.Notef(err, "failed to convert resource doc")
+	}
+	return res, doc.BlobName, nil
+}
+
+func (s Store) resourceDoc(curl *charm.URL, resName string, revision int) (mongodoc.Resource, error) {
 	var doc mongodoc.Resource
 	id := mongodoc.NewResourceID(curl, resName, revision)
 	err := s.DB.Resources().FindId(id).One(&doc)
@@ -68,19 +95,24 @@ func (s Store) resource(curl *charm.URL, resName string, revision int) (resource
 		// TODO(ericsnow) Fail because "latest" points to a missing resource?
 		err = resourceNotFound
 	}
-	if err != nil {
-		return res, err
-	}
-
-	res, err = mongodoc.Doc2Resource(doc)
-	if err != nil {
-		return res, errgo.Notef(err, "failed to convert resource doc")
-	}
-
-	return res, nil
+	return doc, err
 }
 
-func (s Store) insertResource(entity *mongodoc.Entity, res resource.Resource, newRevision int) error {
+func (s Store) addResource(entity *mongodoc.Entity, res resource.Resource, blob io.Reader, newRevision int) error {
+	blobName, err := s.storeResource(entity, res, blob)
+	if err := mongodoc.CheckCharmResource(entity, res); err != nil {
+		return err
+	}
+	if s.insertResource(entity, res, blobName, newRevision); err != nil {
+		if err := s.BlobStore.Remove(blobName); err != nil {
+			logger.Errorf("cannot remove blob %s after error: %v", blobName, err)
+		}
+		return err
+	}
+	return nil
+}
+
+func (s Store) insertResource(entity *mongodoc.Entity, res resource.Resource, blobName string, newRevision int) error {
 	res.Revision = newRevision
 	if err := mongodoc.CheckCharmResource(entity, res); err != nil {
 		return err
@@ -90,6 +122,7 @@ func (s Store) insertResource(entity *mongodoc.Entity, res resource.Resource, ne
 	if err != nil {
 		return err
 	}
+	doc.BlobName = blobName
 
 	err = s.DB.Resources().Insert(doc)
 	if err != nil && !mgo.IsDup(err) {
@@ -99,11 +132,17 @@ func (s Store) insertResource(entity *mongodoc.Entity, res resource.Resource, ne
 	return nil
 }
 
+func (s Store) storeResource(entity *mongodoc.Entity, res resource.Resource, blob io.Reader) (string, error) {
+	name := bson.NewObjectId().Hex()
+	// TODO(ericsnow) We will finish this in a follow-up patch.
+	return name, nil
+}
+
 // TODO(ericsnow) We will need Store.nextResourceRevision()...
 
 func (s Store) setResource(entity *mongodoc.Entity, resName string, revision int) error {
 	// TODO(ericsnow) We need to pass in a base ID...
-	res, err := s.resource(entity.URL, resName, revision)
+	res, _, err := s.resource(entity.URL, resName, revision)
 	if err != nil {
 		return err
 	}

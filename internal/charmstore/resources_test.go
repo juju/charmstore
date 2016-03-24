@@ -5,7 +5,9 @@ package charmstore // import "gopkg.in/juju/charmstore.v5-unstable/internal/char
 
 import (
 	"bytes"
+	"io"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	jc "github.com/juju/testing/checkers"
@@ -87,8 +89,8 @@ func (s *ResourcesSuite) TestListResourcesResourceNotFound(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 	entity, err := store.FindEntity(resolvedURL, nil)
 	c.Assert(err, jc.ErrorIsNil)
-	expected[1].Revision = addResource(c, store, entity, expected[1])
-	expected[2].Revision = addResource(c, store, entity, expected[2])
+	expected[1].Revision = addResource(c, store, entity, expected[1], nil)
+	expected[2].Revision = addResource(c, store, entity, expected[2], nil)
 
 	resources, err := store.ListResources(entity)
 	c.Assert(err, jc.ErrorIsNil)
@@ -108,15 +110,23 @@ func addCharmWithResources(c *gc.C, store *Store, curl *charm.URL) (*mongodoc.En
 
 	resources := extractResources(c, ch)
 	for i, res := range resources {
-		resources[i].Revision = addResource(c, store, entity, res)
+		blob, err := os.Open(filepath.Join(ch.Path, res.Path))
+		c.Assert(err, jc.ErrorIsNil)
+		resources[i].Revision = addResource(c, store, entity, res, blob)
 	}
 	return entity, resources
 }
 
-func addResource(c *gc.C, store *Store, entity *mongodoc.Entity, res resource.Resource) int {
+func addResource(c *gc.C, store *Store, entity *mongodoc.Entity, res resource.Resource, blob io.Reader) int {
 	revision := res.Revision + 1
-	err := store.insertResource(entity, res, revision)
-	c.Assert(err, jc.ErrorIsNil)
+	var err error
+	if blob != nil {
+		err := store.addResource(entity, res, blob, revision)
+		c.Assert(err, jc.ErrorIsNil)
+	} else {
+		err := store.insertResource(entity, res, "", revision)
+		c.Assert(err, jc.ErrorIsNil)
+	}
 	err = store.setResource(entity, res.Name, revision)
 	c.Assert(err, jc.ErrorIsNil)
 	return revision
