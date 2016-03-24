@@ -24,7 +24,7 @@ var (
 
 type ResourceSuite struct{}
 
-func (s *ResourceSuite) TestNewResourceQuery(c *gc.C) {
+func (s *ResourceSuite) TestNewResourceQueryWithRevision(c *gc.C) {
 	cURL := charm.MustParseURL("cs:trusty/spam-2")
 
 	query := mongodoc.NewResourceQuery(cURL, "eggs", 3)
@@ -33,6 +33,17 @@ func (s *ResourceSuite) TestNewResourceQuery(c *gc.C) {
 		{"unresolved-charm-url", charm.MustParseURL("cs:spam")},
 		{"name", "eggs"},
 		{"revision", 3},
+	})
+}
+
+func (s *ResourceSuite) TestNewResourceQueryWithoutRevision(c *gc.C) {
+	cURL := charm.MustParseURL("cs:trusty/spam-2")
+
+	query := mongodoc.NewResourceQuery(cURL, "eggs", -1)
+
+	c.Check(query, jc.DeepEquals, bson.D{
+		{"unresolved-charm-url", charm.MustParseURL("cs:spam")},
+		{"name", "eggs"},
 	})
 }
 
@@ -222,13 +233,23 @@ func (s *ResourceSuite) TestValidateMissingUploadTime(c *gc.C) {
 
 type ResourcesSuite struct{}
 
-func (s *ResourcesSuite) TestNewResourcesQuery(c *gc.C) {
+func (s *ResourcesSuite) TestNewResourcesQueryWithChannel(c *gc.C) {
 	cURL := charm.MustParseURL("cs:trusty/spam-2")
 
 	query := mongodoc.NewResourcesQuery(params.StableChannel, cURL)
 
 	c.Check(query, jc.DeepEquals, bson.D{
 		{"channel", params.StableChannel},
+		{"resolved-charm-url", cURL},
+	})
+}
+
+func (s *ResourcesSuite) TestNewResourcesQueryWithoutChannel(c *gc.C) {
+	cURL := charm.MustParseURL("cs:trusty/spam-2")
+
+	query := mongodoc.NewResourcesQuery(params.NoChannel, cURL)
+
+	c.Check(query, jc.DeepEquals, bson.D{
 		{"resolved-charm-url", cURL},
 	})
 }

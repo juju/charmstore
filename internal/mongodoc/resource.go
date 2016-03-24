@@ -21,11 +21,14 @@ func NewResourceQuery(cURL *charm.URL, resName string, revision int) bson.D {
 	cURL = &copied
 	cURL.Revision = -1
 	cURL.Series = ""
-	return bson.D{
+	query := bson.D{
 		{"unresolved-charm-url", cURL},
 		{"name", resName},
-		{"revision", revision},
 	}
+	if revision >= 0 {
+		query = append(query, bson.DocElem{"revision", revision})
+	}
+	return query
 }
 
 // Resource holds the in-database representation of a charm resource
@@ -125,10 +128,16 @@ func (sorted resourcesByName) Less(i, j int) bool {
 // for the resource revisions associated with the identified *resolved*
 // charm URL (in the given channel).
 func NewResourcesQuery(channel params.Channel, cURL *charm.URL) bson.D {
-	return bson.D{
+	if channel == params.NoChannel {
+		return bson.D{
+			{"resolved-charm-url", cURL},
+		}
+	}
+	query := bson.D{
 		{"channel", channel},
 		{"resolved-charm-url", cURL},
 	}
+	return query
 }
 
 // Resources identifies the set of resource revisions for a resolved
