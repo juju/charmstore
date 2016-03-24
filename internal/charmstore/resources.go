@@ -216,6 +216,36 @@ func (s Store) storeResource(blob ResourceBlob) (string, error) {
 	return blobName, nil
 }
 
+// RemoveResource deletes the resource from the collection and from the
+// blob store. The resource revision must not be currently published.
+// Otherwise it fails.
+func (s Store) RemoveResource(entity *mongodoc.Entity, name string, revision int) error {
+	// TODO(ericsnow) Remove all the revisions if revision < 0?
+	if revision < 0 {
+		return errgo.New("revision cannot be negative")
+	}
+	// TODO(ericsnow) Ensure that the revision is not currently published.
+
+	doc, err := s.resource(entity.BaseURL, name, revision)
+	if err != nil {
+		return errgo.WithCausef(nil, err, "")
+	}
+
+	query := mongodoc.NewResourceQuery(entity.BaseURL, name, revision)
+	if err := s.DB.Resources().Remove(query); err != nil {
+		if err == mgo.ErrNotFound {
+			// Someone else got there first.
+			err = params.ErrNotFound
+		}
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+
+	if err := s.BlobStore.Remove(doc.BlobName); err != nil {
+		return errgo.Notef(err, "cannot remove blob %s", doc.BlobName)
+	}
+	return nil
+}
+
 // SetResource sets the revision of the identified resource for
 // a specific charm revision in the given channel.
 func (s Store) SetResource(entity *mongodoc.Entity, channel params.Channel, resName string, revision int) error {
