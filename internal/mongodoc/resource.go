@@ -127,15 +127,12 @@ func (sorted resourcesByName) Less(i, j int) bool {
 // NewResourcesQuery formats the provided details into a mongo query
 // for the resource revisions associated with the identified *resolved*
 // charm URL (in the given channel).
-func NewResourcesQuery(channel params.Channel, cURL *charm.URL) bson.D {
-	if channel == params.NoChannel {
-		return bson.D{
-			{"resolved-charm-url", cURL},
-		}
-	}
+func NewResourcesQuery(cURL *charm.URL, channel params.Channel) bson.D {
 	query := bson.D{
-		{"channel", channel},
 		{"resolved-charm-url", cURL},
+	}
+	if channel != params.NoChannel {
+		query = append(query, bson.DocElem{"channel", channel})
 	}
 	return query
 }
@@ -143,13 +140,13 @@ func NewResourcesQuery(channel params.Channel, cURL *charm.URL) bson.D {
 // Resources identifies the set of resource revisions for a resolved
 // charm, relative to a specific channel,
 type Resources struct {
-	// Channel is the channel to which the charm was published with
-	// these particular resource revisions.
-	Channel params.Channel `bson:"channel"`
-
 	// CharmURL is the resolved charm ID with which these particular
 	// resource revisions were published.
 	CharmURL *charm.URL `bson:"resolved-charm-url"`
+
+	// Channel is the channel to which the charm was published with
+	// these particular resource revisions.
+	Channel params.Channel `bson:"channel"`
 
 	// Revisions maps the charm's resources, by name, to the resource
 	// revisions tied to the resolved charm ID.

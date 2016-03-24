@@ -236,18 +236,18 @@ type ResourcesSuite struct{}
 func (s *ResourcesSuite) TestNewResourcesQueryWithChannel(c *gc.C) {
 	cURL := charm.MustParseURL("cs:trusty/spam-2")
 
-	query := mongodoc.NewResourcesQuery(params.StableChannel, cURL)
+	query := mongodoc.NewResourcesQuery(cURL, params.StableChannel)
 
 	c.Check(query, jc.DeepEquals, bson.D{
-		{"channel", params.StableChannel},
 		{"resolved-charm-url", cURL},
+		{"channel", params.StableChannel},
 	})
 }
 
 func (s *ResourcesSuite) TestNewResourcesQueryWithoutChannel(c *gc.C) {
 	cURL := charm.MustParseURL("cs:trusty/spam-2")
 
-	query := mongodoc.NewResourcesQuery(params.NoChannel, cURL)
+	query := mongodoc.NewResourcesQuery(cURL, params.NoChannel)
 
 	c.Check(query, jc.DeepEquals, bson.D{
 		{"resolved-charm-url", cURL},
@@ -256,8 +256,8 @@ func (s *ResourcesSuite) TestNewResourcesQueryWithoutChannel(c *gc.C) {
 
 func (s *ResourcesSuite) TestValidateFull(c *gc.C) {
 	doc := mongodoc.Resources{
-		Channel:  params.StableChannel,
 		CharmURL: charm.MustParseURL("cs:trusty/spam-2"),
+		Channel:  params.StableChannel,
 		Revisions: map[string]int{
 			"eggs": 1,
 			"ham":  17,
@@ -279,8 +279,8 @@ func (s *ResourcesSuite) TestValidateZeroValue(c *gc.C) {
 
 func (s *ResourcesSuite) TestValidateMissingChannel(c *gc.C) {
 	doc := mongodoc.Resources{
-		Channel:  "",
 		CharmURL: charm.MustParseURL("cs:trusty/spam-2"),
+		Channel:  "",
 		Revisions: map[string]int{
 			"eggs": 1,
 			"ham":  17,
@@ -294,8 +294,8 @@ func (s *ResourcesSuite) TestValidateMissingChannel(c *gc.C) {
 
 func (s *ResourcesSuite) TestValidateMissingCharmURL(c *gc.C) {
 	doc := mongodoc.Resources{
-		Channel:  params.StableChannel,
 		CharmURL: nil,
+		Channel:  params.StableChannel,
 		Revisions: map[string]int{
 			"eggs": 1,
 			"ham":  17,
@@ -309,8 +309,8 @@ func (s *ResourcesSuite) TestValidateMissingCharmURL(c *gc.C) {
 
 func (s *ResourcesSuite) TestValidateMissingCharmRevision(c *gc.C) {
 	doc := mongodoc.Resources{
-		Channel:  params.StableChannel,
 		CharmURL: charm.MustParseURL("cs:trusty/spam"),
+		Channel:  params.StableChannel,
 		Revisions: map[string]int{
 			"eggs": 1,
 			"ham":  17,
@@ -324,8 +324,8 @@ func (s *ResourcesSuite) TestValidateMissingCharmRevision(c *gc.C) {
 
 func (s *ResourcesSuite) TestValidateMissingCharmSeries(c *gc.C) {
 	doc := mongodoc.Resources{
-		Channel:  params.StableChannel,
 		CharmURL: charm.MustParseURL("cs:spam-2"),
+		Channel:  params.StableChannel,
 		Revisions: map[string]int{
 			"eggs": 1,
 			"ham":  17,
@@ -339,8 +339,8 @@ func (s *ResourcesSuite) TestValidateMissingCharmSeries(c *gc.C) {
 
 func (s *ResourcesSuite) TestValidateMissingName(c *gc.C) {
 	doc := mongodoc.Resources{
-		Channel:  params.StableChannel,
 		CharmURL: charm.MustParseURL("cs:trusty/spam-2"),
+		Channel:  params.StableChannel,
 		Revisions: map[string]int{
 			"eggs": 1,
 			"":     42,
@@ -355,8 +355,8 @@ func (s *ResourcesSuite) TestValidateMissingName(c *gc.C) {
 
 func (s *ResourcesSuite) TestValidateNegativeRevision(c *gc.C) {
 	doc := mongodoc.Resources{
-		Channel:  params.StableChannel,
 		CharmURL: charm.MustParseURL("cs:trusty/spam-2"),
+		Channel:  params.StableChannel,
 		Revisions: map[string]int{
 			"eggs": -1,
 			"ham":  17,
