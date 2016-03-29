@@ -1,7 +1,7 @@
 // Copyright 2016 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package mongodoc // import "gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
+package mongodoc
 
 import (
 	"sort"
