@@ -1097,7 +1097,6 @@ func (s StoreDatabase) BaseEntities() *mgo.Collection {
 
 // Resources returns the mongo collection where resources are stored.
 func (s StoreDatabase) Resources() *mgo.Collection {
-	// TODO(ericsnow) Re-use the Entities collection?
 	return s.C("resources")
 }
 
