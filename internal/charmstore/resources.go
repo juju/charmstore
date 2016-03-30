@@ -70,29 +70,21 @@ func (s Store) ResourceInfo(entity *mongodoc.Entity, name string, revision int) 
 
 // OpenResource returns the blob for the identified resource.
 func (s Store) OpenResource(id *router.ResolvedURL, name string, revision int) (OpenedResource, error) {
-	opened := OpenedResource{
-		EntityID: id,
-	}
 	if revision < 0 {
-		return opened, errgo.New("revision cannot be negative")
+		return OpenedResource{}, errgo.New("revision cannot be negative")
 	}
-
-	doc, err := s.resource(&id.URL, name, revision)
+	entity, err := s.FindEntity(id, nil)
 	if err != nil {
-		return opened, errgo.Mask(err, errgo.Is(resourceNotFound))
+		return OpenedResource{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	opened.Doc = doc
-
-	r, err := s.openResource(doc)
+	opened, err := s.openResource(id, entity, name, revision)
 	if err != nil {
-		return opened, errgo.Mask(err)
+		return opened, errgo.Mask(err, errgo.Any)
 	}
-	opened.ReadSeekCloser = r
-
 	return opened, nil
 }
 
-// OpenResource returns the blob for the latest revision of the identified resource.
+// OpenLatestResource returns the blob for the latest revision of the identified resource.
 func (s Store) OpenLatestResource(id *router.ResolvedURL, channel params.Channel, name string) (OpenedResource, error) {
 	var opened OpenedResource
 	entity, err := s.FindEntity(id, nil)
@@ -103,17 +95,37 @@ func (s Store) OpenLatestResource(id *router.ResolvedURL, channel params.Channel
 	if err != nil {
 		return opened, errgo.Mask(err, errgo.Is(resourceNotFound))
 	}
-	opened, err = s.OpenResource(id, name, revision)
+	opened, err = s.openResource(id, entity, name, revision)
 	if err != nil {
 		return opened, errgo.Mask(err, errgo.Is(resourceNotFound))
-	}
-	if entity.CharmMeta != nil {
-		opened.Meta = entity.CharmMeta.Resources[name]
 	}
 	return opened, nil
 }
 
-func (s Store) openResource(doc *mongodoc.Resource) (blobstore.ReadSeekCloser, error) {
+func (s Store) openResource(id *router.ResolvedURL, entity *mongodoc.Entity, name string, revision int) (OpenedResource, error) {
+	opened := OpenedResource{
+		EntityID: id,
+	}
+	if entity.CharmMeta != nil {
+		opened.Meta = entity.CharmMeta.Resources[name]
+	}
+
+	doc, err := s.resource(&id.URL, name, revision)
+	if err != nil {
+		return opened, errgo.Mask(err, errgo.Is(resourceNotFound))
+	}
+	opened.Doc = doc
+
+	blob, err := s.openResourceBlob(doc)
+	if err != nil {
+		return opened, errgo.Mask(err)
+	}
+	opened.ReadSeekCloser = blob
+
+	return opened, nil
+}
+
+func (s Store) openResourceBlob(doc *mongodoc.Resource) (blobstore.ReadSeekCloser, error) {
 	r, size, err := s.BlobStore.Open(doc.BlobName)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot open resource data for %s", doc.Name)
