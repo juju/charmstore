@@ -63,6 +63,7 @@ type ResourceBlob struct {
 
 // TODO(ericsnow) We will need Store.nextResourceRevision() to get the
 // value to pass to addResource().
+
 func (s Store) addResource(entity *mongodoc.Entity, name string, blob ResourceBlob, newRevision int) error {
 	if !charmHasResource(entity.CharmMeta, name) {
 		return errgo.Newf("charm does not have resource %q", name)
@@ -209,14 +210,16 @@ func (s Store) resource(curl *charm.URL, resName string, revision int) (*mongodo
 func (s Store) resources(curl *charm.URL, resName string) ([]*mongodoc.Resource, error) {
 	query := mongodoc.NewResourceQuery(curl, resName, -1)
 	var docs []*mongodoc.Resource
-	// TODO(ericsnow) Does All() fail with mgo.ErrNotFound when empty?
+	// All() populates an empty list when the query finds no results
+	// rathar than returning mgo.ErrNotFound. So we check for an empty
+	// list farther down.
 	err := s.DB.Resources().Find(query).All(&docs)
-	if err == mgo.ErrNotFound {
-		err = resourceNotFound
-		return nil, errgo.WithCausef(err, err, "")
-	}
 	if err != nil {
 		return nil, errgo.Mask(err)
+	}
+	if len(docs) == 0 {
+		err = resourceNotFound
+		return nil, errgo.WithCausef(err, err, "")
 	}
 	// TODO(ericsnow) Validate each of the results.
 	return docs, nil
