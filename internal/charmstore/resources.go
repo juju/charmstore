@@ -227,7 +227,14 @@ func (s Store) RemoveResource(entity *mongodoc.Entity, name string, revision int
 		// of the resource.
 		return errgo.New("revision cannot be negative")
 	}
-	// TODO(ericsnow) Ensure that the revision is not currently published.
+
+	ok, err := s.isPublished(entity, name, revision)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	if !ok {
+		return errgo.Newf("cannot remove resource %q; published resources cannot be removed", name)
+	}
 
 	doc, err := s.resource(entity.BaseURL, name, revision)
 	if err != nil {
@@ -401,6 +408,25 @@ func (s Store) publishedResources(curl *charm.URL, channel params.Channel) (*mon
 		return nil, errgo.Notef(err, "got bad data from DB")
 	}
 	return &doc, nil
+}
+
+func (s Store) isPublished(entity *mongodoc.Entity, name string, revision int) (bool, error) {
+	query := mongodoc.NewResourcesQuery(entity.URL, params.NoChannel)
+	var docs []*mongodoc.Resources
+	err := s.DB.Resources().Find(query).All(&docs)
+	if err != nil {
+		return false, errgo.Mask(err)
+	}
+	for _, doc := range docs {
+		actualRev, ok := doc.Revisions[name]
+		if !ok {
+			continue
+		}
+		if revision == actualRev {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func charmHasResource(meta *charm.Meta, resName string) bool {
