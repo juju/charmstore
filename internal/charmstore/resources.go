@@ -188,8 +188,11 @@ func (s Store) latestResourceRevision(entity *mongodoc.Entity, channel params.Ch
 	}
 	latest, ok := doc.Revisions[resName]
 	if !ok {
-		// TODO(ericsnow) Fail if the resource otherwise exists?
-		// Fall back to the latest unpublished one?
+		// This means that a revision of the resource was not declared
+		// when the charm/channel pair was published. One alternative
+		// to returning "not found" would be to return the latest
+		// unpublished revision. However, doing so would imply a
+		// published revision when there actually wasn't one.
 		err := resourceNotFound
 		return -1, errgo.WithCausef(err, err, "")
 	}
