@@ -18,8 +18,10 @@ import (
 
 var resourceNotFound = errgo.Newf("resource not found")
 
-// ListResources returns the list of resources for the charm at the
-// latest revision for each resource.
+// ListResources returns the set of resources for the charm. If the
+// unpublished channel is specified then set is composed of the latest
+// revision for each resource. Otherwise it holds the revisions declared
+// when the charm/channel pair was published.
 func (s Store) ListResources(entity *mongodoc.Entity, channel params.Channel) ([]*mongodoc.Resource, error) {
 	if entity.URL.Series == "bundle" {
 		return nil, errgo.Newf("bundles do not have resources")
