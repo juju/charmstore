@@ -28,9 +28,9 @@ func (s *commonSuite) addRequiredCharms(c *gc.C, bundle charm.Bundle) {
 	addRequiredCharms(c, store, bundle)
 }
 
-func (s *commonSuite) newStore(c *gc.C, withES bool) *Store {
+func (s *commonSuite) newStore(c *gc.C, withElasticSearch bool) *Store {
 	var si *SearchIndex
-	if withES {
+	if withElasticSearch {
 		si = &SearchIndex{s.ES, s.TestIndex}
 	}
 	p, err := NewPool(s.Session.DB("juju_test"), si, &bakery.NewServiceParams{}, ServerParams{})
