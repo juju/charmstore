@@ -139,17 +139,6 @@ func (s Store) openResourceBlob(doc *mongodoc.Resource) (blobstore.ReadSeekClose
 	return r, nil
 }
 
-// ResourceBlob holds the information specific to a single resource blob.
-type ResourceBlob struct {
-	io.Reader
-
-	//Fingerprint is the SHA-384 checksum of the blob.
-	Fingerprint []byte
-
-	// Size is the size of the blob in bytes.
-	Size int64
-}
-
 // AddResource adds the resource to the resources collection and stores
 // its blob.
 func (s Store) AddResource(entity *mongodoc.Entity, name string, blob ResourceBlob) (revision int, err error) {
@@ -226,7 +215,7 @@ func (s Store) storeResource(blob ResourceBlob) (string, error) {
 
 	// Upload the actual blob, and make sure that it is removed
 	// if we fail later.
-	hash := fmt.Sprintf("%x", blob.Fingerprint)
+	hash := blob.HashString()
 	err := s.BlobStore.PutUnchallenged(blobReader, blobName, blob.Size, hash)
 	if err != nil {
 		return "", errgo.Notef(err, "cannot put archive blob")
@@ -466,6 +455,22 @@ type OpenedResource struct {
 
 	// Doc holds the resource's info.
 	Doc *mongodoc.Resource
+}
+
+// ResourceBlob holds the information specific to a single resource blob.
+type ResourceBlob struct {
+	io.Reader
+
+	//Fingerprint is the SHA-384 checksum of the blob.
+	Fingerprint []byte
+
+	// Size is the size of the blob in bytes.
+	Size int64
+}
+
+// HashString returns the blob's hex-encoded fingerprint.
+func (blob ResourceBlob) HashString() string {
+	return fmt.Sprintf("%x", blob.Fingerprint)
 }
 
 func charmHasResource(meta *charm.Meta, resName string) bool {
