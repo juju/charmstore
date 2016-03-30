@@ -221,7 +221,11 @@ func (s Store) resources(curl *charm.URL, resName string) ([]*mongodoc.Resource,
 		err = resourceNotFound
 		return nil, errgo.WithCausef(err, err, "")
 	}
-	// TODO(ericsnow) Validate each of the results.
+	for _, doc := range docs {
+		if err := doc.Validate(); err != nil {
+			return nil, errgo.Notef(err, "got bad data from DB")
+		}
+	}
 	return docs, nil
 }
 
