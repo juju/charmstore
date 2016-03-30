@@ -108,7 +108,9 @@ func (s Store) openResource(doc *mongodoc.Resource) (io.ReadCloser, error) {
 	if size != doc.Size {
 		return nil, errgo.Newf("resource size mismatch")
 	}
-	// TODO(ericsnow) Verify that the hash matches?
+	// We would also verify that the hash matches if the hash were
+	// readily available. However, it is not and comparing the size
+	// is good enough.
 	return r, nil
 }
 
@@ -220,8 +222,9 @@ func (s Store) storeResource(blob ResourceBlob) (string, error) {
 // blob store. The resource revision must not be currently published.
 // Otherwise it fails.
 func (s Store) RemoveResource(entity *mongodoc.Entity, name string, revision int) error {
-	// TODO(ericsnow) Remove all the revisions if revision < 0?
 	if revision < 0 {
+		// One alternative to failing here is to remove *all* revisions
+		// of the resource.
 		return errgo.New("revision cannot be negative")
 	}
 	// TODO(ericsnow) Ensure that the revision is not currently published.
