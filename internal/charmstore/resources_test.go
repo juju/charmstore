@@ -116,13 +116,13 @@ func (s *ResourcesSuite) TestOpenResource(c *gc.C) {
 	meta := ch.Meta().Resources["for-store"]
 	expectedData, err := ioutil.ReadFile(filepath.Join(ch.Path, meta.Path))
 
-	doc, reader, err := store.OpenResource(resolvedURL, meta.Name, 1)
+	opened, err := store.OpenResource(resolvedURL, meta.Name, 1)
 	c.Assert(err, jc.ErrorIsNil)
-	defer reader.Close()
+	defer opened.Close()
 
-	adjustExpectedResource(doc, expected)
-	c.Check(doc, jc.DeepEquals, expected)
-	data, err := ioutil.ReadAll(reader)
+	adjustExpectedResource(opened.Doc, expected)
+	c.Check(opened.Doc, jc.DeepEquals, expected)
+	data, err := ioutil.ReadAll(opened)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Check(data, jc.DeepEquals, expectedData)
 }
@@ -140,13 +140,13 @@ func (s *ResourcesSuite) TestOpenLatestResource(c *gc.C) {
 	meta := ch.Meta().Resources["for-store"]
 	expectedData, err := ioutil.ReadFile(filepath.Join(ch.Path, meta.Path))
 
-	doc, reader, err := store.OpenLatestResource(resolvedURL, channel, meta.Name)
+	opened, err := store.OpenLatestResource(resolvedURL, channel, meta.Name)
 	c.Assert(err, jc.ErrorIsNil)
-	defer reader.Close()
+	defer opened.Close()
 
-	adjustExpectedResource(doc, expected)
-	c.Check(doc, jc.DeepEquals, expected)
-	data, err := ioutil.ReadAll(reader)
+	adjustExpectedResource(opened.Doc, expected)
+	c.Check(opened.Doc, jc.DeepEquals, expected)
+	data, err := ioutil.ReadAll(opened)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Check(data, jc.DeepEquals, expectedData)
 }
@@ -171,11 +171,11 @@ func (s *ResourcesSuite) TestAddResourceNew(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 
 	c.Check(revision, gc.Equals, 0)
-	doc, r, err := store.OpenResource(MustParseResolvedURL(curl.String()), "for-store", revision)
-	r.Close()
+	opened, err := store.OpenResource(MustParseResolvedURL(curl.String()), "for-store", revision)
+	opened.Close()
 	expectedDoc.Revision = revision
-	adjustExpectedResource(doc, expectedDoc)
-	c.Check(doc, jc.DeepEquals, expectedDoc)
+	adjustExpectedResource(opened.Doc, expectedDoc)
+	c.Check(opened.Doc, jc.DeepEquals, expectedDoc)
 }
 
 func (s *ResourcesSuite) TestAddResourceExists(c *gc.C) {
@@ -201,11 +201,11 @@ func (s *ResourcesSuite) TestAddResourceExists(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 
 	c.Check(revision, gc.Equals, expected+1)
-	doc, r, err := store.OpenResource(MustParseResolvedURL(curl.String()), "for-store", revision)
-	r.Close()
+	opened, err := store.OpenResource(MustParseResolvedURL(curl.String()), "for-store", revision)
+	opened.Close()
 	expectedDoc.Revision = revision
-	adjustExpectedResource(doc, expectedDoc)
-	c.Check(doc, jc.DeepEquals, expectedDoc)
+	adjustExpectedResource(opened.Doc, expectedDoc)
+	c.Check(opened.Doc, jc.DeepEquals, expectedDoc)
 }
 
 func (s *ResourcesSuite) TestSetResource(c *gc.C) {

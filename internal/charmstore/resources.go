@@ -15,6 +15,7 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
+	"gopkg.in/juju/charmstore.v5-unstable/internal/blobstore"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
 )
@@ -68,39 +69,51 @@ func (s Store) ResourceInfo(entity *mongodoc.Entity, name string, revision int) 
 }
 
 // OpenResource returns the blob for the identified resource.
-func (s Store) OpenResource(id *router.ResolvedURL, name string, revision int) (*mongodoc.Resource, io.ReadCloser, error) {
-	if revision < 0 {
-		return nil, nil, errgo.New("revision cannot be negative")
+func (s Store) OpenResource(id *router.ResolvedURL, name string, revision int) (OpenedResource, error) {
+	opened := OpenedResource{
+		EntityID: id,
 	}
+	if revision < 0 {
+		return opened, errgo.New("revision cannot be negative")
+	}
+
 	doc, err := s.resource(&id.URL, name, revision)
 	if err != nil {
-		return nil, nil, errgo.Mask(err, errgo.Is(resourceNotFound))
+		return opened, errgo.Mask(err, errgo.Is(resourceNotFound))
 	}
+	opened.Doc = doc
+
 	r, err := s.openResource(doc)
 	if err != nil {
-		return nil, nil, errgo.Mask(err)
+		return opened, errgo.Mask(err)
 	}
-	return doc, r, nil
+	opened.ReadSeekCloser = r
+
+	return opened, nil
 }
 
 // OpenResource returns the blob for the latest revision of the identified resource.
-func (s Store) OpenLatestResource(id *router.ResolvedURL, channel params.Channel, name string) (*mongodoc.Resource, io.ReadCloser, error) {
+func (s Store) OpenLatestResource(id *router.ResolvedURL, channel params.Channel, name string) (OpenedResource, error) {
+	var opened OpenedResource
 	entity, err := s.FindEntity(id, nil)
 	if err != nil {
-		return nil, nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+		return opened, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	revision, err := s.latestResourceRevision(entity, channel, name)
 	if err != nil {
-		return nil, nil, errgo.Mask(err, errgo.Is(resourceNotFound))
+		return opened, errgo.Mask(err, errgo.Is(resourceNotFound))
 	}
-	doc, reader, err := s.OpenResource(id, name, revision)
+	opened, err = s.OpenResource(id, name, revision)
 	if err != nil {
-		return nil, nil, errgo.Mask(err, errgo.Is(resourceNotFound))
+		return opened, errgo.Mask(err, errgo.Is(resourceNotFound))
 	}
-	return doc, reader, nil
+	if entity.CharmMeta != nil {
+		opened.Meta = entity.CharmMeta.Resources[name]
+	}
+	return opened, nil
 }
 
-func (s Store) openResource(doc *mongodoc.Resource) (io.ReadCloser, error) {
+func (s Store) openResource(doc *mongodoc.Resource) (blobstore.ReadSeekCloser, error) {
 	r, size, err := s.BlobStore.Open(doc.BlobName)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot open resource data for %s", doc.Name)
@@ -427,6 +440,20 @@ func (s Store) isPublished(entity *mongodoc.Entity, name string, revision int) (
 		}
 	}
 	return false, nil
+}
+
+// OpenedResource wraps an open resource blob.
+type OpenedResource struct {
+	blobstore.ReadSeekCloser
+
+	// EntityID identifies the entity.
+	EntityID *router.ResolvedURL
+
+	// Meta is the charm metadata for the resource.
+	Meta resource.Meta
+
+	// Doc holds the resource's info.
+	Doc *mongodoc.Resource
 }
 
 func charmHasResource(meta *charm.Meta, resName string) bool {
