@@ -32,7 +32,10 @@ func (s Store) ListResources(entity *mongodoc.Entity, channel params.Channel) ([
 	for name, meta := range entity.CharmMeta.Resources {
 		doc, err := s.latestResource(entity, channel, name)
 		if errgo.Cause(err) == resourceNotFound {
-			// Stick in a placeholder.
+			// Convert the "not found" error into placeholder. We do
+			// this instead of pre-populating the database with
+			// placeholders. This keeps the machinery simpler while
+			// still correct.
 			doc = &mongodoc.Resource{
 				CharmURL: entity.BaseURL,
 				Name:     meta.Name,
