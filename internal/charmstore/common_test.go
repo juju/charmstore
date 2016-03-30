@@ -36,7 +36,7 @@ func (s *commonSuite) newStore(c *gc.C, withES bool) *Store {
 	p, err := NewPool(s.Session.DB("juju_test"), si, &bakery.NewServiceParams{}, ServerParams{})
 	c.Assert(err, gc.IsNil)
 	store := p.Store()
-	p.Close()
+	defer p.Close()
 	return store
 }
 
