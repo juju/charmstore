@@ -4,6 +4,7 @@
 package mongodoc
 
 import (
+	"fmt"
 	"sort"
 	"time"
 
@@ -103,6 +104,11 @@ func (doc Resource) Validate() error {
 	}
 
 	return nil
+}
+
+// HashString returns the resource's hex-encoded fingerprint.
+func (doc Resource) HashString() string {
+	return fmt.Sprintf("%x", doc.Fingerprint)
 }
 
 // SortResources sorts the provided resource docs.
