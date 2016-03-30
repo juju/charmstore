@@ -131,6 +131,10 @@ func (s Store) setResource(entity *mongodoc.Entity, channel params.Channel, resN
 
 	resourcesDoc, err := s.publishedResources(entity.URL, channel)
 	if errgo.Cause(err) == resourceNotFound {
+		// The charm/channel pair doesn't have a DB entry yet, so we
+		// return a placeholder. As with ListResources(), we use a
+		// placeholder instead of pre-populating the DB with the same
+		// value.
 		resourcesDoc = &mongodoc.Resources{
 			CharmURL:  entity.URL,
 			Channel:   channel,
