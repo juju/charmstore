@@ -237,7 +237,8 @@ func (s Store) publishedResources(curl *charm.URL, channel params.Channel) (*mon
 	var doc mongodoc.Resources
 	err := s.DB.Resources().Find(query).One(&doc)
 	if err == mgo.ErrNotFound {
-		// Return a placeholder.
+		// Return a placeholder. See ListResources() for more on why we
+		// use a placeholder.
 		doc = mongodoc.Resources{
 			CharmURL:  curl,
 			Channel:   channel,
