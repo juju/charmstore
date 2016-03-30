@@ -63,7 +63,6 @@ type ResourceBlob struct {
 
 // TODO(ericsnow) We will need Store.nextResourceRevision() to get the
 // value to pass to addResource().
-
 func (s Store) addResource(entity *mongodoc.Entity, name string, blob ResourceBlob, newRevision int) error {
 	if !charmHasResource(entity.CharmMeta, name) {
 		return errgo.Newf("charm does not have resource %q", name)
@@ -97,10 +96,12 @@ func (s Store) insertResource(doc *mongodoc.Resource) error {
 		return errgo.Mask(err)
 	}
 	err := s.DB.Resources().Insert(doc)
-	if err != nil && !mgo.IsDup(err) {
+	if err != nil {
+		if mgo.IsDup(err) {
+			return errgo.WithCausef(nil, params.ErrDuplicateUpload, "")
+		}
 		return errgo.Notef(err, "cannot insert resource")
 	}
-	// TODO(ericsnow) Also fail for dupe?
 	return nil
 }
 
