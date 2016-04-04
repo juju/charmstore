@@ -1,6 +1,6 @@
 # Charm store API
 
-The current live API lives at https://api.jujucharms.com/charmstore/v4
+The current live API lives at https://api.jujucharms.com/charmstore/v5
 
 ## Intro
 
@@ -116,9 +116,9 @@ will return {"Revision": 3} because the default channel is "stable".
 The version of the API is indicated by an initial "vN" prefix to the path.
 Later versions will increment this number. This also means we can potentially
 serve backwardly compatible paths to juju-core. All paths in this document
-should be read as if they had a "v4" prefix. For example, the
+should be read as if they had a "v5" prefix. For example, the
 `wordpress/meta/charm-metadata` path is actually at
-`v4/wordpress/meta/charm-metadata`.
+`v5/wordpress/meta/charm-metadata`.
 
 ### Boolean values
 
