@@ -1152,7 +1152,7 @@ func (ctxt funcContext) WillIncludeMetadata(includes []string) {
 	ctxt.willIncludeMetadata(includes)
 }
 
-func (ctxt funcContext) AuthorizeEntity(id *ResolvedURL, req *http.Request) error {
+func (ctxt funcContext) AuthorizeEntity(id *ResolvedURL, req *http.Request, allowedGroups ...string) error {
 	return ctxt.authorizeURL(id, req)
 }
 

@@ -25,6 +25,11 @@ import (
 	"gopkg.in/juju/charmstore.v5-unstable/internal/series"
 )
 
+const (
+	// resolverGroup is allowed to resolve any charm URL.
+	resolverGroup = "resolver@charmstore"
+)
+
 // Implementation note on error handling:
 //
 // We use errgo.Any only when necessary, so that we can see at a glance
@@ -228,8 +233,9 @@ type Context interface {
 
 	// The AuthorizeEntity function will be called to authorize requests
 	// to any BulkIncludeHandlers. All other handlers are expected
-	// to handle their own authorization.
-	AuthorizeEntity(id *ResolvedURL, req *http.Request) error
+	// to handle their own authorization. The allowedGroups argument specifies
+	// a list of groups that are allowed access.
+	AuthorizeEntity(id *ResolvedURL, req *http.Request, allowedGroups ...string) error
 
 	// WillIncludeMetadata informs the context that the given metadata
 	// includes will be required in the request. This allows the context
@@ -406,19 +412,26 @@ func (r *Router) willIncludeMetadata(req *http.Request) {
 }
 
 func (r *Router) serveMetaGet(rurl *ResolvedURL, req *http.Request) (interface{}, error) {
+	key, path := handlerKey(req.URL.Path)
+	if key == "any" {
+		// TODO: consider whether we might want the capability to
+		// have different permissions for different meta endpoints.
+		if err := r.Context.AuthorizeEntity(rurl, req, resolverGroup); err != nil {
+			return nil, errgo.Mask(err, errgo.Any)
+		}
+
+		return r.serveMetaGetAny(rurl, req)
+	}
+
 	// TODO: consider whether we might want the capability to
 	// have different permissions for different meta endpoints.
 	if err := r.Context.AuthorizeEntity(rurl, req); err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
-	key, path := handlerKey(req.URL.Path)
 	if key == "" {
 		// GET id/meta
 		// https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmeta
 		return r.metaNames(), nil
-	}
-	if key == "any" {
-		return r.serveMetaGetAny(rurl, req)
 	}
 	if handler := r.handlers.Meta[key]; handler != nil {
 		results, err := handler.HandleGet([]BulkIncludeHandler{handler}, rurl, []string{path}, req.Form, req)

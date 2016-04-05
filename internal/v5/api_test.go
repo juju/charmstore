@@ -2064,6 +2064,32 @@ func (s *APISuite) TestResolveURL(c *gc.C) {
 	}
 }
 
+func (s *APISuite) TestResolvePrivateURL(c *gc.C) {
+	chURL := newResolvedURL("cs:~tester/trusty/wordpress-42", 42)
+	_, _ = s.addPublicCharmFromRepo(c, "wordpress", chURL)
+	// set read permissions to "noone"
+	err := s.store.SetPerms(&chURL.URL, "stable.read", "noone")
+	c.Assert(err, jc.ErrorIsNil)
+
+	// trying to access /meta/id should result in "not found"
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:     s.srv,
+		Do:          bakeryDo(nil),
+		Method:      "GET",
+		URL:         storeURL("wordpress/meta/any"),
+		ExpectError: ".*third party refused discharge.*",
+	})
+
+	// try again as member of resolver@charmstore
+	s.discharge = dischargeForUser("tester1")
+	s.idM.groups = map[string][]string{
+		"tester1": {"resolver@charmstore"},
+	}
+	s.assertGet(c, "wordpress/meta/any", map[string]interface{}{
+		"Id": "cs:trusty/wordpress-42",
+	})
+}
+
 var serveExpandIdTests = []struct {
 	about  string
 	url    string

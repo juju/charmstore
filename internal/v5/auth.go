@@ -299,11 +299,12 @@ func areAllowedEntities(entityIds []*router.ResolvedURL, allowedEntities string)
 
 // AuthorizeEntity checks that the given HTTP request
 // can access the entity with the given id.
-func (h *ReqHandler) AuthorizeEntity(id *router.ResolvedURL, req *http.Request) error {
+func (h *ReqHandler) AuthorizeEntity(id *router.ResolvedURL, req *http.Request, allowedGroups ...string) error {
 	acls, err := h.entityACLs(id)
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
+	acls.Read = append(acls.Read, allowedGroups...)
 	return h.authorizeWithPerms(req, acls.Read, acls.Write, id)
 }
 
