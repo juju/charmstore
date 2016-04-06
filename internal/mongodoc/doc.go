@@ -195,6 +195,11 @@ type BaseEntity struct {
 	// of series holding the currently published entity revision for
 	// that channel and series.
 	ChannelEntities map[params.Channel]map[string]*charm.URL
+
+	// ChannelResources holds a set of channels, each containing a
+	// set of resource names holding the currently published resource
+	// version for that channel and resource name.
+	ChannelResources map[params.Channel]map[string]int
 }
 
 // ACL holds lists of users and groups that are
