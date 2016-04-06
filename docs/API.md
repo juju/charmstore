@@ -2240,7 +2240,7 @@ Each charm store has a global feed for all new published charms and bundles.
 This endpoint returns the ids of published charms or bundles published, most
 recently published first.
 
-`GET changes/published[?limit=count][&from=fromdate][&to=todate]`
+`GET changes/published[?limit=count][&start=fromdate][&stop=todate]`
 
 The `fromdate` and `todate` values constrain the range of publish dates, in
 "yyyy-mm-dd" format. If `fromdate` is specified only charms published on or
@@ -2276,7 +2276,7 @@ Example: `GET changes/published`
 ]
 ```
 
-Example: `GET changes/published?limit=10&from=31-07-2014`
+Example: `GET changes/published?limit=10&start=31-07-2014`
 
 ```json
 [

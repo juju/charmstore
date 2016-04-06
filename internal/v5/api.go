@@ -1148,7 +1148,7 @@ func (h *ReqHandler) metaArchiveUploadTime(entity *mongodoc.Entity, id *router.R
 	}, nil
 }
 
-// GET changes/published[?limit=$count][&from=$fromdate][&to=$todate]
+// GET changes/published[?limit=$count][&start=$fromdate][&stop=$todate]
 // https://github.com/juju/charmstore/blob/v4/docs/API.md#get-changespublished
 func (h *ReqHandler) serveChangesPublished(_ http.Header, r *http.Request) (interface{}, error) {
 	start, stop, err := parseDateRange(r.Form)
