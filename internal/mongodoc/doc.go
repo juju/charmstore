@@ -199,7 +199,14 @@ type BaseEntity struct {
 	// ChannelResources holds a set of channels, each containing a
 	// set of resource names holding the currently published resource
 	// version for that channel and resource name.
-	ChannelResources map[params.Channel]map[string]int
+	ChannelResources map[params.Channel][]ResourceRevision
+}
+
+// ResourceRevision specifies an association of a resource name to a
+// revision.
+type ResourceRevision struct {
+	Name     string
+	Revision int
 }
 
 // ACL holds lists of users and groups that are
