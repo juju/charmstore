@@ -1,11 +1,9 @@
 // Copyright 2015 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package mongodoc_test // import "gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
+package mongodoc_test
 
 import (
-	"testing"
-
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6-unstable"
@@ -13,10 +11,6 @@ import (
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
 )
-
-func TestPackage(t *testing.T) {
-	gc.TestingT(t)
-}
 
 type DocSuite struct{}
 

@@ -154,5 +154,8 @@ func NormalizeBaseEntity(be *mongodoc.BaseEntity) *mongodoc.BaseEntity {
 	if len(be1.ChannelEntities) == 0 {
 		be1.ChannelEntities = nil
 	}
+	if len(be1.ChannelResources) == 0 {
+		be1.ChannelResources = nil
+	}
 	return &be1
 }
