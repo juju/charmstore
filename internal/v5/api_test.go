@@ -23,7 +23,6 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
-	"gopkg.in/juju/charm.v6-unstable/resource"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
@@ -545,15 +544,17 @@ var metaEndpoints = []metaEndpoint{{
 		if err != nil {
 			return nil, err
 		}
-		// TODO(ericsnow) Switch to store.ListResources() once it exists.
-		resources, err := basicListResources(entity)
+		resources, err := store.ListResources(entity, params.UnpublishedChannel)
 		if err != nil {
 			return resources, err
 		}
 		results := make([]params.Resource, 0, len(resources))
 		for _, res := range resources {
-			result := params.Resource2API(res)
-			results = append(results, result)
+			r, err := v5.FromResourceDoc(res, entity.CharmMeta.Resources)
+			if err != nil {
+				panic(err)
+			}
+			results = append(results, *r)
 		}
 		return results, nil
 	},
@@ -564,20 +565,20 @@ var metaEndpoints = []metaEndpoint{{
 			Name:        "for-install",
 			Type:        "file",
 			Path:        "initial.tgz",
+			Revision:    -1,
 			Description: "get things started",
-			Origin:      "upload",
 		}, {
 			Name:        "for-store",
 			Type:        "file",
 			Path:        "dummy.tgz",
+			Revision:    -1,
 			Description: "One line that is useful when operators need to push it.",
-			Origin:      "upload",
 		}, {
 			Name:        "for-upload",
 			Type:        "file",
 			Path:        "config.xml",
+			Revision:    -1,
 			Description: "Who uses xml anymore?",
-			Origin:      "upload",
 		}})
 	},
 }, {
@@ -602,22 +603,6 @@ var metaEndpoints = []metaEndpoint{{
 		})
 	},
 }}
-
-func basicListResources(entity *mongodoc.Entity) ([]resource.Resource, error) {
-	var resources []resource.Resource
-	for _, meta := range entity.CharmMeta.Resources {
-		// We use an origin of "upload" since charms cannot be uploaded yet.
-		resOrigin := resource.OriginUpload
-		res := resource.Resource{
-			Meta:   meta,
-			Origin: resOrigin,
-			// Revision, Fingerprint, and Size are not set.
-		}
-		resources = append(resources, res)
-	}
-	resource.Sort(resources)
-	return resources, nil
-}
 
 // TestEndpointGet tries to ensure that the endpoint
 // test data getters correspond with reality.

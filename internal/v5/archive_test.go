@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -1528,6 +1529,14 @@ func hashOf(r io.Reader) (hashSum string, size int64) {
 
 func hashOfString(s string) string {
 	return hashOfBytes([]byte(s))
+}
+
+func rawHash(hash string) []byte {
+	bytes, err := hex.DecodeString(hash)
+	if err != nil {
+		panic(err)
+	}
+	return bytes
 }
 
 // assertCacheControl asserts that the cache control headers are

@@ -29,6 +29,7 @@ type ResourceSuite struct {
 var _ = gc.Suite(&ResourceSuite{})
 
 func (s *ResourceSuite) SetUpSuite(c *gc.C) {
+	s.enableES = false
 	s.enableIdentity = true
 	s.commonSuite.SetUpSuite(c)
 }
@@ -408,4 +409,71 @@ func (s *ResourceSuite) uploadResource(c *gc.C, id *router.ResolvedURL, name str
 	hash := fmt.Sprintf("%x", sha512.Sum384([]byte(content)))
 	_, err = s.store.UploadResource(entity, name, strings.NewReader(content), hash, int64(len(content)))
 	c.Assert(err, gc.IsNil)
+}
+
+func (s *ResourceSuite) TestEmptyListResource(c *gc.C) {
+	id := newResolvedURL("~charmers/precise/wordpress-0", 0)
+	s.addPublicCharmFromRepo(c, "wordpress", id)
+
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:      s.srv,
+		URL:          storeURL(id.URL.Path() + "/meta/resources"),
+		ExpectStatus: http.StatusOK,
+		ExpectBody:   []params.Resource{},
+	})
+}
+
+func (s *ResourceSuite) TestListResource(c *gc.C) {
+	id := newResolvedURL("~charmers/precise/wordpress-0", -1)
+	s.addPublicCharm(c, storetesting.NewCharm(storetesting.MetaWithResources(nil, "resource1", "resource2")), id)
+	s.uploadResource(c, id, "resource1", "resource1 content")
+	s.uploadResource(c, id, "resource2", "resource2 content")
+
+	entity, err := s.store.FindEntity(id, nil)
+	c.Assert(err, gc.IsNil)
+	err = s.store.PublishResources(entity, params.StableChannel, []mongodoc.ResourceRevision{{
+		Name:     "resource1",
+		Revision: 0,
+	}, {
+		Name:     "resource2",
+		Revision: 0,
+	}})
+	c.Assert(err, gc.IsNil)
+
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:      s.srv,
+		URL:          storeURL(id.URL.Path() + "/meta/resources"),
+		ExpectStatus: http.StatusOK,
+		ExpectBody: []params.Resource{{
+			Name:        "resource1",
+			Type:        "file",
+			Path:        "resource1-file",
+			Description: "resource1 description",
+			Revision:    0,
+			Fingerprint: rawHash(hashOfString("resource1 content")),
+			Size:        int64(len("resource1 content")),
+		}, {
+			Name:        "resource2",
+			Type:        "file",
+			Path:        "resource2-file",
+			Description: "resource2 description",
+			Revision:    0,
+			Fingerprint: rawHash(hashOfString("resource2 content")),
+			Size:        int64(len("resource2 content")),
+		}},
+	})
+}
+
+func (s *ResourceSuite) TestListResourceWithBundle(c *gc.C) {
+	id := newResolvedURL("cs:~charmers/bundle/bundlelovin-10", 10)
+	s.addPublicBundleFromRepo(c, "wordpress-simple", id, true)
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:      s.srv,
+		URL:          storeURL(id.URL.Path() + "/meta/resources"),
+		ExpectStatus: http.StatusNotFound,
+		ExpectBody: params.Error{
+			Code:    params.ErrMetadataNotFound,
+			Message: string(params.ErrMetadataNotFound),
+		},
+	})
 }

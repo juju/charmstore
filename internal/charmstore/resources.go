@@ -58,6 +58,9 @@ func (sorted resourcesByName) Less(i, j int) bool {
 // revision for each resource. Otherwise it holds the revisions declared
 // when the charm/channel pair was published.
 func (s *Store) ListResources(entity *mongodoc.Entity, channel params.Channel) ([]*mongodoc.Resource, error) {
+	if channel == params.NoChannel {
+		return nil, errgo.Newf("no channel specified")
+	}
 	if entity.URL.Series == "bundle" {
 		return nil, nil
 	}

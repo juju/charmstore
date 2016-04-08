@@ -122,15 +122,14 @@ func (s *resourceSuite) TestNewResourceQuery(c *gc.C) {
 func (s *resourceSuite) TestListResourcesCharmWithResources(c *gc.C) {
 	store := s.newStore(c, false)
 	defer store.Close()
-	channel := params.StableChannel
 	curl := charm.MustParseURL("cs:~charmers/xenial/starsay-3")
 	entity, _ := addCharm(c, store, curl)
 	expected := uploadResources(c, store, entity)
-	err := store.PublishResources(entity, channel, resourceRevisions(expected))
+	err := store.PublishResources(entity, params.StableChannel, resourceRevisions(expected))
 	c.Assert(err, jc.ErrorIsNil)
 	sortResources(expected)
 
-	docs, err := store.ListResources(entity, channel)
+	docs, err := store.ListResources(entity, params.StableChannel)
 	c.Assert(err, jc.ErrorIsNil)
 
 	checkResourceDocs(c, docs, expected)
@@ -139,24 +138,33 @@ func (s *resourceSuite) TestListResourcesCharmWithResources(c *gc.C) {
 func (s *resourceSuite) TestListResourcesCharmWithoutResources(c *gc.C) {
 	store := s.newStore(c, false)
 	defer store.Close()
-	channel := params.StableChannel
 	curl := charm.MustParseURL("cs:~charmers/precise/wordpress-23")
 	entity, _ := addCharm(c, store, curl)
 
-	resources, err := store.ListResources(entity, channel)
+	resources, err := store.ListResources(entity, params.StableChannel)
 	c.Assert(err, jc.ErrorIsNil)
 
 	c.Check(resources, gc.HasLen, 0)
 }
 
+func (s *resourceSuite) TestListResourcesWithNoChannel(c *gc.C) {
+	store := s.newStore(c, false)
+	defer store.Close()
+	curl := charm.MustParseURL("cs:~charmers/precise/wordpress-23")
+	entity, _ := addCharm(c, store, curl)
+
+	resources, err := store.ListResources(entity, "")
+	c.Assert(err, gc.ErrorMatches, "no channel specified")
+	c.Assert(resources, gc.IsNil)
+}
+
 func (s *resourceSuite) TestListResourcesBundle(c *gc.C) {
 	store := s.newStore(c, false)
 	defer store.Close()
-	channel := params.StableChannel
 	curl := charm.MustParseURL("cs:~charmers/bundle/wordpress-simple-0")
 	entity := addBundle(c, store, curl)
 
-	resources, err := store.ListResources(entity, channel)
+	resources, err := store.ListResources(entity, params.StableChannel)
 	c.Assert(err, gc.IsNil)
 	c.Assert(resources, gc.HasLen, 0)
 }

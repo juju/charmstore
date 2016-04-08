@@ -4,6 +4,7 @@
 package v5 // import "gopkg.in/juju/charmstore.v5-unstable/internal/v5"
 
 import (
+	"encoding/hex"
 	"net/http"
 	"net/url"
 	"path"
@@ -19,46 +20,6 @@ import (
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
 )
-
-// GET id/meta/resource
-// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetaresources
-func (h *ReqHandler) metaResources(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
-	if entity.URL.Series == "bundle" {
-		return nil, nil
-	}
-	// TODO(ericsnow) Handle flags.
-	// TODO(ericsnow) Use h.Store.ListResources() once that exists.
-	resources, err := basicListResources(entity)
-	if err != nil {
-		return nil, err
-	}
-	results := make([]params.Resource, 0, len(resources))
-	for _, res := range resources {
-		result := params.Resource2API(res)
-		results = append(results, result)
-	}
-	return results, nil
-}
-
-func basicListResources(entity *mongodoc.Entity) ([]resource.Resource, error) {
-	if entity.CharmMeta == nil {
-		return nil, errgo.Newf("entity missing charm metadata")
-	}
-
-	var resources []resource.Resource
-	for _, meta := range entity.CharmMeta.Resources {
-		// We use an origin of "upload" since resources cannot be uploaded yet.
-		resOrigin := resource.OriginUpload
-		res := resource.Resource{
-			Meta:   meta,
-			Origin: resOrigin,
-			// Revision, Fingerprint, and Size are not set.
-		}
-		resources = append(resources, res)
-	}
-	resource.Sort(resources)
-	return resources, nil
-}
 
 // POST id/resource/name
 // https://github.com/juju/charmstore/blob/v5/docs/API.md#post-idresourcesname
@@ -173,4 +134,58 @@ func parseResourceId(path string) (mongodoc.ResourceRevision, error) {
 func validResourceName(name string) bool {
 	// TODO we should probably be more restrictive than this.
 	return !strings.Contains(name, "/")
+}
+
+// GET id/meta/resource
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetaresources
+func (h *ReqHandler) metaResources(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
+	if entity.URL.Series == "bundle" {
+		return nil, nil
+	}
+	ch, err := h.entityChannel(id)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	resources, err := h.Store.ListResources(entity, ch)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	results := make([]params.Resource, len(resources))
+	for i, res := range resources {
+		result, err := fromResourceDoc(res, entity.CharmMeta.Resources)
+		if err != nil {
+			return nil, err
+		}
+		results[i] = *result
+	}
+	return results, nil
+}
+
+func fromResourceDoc(doc *mongodoc.Resource, resources map[string]resource.Meta) (*params.Resource, error) {
+	meta, ok := resources[doc.Name]
+	if !ok {
+		// Should never happen.
+		return nil, errgo.Newf("resource %q returned by ListResources but not found in metadata", doc.Name)
+	}
+	r := &params.Resource{
+		Name:        doc.Name,
+		Revision:    -1,
+		Type:        meta.Type.String(),
+		Path:        meta.Path,
+		Description: meta.Description,
+	}
+	if doc.BlobHash == "" {
+		// No hash implies that there is no file (the entry
+		// is just a placeholder), so we don't fill in
+		// blob details.
+		return r, nil
+	}
+	rawHash, err := hex.DecodeString(doc.BlobHash)
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot decode blob hash %q", doc.BlobHash)
+	}
+	r.Size = doc.Size
+	r.Fingerprint = rawHash
+	r.Revision = doc.Revision
+	return r, nil
 }
