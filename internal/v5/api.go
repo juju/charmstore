@@ -227,7 +227,7 @@ func RouterHandlers(h *ReqHandler) *router.Handlers {
 			"publish":     resolveId(h.servePublish),
 			"promulgate":  resolveId(h.serveAdminPromulgate),
 			"readme":      resolveId(authId(h.serveReadMe), "contents", "blobname"),
-			"resources":   resolveId(authId(h.serveResources)),
+			"resource/":   resolveId(authId(h.serveResources), "charmmeta"),
 		},
 		Meta: map[string]router.BulkIncludeHandler{
 			"archive-size":         h.EntityHandler(h.metaArchiveSize, "size"),

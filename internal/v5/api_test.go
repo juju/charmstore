@@ -18,7 +18,6 @@ import (
 	"sync"
 	"time"
 
-	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
@@ -79,7 +78,7 @@ var _ = gc.Suite(&APISuite{})
 // patchLegacyDownloadCountsEnabled sets LegacyDownloadCountsEnabled to the
 // given value for the duration of the test.
 // TODO (frankban): remove this function when removing the legacy counts logic.
-func patchLegacyDownloadCountsEnabled(addCleanup func(jujutesting.CleanupFunc), value bool) {
+func patchLegacyDownloadCountsEnabled(addCleanup func(func(*gc.C)), value bool) {
 	original := charmstore.LegacyDownloadCountsEnabled
 	charmstore.LegacyDownloadCountsEnabled = value
 	addCleanup(func(*gc.C) {
@@ -539,24 +538,19 @@ var metaEndpoints = []metaEndpoint{{
 }, {
 	name: "resources",
 	get: func(store *charmstore.Store, url *router.ResolvedURL) (interface{}, error) {
+		if url.URL.Series == "bundle" {
+			return nil, nil
+		}
 		entity, err := store.FindEntity(url, nil)
 		if err != nil {
 			return nil, err
-		}
-		if entity.URL.Series == "bundle" {
-			return []params.Resource{}, nil
 		}
 		// TODO(ericsnow) Switch to store.ListResources() once it exists.
 		resources, err := basicListResources(entity)
 		if err != nil {
 			return resources, err
 		}
-		// Apparently the router's "isNull" check treats empty slices
-		// as nil...
-		if len(resources) == 0 {
-			return nil, nil
-		}
-		var results []params.Resource
+		results := make([]params.Resource, 0, len(resources))
 		for _, res := range resources {
 			result := params.Resource2API(res)
 			results = append(results, result)

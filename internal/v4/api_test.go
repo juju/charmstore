@@ -18,7 +18,6 @@ import (
 	"sync"
 	"time"
 
-	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
@@ -83,7 +82,7 @@ var _ = gc.Suite(&APISuite{})
 // patchLegacyDownloadCountsEnabled sets LegacyDownloadCountsEnabled to the
 // given value for the duration of the test.
 // TODO (frankban): remove this function when removing the legacy counts logic.
-func patchLegacyDownloadCountsEnabled(addCleanup func(jujutesting.CleanupFunc), value bool) {
+func patchLegacyDownloadCountsEnabled(addCleanup func(func(*gc.C)), value bool) {
 	original := charmstore.LegacyDownloadCountsEnabled
 	charmstore.LegacyDownloadCountsEnabled = value
 	addCleanup(func(*gc.C) {

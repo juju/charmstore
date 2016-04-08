@@ -114,7 +114,6 @@ func (h *ReqHandler) serveGetArchive(id *router.ResolvedURL, w http.ResponseWrit
 func (h *ReqHandler) SendEntityArchive(id *router.ResolvedURL, w http.ResponseWriter, req *http.Request, blob *charmstore.Blob) {
 	header := w.Header()
 	setArchiveCacheControl(w.Header(), h.isPublic(id))
-	logger.Infof("sendEntityArchive setting %s=%s", params.ContentHashHeader, blob.Hash)
 	header.Set(params.ContentHashHeader, blob.Hash)
 	header.Set(params.EntityIdHeader, id.PreferredURL().String())
 
