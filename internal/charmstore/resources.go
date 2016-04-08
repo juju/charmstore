@@ -15,6 +15,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
 )
 
 // newResourceQuery returns a mongo query doc that will retrieve the
@@ -52,8 +53,6 @@ func (sorted resourcesByName) Less(i, j int) bool {
 	return r0.Revision < r1.Revision
 }
 
-var resourceNotFound = errgo.Newf("resource not found")
-
 // ListResources returns the set of resources for the charm. If the
 // unpublished channel is specified then set is composed of the latest
 // revision for each resource. Otherwise it holds the revisions declared
@@ -86,7 +85,7 @@ func (s *Store) ListResources(entity *mongodoc.Entity, channel params.Channel) (
 		}
 		doc := resources[name][revision]
 		if doc == nil {
-			return nil, errgo.Newf("published resource %q, revision %d not found", name, revision)
+			return nil, errgo.Newf("published resource %q/%d not found", name, revision)
 		}
 		docs = append(docs, doc)
 	}
@@ -129,6 +128,10 @@ func mapRevisions(resourceRevisions []mongodoc.ResourceRevision) map[string]int 
 // UploadResource add blob to the blob store and adds a new resource with
 // the given name to the given entity. The revision of the new resource
 // will be calculated to be one higher than any existing resources.
+//
+// TODO consider restricting uploads so that if the hash matches the
+// latest revision then a new revision isn't created. This would match
+// the behaviour for charms and bundles.
 func (s *Store) UploadResource(entity *mongodoc.Entity, name string, blob io.Reader, blobHash string, size int64) (*mongodoc.Resource, error) {
 	if !charmHasResource(entity.CharmMeta, name) {
 		return nil, errgo.Newf("charm does not have resource %q", name)
@@ -155,7 +158,7 @@ func (s *Store) UploadResource(entity *mongodoc.Entity, name string, blob io.Rea
 	return res, nil
 }
 
-// addResource adds r to the resources collection. If r does not speify
+// addResource adds r to the resources collection. If r does not specify
 // a revision number will be one higher than any existing revisions. The
 // inserted resource is returned on success.
 func (s *Store) addResource(r *mongodoc.Resource) (*mongodoc.Resource, error) {
@@ -193,9 +196,44 @@ func (s *Store) nextResourceRevision(baseURL *charm.URL, name string) (int, erro
 	return r.Revision + 1, nil
 }
 
-// publishResources publishes the specified set of resources to the
-// specified channel for the specified charm.
-func (s *Store) publishResources(entity *mongodoc.Entity, channel params.Channel, resources []mongodoc.ResourceRevision) error {
+// ResolveResource finds the resource specified. If a matching resource
+// cannot be found an error with the cause params.ErrNotFound will be
+// returned.
+func (s *Store) ResolveResource(url *router.ResolvedURL, name string, revision int, channel params.Channel) (*mongodoc.Resource, error) {
+	if channel == params.NoChannel {
+		channel = params.StableChannel
+	}
+	if revision < 0 && channel != params.UnpublishedChannel {
+		baseEntity, err := s.FindBaseEntity(&url.URL, FieldSelector("channelresources"))
+		if err != nil {
+			return nil, errgo.Mask(err)
+		}
+		var ok bool
+		revision, ok = mapRevisions(baseEntity.ChannelResources[channel])[name]
+		if !ok {
+			return nil, errgo.WithCausef(nil, params.ErrNotFound, "%s has no %q resource on %s channel", url, name, channel)
+		}
+	}
+	q := newResourceQuery(mongodoc.BaseURL(&url.URL), name, revision)
+	var r mongodoc.Resource
+	if err := s.DB.Resources().Find(q).Sort("-revision").One(&r); err != nil {
+		if err == mgo.ErrNotFound {
+			suffix := ""
+			if revision >= 0 {
+				suffix = fmt.Sprintf("/%d", revision)
+			}
+			return nil, errgo.WithCausef(nil, params.ErrNotFound, "%s has no %q%s resource", url, name, suffix)
+		}
+		return nil, errgo.Mask(err)
+	}
+	return &r, nil
+}
+
+// PublishResources publishes the specified set of resources to the
+// specified channel for the specified charm. If any of the revisions
+// specified do not exist then an error with the cause params.ErrNotFound
+// will be returned.
+func (s *Store) PublishResources(entity *mongodoc.Entity, channel params.Channel, resources []mongodoc.ResourceRevision) error {
 	if channel == params.NoChannel {
 		return errgo.New("missing channel")
 	}
@@ -207,37 +245,23 @@ func (s *Store) publishResources(entity *mongodoc.Entity, channel params.Channel
 		if !charmHasResource(entity.CharmMeta, res.Name) {
 			return errgo.Newf("charm does not have resource %q", res.Name)
 		}
-		// TODO(mhilton) find a way to check that the resources exist without fetching each one.
-		_, err := s.resource(entity.BaseURL, res.Name, res.Revision)
-		if err != nil {
-			return errgo.Mask(err, errgo.Is(resourceNotFound))
-		}
 	}
+	knownResources, _, err := s.charmResources(entity.BaseURL)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	for _, res := range resources {
+		if _, ok := knownResources[res.Name][res.Revision]; !ok {
+			return errgo.WithCausef(nil, params.ErrNotFound, "%s resource %s revison %d not found", entity.URL, res.Name, res.Revision)
+		}
+
+	}
+
 	channelresources := fmt.Sprintf("channelresources.%s", channel)
 	if err := s.DB.BaseEntities().UpdateId(entity.BaseURL, bson.D{{"$set", bson.D{{channelresources, resources}}}}); err != nil {
 		return errgo.Mask(err)
 	}
 	return nil
-}
-
-// resource returns the resource with the given URL, name and revision.
-// If the resource was not found, it returns an error with a resourceNotFound
-// cause.
-func (s *Store) resource(url *charm.URL, name string, revision int) (*mongodoc.Resource, error) {
-	query := newResourceQuery(url, name, revision)
-	var doc mongodoc.Resource
-	err := s.DB.Resources().Find(query).One(&doc)
-	if err == mgo.ErrNotFound {
-		err = resourceNotFound
-		return nil, errgo.WithCausef(err, err, "")
-	}
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	if err := doc.Validate(); err != nil {
-		return nil, errgo.Notef(err, "got bad data from DB")
-	}
-	return &doc, nil
 }
 
 func charmHasResource(meta *charm.Meta, name string) bool {
@@ -246,4 +270,17 @@ func charmHasResource(meta *charm.Meta, name string) bool {
 	}
 	_, ok := meta.Resources[name]
 	return ok
+}
+
+// OpenResourceBlob returns the blob associated with the given resource.
+func (s *Store) OpenResourceBlob(res *mongodoc.Resource) (*Blob, error) {
+	r, size, err := s.BlobStore.Open(res.BlobName)
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot open archive data for %s resource %q/%d", res.BaseURL, res.Name, res.Revision)
+	}
+	return &Blob{
+		ReadSeekCloser: r,
+		Size:           size,
+		Hash:           res.BlobHash,
+	}, nil
 }
