@@ -170,11 +170,16 @@ func (s *resourceSuite) TestListResourcesResourceNotFound(c *gc.C) {
 	sortResources(expected)
 	err := store.PublishResources(entity, channel, resourceRevisions(expected[1:]))
 	c.Assert(err, jc.ErrorIsNil)
+	expected[0] = &mongodoc.Resource{
+		BaseURL:  expected[0].BaseURL,
+		Name:     expected[0].Name,
+		Revision: -1,
+	}
 
 	docs, err := store.ListResources(entity, channel)
 	c.Assert(err, jc.ErrorIsNil)
 
-	checkResourceDocs(c, docs, expected[1:])
+	checkResourceDocs(c, docs, expected)
 }
 
 func (s *resourceSuite) TestUploadResource(c *gc.C) {
@@ -432,7 +437,6 @@ func checkResourceDocs(c *gc.C, docs, expected []*mongodoc.Resource) {
 	for i, doc := range docs {
 		adjustExpectedResource(doc, expected[i])
 	}
-
 	c.Check(docs, jc.DeepEquals, expected)
 }
 
