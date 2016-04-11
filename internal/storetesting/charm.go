@@ -12,6 +12,7 @@ import (
 
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/juju/charm.v6-unstable/resource"
 	"gopkg.in/juju/charmrepo.v2-unstable/testing"
 	"gopkg.in/yaml.v2"
 
@@ -247,4 +248,23 @@ func parseRelation(s string) (charm.Relation, error) {
 		return charm.Relation{}, errgo.Newf("unknown role")
 	}
 	return r, nil
+}
+
+// MetaWithResources returns m with Resources set to a set of resources
+// with the given names. If m is nil, new(charm.Meta) will be used
+// instead.
+func MetaWithResources(m *charm.Meta, resources ...string) *charm.Meta {
+	if m == nil {
+		m = new(charm.Meta)
+	}
+	m.Resources = make(map[string]resource.Meta)
+	for _, name := range resources {
+		m.Resources[name] = resource.Meta{
+			Name:        name,
+			Type:        resource.TypeFile,
+			Path:        name,
+			Description: name,
+		}
+	}
+	return m
 }

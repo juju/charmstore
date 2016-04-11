@@ -17,6 +17,7 @@ import (
 	"gopkg.in/mgo.v2"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
 )
 
 type resourceSuite struct {
@@ -163,20 +164,22 @@ func (s *resourceSuite) TestListResourcesBundle(c *gc.C) {
 func (s *resourceSuite) TestListResourcesResourceNotFound(c *gc.C) {
 	store := s.newStore(c, false)
 	defer store.Close()
-	channel := params.StableChannel
-	curl := charm.MustParseURL("cs:~charmers/xenial/starsay-3")
-	entity, _ := addCharm(c, store, curl)
-	expected := uploadResources(c, store, entity)
-	sortResources(expected)
-	err := store.PublishResources(entity, channel, resourceRevisions(expected[1:]))
+	rurl := MustParseResolvedURL("cs:~charmers/xenial/starsay-3")
+	ch := storetesting.NewCharm(storetesting.MetaWithResources(nil, "resource1", "resource2"))
+	err := store.AddCharmWithArchive(rurl, ch)
 	c.Assert(err, jc.ErrorIsNil)
-	expected[0] = &mongodoc.Resource{
-		BaseURL:  expected[0].BaseURL,
-		Name:     expected[0].Name,
+	entity, err := store.FindEntity(rurl, nil)
+	c.Assert(err, jc.ErrorIsNil)
+	expected := make([]*mongodoc.Resource, 2)
+	expected[0] = uploadResource(c, store, entity, "resource1")
+	expected[1] = &mongodoc.Resource{
+		BaseURL:  mongodoc.BaseURL(&rurl.URL),
+		Name:     "resource2",
 		Revision: -1,
 	}
+	sortResources(expected)
 
-	docs, err := store.ListResources(entity, channel)
+	docs, err := store.ListResources(entity, params.UnpublishedChannel)
 	c.Assert(err, jc.ErrorIsNil)
 
 	checkResourceDocs(c, docs, expected)

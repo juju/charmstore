@@ -83,8 +83,8 @@ func (s *Store) ListResources(entity *mongodoc.Entity, channel params.Channel) (
 		if !ok {
 			// Create a placeholder for the missing resource.
 			doc = &mongodoc.Resource{
-				BaseURL: baseEntity.URL,
-				Name: name,
+				BaseURL:  baseEntity.URL,
+				Name:     name,
 				Revision: -1,
 			}
 		} else {
