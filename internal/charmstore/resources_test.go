@@ -179,6 +179,8 @@ func (s *resourceSuite) TestListResourcesResourceNotFound(c *gc.C) {
 	}
 	sortResources(expected)
 
+	// A resource exists for resource1, but not resource2. Expect a
+	// placeholder to be returned for resource2.
 	docs, err := store.ListResources(entity, params.UnpublishedChannel)
 	c.Assert(err, jc.ErrorIsNil)
 

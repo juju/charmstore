@@ -87,10 +87,7 @@ func (s *Store) ListResources(entity *mongodoc.Entity, channel params.Channel) (
 				Name:     name,
 				Revision: -1,
 			}
-		} else {
-			doc = resources[name][revision]
-		}
-		if doc == nil {
+		} else if doc = resources[name][revision]; doc == nil {
 			return nil, errgo.Newf("published resource %q/%d not found", name, revision)
 		}
 		docs = append(docs, doc)
