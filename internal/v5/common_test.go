@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"time"
 
 	"github.com/juju/loggo"
@@ -225,7 +226,7 @@ func (s *commonSuite) addPublicCharm(c *gc.C, ch charm.Charm, rurl *router.Resol
 func (s *commonSuite) setPublic(c *gc.C, rurl *router.ResolvedURL) {
 	err := s.store.SetPerms(&rurl.URL, "stable.read", params.Everyone)
 	c.Assert(err, gc.IsNil)
-	err = s.store.Publish(rurl, params.StableChannel)
+	err = s.store.Publish(rurl, nil, params.StableChannel)
 	c.Assert(err, gc.IsNil)
 }
 
@@ -417,6 +418,16 @@ func (s *commonSuite) doAsUser(user string, f func()) {
 		s.discharge = old
 	}()
 	f()
+}
+
+// uploadResource uploads content to the resource with the given name associated with the
+// charm with the given id.
+func (s *commonSuite) uploadResource(c *gc.C, id *router.ResolvedURL, name string, content string) {
+	entity, err := s.store.FindEntity(id, nil)
+	c.Assert(err, gc.IsNil)
+	hash := hashOfString(content)
+	_, err = s.store.UploadResource(entity, name, strings.NewReader(content), hash, int64(len(content)))
+	c.Assert(err, gc.IsNil)
 }
 
 func bakeryDo(client *http.Client) func(*http.Request) (*http.Response, error) {

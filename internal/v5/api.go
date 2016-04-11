@@ -1402,12 +1402,10 @@ func (h *ReqHandler) servePublish(id *router.ResolvedURL, w http.ResponseWriter,
 		}
 	}
 
-	// TODO(ericsnow) Actually handle the resources.
-	if len(publish.Resources) > 0 {
-		return errNotImplemented
-	}
-
-	if err := h.Store.Publish(id, chans...); err != nil {
+	if err := h.Store.Publish(id, publish.Resources, chans...); err != nil {
+		if errgo.Cause(err) == charmstore.ErrPublishResourceMismatch {
+			return errgo.WithCausef(err, params.ErrBadRequest, "")
+		}
 		return errgo.NoteMask(err, "cannot publish charm or bundle", errgo.Is(params.ErrNotFound))
 	}
 	// TODO add publish audit
