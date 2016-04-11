@@ -199,6 +199,8 @@ func (s *Store) nextResourceRevision(baseURL *charm.URL, name string) (int, erro
 // ResolveResource finds the resource specified. If a matching resource
 // cannot be found an error with the cause params.ErrNotFound will be
 // returned.
+// If revision is negative, the most recently published revision
+// for the given channel will be returned.
 func (s *Store) ResolveResource(url *router.ResolvedURL, name string, revision int, channel params.Channel) (*mongodoc.Resource, error) {
 	if channel == params.NoChannel {
 		channel = params.StableChannel
@@ -222,7 +224,7 @@ func (s *Store) ResolveResource(url *router.ResolvedURL, name string, revision i
 			if revision >= 0 {
 				suffix = fmt.Sprintf("/%d", revision)
 			}
-			return nil, errgo.WithCausef(nil, params.ErrNotFound, "%s has no %q%s resource", url, name, suffix)
+			return nil, errgo.WithCausef(nil, params.ErrNotFound, "%s has no %q resource", url, name+suffix)
 		}
 		return nil, errgo.Mask(err)
 	}

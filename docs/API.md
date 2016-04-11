@@ -1753,14 +1753,57 @@ Request body:
 
 The above example is equivalent to the `meta/common-info` example above.
 
+#### GET *id*/meta/resources
+
+The `meta/resources` path returns information on all the resources associated with the given charm *id* as an array of resource objects.
+
+```go
+
+type Resource struct {
+	// Name identifies the resource.
+	Name string
+
+	// Type is the name of the resource type. Currently only
+	// "file" is supported, which is the default if Type is not specified.
+	Type string
+
+	// Path holds where the resource will be stored on units
+	// deployed with the charm.
+	Path string
+
+	// Description contains user-facing info about the resource.
+	Description string `json:",omitempty"`
+
+	// Revision is the revision, if applicable.
+	Revision int
+
+	// Fingerprint is the SHA-384 checksum for the resource blob.
+	Fingerprint []byte
+
+	// Size is the size of the resource, in bytes.
+	Size int64
+}
+
+[]Resource
+```
+
 ### Resources
 
-**Not yet implemented**
+#### POST *id*/resource/*name*?hash=*sha384*[&filename=*path*]
 
-#### POST *id*/resources/name.stream
 
-Posting to the resources path creates a new version of the given stream
-for the charm with the given id. The request returns the new version.
+Posting to the `resource` path uploads a resource (an arbitrary "blob"
+of data) associated with the charm with the given *id*, which must not
+be a bundle. The *sha384* parameter
+must hold the hex-encoded SHA384 hash of the blob.
+
+If provided, the *path* parameter should hold the filename
+that the resource has been read from, and its file extension will
+be verified against the extension of the filename in the
+declared charm metadata resources of the resolved charm.
+
+As a special case, if the filename in the charm metadata has no
+extension, any file name will be allowed.
 
 ```go
 type ResourcesRevision struct {
@@ -1768,23 +1811,15 @@ type ResourcesRevision struct {
 }
 ```
 
-#### GET *id*/resources/name.stream[-revision]/arch/filename
+#### GET *id*/resource/*name*[/*revision*]
 
-Getting from the `/resources` path retrieves a charm resource from the charm
-with the given id. If version is not specified, it retrieves the latest version
-of the resource. The SHA-256 hash of the data is specified in the HTTP response
-headers.
+Getting from the `/resource` path retrieves a charm resource from the charm
+with the given id. If version is not specified, it retrieves the latest published
+version of the resource (for the "unpublished" channel, this will be
+the most recently uploaded version of the resource).
 
-#### PUT *id*/resources/[~user/]series/name.stream-revision/arch?sha256=hash
-
-Putting to the `resources` path uploads a resource (an arbitrary "blob" of
-data) associated with the charm with id series/name, which must not be a
-bundle. Stream and arch specify which of the charms resource streams and which
-architecture the resource will be associated with, respectively. Revision
-specifies the revision of the stream that's being uploaded to.
-
-The hash value must specify the hash of the stream. If the same series, name,
-stream, revision combination is PUT again, it must specify the same hash.
+The SHA-384 checksum of the data is returned
+in the Content-Sha384 HTTP response header.
 
 ### Search
 

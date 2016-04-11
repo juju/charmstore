@@ -259,7 +259,7 @@ var resolveResourceTests = []struct {
 	name:             "for-install",
 	revision:         3,
 	channel:          params.UnpublishedChannel,
-	expectError:      `cs:~charmers/xenial/starsay-3 has no "for-install"/3 resource`,
+	expectError:      `cs:~charmers/xenial/starsay-3 has no "for-install/3" resource`,
 	expectErrorCause: params.ErrNotFound,
 }, {
 	about:          "no revision specified without channel",

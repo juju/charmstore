@@ -1526,6 +1526,10 @@ func hashOf(r io.Reader) (hashSum string, size int64) {
 	return fmt.Sprintf("%x", hash.Sum(nil)), n
 }
 
+func hashOfString(s string) string {
+	return hashOfBytes([]byte(s))
+}
+
 // assertCacheControl asserts that the cache control headers are
 // appropriately set. The isPublic parameter specifies
 // whether the id in the request represents a public charm or bundle.
