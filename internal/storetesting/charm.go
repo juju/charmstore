@@ -253,6 +253,10 @@ func parseRelation(s string) (charm.Relation, error) {
 // MetaWithResources returns m with Resources set to a set of resources
 // with the given names. If m is nil, new(charm.Meta) will be used
 // instead.
+//
+// The path and description of the resources are derived from
+// the resource name by adding a "-file" and a " description"
+// suffix respectively.
 func MetaWithResources(m *charm.Meta, resources ...string) *charm.Meta {
 	if m == nil {
 		m = new(charm.Meta)
@@ -262,8 +266,8 @@ func MetaWithResources(m *charm.Meta, resources ...string) *charm.Meta {
 		m.Resources[name] = resource.Meta{
 			Name:        name,
 			Type:        resource.TypeFile,
-			Path:        name,
-			Description: name,
+			Path:        name + "-file",
+			Description: name + " description",
 		}
 	}
 	return m

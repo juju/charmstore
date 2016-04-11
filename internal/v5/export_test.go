@@ -7,6 +7,7 @@ var (
 	ProcessIcon          = processIcon
 	ErrProbablyNotXML    = errProbablyNotXML
 	TestAddAuditCallback = &testAddAuditCallback
+	FromResourceDoc      = fromResourceDoc
 
 	GetNewPromulgatedRevision = (*ReqHandler).getNewPromulgatedRevision
 
