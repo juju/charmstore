@@ -17,6 +17,7 @@ import (
 	"gopkg.in/mgo.v2"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
 )
 
 type resourceSuite struct {
@@ -163,18 +164,27 @@ func (s *resourceSuite) TestListResourcesBundle(c *gc.C) {
 func (s *resourceSuite) TestListResourcesResourceNotFound(c *gc.C) {
 	store := s.newStore(c, false)
 	defer store.Close()
-	channel := params.StableChannel
-	curl := charm.MustParseURL("cs:~charmers/xenial/starsay-3")
-	entity, _ := addCharm(c, store, curl)
-	expected := uploadResources(c, store, entity)
+	rurl := MustParseResolvedURL("cs:~charmers/xenial/starsay-3")
+	ch := storetesting.NewCharm(storetesting.MetaWithResources(nil, "resource1", "resource2"))
+	err := store.AddCharmWithArchive(rurl, ch)
+	c.Assert(err, jc.ErrorIsNil)
+	entity, err := store.FindEntity(rurl, nil)
+	c.Assert(err, jc.ErrorIsNil)
+	expected := make([]*mongodoc.Resource, 2)
+	expected[0] = uploadResource(c, store, entity, "resource1")
+	expected[1] = &mongodoc.Resource{
+		BaseURL:  mongodoc.BaseURL(&rurl.URL),
+		Name:     "resource2",
+		Revision: -1,
+	}
 	sortResources(expected)
-	err := store.PublishResources(entity, channel, resourceRevisions(expected[1:]))
+
+	// A resource exists for resource1, but not resource2. Expect a
+	// placeholder to be returned for resource2.
+	docs, err := store.ListResources(entity, params.UnpublishedChannel)
 	c.Assert(err, jc.ErrorIsNil)
 
-	docs, err := store.ListResources(entity, channel)
-	c.Assert(err, jc.ErrorIsNil)
-
-	checkResourceDocs(c, docs, expected[1:])
+	checkResourceDocs(c, docs, expected)
 }
 
 func (s *resourceSuite) TestUploadResource(c *gc.C) {
@@ -432,7 +442,6 @@ func checkResourceDocs(c *gc.C, docs, expected []*mongodoc.Resource) {
 	for i, doc := range docs {
 		adjustExpectedResource(doc, expected[i])
 	}
-
 	c.Check(docs, jc.DeepEquals, expected)
 }
 

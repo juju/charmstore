@@ -79,12 +79,15 @@ func (s *Store) ListResources(entity *mongodoc.Entity, channel params.Channel) (
 	var docs []*mongodoc.Resource
 	for name := range entity.CharmMeta.Resources {
 		revision, ok := revisions[name]
+		var doc *mongodoc.Resource
 		if !ok {
-			// There is no matching resource available, perhaps this is an error?
-			continue
-		}
-		doc := resources[name][revision]
-		if doc == nil {
+			// Create a placeholder for the missing resource.
+			doc = &mongodoc.Resource{
+				BaseURL:  baseEntity.URL,
+				Name:     name,
+				Revision: -1,
+			}
+		} else if doc = resources[name][revision]; doc == nil {
 			return nil, errgo.Newf("published resource %q/%d not found", name, revision)
 		}
 		docs = append(docs, doc)
