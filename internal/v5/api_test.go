@@ -542,9 +542,9 @@ var metaEndpoints = []metaEndpoint{{
 		}
 		entity, err := store.FindEntity(url, nil)
 		if err != nil {
-			return nil, err
+			return nil, errgo.Mask(err)
 		}
-		resources, err := store.ListResources(entity, params.UnpublishedChannel)
+		resources, err := store.ListResources(url, params.UnpublishedChannel)
 		if err != nil {
 			return resources, err
 		}
@@ -565,19 +565,24 @@ var metaEndpoints = []metaEndpoint{{
 			Name:        "for-install",
 			Type:        "file",
 			Path:        "initial.tgz",
-			Revision:    -1,
+			Revision:    0,
+			Fingerprint: rawHash(hashOfString("for-install content")),
+			Size:        int64(len("for-install content")),
 			Description: "get things started",
 		}, {
 			Name:        "for-store",
 			Type:        "file",
 			Path:        "dummy.tgz",
-			Revision:    -1,
+			Revision:    0,
+			Fingerprint: rawHash(hashOfString("for-store content")),
+			Size:        int64(len("for-store content")),
 			Description: "One line that is useful when operators need to push it.",
 		}, {
 			Name:        "for-upload",
 			Type:        "file",
 			Path:        "config.xml",
-			Revision:    -1,
+			Fingerprint: rawHash(hashOfString("for-upload content")),
+			Size:        int64(len("for-upload content")),
 			Description: "Who uses xml anymore?",
 		}})
 	},

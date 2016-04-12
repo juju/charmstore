@@ -53,16 +53,20 @@ func (sorted resourcesByName) Less(i, j int) bool {
 	return r0.Revision < r1.Revision
 }
 
-// ListResources returns the set of resources for the charm. If the
-// unpublished channel is specified then set is composed of the latest
-// revision for each resource. Otherwise it holds the revisions declared
-// when the charm/channel pair was published.
-func (s *Store) ListResources(entity *mongodoc.Entity, channel params.Channel) ([]*mongodoc.Resource, error) {
+// ListResources returns the set of resources for the entity with the
+// given id. If the unpublished channel is specified then set is
+// composed of the latest revision for each resource. Otherwise it holds
+// the revisions declared when the charm/channel pair was published.
+func (s *Store) ListResources(id *router.ResolvedURL, channel params.Channel) ([]*mongodoc.Resource, error) {
 	if channel == params.NoChannel {
 		return nil, errgo.Newf("no channel specified")
 	}
-	if entity.URL.Series == "bundle" {
+	if id.URL.Series == "bundle" {
 		return nil, nil
+	}
+	entity, err := s.FindEntity(id, FieldSelector("charmmeta", "baseurl"))
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	if entity.CharmMeta == nil {
 		return nil, errgo.Newf("entity missing charm metadata")
@@ -91,7 +95,7 @@ func (s *Store) ListResources(entity *mongodoc.Entity, channel params.Channel) (
 				Revision: -1,
 			}
 		} else if doc = resources[name][revision]; doc == nil {
-			return nil, errgo.Newf("published resource %q/%d not found", name, revision)
+			return nil, errgo.Newf("published resource %q not found", fmt.Sprintf("%s/%d", name, revision))
 		}
 		docs = append(docs, doc)
 	}
@@ -132,13 +136,17 @@ func mapRevisions(resourceRevisions []mongodoc.ResourceRevision) map[string]int 
 }
 
 // UploadResource add blob to the blob store and adds a new resource with
-// the given name to the given entity. The revision of the new resource
+// the given name to the entity with the given id. The revision of the new resource
 // will be calculated to be one higher than any existing resources.
 //
 // TODO consider restricting uploads so that if the hash matches the
 // latest revision then a new revision isn't created. This would match
 // the behaviour for charms and bundles.
-func (s *Store) UploadResource(entity *mongodoc.Entity, name string, blob io.Reader, blobHash string, size int64) (*mongodoc.Resource, error) {
+func (s *Store) UploadResource(id *router.ResolvedURL, name string, blob io.Reader, blobHash string, size int64) (*mongodoc.Resource, error) {
+	entity, err := s.FindEntity(id, FieldSelector("charmmeta", "baseurl"))
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
 	if !charmHasResource(entity.CharmMeta, name) {
 		return nil, errgo.Newf("charm does not have resource %q", name)
 	}
@@ -249,7 +257,7 @@ func charmHasResource(meta *charm.Meta, name string) bool {
 func (s *Store) OpenResourceBlob(res *mongodoc.Resource) (*Blob, error) {
 	r, size, err := s.BlobStore.Open(res.BlobName)
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot open archive data for %s resource %q/%d", res.BaseURL, res.Name, res.Revision)
+		return nil, errgo.Notef(err, "cannot open archive data for %s resource %q", res.BaseURL, fmt.Sprintf("%s/%d", res.Name, res.Revision))
 	}
 	return &Blob{
 		ReadSeekCloser: r,

@@ -137,10 +137,7 @@ func (s *resourceSuite) TestListResourcesCharmWithResources(c *gc.C) {
 	}, params.StableChannel)
 	c.Assert(err, jc.ErrorIsNil)
 
-	entity, err := store.FindEntity(id, nil)
-	c.Assert(err, gc.IsNil)
-
-	docs, err := store.ListResources(entity, params.StableChannel)
+	docs, err := store.ListResources(id, params.StableChannel)
 	c.Assert(err, jc.ErrorIsNil)
 
 	checkResourceDocs(c, store, id, []string{"resource1/0", "resource2/0"}, docs)
@@ -149,10 +146,12 @@ func (s *resourceSuite) TestListResourcesCharmWithResources(c *gc.C) {
 func (s *resourceSuite) TestListResourcesCharmWithoutResources(c *gc.C) {
 	store := s.newStore(c, false)
 	defer store.Close()
-	curl := charm.MustParseURL("cs:~charmers/precise/wordpress-23")
-	entity, _ := addCharm(c, store, curl)
 
-	resources, err := store.ListResources(entity, params.StableChannel)
+	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
+	err := store.AddCharmWithArchive(id, storetesting.NewCharm(nil))
+	c.Assert(err, jc.ErrorIsNil)
+
+	resources, err := store.ListResources(id, params.StableChannel)
 	c.Assert(err, jc.ErrorIsNil)
 
 	c.Check(resources, gc.HasLen, 0)
@@ -161,10 +160,12 @@ func (s *resourceSuite) TestListResourcesCharmWithoutResources(c *gc.C) {
 func (s *resourceSuite) TestListResourcesWithNoChannel(c *gc.C) {
 	store := s.newStore(c, false)
 	defer store.Close()
-	curl := charm.MustParseURL("cs:~charmers/precise/wordpress-23")
-	entity, _ := addCharm(c, store, curl)
 
-	resources, err := store.ListResources(entity, "")
+	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
+	err := store.AddCharmWithArchive(id, storetesting.NewCharm(nil))
+	c.Assert(err, jc.ErrorIsNil)
+
+	resources, err := store.ListResources(id, "")
 	c.Assert(err, gc.ErrorMatches, "no channel specified")
 	c.Assert(resources, gc.IsNil)
 }
@@ -172,10 +173,20 @@ func (s *resourceSuite) TestListResourcesWithNoChannel(c *gc.C) {
 func (s *resourceSuite) TestListResourcesBundle(c *gc.C) {
 	store := s.newStore(c, false)
 	defer store.Close()
-	curl := charm.MustParseURL("cs:~charmers/bundle/wordpress-simple-0")
-	entity := addBundle(c, store, curl)
 
-	resources, err := store.ListResources(entity, params.StableChannel)
+	id := MustParseResolvedURL("cs:~charmers/bundle/wordpress-simple-0")
+	b := storetesting.NewBundle(&charm.BundleData{
+		Services: map[string]*charm.ServiceSpec{
+			"wordpress": {
+				Charm: "cs:utopic/wordpress-0",
+			},
+		},
+	})
+	s.addRequiredCharms(c, b)
+	err := store.AddBundleWithArchive(id, b)
+	c.Assert(err, gc.IsNil)
+
+	resources, err := store.ListResources(id, params.StableChannel)
 	c.Assert(err, gc.IsNil)
 	c.Assert(resources, gc.HasLen, 0)
 }
@@ -187,13 +198,11 @@ func (s *resourceSuite) TestListResourcesResourceNotFound(c *gc.C) {
 	ch := storetesting.NewCharm(storetesting.MetaWithResources(nil, "resource1", "resource2"))
 	err := store.AddCharmWithArchive(id, ch)
 	c.Assert(err, jc.ErrorIsNil)
-	entity, err := store.FindEntity(id, nil)
-	c.Assert(err, jc.ErrorIsNil)
 	uploadResource(c, store, id, "resource1", "something")
 
 	// A resource exists for resource1, but not resource2. Expect a
 	// placeholder to be returned for resource2.
-	docs, err := store.ListResources(entity, params.UnpublishedChannel)
+	docs, err := store.ListResources(id, params.UnpublishedChannel)
 	c.Assert(err, jc.ErrorIsNil)
 
 	checkResourceDocs(c, store, id, []string{"resource1/0", "resource2/-1"}, docs)
@@ -208,12 +217,9 @@ func (s *resourceSuite) TestUploadResource(c *gc.C) {
 	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
 	c.Assert(err, jc.ErrorIsNil)
 
-	entity, err := store.FindEntity(id, nil)
-	c.Assert(err, jc.ErrorIsNil)
-
 	now := time.Now()
 	blob := "content 1"
-	res, err := store.UploadResource(entity, "someResource", strings.NewReader(blob), hashOfString(blob), int64(len(blob)))
+	res, err := store.UploadResource(id, "someResource", strings.NewReader(blob), hashOfString(blob), int64(len(blob)))
 	c.Assert(err, jc.ErrorIsNil)
 	if res.UploadTime.Before(now) {
 		c.Fatalf("upload time earlier than expected; want > %v; got %v", now, res.UploadTime)
@@ -221,7 +227,7 @@ func (s *resourceSuite) TestUploadResource(c *gc.C) {
 	checkResourceDocs(c, store, id, []string{"someResource/0"}, []*mongodoc.Resource{res})
 
 	blob = "content 2"
-	res, err = store.UploadResource(entity, "someResource", strings.NewReader(blob), hashOfString(blob), int64(len(blob)))
+	res, err = store.UploadResource(id, "someResource", strings.NewReader(blob), hashOfString(blob), int64(len(blob)))
 	c.Assert(err, jc.ErrorIsNil)
 	checkResourceDocs(c, store, id, []string{"someResource/1"}, []*mongodoc.Resource{res})
 }
@@ -260,9 +266,7 @@ func (s *resourceSuite) TestUploadResourceErrors(c *gc.C) {
 
 	for i, test := range uploadResourceErrorTests {
 		c.Logf("%d. %s", i, test.about)
-		entity, err := store.FindEntity(id, nil)
-		c.Assert(err, gc.IsNil)
-		_, err = store.UploadResource(entity, test.name, strings.NewReader(test.blob), test.hash, test.size)
+		_, err = store.UploadResource(id, test.name, strings.NewReader(test.blob), test.hash, test.size)
 		c.Assert(err, gc.ErrorMatches, test.expectError)
 	}
 }
@@ -342,13 +346,10 @@ func (s *resourceSuite) TestResolveResource(c *gc.C) {
 	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
 	c.Assert(err, jc.ErrorIsNil)
 
-	entity, err := store.FindEntity(id, nil)
-	c.Assert(err, gc.IsNil)
-
 	// Upload three version of the resource.
 	for i := 0; i < 3; i++ {
 		content := fmt.Sprintf("content%d", i)
-		_, err := store.UploadResource(entity, "someResource", strings.NewReader(content), hashOfString(content), int64(len(content)))
+		_, err := store.UploadResource(id, "someResource", strings.NewReader(content), hashOfString(content), int64(len(content)))
 		c.Assert(err, gc.IsNil)
 	}
 	// Publish the charm to different channels with the different resources.
@@ -364,7 +365,7 @@ func (s *resourceSuite) TestResolveResource(c *gc.C) {
 
 	for i, test := range resolveResourceTests {
 		c.Logf("%d. %s", i, test.about)
-		res, err := store.ResolveResource(EntityResolvedURL(entity), test.name, test.revision, test.channel)
+		res, err := store.ResolveResource(id, test.name, test.revision, test.channel)
 		if test.expectError != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectError)
 			c.Assert(errgo.Cause(err), gc.Equals, test.expectErrorCause)
@@ -387,6 +388,7 @@ func (s *resourceSuite) TestPublishWithResourceNotInMetadata(c *gc.C) {
 		"resource1": 0,
 	}, params.StableChannel)
 	c.Assert(err, gc.ErrorMatches, `charm published with incorrect resources: charm does not have resource "resource1"`)
+	c.Assert(errgo.Cause(err), gc.Equals, ErrPublishResourceMismatch)
 }
 
 func (s *resourceSuite) TestPublishWithResourceNotFound(c *gc.C) {
@@ -401,30 +403,57 @@ func (s *resourceSuite) TestPublishWithResourceNotFound(c *gc.C) {
 	err = store.Publish(id, map[string]int{
 		"resource1": 0,
 	}, params.StableChannel)
-	c.Assert(err, gc.ErrorMatches, `charm published with incorrect resources: cs:~charmers/precise/wordpress-3 resource "resource1/0"not found`)
+	c.Assert(err, gc.ErrorMatches, `charm published with incorrect resources: cs:~charmers/precise/wordpress-3 resource "resource1/0" not found`)
+	c.Assert(errgo.Cause(err), gc.Equals, ErrPublishResourceMismatch)
+}
+
+func (s *resourceSuite) TestPublishWithoutAllRequiredResources(c *gc.C) {
+	store := s.newStore(c, false)
+	defer store.Close()
+
+	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
+	meta := storetesting.MetaWithResources(nil, "resource1", "resource2", "resource3")
+	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
+	c.Assert(err, jc.ErrorIsNil)
+
+	uploadResource(c, store, id, "resource2", "content")
+
+	err = store.Publish(id, map[string]int{
+		"resource2": 0,
+	}, params.StableChannel)
+	c.Assert(err, gc.ErrorMatches, `charm published with incorrect resources: resources are missing from publish request: resource1, resource3`)
+	c.Assert(errgo.Cause(err), gc.Equals, ErrPublishResourceMismatch)
 }
 
 func (s *resourceSuite) TestOpenResourceBlob(c *gc.C) {
 	store := s.newStore(c, false)
 	defer store.Close()
-	curl := charm.MustParseURL("cs:~charmers/xenial/starsay-3")
-	entity, _ := addCharm(c, store, curl)
-	res, err := store.UploadResource(entity, "for-install", strings.NewReader(fakeContent), fakeBlobHash, fakeBlobSize)
-	c.Assert(err, jc.ErrorIsNil)
+
+	meta := storetesting.MetaWithResources(nil, "someResource")
+	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
+	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
+	c.Assert(err, gc.IsNil)
+
+	content := "some content"
+	uploadResource(c, store, id, "someResource", content)
+
+	res, err := store.ResolveResource(id, "someResource", -1, params.UnpublishedChannel)
+	c.Assert(err, gc.IsNil)
+
 	blob, err := store.OpenResourceBlob(res)
 	c.Assert(err, jc.ErrorIsNil)
 	defer blob.Close()
-	c.Assert(blob.Size, gc.Equals, fakeBlobSize)
-	c.Assert(blob.Hash, gc.Equals, fakeBlobHash)
+	c.Assert(blob.Size, gc.Equals, int64(len(content)))
+	c.Assert(blob.Hash, gc.Equals, hashOfString(content))
 	data, err := ioutil.ReadAll(blob)
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(string(data), gc.Equals, fakeContent)
+	c.Assert(string(data), gc.Equals, content)
 
-	// Change the blob name so that it's invalid
-	// so that we can check what happens then.
+	// Change the blob name so that it's invalid so that we can
+	// check what happens then.
 	res.BlobName = res.BlobName[1:]
 	_, err = store.OpenResourceBlob(res)
-	c.Assert(err, gc.ErrorMatches, `cannot open archive data for cs:~charmers/starsay resource "for-install"/0: .*`)
+	c.Assert(err, gc.ErrorMatches, `cannot open archive data for cs:~charmers/wordpress resource "someResource/0": resource at path ".*" not found`)
 }
 
 // uploadResources uploads all the resources required by the given entity,
@@ -438,15 +467,13 @@ func uploadResources(c *gc.C, store *Store, id *router.ResolvedURL, contentSuffi
 		content := name + contentSuffix
 		hash := hashOfString(content)
 		r := strings.NewReader(content)
-		_, err := store.UploadResource(entity, name, r, hash, int64(len(content)))
+		_, err := store.UploadResource(id, name, r, hash, int64(len(content)))
 		c.Assert(err, jc.ErrorIsNil)
 	}
 }
 
 func uploadResource(c *gc.C, store *Store, id *router.ResolvedURL, name string, blob string) {
-	entity, err := store.FindEntity(id, nil)
-	c.Assert(err, gc.IsNil)
-	_, err = store.UploadResource(entity, name, strings.NewReader(blob), hashOfString(blob), int64(len(blob)))
+	_, err := store.UploadResource(id, name, strings.NewReader(blob), hashOfString(blob), int64(len(blob)))
 	c.Assert(err, gc.IsNil)
 }
 

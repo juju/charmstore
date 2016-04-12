@@ -104,7 +104,7 @@ func (h *ReqHandler) serveUploadResource(id *router.ResolvedURL, w http.Response
 			}
 		}
 	}
-	rdoc, err := h.Store.UploadResource(e, name, req.Body, hash, req.ContentLength)
+	rdoc, err := h.Store.UploadResource(id, name, req.Body, hash, req.ContentLength)
 	if err != nil {
 		return errgo.Mask(err)
 	}
@@ -146,7 +146,7 @@ func (h *ReqHandler) metaResources(entity *mongodoc.Entity, id *router.ResolvedU
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	resources, err := h.Store.ListResources(entity, ch)
+	resources, err := h.Store.ListResources(id, ch)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}

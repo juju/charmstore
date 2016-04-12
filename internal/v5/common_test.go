@@ -216,18 +216,43 @@ func (s *commonSuite) addPublicCharmFromRepo(c *gc.C, charmName string, rurl *ro
 	return s.addPublicCharm(c, storetesting.Charms.CharmDir(charmName), rurl)
 }
 
-func (s *commonSuite) addPublicCharm(c *gc.C, ch charm.Charm, rurl *router.ResolvedURL) (*router.ResolvedURL, charm.Charm) {
-	err := s.store.AddCharmWithArchive(rurl, ch)
+// addPublicCharm adds the given charm to the store and makes it public
+// by publishing it to the stable channel.
+// It also adds any required resources that haven't already been uploaded
+// with the content "<resourcename> content".
+func (s *commonSuite) addPublicCharm(c *gc.C, ch charm.Charm, id *router.ResolvedURL) (*router.ResolvedURL, charm.Charm) {
+	err := s.store.AddCharmWithArchive(id, ch)
 	c.Assert(err, gc.IsNil)
-	s.setPublic(c, rurl)
-	return rurl, ch
+
+	var resources map[string]int
+	if len(ch.Meta().Resources) > 0 {
+		resources = make(map[string]int)
+		// The charm has resources. Ensure that all the required resources are uploaded,
+		// then publish with them.
+		resDocs, err := s.store.ListResources(id, params.UnpublishedChannel)
+		c.Assert(err, gc.IsNil)
+		for _, doc := range resDocs {
+			if doc.Revision == -1 {
+				// The resource doesn't exist so upload one.
+				s.uploadResource(c, id, doc.Name, doc.Name+" content")
+				doc.Revision = 0
+			}
+			resources[doc.Name] = doc.Revision
+		}
+	}
+	s.setPublicWithResources(c, id, resources)
+	return id, ch
+}
+
+func (s *commonSuite) setPublicWithResources(c *gc.C, rurl *router.ResolvedURL, resources map[string]int) {
+	err := s.store.SetPerms(&rurl.URL, "stable.read", params.Everyone)
+	c.Assert(err, gc.IsNil)
+	err = s.store.Publish(rurl, resources, params.StableChannel)
+	c.Assert(err, gc.IsNil)
 }
 
 func (s *commonSuite) setPublic(c *gc.C, rurl *router.ResolvedURL) {
-	err := s.store.SetPerms(&rurl.URL, "stable.read", params.Everyone)
-	c.Assert(err, gc.IsNil)
-	err = s.store.Publish(rurl, nil, params.StableChannel)
-	c.Assert(err, gc.IsNil)
+	s.setPublicWithResources(c, rurl, nil)
 }
 
 func (s *commonSuite) addPublicBundleFromRepo(c *gc.C, bundleName string, rurl *router.ResolvedURL, addRequiredCharms bool) (*router.ResolvedURL, charm.Bundle) {
@@ -423,10 +448,8 @@ func (s *commonSuite) doAsUser(user string, f func()) {
 // uploadResource uploads content to the resource with the given name associated with the
 // charm with the given id.
 func (s *commonSuite) uploadResource(c *gc.C, id *router.ResolvedURL, name string, content string) {
-	entity, err := s.store.FindEntity(id, nil)
-	c.Assert(err, gc.IsNil)
 	hash := hashOfString(content)
-	_, err = s.store.UploadResource(entity, name, strings.NewReader(content), hash, int64(len(content)))
+	_, err := s.store.UploadResource(id, name, strings.NewReader(content), hash, int64(len(content)))
 	c.Assert(err, gc.IsNil)
 }
 

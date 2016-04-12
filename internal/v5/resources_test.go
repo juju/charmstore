@@ -52,13 +52,15 @@ func (s *ResourceSuite) TestPost(c *gc.C) {
 		URL:          storeURL(fmt.Sprintf("%s/resource/someResource?hash=%s&filename=foo.zip", id.URL.Path(), hash)),
 		ExpectStatus: http.StatusOK,
 		ExpectBody: params.ResourceUploadResponse{
-			Revision: 0,
+			// Note: revision 1 because addPublicCharm has already uploaded
+			// revision 0.
+			Revision: 1,
 		},
 		Do: s.bakeryDoAsUser(c, "charmers"),
 	})
 
 	// Check that the resource has really been uploaded.
-	r, err := s.store.ResolveResource(id, "someResource", 0, "")
+	r, err := s.store.ResolveResource(id, "someResource", 1, "")
 	c.Assert(err, gc.IsNil)
 
 	blob, err := s.store.OpenResourceBlob(r)
@@ -71,15 +73,23 @@ func (s *ResourceSuite) TestPost(c *gc.C) {
 
 func (s *ResourceSuite) TestGet(c *gc.C) {
 	id := newResolvedURL("~charmers/precise/wordpress-0", -1)
-	s.addPublicCharm(c, storetesting.NewCharm(&charm.Meta{
-		Resources: map[string]resource.Meta{
-			"someResource": {
-				Name: "someResource",
-				Type: resource.TypeFile,
-				Path: "1.zip",
-			},
+	meta := storetesting.MetaWithResources(nil, "someResource")
+	s.store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
+
+	// Get with no revision should get a "not found" error because there are
+	// no resources associated with the published charm.
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:      s.srv,
+		Method:       "GET",
+		URL:          storeURL(id.URL.Path() + "/resource/someResource"),
+		ExpectStatus: http.StatusNotFound,
+		ExpectBody: params.Error{
+			Code:    params.ErrNotFound,
+			Message: `cs:~charmers/precise/wordpress-0 has no "someResource" resource`,
 		},
-	}), id)
+		Do: s.bakeryDoAsUser(c, "charmers"),
+	})
+
 	content := "some content"
 	s.uploadResource(c, id, "someResource", content+"0")
 	s.uploadResource(c, id, "someResource", content+"1")
@@ -90,29 +100,20 @@ func (s *ResourceSuite) TestGet(c *gc.C) {
 		Handler: s.srv,
 		Method:  "GET",
 		URL:     storeURL(id.URL.Path() + "/resource/someResource/1"),
+		Do:      s.bakeryDoAsUser(c, "charmers"),
 	})
 	c.Assert(resp.Body.String(), gc.Equals, content+"1")
 	c.Assert(resp.Header().Get(params.ContentHashHeader), gc.Equals, hashOfString(content+"1"))
 	c.Assert(resp.Code, gc.Equals, http.StatusOK)
-	assertCacheControl(c, resp.Header(), true)
-
-	// Get with no revision should get a "not found" error because there are
-	// no published resources associated with the published charm.
-	// TODO this shouldn't happen because it shouldn't be possible
-	// to make the charm public without first uploading its resources.
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler:      s.srv,
-		Method:       "GET",
-		URL:          storeURL(id.URL.Path() + "/resource/someResource"),
-		ExpectStatus: http.StatusNotFound,
-		ExpectBody: params.Error{
-			Code:    params.ErrNotFound,
-			Message: `cs:~charmers/precise/wordpress-0 has no "someResource" resource on stable channel`,
-		},
-	})
+	assertCacheControl(c, resp.Header(), false)
 
 	// If we publish the resource, it should be available with no revision.
 	err := s.store.Publish(id, map[string]int{"someResource": 2}, params.StableChannel)
+	c.Assert(err, gc.IsNil)
+
+	// Make it public so that we can check that the cache-control
+	// headers change appropriately.
+	err = s.store.SetPerms(&id.URL, "stable.read", params.Everyone)
 	c.Assert(err, gc.IsNil)
 
 	resp = httptesting.DoRequest(c, httptesting.DoRequestParams{
@@ -123,6 +124,7 @@ func (s *ResourceSuite) TestGet(c *gc.C) {
 	c.Assert(resp.Body.String(), gc.Equals, content+"2")
 	c.Assert(resp.Header().Get(params.ContentHashHeader), gc.Equals, hashOfString(content+"2"))
 	c.Assert(resp.Code, gc.Equals, http.StatusOK)
+	assertCacheControl(c, resp.Header(), true)
 }
 
 func (s *ResourceSuite) TestInvalidMethod(c *gc.C) {
@@ -299,7 +301,9 @@ func (s *ResourceSuite) TestUploadResourcePathWithNoExtension(c *gc.C) {
 		URL:     storeURL(id.URL.Path() + "/resource/someResource?hash=" + hash + "&filename=foo.zip"),
 		Body:    strings.NewReader(content),
 		ExpectBody: params.ResourceUploadResponse{
-			Revision: 0,
+			// Note: revision 1 because addPublicCharm has already uploaded
+			// revision 0.
+			Revision: 1,
 		},
 		Do: s.bakeryDoAsUser(c, "charmers"),
 	})
