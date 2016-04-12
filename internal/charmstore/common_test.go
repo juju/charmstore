@@ -84,7 +84,7 @@ func addRequiredCharms(c *gc.C, store *Store, bundle charm.Bundle) {
 		}
 		err := store.AddCharmWithArchive(&rurl, ch)
 		c.Assert(err, gc.IsNil)
-		err = store.Publish(&rurl, params.StableChannel)
+		err = store.Publish(&rurl, nil, params.StableChannel)
 		c.Assert(err, gc.IsNil)
 	}
 }

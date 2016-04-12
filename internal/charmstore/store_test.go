@@ -933,13 +933,13 @@ func (s *StoreSuite) TestOpenBlob(c *gc.C) {
 	f, err := os.Open(charmArchive.Path)
 	c.Assert(err, gc.IsNil)
 	defer f.Close()
-	expectHash := hashOfReader(c, f)
+	expectHash := hashOfReader(f)
 
 	blob, err := store.OpenBlob(url)
 	c.Assert(err, gc.IsNil)
 	defer blob.Close()
 
-	c.Assert(hashOfReader(c, blob), gc.Equals, expectHash)
+	c.Assert(hashOfReader(blob), gc.Equals, expectHash)
 	c.Assert(blob.Hash, gc.Equals, expectHash)
 
 	info, err := f.Stat()
@@ -1265,11 +1265,17 @@ func (s *StoreSuite) TestOpenCachedBlobFileWithNotFoundContent(c *gc.C) {
 	c.Assert(r, gc.Equals, nil)
 }
 
-func hashOfReader(c *gc.C, r io.Reader) string {
+func hashOfReader(r io.Reader) string {
 	hash := sha512.New384()
 	_, err := io.Copy(hash, r)
-	c.Assert(err, gc.IsNil)
+	if err != nil {
+		panic(err)
+	}
 	return fmt.Sprintf("%x", hash.Sum(nil))
+}
+
+func hashOfString(s string) string {
+	return hashOfReader(strings.NewReader(s))
 }
 
 func getSizeAndHashes(c interface{}) (int64, string, string) {
@@ -1314,9 +1320,11 @@ func (b *testingBundle) ReadMe() string {
 	return ""
 }
 
+const fakeContent = "fake content"
+
 // Define fake blob attributes to be used in tests.
 var fakeBlobSize, fakeBlobHash = func() (int64, string) {
-	b := []byte("fake content")
+	b := []byte(fakeContent)
 	h := blobstore.NewHash()
 	h.Write(b)
 	return int64(len(b)), fmt.Sprintf("%x", h.Sum(nil))
@@ -2512,11 +2520,11 @@ func (s *StoreSuite) TestFindBestEntity(c *gc.C) {
 		err = store.SetPromulgated(ch.id, ch.id.PromulgatedRevision != -1)
 		c.Assert(err, gc.IsNil)
 		if ch.development {
-			err := store.Publish(ch.id, params.DevelopmentChannel)
+			err := store.Publish(ch.id, nil, params.DevelopmentChannel)
 			c.Assert(err, gc.IsNil)
 		}
 		if ch.stable {
-			err := store.Publish(ch.id, params.StableChannel)
+			err := store.Publish(ch.id, nil, params.StableChannel)
 			c.Assert(err, gc.IsNil)
 		}
 	}
@@ -2527,11 +2535,11 @@ func (s *StoreSuite) TestFindBestEntity(c *gc.C) {
 		err = store.SetPromulgated(b.id, b.id.PromulgatedRevision != -1)
 		c.Assert(err, gc.IsNil)
 		if b.development {
-			err := store.Publish(b.id, params.DevelopmentChannel)
+			err := store.Publish(b.id, nil, params.DevelopmentChannel)
 			c.Assert(err, gc.IsNil)
 		}
 		if b.stable {
-			err := store.Publish(b.id, params.StableChannel)
+			err := store.Publish(b.id, nil, params.StableChannel)
 			c.Assert(err, gc.IsNil)
 		}
 	}
@@ -3221,19 +3229,19 @@ func (s *StoreSuite) TestBundleCharms(c *gc.C) {
 	rurl := router.MustNewResolvedURL("cs:~charmers/saucy/mysql-0", 0)
 	err := store.AddCharmWithArchive(rurl, mysql)
 	c.Assert(err, gc.IsNil)
-	err = store.Publish(rurl, params.StableChannel)
+	err = store.Publish(rurl, nil, params.StableChannel)
 	c.Assert(err, gc.IsNil)
 	riak := storetesting.Charms.CharmArchive(c.MkDir(), "riak")
 	rurl = router.MustNewResolvedURL("cs:~charmers/trusty/riak-42", 42)
 	err = store.AddCharmWithArchive(rurl, riak)
 	c.Assert(err, gc.IsNil)
-	err = store.Publish(rurl, params.StableChannel)
+	err = store.Publish(rurl, nil, params.StableChannel)
 	c.Assert(err, gc.IsNil)
 	wordpress := storetesting.Charms.CharmArchive(c.MkDir(), "wordpress")
 	rurl = router.MustNewResolvedURL("cs:~charmers/utopic/wordpress-47", 47)
 	err = store.AddCharmWithArchive(rurl, wordpress)
 	c.Assert(err, gc.IsNil)
-	err = store.Publish(rurl, params.StableChannel)
+	err = store.Publish(rurl, nil, params.StableChannel)
 	c.Assert(err, gc.IsNil)
 
 	tests := []struct {
@@ -3744,7 +3752,7 @@ var publishTests = []struct {
 	initialBaseEntity: &mongodoc.BaseEntity{
 		URL: charm.MustParseURL("~who/django"),
 	},
-	expectedErr: `cannot update "cs:~who/trusty/no-such-42": not found`,
+	expectedErr: `entity not found`,
 }, {
 	about:    "no valid channels provided",
 	url:      MustParseResolvedURL("~who/trusty/django-42"),
@@ -3755,7 +3763,7 @@ var publishTests = []struct {
 	initialBaseEntity: &mongodoc.BaseEntity{
 		URL: charm.MustParseURL("~who/django"),
 	},
-	expectedErr: `cannot update "cs:~who/trusty/django-42": no channels provided`,
+	expectedErr: `cannot update "cs:~who/trusty/django-42": no valid channels provided`,
 }}
 
 func (s *StoreSuite) TestPublish(c *gc.C) {
@@ -3778,7 +3786,7 @@ func (s *StoreSuite) TestPublish(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 
 		// Publish the entity.
-		err = store.Publish(test.url, test.channels...)
+		err = store.Publish(test.url, nil, test.channels...)
 		if test.expectedErr != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectedErr)
 			continue
@@ -3807,7 +3815,7 @@ func (s *StoreSuite) TestPublishWithFailedESInsert(c *gc.C) {
 	url := router.MustNewResolvedURL("~charmers/precise/wordpress-12", -1)
 	err := store.AddCharmWithArchive(url, storetesting.Charms.CharmDir("wordpress"))
 	c.Assert(err, gc.IsNil)
-	err = store.Publish(url, params.StableChannel)
+	err = store.Publish(url, nil, params.StableChannel)
 	c.Assert(err, gc.ErrorMatches, "cannot index cs:~charmers/precise/wordpress-12 to ElasticSearch: .*")
 }
 

@@ -834,7 +834,7 @@ func (s *APISuite) TestMetaPublished(c *gc.C) {
 		err := s.store.AddEntityWithArchive(id, test.entity)
 		c.Assert(err, gc.IsNil)
 		if len(test.channels) > 0 {
-			err = s.store.Publish(id, test.channels...)
+			err = s.store.Publish(id, nil, test.channels...)
 			c.Assert(err, gc.IsNil)
 		}
 		err = s.store.SetPerms(&id.URL, "unpublished.read", params.Everyone)
@@ -1000,7 +1000,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 
 	// Publish one of the revisions to development, then PUT to meta/perm
 	// and check that the development ACLs have changed.
-	err := s.store.Publish(newResolvedURL("~charmers/precise/wordpress-23", 23), params.DevelopmentChannel)
+	err := s.store.Publish(newResolvedURL("~charmers/precise/wordpress-23", 23), nil, params.DevelopmentChannel)
 	c.Assert(err, gc.IsNil)
 
 	s.doAsUser("bob", func() {
@@ -1052,7 +1052,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 	})
 	// Publish wordpress-1 to stable and check that the stable ACLs
 	// have changed.
-	err = s.store.Publish(newResolvedURL("~charmers/trusty/wordpress-1", 1), params.StableChannel)
+	err = s.store.Publish(newResolvedURL("~charmers/trusty/wordpress-1", 1), nil, params.StableChannel)
 	c.Assert(err, gc.IsNil)
 
 	// The stable permissions only allow charmers currently, so act as
@@ -2107,7 +2107,7 @@ func (s *APISuite) TestServeExpandId(c *gc.C) {
 	s.addPublicCharmFromRepo(c, "wordpress", newResolvedURL("cs:~charmers/trusty/wordpress-47", 47))
 	err := s.store.AddCharmWithArchive(newResolvedURL("cs:~charmers/trusty/wordpress-48", 48), storetesting.NewCharm(nil))
 	c.Assert(err, gc.IsNil)
-	err = s.store.Publish(newResolvedURL("cs:~charmers/trusty/wordpress-48", 48), params.DevelopmentChannel)
+	err = s.store.Publish(newResolvedURL("cs:~charmers/trusty/wordpress-48", 48), nil, params.DevelopmentChannel)
 	c.Assert(err, gc.IsNil)
 	s.addPublicCharmFromRepo(c, "multi-series", newResolvedURL("cs:~charmers/wordpress-5", 49))
 
@@ -2935,6 +2935,21 @@ var publishErrorsTests = []struct {
 		Message: `cannot publish to "unpublished"`,
 		Code:    params.ErrBadRequest,
 	},
+}, {
+	about:  "unknown resource provided",
+	method: "PUT",
+	id:     "~who/trusty/wordpress-0",
+	body: mustMarshalJSON(params.PublishRequest{
+		Resources: map[string]int{
+			"unknown": 5,
+		},
+		Channels: []params.Channel{params.StableChannel},
+	}),
+	expectStatus: http.StatusBadRequest,
+	expectBody: params.Error{
+		Message: `bad request: charm published with incorrect resources: charm does not have resource "unknown"`,
+		Code:    params.ErrBadRequest,
+	},
 }}
 
 func (s *APISuite) TestPublishErrors(c *gc.C) {
@@ -3118,13 +3133,16 @@ func (s *APISuite) TestPublishSuccess(c *gc.C) {
 	// Publish an entity to all channels (don't use publish endpoint
 	// 'cos that's what we're trying to test).
 	id0 := newResolvedURL("cs:~bob/precise/wordpress-0", -1)
-	err := s.store.AddCharmWithArchive(id0, storetesting.NewCharm(nil))
+	meta := storetesting.MetaWithResources(nil, "someResource")
+	err := s.store.AddCharmWithArchive(id0, storetesting.NewCharm(meta))
 	c.Assert(err, gc.IsNil)
-	err = s.store.Publish(id0, params.DevelopmentChannel, params.StableChannel)
+	s.uploadResource(c, id0, "someResource", "stuff 0")
+	s.uploadResource(c, id0, "someResource", "stuff 1")
+	err = s.store.Publish(id0, map[string]int{"someResource": 0}, params.DevelopmentChannel, params.StableChannel)
 	c.Assert(err, gc.IsNil)
 
 	// Add an unpublished entity.
-	err = s.store.AddCharmWithArchive(newResolvedURL("cs:~bob/precise/wordpress-1", -1), storetesting.NewCharm(nil))
+	err = s.store.AddCharmWithArchive(newResolvedURL("cs:~bob/precise/wordpress-1", -1), storetesting.NewCharm(meta))
 	c.Assert(err, gc.IsNil)
 
 	// Publish it to the development channel.
@@ -3134,6 +3152,9 @@ func (s *APISuite) TestPublishSuccess(c *gc.C) {
 		URL:     storeURL("~bob/precise/wordpress-1/publish"),
 		Do:      bakeryDo(nil),
 		JSONBody: params.PublishRequest{
+			Resources: map[string]int{
+				"someResource": 1,
+			},
 			Channels: []params.Channel{params.DevelopmentChannel},
 		},
 	})
@@ -3145,7 +3166,7 @@ func (s *APISuite) TestPublishSuccess(c *gc.C) {
 		}
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 			Handler: s.srv,
-			URL:     storeURL(fmt.Sprintf("~bob/precise/wordpress/meta/id-revision" + chanParam)),
+			URL:     storeURL("~bob/precise/wordpress/meta/id-revision" + chanParam),
 			Do:      bakeryDo(nil),
 			ExpectBody: params.IdRevisionResponse{
 				Revision: rev,
@@ -3156,6 +3177,22 @@ func (s *APISuite) TestPublishSuccess(c *gc.C) {
 	assertResolvesTo(params.DevelopmentChannel, 1)
 	assertResolvesTo(params.StableChannel, 0)
 	assertResolvesTo(params.NoChannel, 0)
+
+	// Check that the associated resource has actually been published.
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		URL:     storeURL("~bob/precise/wordpress/meta/resources?channel=development"),
+		Do:      bakeryDo(nil),
+		ExpectBody: []params.Resource{{
+			Name:        "someResource",
+			Type:        "file",
+			Path:        "someResource-file",
+			Description: "someResource description",
+			Revision:    1,
+			Fingerprint: rawHash(hashOfString("stuff 1")),
+			Size:        int64(len("stuff 1")),
+		}},
+	})
 }
 
 // publishCharmsAtKnownTimes populates the store with
@@ -3300,7 +3337,7 @@ func (s *APISuite) TestURLChannelResolving(c *gc.C) {
 		err := s.store.AddCharmWithArchive(add.id, storetesting.NewCharm(nil))
 		c.Assert(err, gc.IsNil)
 		if add.channel != params.UnpublishedChannel {
-			err = s.store.Publish(add.id, add.channel)
+			err = s.store.Publish(add.id, nil, add.channel)
 			c.Assert(err, gc.IsNil)
 		}
 	}

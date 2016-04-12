@@ -742,53 +742,68 @@ func (s *Store) UpdateBaseEntity(url *router.ResolvedURL, update bson.D) error {
 	return nil
 }
 
+var ErrPublishResourceMismatch = errgo.Newf("charm published with incorrect resources")
+
 // Publish assigns channels to the entity corresponding to the given URL.
 // An error is returned if no channels are provided. For the time being,
 // the only supported channels are "development" and "stable".
-func (s *Store) Publish(url *router.ResolvedURL, channels ...params.Channel) error {
+//
+// If the given resources do not match those expected or they're not
+// found, an error with a ErrPublichResourceMismatch cause will be returned.
+func (s *Store) Publish(url *router.ResolvedURL, resources map[string]int, channels ...params.Channel) error {
 	var updateSearch bool
-	// Validate channels.
-	actual := make([]params.Channel, 0, len(channels))
+	// Throw away any channels that we don't like.
+	actualChannels := make([]params.Channel, 0, len(channels))
 	for _, c := range channels {
 		switch c {
 		case params.StableChannel:
 			updateSearch = true
 			fallthrough
 		case params.DevelopmentChannel:
-			actual = append(actual, c)
+			actualChannels = append(actualChannels, c)
 		}
 	}
-	numChannels := len(actual)
-	if numChannels == 0 {
-		return errgo.Newf("cannot update %q: no channels provided", url)
+	channels = actualChannels
+	if len(channels) == 0 {
+		return errgo.Newf("cannot update %q: no valid channels provided", url)
+	}
+	entity, err := s.FindEntity(url, FieldSelector("series", "supportedseries", "charmmeta", "baseurl"))
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	resourceDocs := make([]mongodoc.ResourceRevision, 0, len(resources))
+	if err = s.checkPublishedResources(entity, resources); err != nil {
+		return errgo.WithCausef(err, ErrPublishResourceMismatch, "")
+	}
+	for name, rev := range resources {
+		resourceDocs = append(resourceDocs, mongodoc.ResourceRevision{
+			Name:     name,
+			Revision: rev,
+		})
 	}
 
-	// Update the entity.
-	update := make(bson.D, numChannels)
-	for i, c := range actual {
-		update[i] = bson.DocElem{string(c), true}
+	series := entity.SupportedSeries
+	if len(series) == 0 {
+		series = []string{entity.Series}
+	}
+	// Update the entity's published channels.
+	update := make(bson.D, 0, len(channels)*(len(series)+1)) // ...ish.
+	for _, c := range channels {
+		update = append(update, bson.DocElem{string(c), true})
 	}
 	if err := s.UpdateEntity(url, bson.D{{"$set", update}}); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 
 	// Update the base entity.
-	entity, err := s.FindEntity(url, FieldSelector("series", "supportedseries"))
-	if err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
-	}
-	series := entity.SupportedSeries
-	numSeries := len(series)
-	if numSeries == 0 {
-		series = []string{entity.Series}
-		numSeries = 1
-	}
-	update = make(bson.D, 0, numChannels*numSeries)
-	for _, c := range actual {
+	update = update[:0]
+	for _, c := range channels {
 		for _, s := range series {
 			update = append(update, bson.DocElem{fmt.Sprintf("channelentities.%s.%s", c, s), entity.URL})
 		}
+		update = append(update, bson.DocElem{fmt.Sprintf("channelresources.%s", c), resourceDocs})
 	}
+
 	if err := s.UpdateBaseEntity(url, bson.D{{"$set", update}}); err != nil {
 		return errgo.Mask(err)
 	}
@@ -801,6 +816,24 @@ func (s *Store) Publish(url *router.ResolvedURL, channels ...params.Channel) err
 	if err := s.UpdateSearch(url); err != nil {
 		return errgo.Notef(err, "cannot index %s to ElasticSearch", url)
 	}
+	return nil
+}
+
+func (s *Store) checkPublishedResources(entity *mongodoc.Entity, resources map[string]int) error {
+	knownResources, _, err := s.charmResources(entity.BaseURL)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	for name, rev := range resources {
+		if !charmHasResource(entity.CharmMeta, name) {
+			return errgo.Newf("charm does not have resource %q", name)
+		}
+		if _, ok := knownResources[name][rev]; !ok {
+			return errgo.WithCausef(nil, params.ErrNotFound, "%s resource %qnot found", entity.URL, fmt.Sprintf("%s/%d", name, rev))
+		}
+	}
+	// TODO(rog) check that every resource in the entity
+	// also has an entry in the resources map.
 	return nil
 }
 

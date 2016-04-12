@@ -4,6 +4,7 @@
 package charmstore
 
 import (
+	"fmt"
 	"io/ioutil"
 	"strconv"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	"gopkg.in/mgo.v2"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
 )
 
@@ -122,17 +124,26 @@ func (s *resourceSuite) TestNewResourceQuery(c *gc.C) {
 func (s *resourceSuite) TestListResourcesCharmWithResources(c *gc.C) {
 	store := s.newStore(c, false)
 	defer store.Close()
-	curl := charm.MustParseURL("cs:~charmers/xenial/starsay-3")
-	entity, _ := addCharm(c, store, curl)
-	expected := uploadResources(c, store, entity)
-	err := store.PublishResources(entity, params.StableChannel, resourceRevisions(expected))
+
+	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
+	meta := storetesting.MetaWithResources(nil, "resource1", "resource2")
+	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
 	c.Assert(err, jc.ErrorIsNil)
-	sortResources(expected)
+	uploadResources(c, store, id, "")
+
+	err = store.Publish(id, map[string]int{
+		"resource1": 0,
+		"resource2": 0,
+	}, params.StableChannel)
+	c.Assert(err, jc.ErrorIsNil)
+
+	entity, err := store.FindEntity(id, nil)
+	c.Assert(err, gc.IsNil)
 
 	docs, err := store.ListResources(entity, params.StableChannel)
 	c.Assert(err, jc.ErrorIsNil)
 
-	checkResourceDocs(c, docs, expected)
+	checkResourceDocs(c, store, id, []string{"resource1/0", "resource2/0"}, docs)
 }
 
 func (s *resourceSuite) TestListResourcesCharmWithoutResources(c *gc.C) {
@@ -172,43 +183,47 @@ func (s *resourceSuite) TestListResourcesBundle(c *gc.C) {
 func (s *resourceSuite) TestListResourcesResourceNotFound(c *gc.C) {
 	store := s.newStore(c, false)
 	defer store.Close()
-	rurl := MustParseResolvedURL("cs:~charmers/xenial/starsay-3")
+	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
 	ch := storetesting.NewCharm(storetesting.MetaWithResources(nil, "resource1", "resource2"))
-	err := store.AddCharmWithArchive(rurl, ch)
+	err := store.AddCharmWithArchive(id, ch)
 	c.Assert(err, jc.ErrorIsNil)
-	entity, err := store.FindEntity(rurl, nil)
+	entity, err := store.FindEntity(id, nil)
 	c.Assert(err, jc.ErrorIsNil)
-	expected := make([]*mongodoc.Resource, 2)
-	expected[0] = uploadResource(c, store, entity, "resource1")
-	expected[1] = &mongodoc.Resource{
-		BaseURL:  mongodoc.BaseURL(&rurl.URL),
-		Name:     "resource2",
-		Revision: -1,
-	}
-	sortResources(expected)
+	uploadResource(c, store, id, "resource1", "something")
 
 	// A resource exists for resource1, but not resource2. Expect a
 	// placeholder to be returned for resource2.
 	docs, err := store.ListResources(entity, params.UnpublishedChannel)
 	c.Assert(err, jc.ErrorIsNil)
 
-	checkResourceDocs(c, docs, expected)
+	checkResourceDocs(c, store, id, []string{"resource1/0", "resource2/-1"}, docs)
 }
 
 func (s *resourceSuite) TestUploadResource(c *gc.C) {
 	store := s.newStore(c, false)
 	defer store.Close()
-	curl := charm.MustParseURL("cs:~charmers/xenial/starsay-3")
-	entity, _ := addCharm(c, store, curl)
-	res, err := store.UploadResource(entity, "for-install", strings.NewReader("fake content"), fakeBlobHash, fakeBlobSize)
+
+	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
+	meta := storetesting.MetaWithResources(nil, "someResource")
+	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(res.Name, gc.Equals, "for-install")
-	c.Assert(res.Revision, gc.Equals, 0)
-	c.Assert(res.Size, gc.Equals, fakeBlobSize)
-	c.Assert(res.BlobHash, gc.Equals, fakeBlobHash)
-	res, err = store.UploadResource(entity, "for-install", strings.NewReader("fake content"), fakeBlobHash, fakeBlobSize)
+
+	entity, err := store.FindEntity(id, nil)
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(res.Revision, gc.Equals, 1)
+
+	now := time.Now()
+	blob := "content 1"
+	res, err := store.UploadResource(entity, "someResource", strings.NewReader(blob), hashOfString(blob), int64(len(blob)))
+	c.Assert(err, jc.ErrorIsNil)
+	if res.UploadTime.Before(now) {
+		c.Fatalf("upload time earlier than expected; want > %v; got %v", now, res.UploadTime)
+	}
+	checkResourceDocs(c, store, id, []string{"someResource/0"}, []*mongodoc.Resource{res})
+
+	blob = "content 2"
+	res, err = store.UploadResource(entity, "someResource", strings.NewReader(blob), hashOfString(blob), int64(len(blob)))
+	c.Assert(err, jc.ErrorIsNil)
+	checkResourceDocs(c, store, id, []string{"someResource/1"}, []*mongodoc.Resource{res})
 }
 
 var uploadResourceErrorTests = []struct {
@@ -221,13 +236,13 @@ var uploadResourceErrorTests = []struct {
 }{{
 	about:       "unrecognised name",
 	name:        "bad-name",
-	blob:        "fake content",
+	blob:        fakeContent,
 	hash:        fakeBlobHash,
 	size:        fakeBlobSize,
 	expectError: `charm does not have resource "bad-name"`,
 }, {
 	about:       "bad hash",
-	name:        "for-install",
+	name:        "someResource",
 	blob:        "fake context",
 	hash:        fakeBlobHash,
 	size:        fakeBlobSize,
@@ -237,11 +252,17 @@ var uploadResourceErrorTests = []struct {
 func (s *resourceSuite) TestUploadResourceErrors(c *gc.C) {
 	store := s.newStore(c, false)
 	defer store.Close()
-	curl := charm.MustParseURL("cs:~charmers/xenial/starsay-3")
-	entity, _ := addCharm(c, store, curl)
+
+	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
+	meta := storetesting.MetaWithResources(nil, "someResource")
+	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
+	c.Assert(err, jc.ErrorIsNil)
+
 	for i, test := range uploadResourceErrorTests {
 		c.Logf("%d. %s", i, test.about)
-		_, err := store.UploadResource(entity, test.name, strings.NewReader(test.blob), test.hash, test.size)
+		entity, err := store.FindEntity(id, nil)
+		c.Assert(err, gc.IsNil)
+		_, err = store.UploadResource(entity, test.name, strings.NewReader(test.blob), test.hash, test.size)
 		c.Assert(err, gc.ErrorMatches, test.expectError)
 	}
 }
@@ -256,87 +277,90 @@ var resolveResourceTests = []struct {
 	expectErrorCause error
 }{{
 	about:          "revision specified without channel",
-	name:           "for-install",
+	name:           "someResource",
 	revision:       0,
 	channel:        params.NoChannel,
 	expectResource: 0,
 }, {
 	about:          "revision specified on stable channel",
-	name:           "for-install",
+	name:           "someResource",
 	revision:       1,
 	channel:        params.StableChannel,
 	expectResource: 1,
 }, {
 	about:          "revision specified on development channel",
-	name:           "for-install",
+	name:           "someResource",
 	revision:       2,
 	channel:        params.DevelopmentChannel,
 	expectResource: 2,
 }, {
 	about:            "revision specified that doesn't exist",
-	name:             "for-install",
+	name:             "someResource",
 	revision:         3,
 	channel:          params.UnpublishedChannel,
-	expectError:      `cs:~charmers/xenial/starsay-3 has no "for-install/3" resource`,
+	expectError:      `cs:~charmers/precise/wordpress-3 has no "someResource/3" resource`,
 	expectErrorCause: params.ErrNotFound,
 }, {
 	about:          "no revision specified without channel",
-	name:           "for-install",
+	name:           "someResource",
 	revision:       -1,
 	channel:        params.NoChannel,
 	expectResource: 0,
 }, {
 	about:          "no revision specified on stable channel",
-	name:           "for-install",
+	name:           "someResource",
 	revision:       -1,
 	channel:        params.StableChannel,
 	expectResource: 0,
 }, {
 	about:          "no revision specified on development channel",
-	name:           "for-install",
+	name:           "someResource",
 	revision:       -1,
 	channel:        params.DevelopmentChannel,
 	expectResource: 1,
 }, {
 	about:          "no revision specified on unpublished channel",
-	name:           "for-install",
+	name:           "someResource",
 	revision:       -1,
 	channel:        params.UnpublishedChannel,
 	expectResource: 2,
 }, {
 	about:            "no resource with name",
-	name:             "for-setup",
+	name:             "otherResource",
 	revision:         -1,
 	channel:          params.UnpublishedChannel,
-	expectError:      `cs:~charmers/xenial/starsay-3 has no "for-setup" resource`,
+	expectError:      `cs:~charmers/precise/wordpress-3 has no "otherResource" resource`,
 	expectErrorCause: params.ErrNotFound,
 }}
 
 func (s *resourceSuite) TestResolveResource(c *gc.C) {
 	store := s.newStore(c, false)
 	defer store.Close()
-	curl := charm.MustParseURL("cs:~charmers/xenial/starsay-3")
-	entity, _ := addCharm(c, store, curl)
 
-	var resources []*mongodoc.Resource
+	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
+	meta := storetesting.MetaWithResources(nil, "someResource")
+	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
+	c.Assert(err, jc.ErrorIsNil)
 
-	// Upload a resource a number of times, publishing to the
-	// specified channel. If the channel is params.NoChannel then the
-	// resource is upload, but not published.
-	for _, ch := range []params.Channel{
-		params.StableChannel,
-		params.DevelopmentChannel,
-		params.NoChannel,
-	} {
-		res, err := store.UploadResource(entity, "for-install", strings.NewReader("fake content"), fakeBlobHash, fakeBlobSize)
-		c.Assert(err, jc.ErrorIsNil)
-		resources = append(resources, res)
-		if ch == params.NoChannel {
-			continue
-		}
-		err = store.PublishResources(entity, ch, []mongodoc.ResourceRevision{{res.Name, res.Revision}})
-		c.Assert(err, jc.ErrorIsNil)
+	entity, err := store.FindEntity(id, nil)
+	c.Assert(err, gc.IsNil)
+
+	// Upload three version of the resource.
+	for i := 0; i < 3; i++ {
+		content := fmt.Sprintf("content%d", i)
+		_, err := store.UploadResource(entity, "someResource", strings.NewReader(content), hashOfString(content), int64(len(content)))
+		c.Assert(err, gc.IsNil)
 	}
+	// Publish the charm to different channels with the different resources.
+	err = store.Publish(id, map[string]int{
+		"someResource": 0,
+	}, params.StableChannel)
+	c.Assert(err, gc.IsNil)
+
+	err = store.Publish(id, map[string]int{
+		"someResource": 1,
+	}, params.DevelopmentChannel)
+	c.Assert(err, gc.IsNil)
 
 	for i, test := range resolveResourceTests {
 		c.Logf("%d. %s", i, test.about)
@@ -347,55 +371,37 @@ func (s *resourceSuite) TestResolveResource(c *gc.C) {
 			continue
 		}
 		c.Assert(err, jc.ErrorIsNil)
-		adjustExpectedResource(res, resources[test.expectResource])
-		c.Assert(res, jc.DeepEquals, resources[test.expectResource])
+		checkResourceDocs(c, store, id, []string{fmt.Sprintf("someResource/%d", test.expectResource)}, []*mongodoc.Resource{res})
 	}
 }
 
-var publishResourceErrorTests = []struct {
-	about       string
-	channel     params.Channel
-	resources   []mongodoc.ResourceRevision
-	expectError string
-}{{
-	about:       "no channel",
-	channel:     params.NoChannel,
-	expectError: `missing channel`,
-}, {
-	about:       "unpublished channel",
-	channel:     params.UnpublishedChannel,
-	expectError: `cannot publish to unpublished channel`,
-}, {
-	about:   "unknown resource name",
-	channel: params.StableChannel,
-	resources: []mongodoc.ResourceRevision{{
-		Name:     "for-install",
-		Revision: 0,
-	}, {
-		Name:     "bad-name",
-		Revision: 0,
-	}},
-	expectError: `charm does not have resource "bad-name"`,
-}, {
-	about:   "no such resource",
-	channel: params.StableChannel,
-	resources: []mongodoc.ResourceRevision{{
-		Name:     "for-install",
-		Revision: 0,
-	}},
-	expectError: `cs:~charmers/xenial/starsay-3 resource for-install revison 0 not found`,
-}}
-
-func (s *resourceSuite) TestPublishResourceErrors(c *gc.C) {
+func (s *resourceSuite) TestPublishWithResourceNotInMetadata(c *gc.C) {
 	store := s.newStore(c, false)
 	defer store.Close()
-	curl := charm.MustParseURL("cs:~charmers/xenial/starsay-3")
-	entity, _ := addCharm(c, store, curl)
-	for i, test := range publishResourceErrorTests {
-		c.Logf("%d. %d", i, test.about)
-		err := store.PublishResources(entity, test.channel, test.resources)
-		c.Assert(err, gc.ErrorMatches, test.expectError)
-	}
+
+	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
+	err := store.AddCharmWithArchive(id, storetesting.NewCharm(nil))
+	c.Assert(err, jc.ErrorIsNil)
+
+	err = store.Publish(id, map[string]int{
+		"resource1": 0,
+	}, params.StableChannel)
+	c.Assert(err, gc.ErrorMatches, `charm published with incorrect resources: charm does not have resource "resource1"`)
+}
+
+func (s *resourceSuite) TestPublishWithResourceNotFound(c *gc.C) {
+	store := s.newStore(c, false)
+	defer store.Close()
+
+	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
+	meta := storetesting.MetaWithResources(nil, "resource1")
+	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
+	c.Assert(err, jc.ErrorIsNil)
+
+	err = store.Publish(id, map[string]int{
+		"resource1": 0,
+	}, params.StableChannel)
+	c.Assert(err, gc.ErrorMatches, `charm published with incorrect resources: cs:~charmers/precise/wordpress-3 resource "resource1/0"not found`)
 }
 
 func (s *resourceSuite) TestOpenResourceBlob(c *gc.C) {
@@ -403,7 +409,7 @@ func (s *resourceSuite) TestOpenResourceBlob(c *gc.C) {
 	defer store.Close()
 	curl := charm.MustParseURL("cs:~charmers/xenial/starsay-3")
 	entity, _ := addCharm(c, store, curl)
-	res, err := store.UploadResource(entity, "for-install", strings.NewReader("fake content"), fakeBlobHash, fakeBlobSize)
+	res, err := store.UploadResource(entity, "for-install", strings.NewReader(fakeContent), fakeBlobHash, fakeBlobSize)
 	c.Assert(err, jc.ErrorIsNil)
 	blob, err := store.OpenResourceBlob(res)
 	c.Assert(err, jc.ErrorIsNil)
@@ -412,7 +418,7 @@ func (s *resourceSuite) TestOpenResourceBlob(c *gc.C) {
 	c.Assert(blob.Hash, gc.Equals, fakeBlobHash)
 	data, err := ioutil.ReadAll(blob)
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(string(data), gc.Equals, "fake content")
+	c.Assert(string(data), gc.Equals, fakeContent)
 
 	// Change the blob name so that it's invalid
 	// so that we can check what happens then.
@@ -421,39 +427,89 @@ func (s *resourceSuite) TestOpenResourceBlob(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `cannot open archive data for cs:~charmers/starsay resource "for-install"/0: .*`)
 }
 
-func uploadResources(c *gc.C, store *Store, entity *mongodoc.Entity) []*mongodoc.Resource {
-	var resources []*mongodoc.Resource
-	for _, m := range entity.CharmMeta.Resources {
-		resources = append(resources, uploadResource(c, store, entity, m.Name))
+// uploadResources uploads all the resources required by the given entity,
+// giving each one blob content that's the resource name
+// followed by the given content suffix.
+func uploadResources(c *gc.C, store *Store, id *router.ResolvedURL, contentSuffix string) {
+	entity, err := store.FindEntity(id, nil)
+	c.Assert(err, gc.IsNil)
+	for name := range entity.CharmMeta.Resources {
+		c.Logf("uploading resource %v", name)
+		content := name + contentSuffix
+		hash := hashOfString(content)
+		r := strings.NewReader(content)
+		_, err := store.UploadResource(entity, name, r, hash, int64(len(content)))
+		c.Assert(err, jc.ErrorIsNil)
 	}
-	return resources
 }
 
-func uploadResource(c *gc.C, store *Store, entity *mongodoc.Entity, name string) *mongodoc.Resource {
-	r := strings.NewReader("fake content")
-	res, err := store.UploadResource(entity, name, r, fakeBlobHash, fakeBlobSize)
-	c.Assert(err, jc.ErrorIsNil)
-	return res
+func uploadResource(c *gc.C, store *Store, id *router.ResolvedURL, name string, blob string) {
+	entity, err := store.FindEntity(id, nil)
+	c.Assert(err, gc.IsNil)
+	_, err = store.UploadResource(entity, name, strings.NewReader(blob), hashOfString(blob), int64(len(blob)))
+	c.Assert(err, gc.IsNil)
 }
 
-func resourceRevisions(resources []*mongodoc.Resource) []mongodoc.ResourceRevision {
-	revisions := make([]mongodoc.ResourceRevision, len(resources))
-	for i := range resources {
-		revisions[i].Name = resources[i].Name
-		revisions[i].Revision = resources[i].Revision
+func resourceRevisions(resources []*mongodoc.Resource) map[string]int {
+	revisions := make(map[string]int)
+	for _, r := range resources {
+		revisions[r.Name] = r.Revision
 	}
 	return revisions
 }
 
-func checkResourceDocs(c *gc.C, docs, expected []*mongodoc.Resource) {
-	sortResources(docs)
-	for i, doc := range docs {
-		adjustExpectedResource(doc, expected[i])
+// checkResourceDocs checks that the resource documents in docs match
+// the named resources held by the charm with the given base URL.
+// The resource names are parsed with parseResourceId.
+//
+// If a resource revision is specified as -1, it is expected to
+// be a placeholder in docs.
+func checkResourceDocs(c *gc.C, store *Store, id *router.ResolvedURL, expectResources []string, docs []*mongodoc.Resource) {
+	c.Assert(expectResources, gc.HasLen, len(docs))
+	for i, ridStr := range expectResources {
+		doc := docs[i]
+		rid := parseResourceId(ridStr)
+		if rid.Revision == -1 {
+			// No revision implies we want a placeholder doc.
+			c.Assert(doc, jc.DeepEquals, &mongodoc.Resource{
+				BaseURL:  mongodoc.BaseURL(&id.URL),
+				Name:     rid.Name,
+				Revision: -1,
+			}, gc.Commentf("resource %v/%d", rid.Name, rid.Revision))
+			continue
+		}
+		expectDoc, err := store.ResolveResource(id, rid.Name, rid.Revision, params.UnpublishedChannel)
+		c.Assert(err, gc.IsNil, gc.Commentf("resource %v/%d", rid.Name, rid.Revision))
+
+		// Mongo's time stamps are only accurate to a millisecond.
+		// If we're checking against a document that's been created
+		// locally, rather than pulled from the database, there might be
+		// up to a millisecond of discrepancy.
+		if doc.UploadTime.Before(expectDoc.UploadTime.Add(-time.Millisecond)) ||
+			doc.UploadTime.After(expectDoc.UploadTime.Add(time.Millisecond)) {
+			c.Fatalf("upload time mismatch; got %v want %v", doc.UploadTime, expectDoc.UploadTime)
+		}
+		doc.UploadTime = expectDoc.UploadTime
+		c.Assert(doc, jc.DeepEquals, expectDoc, gc.Commentf("resource %v/%d", rid.Name, rid.Revision))
 	}
-	c.Check(docs, jc.DeepEquals, expected)
 }
 
 func adjustExpectedResource(doc, expected *mongodoc.Resource) {
 	expected.BlobName = doc.BlobName
 	expected.UploadTime = doc.UploadTime
+}
+
+func parseResourceId(s string) mongodoc.ResourceRevision {
+	i := strings.Index(s, "/")
+	if i == -1 {
+		panic(fmt.Sprintf("no revision in %q", s))
+	}
+	rev, err := strconv.Atoi(s[i+1:])
+	if err != nil {
+		panic(fmt.Sprintf("invalid resource revision in %q", s))
+	}
+	return mongodoc.ResourceRevision{
+		Name:     s[0:i],
+		Revision: rev,
+	}
 }

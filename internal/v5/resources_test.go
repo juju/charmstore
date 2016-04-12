@@ -17,8 +17,6 @@ import (
 	"gopkg.in/juju/charm.v6-unstable/resource"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
 )
 
@@ -114,12 +112,7 @@ func (s *ResourceSuite) TestGet(c *gc.C) {
 	})
 
 	// If we publish the resource, it should be available with no revision.
-	entity, err := s.store.FindEntity(id, nil)
-	c.Assert(err, gc.IsNil)
-	err = s.store.PublishResources(entity, params.StableChannel, []mongodoc.ResourceRevision{{
-		Name:     "someResource",
-		Revision: 2,
-	}})
+	err := s.store.Publish(id, map[string]int{"someResource": 2}, params.StableChannel)
 	c.Assert(err, gc.IsNil)
 
 	resp = httptesting.DoRequest(c, httptesting.DoRequestParams{
@@ -403,14 +396,6 @@ func (s *ResourceSuite) TestDownloadPrivateCharmResource(c *gc.C) {
 	assertCacheControl(c, resp.Header(), false)
 }
 
-func (s *ResourceSuite) uploadResource(c *gc.C, id *router.ResolvedURL, name string, content string) {
-	entity, err := s.store.FindEntity(id, nil)
-	c.Assert(err, gc.IsNil)
-	hash := fmt.Sprintf("%x", sha512.Sum384([]byte(content)))
-	_, err = s.store.UploadResource(entity, name, strings.NewReader(content), hash, int64(len(content)))
-	c.Assert(err, gc.IsNil)
-}
-
 func (s *ResourceSuite) TestEmptyListResource(c *gc.C) {
 	id := newResolvedURL("~charmers/precise/wordpress-0", 0)
 	s.addPublicCharmFromRepo(c, "wordpress", id)
@@ -429,15 +414,10 @@ func (s *ResourceSuite) TestListResource(c *gc.C) {
 	s.uploadResource(c, id, "resource1", "resource1 content")
 	s.uploadResource(c, id, "resource2", "resource2 content")
 
-	entity, err := s.store.FindEntity(id, nil)
-	c.Assert(err, gc.IsNil)
-	err = s.store.PublishResources(entity, params.StableChannel, []mongodoc.ResourceRevision{{
-		Name:     "resource1",
-		Revision: 0,
-	}, {
-		Name:     "resource2",
-		Revision: 0,
-	}})
+	err := s.store.Publish(id, map[string]int{
+		"resource1": 0,
+		"resource2": 0,
+	}, params.StableChannel)
 	c.Assert(err, gc.IsNil)
 
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{

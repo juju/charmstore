@@ -693,7 +693,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 
 	// Publish one of the revisions to development, then PUT to meta/perm
 	// and check that the development ACLs have changed.
-	err := s.store.Publish(newResolvedURL("~charmers/precise/wordpress-23", 23), params.DevelopmentChannel)
+	err := s.store.Publish(newResolvedURL("~charmers/precise/wordpress-23", 23), nil, params.DevelopmentChannel)
 	c.Assert(err, gc.IsNil)
 
 	s.doAsUser("bob", func() {
@@ -745,7 +745,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 	})
 	// Publish wordpress-1 to stable and check that the stable ACLs
 	// have changed.
-	err = s.store.Publish(newResolvedURL("~charmers/trusty/wordpress-1", 1), params.StableChannel)
+	err = s.store.Publish(newResolvedURL("~charmers/trusty/wordpress-1", 1), nil, params.StableChannel)
 	c.Assert(err, gc.IsNil)
 
 	// The stable permissions only allow charmers currently, so act as
@@ -1777,7 +1777,7 @@ func (s *APISuite) TestServeExpandId(c *gc.C) {
 	s.addPublicCharmFromRepo(c, "wordpress", newResolvedURL("cs:~charmers/trusty/wordpress-47", 47))
 	err := s.store.AddCharmWithArchive(newResolvedURL("cs:~charmers/trusty/wordpress-48", 48), storetesting.NewCharm(nil))
 	c.Assert(err, gc.IsNil)
-	err = s.store.Publish(newResolvedURL("cs:~charmers/trusty/wordpress-48", 48), params.DevelopmentChannel)
+	err = s.store.Publish(newResolvedURL("cs:~charmers/trusty/wordpress-48", 48), nil, params.DevelopmentChannel)
 	c.Assert(err, gc.IsNil)
 	s.addPublicCharmFromRepo(c, "multi-series", newResolvedURL("cs:~charmers/wordpress-5", 49))
 
@@ -2662,7 +2662,7 @@ func (s *APISuite) TestURLChannelResolving(c *gc.C) {
 		err := s.store.AddCharmWithArchive(add.id, storetesting.NewCharm(nil))
 		c.Assert(err, gc.IsNil)
 		if add.channel != params.UnpublishedChannel {
-			err = s.store.Publish(add.id, add.channel)
+			err = s.store.Publish(add.id, nil, add.channel)
 			c.Assert(err, gc.IsNil)
 		}
 	}

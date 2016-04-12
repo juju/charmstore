@@ -412,7 +412,7 @@ func (s *authSuite) TestReadAuthorization(c *gc.C) {
 
 		// publish the charm on any required channels.
 		if len(test.channels) > 0 {
-			err := s.store.Publish(rurl, test.channels...)
+			err := s.store.Publish(rurl, nil, test.channels...)
 			c.Assert(err, gc.IsNil)
 		}
 
@@ -639,7 +639,7 @@ func (s *authSuite) TestWriteAuthorization(c *gc.C) {
 
 		// publish the charm on any required channels.
 		if len(test.channels) > 0 {
-			err := s.store.Publish(rurl, test.channels...)
+			err := s.store.Publish(rurl, nil, test.channels...)
 			c.Assert(err, gc.IsNil)
 		}
 
@@ -1004,7 +1004,7 @@ func (s *authSuite) TestDelegatableMacaroon(c *gc.C) {
 		rurl,
 		storetesting.Charms.CharmDir("wordpress"))
 	c.Assert(err, gc.IsNil)
-	err = s.store.Publish(rurl, params.StableChannel)
+	err = s.store.Publish(rurl, nil, params.StableChannel)
 	c.Assert(err, gc.IsNil)
 	// Change the ACLs for the testing charm.
 	err = s.store.SetPerms(charm.MustParseURL("cs:~charmers/wordpress"), "stable.read", "bob")

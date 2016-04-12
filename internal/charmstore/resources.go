@@ -237,41 +237,6 @@ func (s *Store) ResolveResource(url *router.ResolvedURL, name string, revision i
 	return &r, nil
 }
 
-// PublishResources publishes the specified set of resources to the
-// specified channel for the specified charm. If any of the revisions
-// specified do not exist then an error with the cause params.ErrNotFound
-// will be returned.
-func (s *Store) PublishResources(entity *mongodoc.Entity, channel params.Channel, resources []mongodoc.ResourceRevision) error {
-	if channel == params.NoChannel {
-		return errgo.New("missing channel")
-	}
-	if channel == params.UnpublishedChannel {
-		return errgo.New("cannot publish to unpublished channel")
-	}
-
-	for _, res := range resources {
-		if !charmHasResource(entity.CharmMeta, res.Name) {
-			return errgo.Newf("charm does not have resource %q", res.Name)
-		}
-	}
-	knownResources, _, err := s.charmResources(entity.BaseURL)
-	if err != nil {
-		return errgo.Mask(err)
-	}
-	for _, res := range resources {
-		if _, ok := knownResources[res.Name][res.Revision]; !ok {
-			return errgo.WithCausef(nil, params.ErrNotFound, "%s resource %s revison %d not found", entity.URL, res.Name, res.Revision)
-		}
-
-	}
-
-	channelresources := fmt.Sprintf("channelresources.%s", channel)
-	if err := s.DB.BaseEntities().UpdateId(entity.BaseURL, bson.D{{"$set", bson.D{{channelresources, resources}}}}); err != nil {
-		return errgo.Mask(err)
-	}
-	return nil
-}
-
 func charmHasResource(meta *charm.Meta, name string) bool {
 	if meta == nil {
 		return false

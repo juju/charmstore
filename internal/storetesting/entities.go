@@ -154,6 +154,12 @@ func NormalizeBaseEntity(be *mongodoc.BaseEntity) *mongodoc.BaseEntity {
 	if len(be1.ChannelEntities) == 0 {
 		be1.ChannelEntities = nil
 	}
+
+	for c, resources := range be1.ChannelResources {
+		if len(resources) == 0 {
+			delete(be1.ChannelResources, c)
+		}
+	}
 	if len(be1.ChannelResources) == 0 {
 		be1.ChannelResources = nil
 	}

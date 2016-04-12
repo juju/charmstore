@@ -603,7 +603,7 @@ func (s *ArchiveSuite) TestPostBundle(c *gc.C) {
 	} {
 		err := s.store.AddCharmWithArchive(rurl, storetesting.Charms.CharmArchive(c.MkDir(), rurl.URL.Name))
 		c.Assert(err, gc.IsNil)
-		err = s.store.Publish(rurl, params.StableChannel)
+		err = s.store.Publish(rurl, nil, params.StableChannel)
 		c.Assert(err, gc.IsNil)
 	}
 
