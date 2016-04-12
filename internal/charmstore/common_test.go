@@ -4,13 +4,11 @@
 package charmstore // import "gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
 
 import (
-	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
 )
@@ -38,27 +36,6 @@ func (s *commonSuite) newStore(c *gc.C, withElasticSearch bool) *Store {
 	store := p.Store()
 	defer p.Close()
 	return store
-}
-
-func addCharm(c *gc.C, store *Store, curl *charm.URL) (*mongodoc.Entity, *charm.CharmDir) {
-	resolvedURL := MustParseResolvedURL(curl.String())
-	ch := storetesting.Charms.CharmDir(curl.Name)
-	err := store.AddCharmWithArchive(resolvedURL, ch)
-	c.Assert(err, jc.ErrorIsNil)
-	entity, err := store.FindEntity(resolvedURL, nil)
-	c.Assert(err, jc.ErrorIsNil)
-	return entity, ch
-}
-
-func addBundle(c *gc.C, store *Store, curl *charm.URL) *mongodoc.Entity {
-	resolvedURL := MustParseResolvedURL(curl.String())
-	b := storetesting.Charms.BundleDir(curl.Name)
-	addRequiredCharms(c, store, b)
-	err := store.AddBundleWithArchive(resolvedURL, b)
-	c.Assert(err, jc.ErrorIsNil)
-	entity, err := store.FindEntity(resolvedURL, nil)
-	c.Assert(err, jc.ErrorIsNil)
-	return entity
 }
 
 func addRequiredCharms(c *gc.C, store *Store, bundle charm.Bundle) {

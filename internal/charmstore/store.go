@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -829,12 +831,23 @@ func (s *Store) checkPublishedResources(entity *mongodoc.Entity, resources map[s
 			return errgo.Newf("charm does not have resource %q", name)
 		}
 		if _, ok := knownResources[name][rev]; !ok {
-			return errgo.WithCausef(nil, params.ErrNotFound, "%s resource %qnot found", entity.URL, fmt.Sprintf("%s/%d", name, rev))
+			return errgo.Newf("%s resource %q not found", entity.URL, fmt.Sprintf("%s/%d", name, rev))
 		}
 	}
-	// TODO(rog) check that every resource in the entity
-	// also has an entry in the resources map.
-	return nil
+	if entity.CharmMeta == nil {
+		return nil
+	}
+	var missing []string
+	for name := range entity.CharmMeta.Resources {
+		if _, ok := resources[name]; !ok {
+			missing = append(missing, name)
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	sort.Strings(missing)
+	return errgo.Newf("resources are missing from publish request: %s", strings.Join(missing, ", "))
 }
 
 // SetPromulgated sets whether the base entity of url is promulgated, If
