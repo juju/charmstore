@@ -22,10 +22,10 @@ import (
 )
 
 // POST id/resource/name
-// https://github.com/juju/charmstore/blob/v5/docs/API.md#post-idresourcesname
+// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#post-idresourcesname
 //
 // GET  id/resource/name[/revision]
-// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idresourcesnamerevision
+// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idresourcesnamerevision
 func (h *ReqHandler) serveResources(id *router.ResolvedURL, w http.ResponseWriter, req *http.Request) error {
 	// Resources are "published" using "POST id/publish" so we don't
 	// support PUT here.
@@ -113,31 +113,8 @@ func (h *ReqHandler) serveUploadResource(id *router.ResolvedURL, w http.Response
 	})
 }
 
-func parseResourceId(path string) (mongodoc.ResourceRevision, error) {
-	i := strings.Index(path, "/")
-	if i == -1 {
-		return mongodoc.ResourceRevision{
-			Name:     path,
-			Revision: -1,
-		}, nil
-	}
-	revno, err := strconv.Atoi(path[i+1:])
-	if err != nil {
-		return mongodoc.ResourceRevision{}, errgo.Newf("malformed revision number")
-	}
-	return mongodoc.ResourceRevision{
-		Name:     path[0:i],
-		Revision: revno,
-	}, nil
-}
-
-func validResourceName(name string) bool {
-	// TODO we should probably be more restrictive than this.
-	return !strings.Contains(name, "/")
-}
-
 // GET id/meta/resource
-// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetaresources
+// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetaresources
 func (h *ReqHandler) metaResources(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	if entity.URL.Series == "bundle" {
 		return nil, nil
@@ -161,11 +138,62 @@ func (h *ReqHandler) metaResources(entity *mongodoc.Entity, id *router.ResolvedU
 	return results, nil
 }
 
+// GET id/meta/resource/*name*[/*revision]
+// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetaresourcesnamerevision
+func (h *ReqHandler) metaResourcesSingle(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
+	data, err := h.metaResourcesSingle0(entity, id, path, flags, req)
+	if err != nil {
+		if errgo.Cause(err) == params.ErrNotFound {
+			logger.Infof("replacing not-found error on %s/meta/resources%s: %v (%#v)", id.URL.Path(), path, err, err)
+			// It's a not-found error; return nothing
+			// so that it's OK to use this in a bulk meta request.
+			return nil, nil
+		}
+		return nil, errgo.Mask(err)
+	}
+	return data, nil
+}
+
+func (h *ReqHandler) metaResourcesSingle0(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
+	if id.URL.Series == "bundle" {
+		return nil, nil
+	}
+	rid, err := parseResourceId(strings.TrimPrefix(path, "/"))
+	if err != nil {
+		return nil, errgo.WithCausef(err, params.ErrNotFound, "")
+	}
+	ch, err := h.entityChannel(id)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	doc, err := h.Store.ResolveResource(id, rid.Name, rid.Revision, ch)
+	if err != nil {
+		if errgo.Cause(err) != params.ErrNotFound || rid.Revision != -1 {
+			return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+		}
+		// The resource wasn't found and we're not asking for a specific
+		// revision. If the resource actually exists in the charm metadata,
+		// return a placeholder document as would be returned by
+		// the /meta/resources (ListResources) endpoint.
+		if _, ok := entity.CharmMeta.Resources[rid.Name]; !ok {
+			return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+		}
+		doc = &mongodoc.Resource{
+			Name:     rid.Name,
+			Revision: -1,
+		}
+	}
+	result, err := fromResourceDoc(doc, entity.CharmMeta.Resources)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return result, nil
+}
+
 func fromResourceDoc(doc *mongodoc.Resource, resources map[string]resource.Meta) (*params.Resource, error) {
 	meta, ok := resources[doc.Name]
 	if !ok {
-		// Should never happen.
-		return nil, errgo.Newf("resource %q returned by ListResources but not found in metadata", doc.Name)
+		return nil, errgo.WithCausef(nil, params.ErrNotFound, "resource %q not found in charm", doc.Name)
 	}
 	r := &params.Resource{
 		Name:        doc.Name,
@@ -188,4 +216,30 @@ func fromResourceDoc(doc *mongodoc.Resource, resources map[string]resource.Meta)
 	r.Fingerprint = rawHash
 	r.Revision = doc.Revision
 	return r, nil
+}
+
+func parseResourceId(path string) (mongodoc.ResourceRevision, error) {
+	i := strings.Index(path, "/")
+	if i == -1 {
+		return mongodoc.ResourceRevision{
+			Name:     path,
+			Revision: -1,
+		}, nil
+	}
+	revno, err := strconv.Atoi(path[i+1:])
+	if err != nil {
+		return mongodoc.ResourceRevision{}, errgo.Newf("malformed revision number")
+	}
+	if revno < 0 {
+		return mongodoc.ResourceRevision{}, errgo.Newf("negative revision number")
+	}
+	return mongodoc.ResourceRevision{
+		Name:     path[0:i],
+		Revision: revno,
+	}, nil
+}
+
+func validResourceName(name string) bool {
+	// TODO we should probably be more restrictive than this.
+	return !strings.Contains(name, "/")
 }

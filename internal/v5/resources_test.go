@@ -400,7 +400,7 @@ func (s *ResourceSuite) TestDownloadPrivateCharmResource(c *gc.C) {
 	assertCacheControl(c, resp.Header(), false)
 }
 
-func (s *ResourceSuite) TestEmptyListResource(c *gc.C) {
+func (s *ResourceSuite) TestMetaResourcesWithNoResources(c *gc.C) {
 	id := newResolvedURL("~charmers/precise/wordpress-0", 0)
 	s.addPublicCharmFromRepo(c, "wordpress", id)
 
@@ -412,7 +412,7 @@ func (s *ResourceSuite) TestEmptyListResource(c *gc.C) {
 	})
 }
 
-func (s *ResourceSuite) TestListResource(c *gc.C) {
+func (s *ResourceSuite) TestMetaResources(c *gc.C) {
 	id := newResolvedURL("~charmers/precise/wordpress-0", -1)
 	s.addPublicCharm(c, storetesting.NewCharm(storetesting.MetaWithResources(nil, "resource1", "resource2")), id)
 	s.uploadResource(c, id, "resource1", "resource1 content")
@@ -448,7 +448,7 @@ func (s *ResourceSuite) TestListResource(c *gc.C) {
 	})
 }
 
-func (s *ResourceSuite) TestListResourceWithBundle(c *gc.C) {
+func (s *ResourceSuite) TestMetaResourcesWithBundle(c *gc.C) {
 	id := newResolvedURL("cs:~charmers/bundle/bundlelovin-10", 10)
 	s.addPublicBundleFromRepo(c, "wordpress-simple", id, true)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -459,5 +459,162 @@ func (s *ResourceSuite) TestListResourceWithBundle(c *gc.C) {
 			Code:    params.ErrMetadataNotFound,
 			Message: string(params.ErrMetadataNotFound),
 		},
+	})
+}
+
+func (s *ResourceSuite) TestMetaResourcesSingleBadResourceId(c *gc.C) {
+	id := newResolvedURL("~charmers/precise/wordpress-0", -1)
+	s.addPublicCharm(c, storetesting.NewCharm(nil), id)
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:      s.srv,
+		URL:          storeURL(id.URL.Path() + "/meta/resources/foo/bar"),
+		ExpectStatus: http.StatusNotFound,
+		ExpectBody: params.Error{
+			Code:    params.ErrMetadataNotFound,
+			Message: string(params.ErrMetadataNotFound),
+		},
+	})
+}
+
+func (s *ResourceSuite) TestMetaResourcesSingleResourceWithNegativeRevisionNumber(c *gc.C) {
+	id := newResolvedURL("~charmers/precise/wordpress-0", -1)
+	s.addPublicCharm(c, storetesting.NewCharm(nil), id)
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:      s.srv,
+		URL:          storeURL(id.URL.Path() + "/meta/resources/foo/-2"),
+		ExpectStatus: http.StatusNotFound,
+		ExpectBody: params.Error{
+			Code:    params.ErrMetadataNotFound,
+			Message: string(params.ErrMetadataNotFound),
+		},
+	})
+}
+
+func (s *ResourceSuite) TestMetaResourcesSingleWithBundle(c *gc.C) {
+	id, _ := s.addPublicBundleFromRepo(c, "wordpress-simple", newResolvedURL("cs:~charmers/bundle/something-32", 32), true)
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:      s.srv,
+		URL:          storeURL(id.URL.Path() + "/meta/resources/foo"),
+		ExpectStatus: http.StatusNotFound,
+		ExpectBody: params.Error{
+			Code:    params.ErrMetadataNotFound,
+			Message: string(params.ErrMetadataNotFound),
+		},
+	})
+}
+
+func (s *ResourceSuite) TestMetaResourcesSingleResourceNotInCharm(c *gc.C) {
+	id := newResolvedURL("~charmers/precise/wordpress-0", -1)
+	s.addPublicCharm(c, storetesting.NewCharm(nil), id)
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:      s.srv,
+		URL:          storeURL(id.URL.Path() + "/meta/resources/foo"),
+		ExpectStatus: http.StatusNotFound,
+		ExpectBody: params.Error{
+			Code:    params.ErrMetadataNotFound,
+			Message: string(params.ErrMetadataNotFound),
+		},
+	})
+}
+
+func (s *ResourceSuite) TestMetaResourcesSingleResourceNotUploaded(c *gc.C) {
+	id := newResolvedURL("~charmers/precise/wordpress-0", -1)
+	meta := storetesting.MetaWithResources(nil, "someResource")
+	err := s.store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
+	c.Assert(err, gc.IsNil)
+
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		URL:     storeURL(id.URL.Path() + "/meta/resources/someResource?channel=unpublished"),
+		ExpectBody: params.Resource{
+			Name:        "someResource",
+			Type:        "file",
+			Path:        "someResource-file",
+			Description: "someResource description",
+			Revision:    -1,
+		},
+		Do: s.bakeryDoAsUser(c, "charmers"),
+	})
+}
+
+func (s *ResourceSuite) TestMetaResourcesSingleResourceWithRevision(c *gc.C) {
+	id := newResolvedURL("~charmers/precise/wordpress-0", -1)
+	meta := storetesting.MetaWithResources(nil, "someResource")
+	s.addPublicCharm(c, storetesting.NewCharm(meta), id)
+
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		URL:     storeURL(id.URL.Path() + "/meta/resources/someResource/0"),
+		ExpectBody: params.Resource{
+			Name:        "someResource",
+			Type:        "file",
+			Path:        "someResource-file",
+			Description: "someResource description",
+			Revision:    0,
+			Fingerprint: rawHash(hashOfString("someResource content")),
+			Size:        int64(len("someResource content")),
+		},
+		Do: s.bakeryDoAsUser(c, "charmers"),
+	})
+}
+
+func (s *ResourceSuite) TestMetaResourcesSingleResourceWithRevisionNotFound(c *gc.C) {
+	id := newResolvedURL("~charmers/precise/wordpress-0", -1)
+	meta := storetesting.MetaWithResources(nil, "someResource")
+	s.addPublicCharm(c, storetesting.NewCharm(meta), id)
+
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:      s.srv,
+		URL:          storeURL(id.URL.Path() + "/meta/resources/someResource/1"),
+		ExpectStatus: http.StatusNotFound,
+		ExpectBody: params.Error{
+			Code:    params.ErrMetadataNotFound,
+			Message: string(params.ErrMetadataNotFound),
+		},
+		Do: s.bakeryDoAsUser(c, "charmers"),
+	})
+}
+
+func (s *ResourceSuite) TestMetaResourcesSingleResourceWithRevisionNotInCharm(c *gc.C) {
+	id := newResolvedURL("~charmers/precise/wordpress-0", -1)
+	meta := storetesting.MetaWithResources(nil, "someResource")
+	s.addPublicCharm(c, storetesting.NewCharm(meta), id)
+
+	s.uploadResource(c, id, "someResource", "a new version")
+
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		URL:     storeURL(id.URL.Path() + "/meta/resources/someResource/1"),
+		ExpectBody: params.Resource{
+			Name:        "someResource",
+			Type:        "file",
+			Path:        "someResource-file",
+			Description: "someResource description",
+			Revision:    1,
+			Fingerprint: rawHash(hashOfString("a new version")),
+			Size:        int64(len("a new version")),
+		},
+		Do: s.bakeryDoAsUser(c, "charmers"),
+	})
+}
+
+func (s *ResourceSuite) TestMetaResourcesSingleResourceWithNameNotInCharm(c *gc.C) {
+	id0 := newResolvedURL("~charmers/precise/wordpress-0", -1)
+	meta := storetesting.MetaWithResources(nil, "someResource")
+	s.addPublicCharm(c, storetesting.NewCharm(meta), id0)
+
+	id1 := newResolvedURL("~charmers/precise/wordpress-1", -1)
+	meta = storetesting.MetaWithResources(nil, "otherResource")
+	s.addPublicCharm(c, storetesting.NewCharm(meta), id1)
+
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:      s.srv,
+		URL:          storeURL(id0.URL.Path() + "/meta/resources/otherResource/0"),
+		ExpectStatus: http.StatusNotFound,
+		ExpectBody: params.Error{
+			Code:    params.ErrMetadataNotFound,
+			Message: string(params.ErrMetadataNotFound),
+		},
+		Do: s.bakeryDoAsUser(c, "charmers"),
 	})
 }
