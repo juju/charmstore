@@ -27,13 +27,13 @@ import (
 )
 
 // GET id/archive
-// https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idarchive
+// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idarchive
 //
 // POST id/archive?hash=sha384hash
-// https://github.com/juju/charmstore/blob/v4/docs/API.md#post-idarchive
+// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#post-idarchive
 //
 // DELETE id/archive
-// https://github.com/juju/charmstore/blob/v4/docs/API.md#delete-idarchive
+// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#delete-idarchive
 //
 // PUT id/archive?hash=sha384hash
 // This is like POST except that it puts the archive to a known revision
@@ -286,7 +286,7 @@ func (h *ReqHandler) latestRevisionInfo(id *charm.URL) (*router.ResolvedURL, str
 }
 
 // GET id/archive/path
-// https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idarchivepath
+// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idarchivepath
 func (h *ReqHandler) serveArchiveFile(id *router.ResolvedURL, w http.ResponseWriter, req *http.Request) error {
 	blob, err := h.Store.OpenBlob(id)
 	if err != nil {

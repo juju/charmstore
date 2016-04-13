@@ -140,6 +140,7 @@ func newReqHandler() ReqHandler {
 	delete(handlers.Meta, "published")
 	delete(handlers.Id, "resource")
 	delete(handlers.Meta, "resources")
+	delete(handlers.Meta, "resources/")
 
 	h.Router = router.New(handlers, h)
 	return h

@@ -1787,6 +1787,13 @@ type Resource struct {
 []Resource
 ```
 
+#### GET *id*/meta/resources/*name*[/*revision*]
+
+This endpoint retrieves information on the resource with the given *name*
+associated with the charm *id* as a resource object (see above).
+
+If *revision* is omitted, information on the latest revision of the resource is returned.
+
 ### Resources
 
 #### POST *id*/resource/*name*?hash=*sha384*[&filename=*path*]

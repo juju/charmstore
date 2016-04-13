@@ -587,6 +587,34 @@ var metaEndpoints = []metaEndpoint{{
 		}})
 	},
 }, {
+	name: "resources/for-install",
+	get: func(store *charmstore.Store, url *router.ResolvedURL) (interface{}, error) {
+		if url.URL.Name != "starsay" {
+			return nil, nil
+		}
+		return &params.Resource{
+			Name:        "for-install",
+			Type:        "file",
+			Path:        "initial.tgz",
+			Description: "get things started",
+			Revision:    0,
+			Fingerprint: rawHash(hashOfString("for-install content")),
+			Size:        int64(len("for-install content")),
+		}, nil
+	},
+	checkURL: newResolvedURL("cs:~charmers/utopic/starsay-17", 17),
+	assertCheckData: func(c *gc.C, data interface{}) {
+		c.Assert(data, jc.DeepEquals, &params.Resource{
+			Name:        "for-install",
+			Type:        "file",
+			Path:        "initial.tgz",
+			Description: "get things started",
+			Revision:    0,
+			Fingerprint: rawHash(hashOfString("for-install content")),
+			Size:        int64(len("for-install content")),
+		})
+	},
+}, {
 	name: "published",
 	get: func(store *charmstore.Store, url *router.ResolvedURL) (interface{}, error) {
 		// All the entities published are in stable, not development,
