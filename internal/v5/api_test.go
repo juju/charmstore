@@ -500,6 +500,21 @@ var metaEndpoints = []metaEndpoint{{
 		c.Assert(data, gc.Equals, params.PromulgatedResponse{Promulgated: false})
 	},
 }, {
+	name: "can-ingest",
+	get: func(store *charmstore.Store, url *router.ResolvedURL) (interface{}, error) {
+		e, err := store.FindBaseEntity(&url.URL, nil)
+		if err != nil {
+			return nil, err
+		}
+		return params.CanIngestResponse{
+			CanIngest: !e.NoIngest,
+		}, nil
+	},
+	checkURL: newResolvedURL("cs:~bob/utopic/wordpress-2", -1),
+	assertCheckData: func(c *gc.C, data interface{}) {
+		c.Assert(data, gc.Equals, params.CanIngestResponse{CanIngest: true})
+	},
+}, {
 	name: "supported-series",
 	get: entityGetter(func(entity *mongodoc.Entity) interface{} {
 		if entity.URL.Series == "bundle" {

@@ -141,6 +141,7 @@ func newReqHandler() ReqHandler {
 	delete(handlers.Id, "resource")
 	delete(handlers.Meta, "resources")
 	delete(handlers.Meta, "resources/")
+	delete(handlers.Meta, "can-ingest")
 
 	h.Router = router.New(handlers, h)
 	return h

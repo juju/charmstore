@@ -56,6 +56,11 @@ func (h *ReqHandler) serveArchive(id *charm.URL, w http.ResponseWriter, req *htt
 		// TODO: investigate using 100-Continue statuses to prevent
 		// unnecessary uploads.
 		defer io.Copy(ioutil.Discard, req.Body)
+
+		// Add "noingest" so that we don't need to fetch the base entity
+		// twice in the common case when uploading a charm.
+		h.Cache.AddBaseEntityFields(charmstore.FieldSelector("noingest"))
+
 		if err := h.authorizeUpload(id, req); err != nil {
 			return errgo.Mask(err, errgo.Any)
 		}
@@ -71,7 +76,7 @@ func (h *ReqHandler) authorizeUpload(id *charm.URL, req *http.Request) error {
 	if id.User == "" {
 		return badRequestf(nil, "user not specified in entity upload URL %q", id)
 	}
-	baseEntity, err := h.Store.FindBaseEntity(id, charmstore.FieldSelector("channelacls"))
+	baseEntity, err := h.Cache.BaseEntity(id, charmstore.FieldSelector("channelacls"))
 	// Note that we pass a nil entity URL to authorizeWithPerms, because
 	// we haven't got a resolved URL at this point. At some
 	// point in the future, we may want to be able to allow
@@ -192,6 +197,22 @@ func (h *ReqHandler) servePostArchive(id *charm.URL, w http.ResponseWriter, req 
 			errgo.Is(params.ErrEntityIdNotAllowed),
 			errgo.Is(params.ErrInvalidEntity),
 		)
+	}
+	// Find the base entity before trying to update its noingest status
+	// as if this isn't the first upload of the entity, the base entity
+	// will already be cached, so we won't need any more round trips
+	// to mongo than usual.
+	baseEntity, err := h.Cache.BaseEntity(&rid.URL, charmstore.FieldSelector("noingest"))
+	if err != nil || !baseEntity.NoIngest {
+		if err := h.Store.DB.BaseEntities().UpdateId(mongodoc.BaseURL(&rid.URL), bson.D{{
+			"$set", bson.D{{
+				"noingest", true,
+			}},
+		}}); err != nil {
+			// We can't update NoIngest status but that's probably no big deal
+			// so just log the error and move on.
+			logger.Errorf("cannot update NoIngest status of entity %v: %v", &rid.URL, err)
+		}
 	}
 	return httprequest.WriteJSON(w, http.StatusOK, &params.ArchiveUploadResponse{
 		Id:            &rid.URL,
@@ -348,7 +369,7 @@ func setArchiveCacheControl(h http.Header, isPublic bool) {
 // to give to a newly uploaded charm with the given id.
 // It returns -1 if the charm is not promulgated.
 func (h *ReqHandler) getNewPromulgatedRevision(id *charm.URL) (int, error) {
-	baseEntity, err := h.Store.FindBaseEntity(id, charmstore.FieldSelector("promulgated"))
+	baseEntity, err := h.Cache.BaseEntity(id, charmstore.FieldSelector("promulgated"))
 	if err != nil && errgo.Cause(err) != params.ErrNotFound {
 		return 0, errgo.Mask(err)
 	}
