@@ -273,6 +273,7 @@ func RouterHandlers(h *ReqHandler) *router.Handlers {
 			"perm":             h.puttableBaseEntityHandler(h.metaPerm, h.putMetaPerm, "channelacls"),
 			"perm/":            h.puttableBaseEntityHandler(h.metaPermWithKey, h.putMetaPermWithKey, "channelacls"),
 			"promulgated":      h.baseEntityHandler(h.metaPromulgated, "promulgated"),
+			"can-ingest":       h.baseEntityHandler(h.metaCanIngest, "noingest"),
 			"resources":        h.EntityHandler(h.metaResources, "charmmeta"),
 			"resources/":       h.EntityHandler(h.metaResourcesSingle, "charmmeta"),
 			"revision-info":    router.SingleIncludeHandler(h.metaRevisionInfo),
@@ -1054,6 +1055,14 @@ func (h *ReqHandler) putMetaPerm(id *router.ResolvedURL, path string, val *json.
 func (h *ReqHandler) metaPromulgated(entity *mongodoc.BaseEntity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	return params.PromulgatedResponse{
 		Promulgated: bool(entity.Promulgated),
+	}, nil
+}
+
+// GET id/meta/can-ingest
+// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetacan-ingest
+func (h *ReqHandler) metaCanIngest(entity *mongodoc.BaseEntity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
+	return params.CanIngestResponse{
+		CanIngest: !entity.NoIngest,
 	}, nil
 }
 

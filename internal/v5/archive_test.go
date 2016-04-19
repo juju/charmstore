@@ -645,6 +645,33 @@ func (s *ArchiveSuite) TestPostHashMismatch(c *gc.C) {
 	})
 }
 
+func (s *ArchiveSuite) TestPostEntityClearsCanIngest(c *gc.C) {
+	id := newResolvedURL("~charmers/precise/juju-gui-0", -1)
+	s.assertUploadCharm(c, "PUT", id, "wordpress", nil)
+	s.setPublic(c, id)
+
+	// Sanity check that can-ingest is false after the initial PUT.
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		URL:     storeURL(id.URL.Path() + "/meta/can-ingest"),
+		ExpectBody: params.CanIngestResponse{
+			CanIngest: true,
+		},
+	})
+	id1 := *id
+	id1.URL.Revision = 1
+	s.assertUploadCharm(c, "POST", &id1, "mysql", nil)
+
+	// Uploading with POST should have set can-ingest to false.
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		URL:     storeURL(id.URL.Path() + "/meta/can-ingest"),
+		ExpectBody: params.CanIngestResponse{
+			CanIngest: false,
+		},
+	})
+}
+
 func invalidZip() io.ReadSeeker {
 	return strings.NewReader("invalid zip content")
 }

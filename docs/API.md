@@ -1444,6 +1444,26 @@ Example: `GET trusty/wordpress-42/meta/promulgated`
 }
 ```
 
+#### GET *id*/meta/can-ingest
+
+The `can-ingest` path reports whether the entity with the given ID is
+eligible for ingestion. When an entity is manually uploaded (via the /archive
+endpoint with the POST method), it becomes ineligible for ingestion.
+
+```go
+type CanIngestResponse struct {
+	CanIngest bool
+}
+```
+
+Example: `GET trusty/wordpress-42/meta/can-ingest`
+
+```json
+{
+	"CanIngest": false
+}
+```
+
 #### GET *id*/meta/stats
 
 <pre>
