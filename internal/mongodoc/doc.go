@@ -200,12 +200,12 @@ type BaseEntity struct {
 	// set of resource names holding the currently published resource
 	// version for that channel and resource name.
 	ChannelResources map[params.Channel][]ResourceRevision
-	
+
 	// NoIngest is set to true when a charm or bundle has been uploaded
 	// with a POST request. Since the ingester only uses PUT requests
 	// at present, this signifies that someone has taken over control from
 	// the ingester.
-	NoIngest bool	`bson:",omitempty"`
+	NoIngest bool `bson:",omitempty"`
 }
 
 // ResourceRevision specifies an association of a resource name to a

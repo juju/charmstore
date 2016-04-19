@@ -1179,7 +1179,6 @@ func (s *ArchiveSuite) TestArchiveFileErrors(c *gc.C) {
 			Handler:      s.srv,
 			URL:          storeURL(test.path),
 			Do:           bakeryDo(nil),
-			Method:       "GET",
 			ExpectStatus: test.expectStatus,
 			ExpectBody: params.Error{
 				Message: test.expectMessage,

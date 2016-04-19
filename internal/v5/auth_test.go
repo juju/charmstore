@@ -4,6 +4,7 @@
 package v5_test // import "gopkg.in/juju/charmstore.v5-unstable/internal/v5"
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -167,29 +168,6 @@ func (j *cookieJar) SetCookies(url *url.URL, cookies []*http.Cookie) {
 
 func noInteraction(*url.URL) error {
 	return fmt.Errorf("unexpected interaction required")
-}
-
-// dischargedAuthCookie retrieves and discharges an authentication macaroon cookie. It adds the provided
-// first-party caveats before discharging the macaroon.
-func dischargedAuthCookie(c *gc.C, srv http.Handler, caveats ...string) *http.Cookie {
-	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
-		Handler: srv,
-		URL:     storeURL("macaroon"),
-		Method:  "GET",
-	})
-	var m macaroon.Macaroon
-	err := json.Unmarshal(rec.Body.Bytes(), &m)
-	c.Assert(err, gc.IsNil)
-	for _, cav := range caveats {
-		err := m.AddFirstPartyCaveat(cav)
-		c.Assert(err, gc.IsNil)
-	}
-	client := httpbakery.NewClient()
-	ms, err := client.DischargeAll(&m)
-	c.Assert(err, gc.IsNil)
-	macaroonCookie, err := httpbakery.NewCookie(ms)
-	c.Assert(err, gc.IsNil)
-	return macaroonCookie
 }
 
 type authSuite struct {
@@ -387,14 +365,6 @@ var readAuthorizationTests = []struct {
 		Message: `unauthorized: access denied for user "kirk"`,
 	},
 }}
-
-func dischargeForUser(username string) func(_, _ string) ([]checkers.Caveat, error) {
-	return func(_, _ string) ([]checkers.Caveat, error) {
-		return []checkers.Caveat{
-			checkers.DeclaredCaveat(v5.UsernameAttr, username),
-		}, nil
-	}
-}
 
 func (s *authSuite) TestReadAuthorization(c *gc.C) {
 	for i, test := range readAuthorizationTests {
@@ -1055,6 +1025,242 @@ func (s *authSuite) TestDelegatableMacaroonWithBasicAuth(c *gc.C) {
 	})
 }
 
+func (s *authSuite) TestDelegatableMacaroonWithIds(c *gc.C) {
+	err := s.store.AddCharmWithArchive(newResolvedURL("~charmers/utopic/wordpress-1", 1), storetesting.NewCharm(nil))
+	c.Assert(err, gc.IsNil)
+	err = s.store.AddCharmWithArchive(newResolvedURL("~charmers/utopic/wordpress-2", 2), storetesting.NewCharm(nil))
+	c.Assert(err, gc.IsNil)
+	err = s.store.AddCharmWithArchive(newResolvedURL("~charmers/precise/mysql-1", 1), storetesting.NewCharm(nil))
+	c.Assert(err, gc.IsNil)
+
+	// Check that we can't acquire a delegatable macaroon if we
+	// don't already have permission.
+	s.doAsUser("bob", func() {
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler:      s.srv,
+			URL:          storeURL("delegatable-macaroon?channel=unpublished&id=wordpress"),
+			Do:           bakeryDo(nil),
+			ExpectStatus: http.StatusUnauthorized,
+			ExpectBody: params.Error{
+				Message: `unauthorized: access denied for user "bob"`,
+				Code:    params.ErrUnauthorized,
+			},
+		})
+	})
+
+	// Get a delegatable macaroon for "wordpress", which should
+	// tied to the latest revision.
+	var m *macaroon.Macaroon
+	s.doAsUser("charmers", func() {
+		m = s.getDelegatableMacaroon(c, params.UnpublishedChannel, "wordpress")
+	})
+
+	s.doAsUser("bob", func() {
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler:      s.srv,
+			URL:          storeURL("wordpress/meta/id-revision?channel=unpublished"),
+			Header:       macaroonHeader(nil, macaroon.Slice{m}),
+			ExpectStatus: http.StatusOK,
+			ExpectBody: params.IdRevisionResponse{
+				Revision: 2,
+			},
+		})
+		// Check that we can't use the macaroon to access a different revision
+		// from the original.
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler:      s.srv,
+			URL:          storeURL("utopic/wordpress-1/meta/id-revision?channel=unpublished"),
+			Do:           bakeryDo(nil),
+			Header:       macaroonHeader(nil, macaroon.Slice{m}),
+			ExpectStatus: http.StatusUnauthorized,
+			ExpectBody: params.Error{
+				Message: `unauthorized: access denied for user "bob"`,
+				Code:    params.ErrUnauthorized,
+			},
+		})
+
+		// ... and that we can't use it to access a different charm.
+		s.discharge = dischargeForUser("bob")
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler:      s.srv,
+			URL:          storeURL("precise/mysql/meta/id-revision?channel=unpublished"),
+			Do:           bakeryDo(nil),
+			Header:       macaroonHeader(nil, macaroon.Slice{m}),
+			ExpectStatus: http.StatusUnauthorized,
+			ExpectBody: params.Error{
+				Message: `unauthorized: access denied for user "bob"`,
+				Code:    params.ErrUnauthorized,
+			},
+		})
+	})
+}
+
+func (s *authSuite) TestRenewDelegatableMacaroonWithIds(c *gc.C) {
+	err := s.store.AddCharmWithArchive(newResolvedURL("~charmers/utopic/wordpress-1", 1), storetesting.NewCharm(nil))
+	c.Assert(err, gc.IsNil)
+
+	// Fake the current time so that we can easily test expiration times.
+	t0 := time.Now()
+	currentTime := t0
+	s.PatchValue(v5.TimeNow, func() time.Time {
+		return currentTime
+	})
+
+	var m *macaroon.Macaroon
+	s.doAsUser("charmers", func() {
+		m = s.getDelegatableMacaroon(c, params.UnpublishedChannel, "wordpress")
+	})
+
+	// Check that the delegatable macaroon works.
+	s.doAsUser("", func() {
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler:      s.srv,
+			URL:          storeURL("wordpress/meta/id-revision?channel=unpublished"),
+			Header:       macaroonHeader(nil, macaroon.Slice{m}),
+			ExpectStatus: http.StatusOK,
+			ExpectBody: params.IdRevisionResponse{
+				Revision: 1,
+			},
+		})
+	})
+
+	// If we try again after the active expiry time, we should get
+	// a discharge-required error.
+	currentTime = t0.Add(v5.DelegatableMacaroonExpiry + time.Second)
+
+	s.doAsUser("", func() {
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler:      s.srv,
+			URL:          storeURL("wordpress/meta/id-revision?channel=unpublished"),
+			Header:       macaroonHeader(nil, macaroon.Slice{m}),
+			ExpectStatus: http.StatusProxyAuthRequired,
+			ExpectBody: httptesting.BodyAsserter(func(c *gc.C, m json.RawMessage) {
+			}),
+		})
+	})
+
+	// Try with the bakery client - the macaroon should be automatically renewed
+	// and stored in the cookie jar.
+	client := httpbakery.NewHTTPClient()
+	s.doAsUser("", func() {
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler: s.srv,
+			Do:      bakeryDo(client),
+			URL:     storeURL("wordpress/meta/id-revision?channel=unpublished"),
+			Header:  macaroonHeader(nil, macaroon.Slice{m}),
+			ExpectBody: params.IdRevisionResponse{
+				Revision: 1,
+			},
+		})
+	})
+
+	// Try again without the original macaroon to check that we've
+	// actually acquired the renewed macaroon.
+	s.doAsUser("", func() {
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler: s.srv,
+			Do:      bakeryDo(client),
+			URL:     storeURL("wordpress/meta/id-revision?channel=unpublished"),
+			ExpectBody: params.IdRevisionResponse{
+				Revision: 1,
+			},
+		})
+	})
+	// Try again after the second expiry time, using the same cookie
+	// jar but not using the bakery client. We should get a discharge-denied error.
+	currentTime = currentTime.Add(v5.DelegatableMacaroonExpiry + time.Second)
+
+	client1 := httpbakery.NewHTTPClient()
+	client1.Jar = client.Jar
+	s.doAsUser("", func() {
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler:      s.srv,
+			Do:           client1.Do,
+			URL:          storeURL("wordpress/meta/id-revision?channel=unpublished"),
+			ExpectStatus: http.StatusProxyAuthRequired,
+			ExpectBody: httptesting.BodyAsserter(func(c *gc.C, m json.RawMessage) {
+			}),
+		})
+	})
+	// Check again that we can renew the macaroon.
+	s.doAsUser("", func() {
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler: s.srv,
+			Do:      bakeryDo(client),
+			URL:     storeURL("wordpress/meta/id-revision?channel=unpublished"),
+			ExpectBody: params.IdRevisionResponse{
+				Revision: 1,
+			},
+		})
+	})
+}
+
+func (s *authSuite) TestDelegatableMacaroonCannotBeUsedForWriting(c *gc.C) {
+	currentTime := time.Now()
+	s.PatchValue(v5.TimeNow, func() time.Time {
+		return currentTime
+	})
+
+	id := newResolvedURL("~charmers/utopic/wordpress-1", 1)
+	err := s.store.AddCharmWithArchive(id, storetesting.NewCharm(nil))
+	c.Assert(err, gc.IsNil)
+	err = s.store.SetPerms(&id.URL, "stable.read", "bob")
+	c.Assert(err, gc.IsNil)
+	err = s.store.Publish(id, nil, params.StableChannel)
+	c.Assert(err, gc.IsNil)
+
+	var m *macaroon.Macaroon
+	s.doAsUser("bob", func() {
+		m = s.getDelegatableMacaroon(c, params.StableChannel, "~charmers/utopic/wordpress-1")
+	})
+
+	s.doAsUser("", func() {
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler:      s.srv,
+			Method:       "PUT",
+			URL:          storeURL("wordpress/meta/extra-info/foo"),
+			Header:       macaroonHeader(nil, macaroon.Slice{m}),
+			ExpectStatus: http.StatusUnauthorized,
+			ExpectBody: params.Error{
+				Code:    params.ErrUnauthorized,
+				Message: `unauthorized: access denied for user "bob"`,
+			},
+		})
+	})
+}
+
+func (s *authSuite) TestRenewMacaroon(c *gc.C) {
+	m, err := macaroon.New([]byte("key"), "id", "somewhere")
+	c.Assert(err, gc.IsNil)
+	m.AddFirstPartyCaveat("active-time-before xxx")
+	m.AddFirstPartyCaveat("hello")
+	m.AddThirdPartyCaveat([]byte("otherkey"), "x", "location")
+	m.AddFirstPartyCaveat("goodbye")
+	m.AddFirstPartyCaveat("active-time-before yyy")
+
+	newm, err := macaroon.New([]byte("otherkey"), "id2", "somewhere")
+	c.Assert(err, gc.IsNil)
+
+	expectTime := "2016-04-22T16:30:00Z"
+
+	expiry, err := time.Parse(time.RFC3339, expectTime)
+	c.Assert(err, gc.IsNil)
+
+	err = v5.RenewMacaroon(newm, macaroon.Slice{m}, expiry)
+	c.Assert(err, gc.IsNil)
+
+	// The new macaroon should have all the first party caveats
+	// from the original, omitting the third party caveats
+	// and with a new active-time-before caveat.
+	c.Assert(newm.Caveats(), jc.DeepEquals, []macaroon.Caveat{{
+		Id: "hello",
+	}, {
+		Id: "goodbye",
+	}, {
+		Id: "active-time-before " + expectTime,
+	}})
+}
+
 func (s *authSuite) TestGroupsForUserSuccess(c *gc.C) {
 	h := s.handler(c)
 	defer h.Close()
@@ -1115,8 +1321,55 @@ func (s *authSuite) TestGroupsForUserWithBadErrorResponse(c *gc.C) {
 	c.Assert(groups, gc.HasLen, 0)
 }
 
+// getDelegatableMacaroon acquires a delegatable macaroon good for
+// accessing the given URLs.
+func (s *authSuite) getDelegatableMacaroon(c *gc.C, ch params.Channel, urlStrs ...string) *macaroon.Macaroon {
+	var gotBody json.RawMessage
+	p := url.Values{
+		"id": urlStrs,
+	}
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		URL:     storeURL("delegatable-macaroon?channel=" + string(ch) + "&" + p.Encode()),
+		Do:      bakeryDo(nil),
+		ExpectBody: httptesting.BodyAsserter(func(c *gc.C, body json.RawMessage) {
+			gotBody = body
+		}),
+	})
+	c.Assert(gotBody, gc.NotNil)
+	var m macaroon.Macaroon
+	err := json.Unmarshal(gotBody, &m)
+	c.Assert(err, jc.ErrorIsNil)
+	return &m
+}
+
 type errorTransport string
 
 func (e errorTransport) RoundTrip(*http.Request) (*http.Response, error) {
 	return nil, errgo.New(string(e))
+}
+
+func dischargeForUser(username string) func(_, _ string) ([]checkers.Caveat, error) {
+	return func(_, _ string) ([]checkers.Caveat, error) {
+		return []checkers.Caveat{
+			checkers.DeclaredCaveat(v5.UsernameAttr, username),
+		}, nil
+	}
+}
+
+func noDischarge(_, _ string) ([]checkers.Caveat, error) {
+	return nil, errgo.New("no discharge")
+}
+
+func macaroonHeader(h http.Header, ms macaroon.Slice) http.Header {
+	if h == nil {
+		h = make(http.Header)
+	}
+	data, err := json.Marshal(ms)
+	if err != nil {
+		panic(err)
+	}
+	value := base64.StdEncoding.EncodeToString(data)
+	h.Add(httpbakery.MacaroonsHeader, value)
+	return h
 }

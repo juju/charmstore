@@ -36,6 +36,9 @@ const (
 	defaultMacaroonExpiry = 24 * time.Hour
 )
 
+// timeNow is defined as a variable so that it can be overridden in tests.
+var timeNow = time.Now
+
 // authorize checks that the current user is authorized based on the provided
 // ACL and optional entity. If an authenticated user is required, authorize tries to retrieve the
 // current user in the following ways:
@@ -81,7 +84,7 @@ func (h *ReqHandler) authorize(req *http.Request, acl []string, alwaysAuth bool,
 		return auth, nil
 	}
 	if _, ok := errgo.Cause(verr).(*bakery.VerificationError); !ok {
-		return authorization{}, errgo.Mask(verr, errgo.Is(params.ErrUnauthorized))
+		return authorization{}, errgo.Mask(verr, errgo.Is(params.ErrUnauthorized), isDischargeRequiredError)
 	}
 
 	// Macaroon verification failed: mint a new macaroon.
@@ -120,8 +123,10 @@ func (h *ReqHandler) AuthorizeEntityAndTerms(req *http.Request, entityIds []*rou
 		return authorization{}, errgo.Mask(err)
 	}
 
-	// if all entities are open to everyone and non of the entities defines any Terms, then we return nil
+	// If all entities are open to everyone and non of the entities
+	// defines any Terms, then it's not an error.
 	if public {
+		// TODO return Username=everyone?
 		return authorization{}, nil
 	}
 
@@ -192,6 +197,13 @@ func (h *ReqHandler) newDischargeRequiredError(m *macaroon.Macaroon, verr error,
 	return dischargeErr
 }
 
+func isDischargeRequiredError(err error) bool {
+	if err, ok := errgo.Cause(err).(*httpbakery.Error); ok && err.Code == httpbakery.ErrDischargeRequired {
+		return true
+	}
+	return false
+}
+
 // entityAuthInfo returns authorization on the entities with the given ids.
 // If public is true, no authorization is required, otherwise acls holds
 // an entry for each id with the corresponding ACL for each entity,
@@ -232,6 +244,8 @@ func (h *ReqHandler) entityAuthInfo(entityIds []*router.ResolvedURL) (public boo
 	return public, acls, requiredTerms, nil
 }
 
+var errActiveTimeExpired = errgo.New("active time expired")
+
 // CheckRequest checks for any authorization tokens in the request and
 // returns any found as an authorization. If no suitable credentials are
 // found, or an error occurs, then a zero valued authorization is
@@ -251,8 +265,8 @@ func (h *ReqHandler) CheckRequest(req *http.Request, entityIds []*router.Resolve
 	if errgo.Cause(err) != errNoCreds || bk == nil || h.Handler.config.IdentityLocation == "" {
 		return authorization{}, errgo.WithCausef(err, params.ErrUnauthorized, "authentication failed")
 	}
-
-	attrMap, err := httpbakery.CheckRequest(bk, req, nil, checkers.New(
+	active := true
+	reqCheckers := checkers.New(
 		checkers.CheckerFunc{
 			Condition_: "is-entity",
 			Check_: func(_, args string) error {
@@ -260,15 +274,82 @@ func (h *ReqHandler) CheckRequest(req *http.Request, entityIds []*router.Resolve
 			},
 		},
 		checkers.OperationChecker(operation),
-	))
-	if err != nil {
-		return authorization{}, errgo.Mask(err, errgo.Any)
-	}
+		checkers.CheckerFunc{
+			Condition_: condActiveTimeBefore,
+			Check_: func(_, args string) error {
+				t, err := time.Parse(time.RFC3339Nano, args)
+				if err != nil {
+					return errgo.Mask(err)
+				}
+				logger.Infof("active time (active %v); %v < %v ?", active, timeNow(), t)
+				if !active || timeNow().Before(t) {
+					return nil
+				}
+				return errActiveTimeExpired
+			},
+		},
+	)
 
+	attrMap, _, err := httpbakery.CheckRequestM(bk, req, nil, reqCheckers)
+	if err != nil {
+		verr, ok := errgo.Cause(err).(*bakery.VerificationError)
+		if !ok || errgo.Cause(verr.Reason) != errActiveTimeExpired {
+			return authorization{}, errgo.Mask(err, errgo.Any)
+		}
+		// Set active to false and see if the macaroon can be used to self-renew.
+		active = false
+		_, ms, err := httpbakery.CheckRequestM(bk, req, nil, reqCheckers)
+		if err != nil {
+			return authorization{}, errgo.Mask(err, errgo.Any)
+		}
+		// The active time period of the macaroon has expired, but it's
+		// otherwise still valid. Mint another macaroon with a later expiration
+		// date but all other first party caveats the same.
+		newm, err := h.Store.Bakery.NewMacaroon("", nil, nil)
+		if err != nil {
+			return authorization{}, errgo.Notef(err, "cannot make renewed macaroon")
+		}
+		activeExpireTime := timeNow().Add(DelegatableMacaroonExpiry)
+		logger.Infof("renewing macaroon; new active expire time %v", activeExpireTime)
+		err = renewMacaroon(newm, ms, activeExpireTime)
+		if err != nil {
+			return authorization{}, errgo.Notef(err, "cannot renew macaroon")
+		}
+		return authorization{}, h.newDischargeRequiredError(newm, errgo.New("active lifetime expired; renew macaroon"), req)
+	}
+	logger.Infof("check request succeeded at time %v", timeNow())
+	// TODO check username is non-empty?
 	return authorization{
 		Admin:    false,
 		Username: attrMap[UsernameAttr],
 	}, nil
+}
+
+// renewMacaroon renews the macaroons in the given slice by copying all
+// their first-party caveats onto newm, except for active-time-before,
+// which gets extended to the given new expiry time.
+func renewMacaroon(newm *macaroon.Macaroon, ms macaroon.Slice, newExpiry time.Time) error {
+	for _, m := range ms {
+		for _, c := range m.Caveats() {
+			if c.Location != "" {
+				continue
+			}
+			if strings.HasPrefix(c.Id, condActiveTimeBefore+" ") {
+				// Ignore any old active-time-before caveats.
+				continue
+			}
+			if err := newm.AddFirstPartyCaveat(c.Id); err != nil {
+				// Can't happen in fact, as the only failure
+				// mode is when the id is too big but we know
+				// it's small enough because it came from a macaroon.
+				return errgo.Mask(err)
+			}
+		}
+	}
+	if err := newm.AddFirstPartyCaveat(activeTimeBeforeCaveat(newExpiry).Condition); err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
 }
 
 // areAllowedEntities checks if all entityIds are in the allowedEntities list (space
@@ -424,7 +505,7 @@ func (h *ReqHandler) newMacaroon(caveats ...checkers.Caveat) (*macaroon.Macaroon
 			},
 			UsernameAttr,
 		),
-		checkers.TimeBeforeCaveat(time.Now().Add(defaultMacaroonExpiry)),
+		checkers.TimeBeforeCaveat(timeNow().Add(defaultMacaroonExpiry)),
 	)
 	// TODO generate different caveats depending on the requested operation
 	// and whether there's a charm id or not.
@@ -456,4 +537,15 @@ func parseCredentials(req *http.Request) (username, password string, err error) 
 		return "", "", errgo.New("invalid HTTP auth contents")
 	}
 	return tokens[0], tokens[1], nil
+}
+
+const condActiveTimeBefore = "active-time-before"
+
+// activeTimeBeforeCaveat returns a caveat that will be satisfied
+// before the given time; after the given time, it will only
+// be satisfied if the macaroon is being renewed.
+func activeTimeBeforeCaveat(t time.Time) checkers.Caveat {
+	return checkers.Caveat{
+		Condition: condActiveTimeBefore + " " + t.UTC().Format(time.RFC3339Nano),
+	}
 }

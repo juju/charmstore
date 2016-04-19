@@ -1234,10 +1234,10 @@ func (h *ReqHandler) serveDelegatableMacaroon(_ http.Header, req *http.Request) 
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	entityIds := values["id"]
+	idStrs := values["id"]
 	// No entity ids, so we provide a macaroon that's good for any entity that the
 	// user can access, as long as that entity doesn't have terms and conditions.
-	if len(entityIds) == 0 {
+	if len(idStrs) == 0 {
 		auth, err := h.authorize(req, []string{params.Everyone}, true, nil)
 		if err != nil {
 			return nil, errgo.Mask(err, errgo.Any)
@@ -1256,41 +1256,52 @@ func (h *ReqHandler) serveDelegatableMacaroon(_ http.Header, req *http.Request) 
 		}
 		return m, nil
 	}
-	resolvedURLs := make([]*router.ResolvedURL, len(entityIds))
-	for i, id := range entityIds {
-		charmRef, err := charm.ParseURL(id)
+	urls := make([]*charm.URL, len(idStrs))
+	for i, idStr := range idStrs {
+		u, err := charm.ParseURL(idStr)
 		if err != nil {
-			return nil, errgo.WithCausef(err, params.ErrBadRequest, `bad "id" parameter`)
+			return nil, errgo.WithCausef(err, params.ErrBadRequest, `bad "id" parameter %q`, idStr)
 		}
-		resolvedURL, err := h.ResolveURL(charmRef)
-		if err != nil {
-			return nil, errgo.Mask(err)
+		urls[i] = u
+	}
+	ids, err := h.ResolveURLs(urls)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	// ResolveURLs will return nil elements for any ids that aren't found.
+	for i, id := range ids {
+		if id == nil {
+			return nil, errgo.WithCausef(err, params.ErrNotFound, "%q not found", idStrs[i])
 		}
-		resolvedURLs[i] = resolvedURL
+		// Adjust the original id string so it will always refer to the
+		// canononical URL.
+		idStrs[i] = id.URL.String()
 	}
 
 	// Note that we require authorization even though we allow
 	// anyone to obtain a delegatable macaroon. This means
 	// that we will be able to add the declared caveats to
 	// the returned macaroon.
-	auth, err := h.AuthorizeEntityAndTerms(req, resolvedURLs)
+	auth, err := h.AuthorizeEntityAndTerms(req, ids)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
 	if auth.Username == "" {
-		return nil, errgo.WithCausef(nil, params.ErrForbidden, "delegatable macaroon is not obtainable using admin credentials")
+		if !auth.Admin {
+			return nil, errgo.WithCausef(nil, params.ErrForbidden, "delegatable macaroon cannot be obtained for public entities")
+		}
+		return nil, errgo.WithCausef(nil, params.ErrForbidden, "delegatable macaroon is not obtainable using admin credentials (admin %v)", auth.Admin)
 	}
 
-	resolvedURLstrings := make([]string, len(resolvedURLs))
-	for i, resolvedURL := range resolvedURLs {
-		resolvedURLstrings[i] = resolvedURL.URL.String()
-	}
+	// After this time, clients will be forced to renew the macaroon, even
+	// though it remains technically valid.
+	activeExpireTime := time.Now().Add(DelegatableMacaroonExpiry)
 
 	// TODO propagate expiry time from macaroons in request.
 	m, err := h.Store.Bakery.NewMacaroon("", nil, []checkers.Caveat{
 		checkers.DeclaredCaveat(UsernameAttr, auth.Username),
-		checkers.TimeBeforeCaveat(time.Now().Add(DelegatableMacaroonExpiry)),
-		checkers.Caveat{Condition: "is-entity " + strings.Join(resolvedURLstrings, " ")},
+		checkers.Caveat{Condition: "is-entity " + strings.Join(idStrs, " ")},
+		activeTimeBeforeCaveat(activeExpireTime),
 	})
 	if err != nil {
 		return nil, errgo.Mask(err)

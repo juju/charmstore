@@ -4,12 +4,12 @@
 package v5 // import "gopkg.in/juju/charmstore.v5-unstable/internal/v5"
 
 var (
-	ProcessIcon          = processIcon
-	ErrProbablyNotXML    = errProbablyNotXML
-	TestAddAuditCallback = &testAddAuditCallback
-	FromResourceDoc      = fromResourceDoc
-
+	ProcessIcon               = processIcon
+	ErrProbablyNotXML         = errProbablyNotXML
+	TestAddAuditCallback      = &testAddAuditCallback
+	FromResourceDoc           = fromResourceDoc
 	GetNewPromulgatedRevision = (*ReqHandler).getNewPromulgatedRevision
-
-	ResolveURL = resolveURL
+	ResolveURL                = resolveURL
+	RenewMacaroon             = renewMacaroon
+	TimeNow                   = &timeNow
 )
