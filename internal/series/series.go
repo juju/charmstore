@@ -36,7 +36,7 @@ type SeriesInfo struct {
 // Series contains the data charmstore knows about series names
 var Series = map[string]SeriesInfo{
 	// Bundle
-	"bundle": {false, "", true, 1.1255},
+	"bundle": {false, "", true, 1.1380},
 
 	// Ubuntu
 	"oneiric": {true, Ubuntu, false, 0},
@@ -46,9 +46,10 @@ var Series = map[string]SeriesInfo{
 	"saucy":   {true, Ubuntu, false, 0},
 	"trusty":  {true, Ubuntu, true, 1.125},
 	"utopic":  {true, Ubuntu, false, 0},
-	"vivid":   {true, Ubuntu, true, 1.101},
+	"vivid":   {true, Ubuntu, false, 0},
 	"wily":    {true, Ubuntu, true, 1.102},
-	"xenial":  {true, Ubuntu, true, 1.103},
+	"xenial":  {true, Ubuntu, true, 1.1375},
+	"yakkety": {true, Ubuntu, true, 1.103},
 
 	// Windows
 	"win2012hvr2": {true, Windows, true, 1.1},
