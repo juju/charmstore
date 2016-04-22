@@ -672,6 +672,39 @@ func (s *ArchiveSuite) TestPostEntityClearsCanIngest(c *gc.C) {
 	})
 }
 
+func (s *ArchiveSuite) TestPostEntityWithIngestDoesNotClearCanIngest(c *gc.C) {
+	id := newResolvedURL("~charmers/precise/juju-gui-0", -1)
+	s.assertUploadCharm(c, "PUT", id, "wordpress", nil)
+	s.setPublic(c, id)
+
+	// Sanity check that can-ingest is false after the initial PUT.
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		URL:     storeURL(id.URL.Path() + "/meta/can-ingest"),
+		ExpectBody: params.CanIngestResponse{
+			CanIngest: true,
+		},
+	})
+	id1 := *id
+	id1.URL.Revision = 1
+	ch := storetesting.Charms.CharmArchive(c.MkDir(), "mysql")
+	s.assertUpload(c, uploadParams{
+		method:   "POST",
+		id:       &id1,
+		fileName: ch.Path,
+		ingest:   true,
+	})
+
+	// Uploading with POST but with the ingest flag should leave can-ingest as it is.
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		URL:     storeURL(id.URL.Path() + "/meta/can-ingest"),
+		ExpectBody: params.CanIngestResponse{
+			CanIngest: true,
+		},
+	})
+}
+
 func invalidZip() io.ReadSeeker {
 	return strings.NewReader("invalid zip content")
 }
@@ -904,7 +937,12 @@ func (s *ArchiveSuite) assertCannotUpload(c *gc.C, id string, content io.ReadSee
 // that the charm will be given when uploaded.
 func (s *commonArchiveSuite) assertUploadCharm(c *gc.C, method string, url *router.ResolvedURL, charmName string, chans []params.Channel) *charm.CharmArchive {
 	ch := storetesting.Charms.CharmArchive(c.MkDir(), charmName)
-	id, size := s.assertUpload(c, method, url, ch.Path, nil)
+	id, size := s.assertUpload(c, uploadParams{
+		method:   method,
+		id:       url,
+		fileName: ch.Path,
+		chans:    chans,
+	})
 	s.assertEntityInfo(c, entityInfo{
 		Id: id,
 		Meta: entityMetaInfo{
@@ -924,7 +962,11 @@ func (s *commonArchiveSuite) assertUploadBundle(c *gc.C, method string, url *rou
 	path := storetesting.Charms.BundleArchivePath(c.MkDir(), bundleName)
 	b, err := charm.ReadBundleArchive(path)
 	c.Assert(err, gc.IsNil)
-	id, size := s.assertUpload(c, method, url, path, nil)
+	id, size := s.assertUpload(c, uploadParams{
+		method:   method,
+		id:       url,
+		fileName: path,
+	})
 	s.assertEntityInfo(c, entityInfo{
 		Id: id,
 		Meta: entityMetaInfo{
@@ -935,8 +977,16 @@ func (s *commonArchiveSuite) assertUploadBundle(c *gc.C, method string, url *rou
 	)
 }
 
-func (s *commonArchiveSuite) assertUpload(c *gc.C, method string, url *router.ResolvedURL, fileName string, chans []params.Channel) (id *charm.URL, size int64) {
-	f, err := os.Open(fileName)
+type uploadParams struct {
+	method   string
+	id       *router.ResolvedURL
+	fileName string
+	chans    []params.Channel
+	ingest   bool
+}
+
+func (s *commonArchiveSuite) assertUpload(c *gc.C, p uploadParams) (id *charm.URL, size int64) {
+	f, err := os.Open(p.fileName)
 	c.Assert(err, gc.IsNil)
 	defer f.Close()
 
@@ -950,24 +1000,27 @@ func (s *commonArchiveSuite) assertUpload(c *gc.C, method string, url *router.Re
 	_, err = f.Seek(0, 0)
 	c.Assert(err, gc.IsNil)
 
-	uploadURL := url.URL
-	if method == "POST" {
+	uploadURL := p.id.URL
+	if p.method == "POST" {
 		uploadURL.Revision = -1
 	}
 
 	path := fmt.Sprintf("%s/archive?hash=%s", uploadURL.Path(), hashSum)
-	for _, c := range chans {
+	for _, c := range p.chans {
 		path += fmt.Sprintf("&channel=%s", c)
 	}
-	expectId := uploadURL.WithRevision(url.URL.Revision)
-	expectedPromulgatedId := url.PromulgatedURL()
+	if p.ingest {
+		path += "&ingest=1"
+	}
+	expectId := uploadURL.WithRevision(p.id.URL.Revision)
+	expectedPromulgatedId := p.id.PromulgatedURL()
 	if expectedPromulgatedId != nil {
 		path += fmt.Sprintf("&promulgated=%s", expectedPromulgatedId.String())
 	}
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:       s.srv,
 		URL:           storeURL(path),
-		Method:        method,
+		Method:        p.method,
 		ContentLength: size,
 		Header: http.Header{
 			"Content-Type": {"application/zip"},
@@ -987,7 +1040,7 @@ func (s *commonArchiveSuite) assertUpload(c *gc.C, method string, url *router.Re
 	expectChans := map[params.Channel]bool{
 		params.UnpublishedChannel: true,
 	}
-	for _, ch := range chans {
+	for _, ch := range p.chans {
 		expectChans[ch] = true
 	}
 
@@ -996,7 +1049,7 @@ func (s *commonArchiveSuite) assertUpload(c *gc.C, method string, url *router.Re
 		params.DevelopmentChannel,
 		params.StableChannel,
 	} {
-		_, err := s.store.FindBestEntity(&url.URL, ch, nil)
+		_, err := s.store.FindBestEntity(&p.id.URL, ch, nil)
 		if expectChans[ch] {
 			c.Assert(err, gc.IsNil)
 		} else {
@@ -1005,14 +1058,15 @@ func (s *commonArchiveSuite) assertUpload(c *gc.C, method string, url *router.Re
 		}
 	}
 
-	entity, err := s.store.FindEntity(url, nil)
+	entity, err := s.store.FindEntity(p.id, nil)
 	c.Assert(err, gc.IsNil)
 	c.Assert(entity.BlobHash, gc.Equals, hashSum)
-	if url.URL.Series != "" {
+	if p.id.URL.Series != "" {
 		c.Assert(entity.BlobHash256, gc.Equals, hash256Sum)
 	}
-	c.Assert(entity.PromulgatedURL, gc.DeepEquals, url.PromulgatedURL())
-	c.Assert(entity.Development, gc.Equals, false)
+	c.Assert(entity.PromulgatedURL, gc.DeepEquals, p.id.PromulgatedURL())
+	c.Assert(entity.Development, gc.Equals, expectChans[params.DevelopmentChannel])
+	c.Assert(entity.Stable, gc.Equals, expectChans[params.StableChannel])
 
 	// Test that the expected entry has been created
 	// in the blob store.

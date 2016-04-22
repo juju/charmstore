@@ -198,20 +198,22 @@ func (h *ReqHandler) servePostArchive(id *charm.URL, w http.ResponseWriter, req 
 			errgo.Is(params.ErrInvalidEntity),
 		)
 	}
-	// Find the base entity before trying to update its noingest status
-	// as if this isn't the first upload of the entity, the base entity
-	// will already be cached, so we won't need any more round trips
-	// to mongo than usual.
-	baseEntity, err := h.Cache.BaseEntity(&rid.URL, charmstore.FieldSelector("noingest"))
-	if err != nil || !baseEntity.NoIngest {
-		if err := h.Store.DB.BaseEntities().UpdateId(mongodoc.BaseURL(&rid.URL), bson.D{{
-			"$set", bson.D{{
-				"noingest", true,
-			}},
-		}}); err != nil {
-			// We can't update NoIngest status but that's probably no big deal
-			// so just log the error and move on.
-			logger.Errorf("cannot update NoIngest status of entity %v: %v", &rid.URL, err)
+	if ingesting, _ := router.ParseBool(req.Form.Get("ingest")); !ingesting {
+		// Find the base entity before trying to update its noingest status
+		// as if this isn't the first upload of the entity, the base entity
+		// will already be cached, so we won't need any more round trips
+		// to mongo than usual.
+		baseEntity, err := h.Cache.BaseEntity(&rid.URL, charmstore.FieldSelector("noingest"))
+		if err != nil || !baseEntity.NoIngest {
+			if err := h.Store.DB.BaseEntities().UpdateId(mongodoc.BaseURL(&rid.URL), bson.D{{
+				"$set", bson.D{{
+					"noingest", true,
+				}},
+			}}); err != nil {
+				// We can't update NoIngest status but that's probably no big deal
+				// so just log the error and move on.
+				logger.Errorf("cannot update NoIngest status of entity %v: %v", &rid.URL, err)
+			}
 		}
 	}
 	return httprequest.WriteJSON(w, http.StatusOK, &params.ArchiveUploadResponse{
