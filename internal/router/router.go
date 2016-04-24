@@ -226,7 +226,7 @@ type Context interface {
 	// by nil elements.
 	ResolveURLs(ids []*charm.URL) ([]*ResolvedURL, error)
 
-	// The AuthorizeEntity function will be called to authorize requests
+	// AuthorizeEntity will be called to authorize requests
 	// to any BulkIncludeHandlers. All other handlers are expected
 	// to handle their own authorization.
 	AuthorizeEntity(id *ResolvedURL, req *http.Request) error

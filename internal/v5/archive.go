@@ -77,32 +77,36 @@ func (h *ReqHandler) authorizeUpload(id *charm.URL, req *http.Request) error {
 		return badRequestf(nil, "user not specified in entity upload URL %q", id)
 	}
 	baseEntity, err := h.Cache.BaseEntity(id, charmstore.FieldSelector("channelacls"))
-	// Note that we pass a nil entity URL to authorizeWithPerms, because
+	if err != nil && errgo.Cause(err) != params.ErrNotFound {
+		return errgo.Notef(err, "cannot retrieve entity %q for authorization", id)
+	}
+	var acl mongodoc.ACL
+	if err == nil {
+		acl = baseEntity.ChannelACLs[params.UnpublishedChannel]
+	} else {
+		// The base entity does not currently exist, so we default to
+		// assuming write permissions for the entity user.
+		acl = mongodoc.ACL{
+			Write: []string{id.User},
+		}
+	}
+	// Note that we pass no entity ids to authorize, because
 	// we haven't got a resolved URL at this point. At some
 	// point in the future, we may want to be able to allow
 	// is-entity first-party caveats to be allowed when uploading
 	// at which point we will need to rethink this a little.
-	if err == nil {
-		acls := baseEntity.ChannelACLs[params.UnpublishedChannel]
-		if err := h.authorizeWithPerms(req, acls.Read, acls.Write, nil); err != nil {
-			return errgo.Mask(err, errgo.Any)
-		}
-		return nil
-	}
-	if errgo.Cause(err) != params.ErrNotFound {
-		return errgo.Notef(err, "cannot retrieve entity %q for authorization", id)
-	}
-	// The base entity does not currently exist, so we default to
-	// assuming write permissions for the entity user.
-	if err := h.authorizeWithPerms(req, nil, []string{id.User}, nil); err != nil {
+	if _, err := h.authorize(authorizeParams{
+		req:  req,
+		acls: []mongodoc.ACL{acl},
+		ops:  []string{OpWrite},
+	}); err != nil {
 		return errgo.Mask(err, errgo.Any)
 	}
 	return nil
 }
 
 func (h *ReqHandler) serveGetArchive(id *router.ResolvedURL, w http.ResponseWriter, req *http.Request) error {
-	_, err := h.AuthorizeEntityAndTerms(req, []*router.ResolvedURL{id})
-	if err != nil {
+	if err := h.AuthorizeEntityForOp(id, req, OpReadWithTerms); err != nil {
 		return errgo.Mask(err, errgo.Any)
 	}
 	blob, err := h.Store.OpenBlob(id)

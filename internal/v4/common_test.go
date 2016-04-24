@@ -26,6 +26,7 @@ import (
 	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/v4"
+	"gopkg.in/juju/charmstore.v5-unstable/internal/v5"
 )
 
 var mgoLogger = loggo.GetLogger("mgo")
@@ -142,6 +143,8 @@ func (s *commonSuite) TearDownTest(c *gc.C) {
 
 // startServer creates a new charmstore server.
 func (s *commonSuite) startServer(c *gc.C) {
+	// Disable group caching.
+	s.PatchValue(&v5.PermCacheExpiry, time.Duration(0))
 	config := charmstore.ServerParams{
 		AuthUsername:     testUsername,
 		AuthPassword:     testPassword,

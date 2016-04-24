@@ -14,6 +14,7 @@ import (
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
+	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
 )
 
 const dateFormat = "2006-01-02"
@@ -115,7 +116,13 @@ func (h *ReqHandler) serveStatsCounter(_ http.Header, r *http.Request) (interfac
 // PUT stats/update
 // https://github.com/juju/charmstore/blob/v4/docs/API.md#put-statsupdate
 func (h *ReqHandler) serveStatsUpdate(w http.ResponseWriter, r *http.Request) error {
-	if _, err := h.authorize(r, []string{"statsupdate@cs"}, true, nil); err != nil {
+	if _, err := h.authorize(authorizeParams{
+		req: r,
+		acls: []mongodoc.ACL{{
+			Write: []string{"statsupdate@cs"},
+		}},
+		ops: []string{OpWrite},
+	}); err != nil {
 		return err
 	}
 	if r.Method != "PUT" {

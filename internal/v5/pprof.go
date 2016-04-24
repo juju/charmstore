@@ -13,14 +13,14 @@ import (
 
 type pprofHandler struct {
 	mux  *http.ServeMux
-	auth authorizer
+	auth adminAuthenticator
 }
 
-type authorizer interface {
-	authorize(req *http.Request, acl []string, alwaysAuth bool, entityId *router.ResolvedURL) (authorization, error)
+type adminAuthenticator interface {
+	authenticateAdmin(*http.Request) error
 }
 
-func newPprofHandler(auth authorizer) http.Handler {
+func newPprofHandler(auth adminAuthenticator) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/cmdline", pprof.Cmdline)
 	mux.HandleFunc("/profile", pprof.Profile)
@@ -33,7 +33,7 @@ func newPprofHandler(auth authorizer) http.Handler {
 }
 
 func (h *pprofHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	if _, err := h.auth.authorize(req, nil, true, nil); err != nil {
+	if err := h.auth.authenticateAdmin(req); err != nil {
 		router.WriteError(w, err)
 		return
 	}

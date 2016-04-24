@@ -150,6 +150,8 @@ func (s *commonSuite) TearDownTest(c *gc.C) {
 
 // startServer creates a new charmstore server.
 func (s *commonSuite) startServer(c *gc.C) {
+	// Disable group caching.
+	s.PatchValue(&v5.PermCacheExpiry, time.Duration(0))
 	config := charmstore.ServerParams{
 		AuthUsername:     testUsername,
 		AuthPassword:     testPassword,
@@ -168,6 +170,7 @@ func (s *commonSuite) startServer(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 		err = keyring.AddPublicKeyForLocation(discharger.Location(), true, pk)
 		c.Assert(err, gc.IsNil)
+		c.Logf("added public key for location %v", discharger.Location())
 	}
 	if s.enableTerms {
 		s.dischargeTerms = noDischarge
