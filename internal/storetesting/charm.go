@@ -272,3 +272,23 @@ func MetaWithResources(m *charm.Meta, resources ...string) *charm.Meta {
 	}
 	return m
 }
+
+// MetaWithCategories returns m with Categories set to categories. If m
+// is nil, new(charm.Meta) will be used instead.
+func MetaWithCategories(m *charm.Meta, categories ...string) *charm.Meta {
+	if m == nil {
+		m = new(charm.Meta)
+	}
+	m.Categories = categories
+	return m
+}
+
+// MetaWithTags returns m with Tags set to tags. If m is nil,
+// new(charm.Meta) will be used instead.
+func MetaWithTags(m *charm.Meta, tags ...string) *charm.Meta {
+	if m == nil {
+		m = new(charm.Meta)
+	}
+	m.Tags = tags
+	return m
+}

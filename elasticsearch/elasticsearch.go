@@ -337,14 +337,14 @@ func (db *Database) Search(index, type_ string, q QueryDSL) (SearchResult, error
 // marshaled as a json object and sent with the request. If v is non nil the response
 // body will be unmarshalled into the value it points to.
 func (db *Database) do(method, url string, body, v interface{}) error {
-	log.Debugf(">>> %s %s", method, url)
+	log.Tracef(">>> %s %s", method, url)
 	var r io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)
 		if err != nil {
 			return errgo.Notef(err, "can not marshaling body")
 		}
-		log.Debugf(">>> %s", b)
+		log.Tracef(">>> %s", b)
 		r = bytes.NewReader(b)
 	}
 	req, err := http.NewRequest(method, url, r)
@@ -366,8 +366,8 @@ func (db *Database) do(method, url string, body, v interface{}) error {
 		log.Debugf("*** %s", err)
 		return errgo.Notef(err, "cannot read response")
 	}
-	log.Debugf("<<< %s", resp.Status)
-	log.Debugf("<<< %s", b)
+	log.Tracef("<<< %s", resp.Status)
+	log.Tracef("<<< %s", b)
 	var eserr *ElasticSearchError
 	// TODO(mhilton) don't try to parse every response as an error.
 	if err = json.Unmarshal(b, &eserr); err != nil {

@@ -625,12 +625,14 @@ var seriesScore = map[string]int{
 	"lucid":   1000,
 	"precise": 1001,
 	"trusty":  1002,
+	"xenial":  1003,
 	"quantal": 1,
 	"raring":  2,
 	"saucy":   3,
 	"utopic":  4,
 	"vivid":   5,
 	"wily":    6,
+	"yakkety": 7,
 	// When we find a multi-series charm (no series) we
 	// will always choose it in preference to a series-specific
 	// charm
