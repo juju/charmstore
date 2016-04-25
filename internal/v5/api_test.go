@@ -1390,7 +1390,6 @@ func (s *APISuite) TestMetaTerms(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:      s.srv,
 		URL:          storeURL(id2 + "meta/terms"),
-		Method:       "GET",
 		ExpectStatus: http.StatusNotFound,
 		ExpectBody: params.Error{
 			Code:    params.ErrNotFound,
@@ -1406,7 +1405,6 @@ func (s *APISuite) TestMetaTermsBundle(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:      s.srv,
 		URL:          storeURL(id.URL.Path() + "/meta/terms"),
-		Method:       "GET",
 		ExpectStatus: http.StatusNotFound,
 		ExpectBody: params.Error{
 			Code:    params.ErrMetadataNotFound,

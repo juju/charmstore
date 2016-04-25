@@ -14,7 +14,6 @@ import (
 	"github.com/juju/testing/httptesting"
 	"github.com/julienschmidt/httprouter"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 	"gopkg.in/macaroon-bakery.v1/bakery"
@@ -159,9 +158,7 @@ func (s *commonSuite) startServer(c *gc.C) {
 	}
 	keyring := bakery.NewPublicKeyRing()
 	if s.enableIdentity {
-		s.discharge = func(_, _ string) ([]checkers.Caveat, error) {
-			return nil, errgo.New("no discharge")
-		}
+		s.discharge = noDischarge
 		discharger := bakerytest.NewDischarger(nil, func(_ *http.Request, cond string, arg string) ([]checkers.Caveat, error) {
 			return s.discharge(cond, arg)
 		})
@@ -173,9 +170,7 @@ func (s *commonSuite) startServer(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 	}
 	if s.enableTerms {
-		s.dischargeTerms = func(_, _ string) ([]checkers.Caveat, error) {
-			return nil, errgo.New("no discharge")
-		}
+		s.dischargeTerms = noDischarge
 		termsDischarger := bakerytest.NewDischarger(nil, func(_ *http.Request, cond string, arg string) ([]checkers.Caveat, error) {
 			return s.dischargeTerms(cond, arg)
 		})
@@ -436,9 +431,14 @@ func (s *commonSuite) assertPutIsUnauthorized(c *gc.C, url string, val interface
 
 // doAsUser calls the given function, discharging any authorization
 // request as the given user name.
+// If user is empty, no discharge will be allowed.
 func (s *commonSuite) doAsUser(user string, f func()) {
 	old := s.discharge
-	s.discharge = dischargeForUser(user)
+	if user != "" {
+		s.discharge = dischargeForUser(user)
+	} else {
+		s.discharge = noDischarge
+	}
 	defer func() {
 		s.discharge = old
 	}()
