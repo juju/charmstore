@@ -281,7 +281,7 @@ promulgated meta endpoint.
 
 ```go
 type PromulgateRequest struct {
-	Promulgate bool
+	Promulgated bool
 }
 ```
 
