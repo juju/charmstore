@@ -11,6 +11,7 @@ import (
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
+	"gopkg.in/juju/charmstore.v5-unstable/internal/v5"
 )
 
 // serveArchive returns a handler for /archive that falls back to v5ServeArchive
@@ -26,8 +27,7 @@ func (h ReqHandler) serveArchive(v5ServeArchive router.IdHandler) router.IdHandl
 }
 
 func (h ReqHandler) serveGetArchive(id *router.ResolvedURL, w http.ResponseWriter, req *http.Request) error {
-	_, err := h.AuthorizeEntityAndTerms(req, []*router.ResolvedURL{id})
-	if err != nil {
+	if err := h.AuthorizeEntityForOp(id, req, v5.OpReadWithTerms); err != nil {
 		return errgo.Mask(err, errgo.Any)
 	}
 	blob, err := h.Store.OpenBlobPreV5(id)

@@ -867,7 +867,7 @@ var isEntityCaveatTests = []struct {
 	expectError: `verification failed: caveat "is-entity cs:~charmers/utopic/wordpress-42" not satisfied: operation on entity cs:utopic/wordpress-9 not allowed`,
 }, {
 	url:         "log",
-	expectError: `verification failed: caveat "is-entity cs:~charmers/utopic/wordpress-42" not satisfied: operation does not involve any of the allowed entities cs:~charmers/utopic/wordpress-42`,
+	expectError: `verification failed: caveat "is-entity cs:~charmers/utopic/wordpress-42" not satisfied: operation does not involve any entities`,
 }}
 
 func (s *authSuite) TestIsEntityCaveat(c *gc.C) {
@@ -1259,66 +1259,6 @@ func (s *authSuite) TestRenewMacaroon(c *gc.C) {
 	}, {
 		Id: "active-time-before " + expectTime,
 	}})
-}
-
-func (s *authSuite) TestGroupsForUserSuccess(c *gc.C) {
-	h := s.handler(c)
-	defer h.Close()
-	s.idM.groups = map[string][]string{
-		"bob": {"one", "two"},
-	}
-	groups, err := h.GroupsForUser("bob")
-	c.Assert(err, gc.IsNil)
-	c.Assert(groups, jc.DeepEquals, []string{"one", "two"})
-}
-
-func (s *authSuite) TestGroupsForUserWithNoIdentity(c *gc.C) {
-	h := s.handler(c)
-	defer h.Close()
-	groups, err := h.GroupsForUser("someone")
-	c.Assert(err, gc.IsNil)
-	c.Assert(groups, gc.HasLen, 0)
-}
-
-func (s *authSuite) TestGroupsForUserWithInvalidIdentityURL(c *gc.C) {
-	s.PatchValue(&s.srvParams.IdentityAPIURL, ":::::")
-	h := s.handler(c)
-	defer h.Close()
-	groups, err := h.GroupsForUser("someone")
-	c.Assert(err, gc.ErrorMatches, `cannot get groups for someone: cannot parse ":::::": parse :::::: missing protocol scheme`)
-	c.Assert(groups, gc.HasLen, 0)
-}
-
-func (s *authSuite) TestGroupsForUserWithInvalidBody(c *gc.C) {
-	h := s.handler(c)
-	defer h.Close()
-	s.idM.body = "bad"
-	s.idM.contentType = "application/json"
-	groups, err := h.GroupsForUser("someone")
-	c.Assert(err, gc.ErrorMatches, `cannot get groups for someone: GET .*: invalid character 'b' looking for beginning of value`)
-	c.Assert(groups, gc.HasLen, 0)
-}
-
-func (s *authSuite) TestGroupsForUserWithErrorResponse(c *gc.C) {
-	h := s.handler(c)
-	defer h.Close()
-	s.idM.body = `{"message":"some error","code":"some code"}`
-	s.idM.status = http.StatusUnauthorized
-	s.idM.contentType = "application/json"
-	groups, err := h.GroupsForUser("someone")
-	c.Assert(err, gc.ErrorMatches, `cannot get groups for someone: GET .*: some error`)
-	c.Assert(groups, gc.HasLen, 0)
-}
-
-func (s *authSuite) TestGroupsForUserWithBadErrorResponse(c *gc.C) {
-	h := s.handler(c)
-	defer h.Close()
-	s.idM.body = `{"message":"some error"`
-	s.idM.status = http.StatusUnauthorized
-	s.idM.contentType = "application/json"
-	groups, err := h.GroupsForUser("someone")
-	c.Assert(err, gc.ErrorMatches, `cannot get groups for someone: GET .*: cannot unmarshal error response \(status 401 Unauthorized\): unexpected EOF`)
-	c.Assert(groups, gc.HasLen, 0)
 }
 
 // getDelegatableMacaroon acquires a delegatable macaroon good for

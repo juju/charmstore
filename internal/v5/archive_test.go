@@ -59,20 +59,21 @@ func (s *ArchiveSuite) SetUpSuite(c *gc.C) {
 	s.commonSuite.SetUpSuite(c)
 }
 
-func (s *ArchiveSuite) TestGetCharmWithTerms(c *gc.C) {
-	client := httpbakery.NewHTTPClient()
-
+func (s *ArchiveSuite) TestGetCharmWithTermsWhenTermsServiceNotConfigured(c *gc.C) {
 	id := newResolvedURL("cs:~charmers/precise/terms-0", -1)
 	s.addPublicCharm(c, storetesting.NewCharm(&charm.Meta{
 		Terms: []string{"terms-1/1", "terms-2/5"},
 	}), id)
 
-	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
-		Handler: s.srv,
-		URL:     storeURL("~charmers/precise/terms-0/archive"),
-		Do:      bakeryDo(client),
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:      s.srv,
+		URL:          storeURL("~charmers/precise/terms-0/archive"),
+		ExpectStatus: http.StatusUnauthorized,
+		ExpectBody: params.Error{
+			Message: "charmstore not configured to serve charms with terms and conditions",
+			Code:    params.ErrUnauthorized,
+		},
 	})
-	c.Assert(rec.Code, gc.Equals, http.StatusUnauthorized)
 }
 
 func (s *ArchiveSuite) TestGet(c *gc.C) {
@@ -422,7 +423,7 @@ func (s *ArchiveSuite) TestPostCharm(c *gc.C) {
 		URL:     storeURL("~charmers/wordpress/archive?channel=unpublished"),
 		Do:      bakeryDo(nil),
 	})
-	c.Assert(rec.Code, gc.Equals, http.StatusOK)
+	c.Assert(rec.Code, gc.Equals, http.StatusOK, gc.Commentf("body: %s", rec.Body))
 	c.Assert(rec.Header().Get(params.EntityIdHeader), gc.Equals, "cs:~charmers/precise/wordpress-2")
 }
 

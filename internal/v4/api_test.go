@@ -2878,7 +2878,7 @@ func (s *APISuite) TestWhoAmIReturnsNameAndGroups(c *gc.C) {
 		ExpectStatus: http.StatusOK,
 		ExpectBody: params.WhoAmIResponse{
 			User:   "who",
-			Groups: []string{"foo", "bar"},
+			Groups: []string{"bar", "foo"},
 		},
 	})
 }

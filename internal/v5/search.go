@@ -26,14 +26,14 @@ func (h *ReqHandler) serveSearch(_ http.Header, req *http.Request) (interface{},
 	if err != nil {
 		return "", err
 	}
-	auth, err := h.CheckRequest(req, nil, OpOther)
+	auth, err := h.Authenticate(req)
 	if err != nil {
 		logger.Infof("authorization failed on search request, granting no privileges: %v", err)
 	}
 	sp.Admin = auth.Admin
 	if auth.Username != "" {
 		sp.Groups = append(sp.Groups, auth.Username)
-		groups, err := h.GroupsForUser(auth.Username)
+		groups, err := h.Handler.GroupsForUser(auth.Username)
 		if err != nil {
 			logger.Infof("cannot get groups for user %q, assuming no groups: %v", auth.Username, err)
 		}

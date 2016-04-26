@@ -52,10 +52,11 @@ type Handler struct {
 	// with.
 	Pool *charmstore.Pool
 
-	config         charmstore.ServerParams
-	locator        bakery.PublicKeyLocator
-	identityClient *idmclient.Client
-	rootPath       string
+	config      charmstore.ServerParams
+	locator     bakery.PublicKeyLocator
+	groupCache  *idmclient.GroupCache
+	permChecker *idmclient.PermChecker
+	rootPath    string
 
 	// searchCache is a cache of search results keyed on the query
 	// parameters of the search. It should only be used for searches
@@ -94,18 +95,24 @@ const (
 	reqHandlerCacheSize       = 50
 )
 
+// PermCacheExpiry holds the maximum length of time that permissions
+// and group membership information will be cached for.
+var PermCacheExpiry = time.Minute
+
 func New(pool *charmstore.Pool, config charmstore.ServerParams, rootPath string) *Handler {
+	identityClient := idmclient.New(idmclient.NewParams{
+		BaseURL: config.IdentityAPIURL,
+		Client:  agent.NewClient(config.AgentUsername, config.AgentKey),
+	})
 	h := &Handler{
 		Pool:        pool,
 		config:      config,
 		rootPath:    rootPath,
 		searchCache: cache.New(config.SearchCacheMaxAge),
 		locator:     config.PublicKeyLocator,
-		identityClient: idmclient.New(idmclient.NewParams{
-			BaseURL: config.IdentityAPIURL,
-			Client:  agent.NewClient(config.AgentUsername, config.AgentKey),
-		}),
+		groupCache:  idmclient.NewGroupCache(identityClient, PermCacheExpiry),
 	}
+	h.permChecker = idmclient.NewPermCheckerWithCache(h.groupCache)
 	return h
 }
 
@@ -225,7 +232,7 @@ func RouterHandlers(h *ReqHandler) *router.Handlers {
 			"expand-id":   resolveId(authId(h.serveExpandId)),
 			"icon.svg":    resolveId(authId(h.serveIcon), "contents", "blobname"),
 			"publish":     resolveId(h.servePublish),
-			"promulgate":  resolveId(h.serveAdminPromulgate),
+			"promulgate":  resolveId(h.servePromulgate),
 			"readme":      resolveId(authId(h.serveReadMe), "contents", "blobname"),
 			"resource/":   resolveId(authId(h.serveResources), "charmmeta"),
 		},
@@ -307,6 +314,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	defer rh.Close()
 	rh.ServeHTTP(w, req)
+}
+
+// GroupsForUser returns all the groups that the given user
+// is a member of.
+func (h *Handler) GroupsForUser(username string) ([]string, error) {
+	return h.groupCache.Groups(username)
 }
 
 // ServeHTTP implements http.Handler by calling h.Router.ServeHTTP.
@@ -586,7 +599,7 @@ func (h *ReqHandler) serveExpandId(id *router.ResolvedURL, w http.ResponseWriter
 	// Collect all the expanded identifiers for each entity.
 	response := make([]params.ExpandedId, 0, len(docs))
 	for _, doc := range docs {
-		if err := h.AuthorizeEntity(charmstore.EntityResolvedURL(doc), req); err != nil {
+		if err := h.AuthorizeEntityForOp(charmstore.EntityResolvedURL(doc), req, OpReadWithNoTerms); err != nil {
 			continue
 		}
 		url := doc.PreferredURL(id.PromulgatedRevision != -1)
@@ -782,7 +795,7 @@ func (h *ReqHandler) metaRevisionInfo(id *router.ResolvedURL, path string, flags
 	for iter.Next() {
 		e := iter.Entity()
 		rurl := charmstore.EntityResolvedURL(e)
-		if err := h.AuthorizeEntity(rurl, req); err != nil {
+		if err := h.AuthorizeEntityForOp(rurl, req, OpReadWithNoTerms); err != nil {
 			// We're not authorized to see the entity, so leave it out.
 			// Note that the only time this will happen is when
 			// the original URL is promulgated and has a development channel,
@@ -1200,7 +1213,7 @@ func (h *ReqHandler) serveChangesPublished(_ http.Header, r *http.Request) (inte
 	for iter.Next() {
 		entity := iter.Entity()
 		// Ignore entities that aren't readable by the current user.
-		if err := h.AuthorizeEntity(charmstore.EntityResolvedURL(entity), r); err != nil {
+		if err := h.AuthorizeEntityForOp(charmstore.EntityResolvedURL(entity), r, OpReadWithNoTerms); err != nil {
 			continue
 		}
 		results = append(results, params.Published{
@@ -1221,10 +1234,10 @@ func (h *ReqHandler) serveChangesPublished(_ http.Header, r *http.Request) (inte
 
 // GET /macaroon
 // See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-macaroon
+// Return a macaroon that will enable access to that can be checked by just
+// knowing the user's name.
 func (h *ReqHandler) serveMacaroon(_ http.Header, _ *http.Request) (interface{}, error) {
-	// will return a macaroon that will enable access to everything except archives
-	// of charms that require agreement to terms and conditions.
-	return h.newMacaroon([]checkers.Caveat{checkers.DenyCaveat(OpAccessCharmWithTerms)}...)
+	return h.newMacaroon(authnCheckableOps, nil, nil, false)
 }
 
 // GET /delegatable-macaroon
@@ -1238,7 +1251,11 @@ func (h *ReqHandler) serveDelegatableMacaroon(_ http.Header, req *http.Request) 
 	// No entity ids, so we provide a macaroon that's good for any entity that the
 	// user can access, as long as that entity doesn't have terms and conditions.
 	if len(idStrs) == 0 {
-		auth, err := h.authorize(req, []string{params.Everyone}, true, nil)
+		// Note that we require authorization even though we allow
+		// anyone to obtain a delegatable macaroon. This means
+		// that we will be able to add the declared caveats to
+		// the returned macaroon.
+		auth, err := h.Authenticate(req)
 		if err != nil {
 			return nil, errgo.Mask(err, errgo.Any)
 		}
@@ -1249,7 +1266,7 @@ func (h *ReqHandler) serveDelegatableMacaroon(_ http.Header, req *http.Request) 
 		m, err := h.Store.Bakery.NewMacaroon("", nil, []checkers.Caveat{
 			checkers.DeclaredCaveat(UsernameAttr, auth.Username),
 			checkers.TimeBeforeCaveat(time.Now().Add(DelegatableMacaroonExpiry)),
-			checkers.DenyCaveat(OpAccessCharmWithTerms),
+			checkers.AllowCaveat(authnCheckableOps...),
 		})
 		if err != nil {
 			return nil, errgo.Mask(err)
@@ -1273,16 +1290,15 @@ func (h *ReqHandler) serveDelegatableMacaroon(_ http.Header, req *http.Request) 
 		if id == nil {
 			return nil, errgo.WithCausef(err, params.ErrNotFound, "%q not found", idStrs[i])
 		}
-		// Adjust the original id string so it will always refer to the
-		// canononical URL.
-		idStrs[i] = id.URL.String()
 	}
 
-	// Note that we require authorization even though we allow
-	// anyone to obtain a delegatable macaroon. This means
-	// that we will be able to add the declared caveats to
-	// the returned macaroon.
-	auth, err := h.AuthorizeEntityAndTerms(req, ids)
+	auth, err := h.authorize(authorizeParams{
+		req:       req,
+		entityIds: ids,
+		// Note: we don't allow OpWrite here even though we could, because
+		// the current use-case for delegatable macaroon doesn't require it.
+		ops: []string{OpReadWithTerms, OpReadWithNoTerms},
+	})
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
@@ -1300,7 +1316,7 @@ func (h *ReqHandler) serveDelegatableMacaroon(_ http.Header, req *http.Request) 
 	// TODO propagate expiry time from macaroons in request.
 	m, err := h.Store.Bakery.NewMacaroon("", nil, []checkers.Caveat{
 		checkers.DeclaredCaveat(UsernameAttr, auth.Username),
-		checkers.Caveat{Condition: "is-entity " + strings.Join(idStrs, " ")},
+		isEntityCaveat(ids),
 		activeTimeBeforeCaveat(activeExpireTime),
 	})
 	if err != nil {
@@ -1312,14 +1328,14 @@ func (h *ReqHandler) serveDelegatableMacaroon(_ http.Header, req *http.Request) 
 // GET /whoami
 // See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#whoami
 func (h *ReqHandler) serveWhoAmI(_ http.Header, req *http.Request) (interface{}, error) {
-	auth, err := h.authorize(req, []string{params.Everyone}, true, nil)
+	auth, err := h.Authenticate(req)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
 	if auth.Admin {
 		return nil, errgo.WithCausef(nil, params.ErrForbidden, "admin credentials used")
 	}
-	groups, err := h.GroupsForUser(auth.Username)
+	groups, err := h.Handler.GroupsForUser(auth.Username)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
@@ -1331,8 +1347,18 @@ func (h *ReqHandler) serveWhoAmI(_ http.Header, req *http.Request) (interface{},
 
 // PUT id/promulgate
 // See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#put-idpromulgate
-func (h *ReqHandler) serveAdminPromulgate(id *router.ResolvedURL, w http.ResponseWriter, req *http.Request) error {
-	if _, err := h.authorize(req, []string{PromulgatorsGroup}, false, id); err != nil {
+func (h *ReqHandler) servePromulgate(id *router.ResolvedURL, w http.ResponseWriter, req *http.Request) error {
+	// Note: the promulgator must be in the promulgators group but
+	// doesn't need write access to the entity.
+	if _, err := h.authorize(authorizeParams{
+		req: req,
+		acls: []mongodoc.ACL{{
+			Write: []string{PromulgatorsGroup},
+		}},
+		ops:              []string{OpWrite},
+		entityIds:        []*router.ResolvedURL{id},
+		ignoreEntityACLs: true,
+	}); err != nil {
 		return errgo.Mask(err, errgo.Any)
 	}
 	if req.Method != "PUT" {
@@ -1416,11 +1442,19 @@ func (h *ReqHandler) servePublish(id *router.ResolvedURL, w http.ResponseWriter,
 	}
 
 	// Authorize the operation. Users must have write permissions on the ACLs
-	// on the channel being published to.
+	// on all the channels being published to.
+	acls := make([]mongodoc.ACL, 0, len(chans))
 	for _, c := range chans {
-		if _, err := h.authorize(req, baseEntity.ChannelACLs[c].Write, true, id); err != nil {
-			return errgo.Mask(err, errgo.Any)
-		}
+		acls = append(acls, baseEntity.ChannelACLs[c])
+	}
+	if _, err := h.authorize(authorizeParams{
+		req:              req,
+		acls:             acls,
+		entityIds:        []*router.ResolvedURL{id},
+		ignoreEntityACLs: true, // acls holds all the ACLs we care about.
+		ops:              []string{OpWrite},
+	}); err != nil {
+		return errgo.Mask(err, errgo.Any)
 	}
 
 	if err := h.Store.Publish(id, publish.Resources, chans...); err != nil {
