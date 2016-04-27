@@ -40,12 +40,13 @@ type ServerParams struct {
 
 	// IdentityLocation holds the location of the third party authorization
 	// service to use when creating third party caveats,
-	// for example: http://api.jujucharms.com/identity/v1/discharger
-	// If it is empty, IdentityURL+"/v1/discharger" will be used.
+	// for example: http://api.jujucharms.com/identity
+	// If it is empty, IdentityAPIURL will be used.
 	IdentityLocation string
 
-	// TermsLocation holds the location of the third party
-	// terms service to use when creating third party caveats.
+	// TermsLocations holds the location of the
+	// terms service, which knows about user agreements to
+	// Terms and Conditions required by the charm.
 	TermsLocation string
 
 	// PublicKeyLocator holds a public key store.
@@ -96,11 +97,11 @@ func NewServer(db *mgo.Database, si *SearchIndex, config ServerParams, versions 
 	if len(versions) == 0 {
 		return nil, errgo.Newf("charm store server must serve at least one version of the API")
 	}
-	config.IdentityLocation = strings.Trim(config.IdentityLocation, "/")
-	config.TermsLocation = strings.Trim(config.TermsLocation, "/")
-	config.IdentityAPIURL = strings.Trim(config.IdentityAPIURL, "/")
+	config.IdentityLocation = strings.TrimSuffix(config.IdentityLocation, "/")
+	config.TermsLocation = strings.TrimSuffix(config.TermsLocation, "/")
+	config.IdentityAPIURL = strings.TrimSuffix(config.IdentityAPIURL, "/")
 	if config.IdentityLocation == "" && config.IdentityAPIURL != "" {
-		config.IdentityLocation = config.IdentityAPIURL + "/v1/discharger"
+		config.IdentityLocation = config.IdentityAPIURL
 	}
 	logger.Infof("identity discharge location: %s", config.IdentityLocation)
 	logger.Infof("identity API location: %s", config.IdentityAPIURL)

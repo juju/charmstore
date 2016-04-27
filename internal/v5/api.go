@@ -54,8 +54,8 @@ type Handler struct {
 
 	config      charmstore.ServerParams
 	locator     bakery.PublicKeyLocator
-	groupCache  *idmclient.GroupCache
-	permChecker *idmclient.PermChecker
+	groupCache  groupCache
+	permChecker permChecker
 	rootPath    string
 
 	// searchCache is a cache of search results keyed on the query
@@ -99,20 +99,40 @@ const (
 // and group membership information will be cached for.
 var PermCacheExpiry = time.Minute
 
+type permChecker interface {
+	Allow(username string, acl []string) (bool, error)
+}
+
+type groupCache interface {
+	Groups(username string) ([]string, error)
+}
+
 func New(pool *charmstore.Pool, config charmstore.ServerParams, rootPath string) *Handler {
-	identityClient := idmclient.New(idmclient.NewParams{
-		BaseURL: config.IdentityAPIURL,
-		Client:  agent.NewClient(config.AgentUsername, config.AgentKey),
-	})
+	var groupCache groupCache
+	var permChecker permChecker
+	if config.IdentityAPIURL != "" && config.AgentUsername != "" && config.AgentKey != nil {
+		logger.Infof("group membership enabled at %s; agent %s", config.IdentityAPIURL, config.AgentUsername)
+		identityClient := idmclient.New(idmclient.NewParams{
+			BaseURL: config.IdentityAPIURL,
+			Client:  agent.NewClient(config.AgentUsername, config.AgentKey),
+		})
+		gc := idmclient.NewGroupCache(identityClient, PermCacheExpiry)
+		groupCache = gc
+		permChecker = idmclient.NewPermCheckerWithCache(gc)
+	} else {
+		logger.Infof("group membership not enabled (no identity-api-url or agent-username)")
+		groupCache = noGroupCache{}
+		permChecker = noGroupsPermChecker{}
+	}
 	h := &Handler{
 		Pool:        pool,
 		config:      config,
 		rootPath:    rootPath,
 		searchCache: cache.New(config.SearchCacheMaxAge),
 		locator:     config.PublicKeyLocator,
-		groupCache:  idmclient.NewGroupCache(identityClient, PermCacheExpiry),
+		groupCache:  groupCache,
+		permChecker: permChecker,
 	}
-	h.permChecker = idmclient.NewPermCheckerWithCache(h.groupCache)
 	return h
 }
 

@@ -157,6 +157,8 @@ func (s *commonSuite) startServer(c *gc.C) {
 		AuthPassword:     testPassword,
 		StatsCacheMaxAge: time.Nanosecond,
 		MaxMgoSessions:   s.maxMgoSessions,
+		AgentUsername:    "notused",
+		AgentKey:         new(bakery.KeyPair),
 	}
 	keyring := bakery.NewPublicKeyRing()
 	if s.enableIdentity {

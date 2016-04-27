@@ -59,8 +59,8 @@ type ServerParams struct {
 
 	// IdentityLocation holds the location of the third party authorization
 	// service to use when creating third party caveats,
-	// for example: http://api.jujucharms.com/identity/v1/discharger
-	// If it is empty, IdentityURL+"/v1/discharger" will be used.
+	// for example: http://api.jujucharms.com/identity
+	// If it is empty, IdentityAPIURL will be used.
 	IdentityLocation string
 
 	// TermsLocations holds the location of the

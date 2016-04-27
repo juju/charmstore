@@ -258,7 +258,7 @@ func runMigrationVersion(db *mgo.Database, vc versionSpec) error {
 		AuthPassword:      "password",
 		APIAddr:           fmt.Sprintf("localhost:%d", jujutesting.FindTCPPort()),
 		MaxMgoSessions:    10,
-		IdentityLocation:  "https://api.jujucharms.com/identity",
+		IdentityAPIURL:    "https://0.1.2.3/identity",
 		IdentityPublicKey: &bogusPublicKey,
 	})
 	if err != nil {
