@@ -363,7 +363,7 @@ func (h *ReqHandler) checkRequest(p authorizeParams) (authorization, error) {
 		return authorization{Admin: true}, nil
 	}
 	bk := h.Store.Bakery
-	if errgo.Cause(err) != errNoCreds || bk == nil || h.Handler.config.IdentityAPIURL == "" {
+	if errgo.Cause(err) != errNoCreds || bk == nil || h.Handler.config.IdentityLocation == "" {
 		return authorization{}, errgo.WithCausef(err, params.ErrUnauthorized, "authentication failed")
 	}
 	// active holds whether we're checking with active status.
@@ -718,4 +718,21 @@ func isPublicACL(acl []string) bool {
 		}
 	}
 	return false
+}
+
+type noGroupCache struct{}
+
+func (noGroupCache) Groups(username string) ([]string, error) {
+	return nil, nil
+}
+
+type noGroupsPermChecker struct{}
+
+func (noGroupsPermChecker) Allow(username string, acl []string) (bool, error) {
+	for _, name := range acl {
+		if name == username || name == params.Everyone {
+			return true, nil
+		}
+	}
+	return false, nil
 }

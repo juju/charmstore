@@ -14,8 +14,9 @@ import (
 )
 
 var serverParams = ServerParams{
-	AuthUsername: "test-user",
-	AuthPassword: "test-password",
+	AuthUsername:   "test-user",
+	AuthPassword:   "test-password",
+	IdentityAPIURL: "http://0.1.2.3",
 }
 
 type ServerSuite struct {
@@ -91,6 +92,12 @@ func (s *ServerSuite) TestNewServerWithVersions(c *gc.C) {
 }
 
 func (s *ServerSuite) TestNewServerWithConfig(c *gc.C) {
+
+	params := ServerParams{
+		AuthUsername:   "test-user",
+		AuthPassword:   "test-password",
+		IdentityAPIURL: "http://0.1.2.3/",
+	}
 	serveConfig := func(p *Pool, config ServerParams, _ string) HTTPCloseHandler {
 		return nopCloseHandler{
 			router.HandleJSON(func(_ http.Header, req *http.Request) (interface{}, error) {
@@ -98,19 +105,33 @@ func (s *ServerSuite) TestNewServerWithConfig(c *gc.C) {
 			}),
 		}
 	}
-	h, err := NewServer(s.Session.DB("foo"), nil, serverParams, map[string]NewAPIHandlerFunc{
+	h, err := NewServer(s.Session.DB("foo"), nil, params, map[string]NewAPIHandlerFunc{
 		"version1": serveConfig,
 	})
 	c.Assert(err, gc.IsNil)
 	defer h.Close()
+
+	// The IdentityLocation field is filled out from the IdentityAPIURL
+	// and the final slash is trimmed.
+
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler:    h,
-		URL:        "/version1/some/path",
-		ExpectBody: serverParams,
+		Handler: h,
+		URL:     "/version1/some/path",
+		ExpectBody: ServerParams{
+			AuthUsername:     "test-user",
+			AuthPassword:     "test-password",
+			IdentityAPIURL:   "http://0.1.2.3",
+			IdentityLocation: "http://0.1.2.3",
+		},
 	})
 }
 
 func (s *ServerSuite) TestNewServerWithElasticSearch(c *gc.C) {
+	params := ServerParams{
+		AuthUsername:   "test-user",
+		AuthPassword:   "test-password",
+		IdentityAPIURL: "http://0.1.2.3",
+	}
 	serveConfig := func(p *Pool, config ServerParams, _ string) HTTPCloseHandler {
 		return nopCloseHandler{
 			router.HandleJSON(func(_ http.Header, req *http.Request) (interface{}, error) {
@@ -118,16 +139,21 @@ func (s *ServerSuite) TestNewServerWithElasticSearch(c *gc.C) {
 			}),
 		}
 	}
-	h, err := NewServer(s.Session.DB("foo"), &SearchIndex{s.ES, s.TestIndex}, serverParams,
+	h, err := NewServer(s.Session.DB("foo"), &SearchIndex{s.ES, s.TestIndex}, params,
 		map[string]NewAPIHandlerFunc{
 			"version1": serveConfig,
 		})
 	c.Assert(err, gc.IsNil)
 	defer h.Close()
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler:    h,
-		URL:        "/version1/some/path",
-		ExpectBody: serverParams,
+		Handler: h,
+		URL:     "/version1/some/path",
+		ExpectBody: ServerParams{
+			AuthUsername:     "test-user",
+			AuthPassword:     "test-password",
+			IdentityAPIURL:   "http://0.1.2.3",
+			IdentityLocation: "http://0.1.2.3",
+		},
 	})
 }
 
