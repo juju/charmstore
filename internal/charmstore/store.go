@@ -927,22 +927,7 @@ func (s *Store) SetPromulgated(url *router.ResolvedURL, promulgate bool) error {
 		return errgo.Notef(err, "cannot promulgate base entity %q", base)
 	}
 
-	type result struct {
-		Series   string `bson:"_id"`
-		Revision int
-	}
-
-	// Find the latest revision in each series of entities with the promulgated base URL.
-	var latestOwned []result
-	err = s.DB.Entities().Pipe([]bson.D{
-		{{"$match", bson.D{{"baseurl", base}}}},
-		{{"$group", bson.D{{"_id", "$series"}, {"revision", bson.D{{"$max", "$revision"}}}}}},
-	}).All(&latestOwned)
-	if err != nil {
-		return errgo.Notef(err, "cannot find latest revision for promulgated URL")
-	}
-
-	// Find the latest revision in each series of the promulgated entitities
+	// Find the latest revision in each series of the promulgated entities
 	// with the same name as the base entity. Note that this works because:
 	//     1) promulgated URLs always have the same charm name as their
 	//     non-promulgated counterparts.
@@ -951,31 +936,96 @@ func (s *Store) SetPromulgated(url *router.ResolvedURL, promulgate bool) error {
 	// select all entities with a matching promulgated URL name. Because of
 	// 2) we are sure that we are only updating all charms or the single
 	// bundle entity.
+
+	iter = s.DB.Entities().Find(bson.D{{
+		"promulgated-revision", bson.D{{"$gt", -1}},
+	}, {
+		"name", base.Name,
+	}}).Select(FieldSelector("promulgated-revision", "supportedseries", "series")).Iter()
+
 	latestPromulgated := make(map[string]int)
-	iter = s.DB.Entities().Pipe([]bson.D{
-		{{"$match", bson.D{{"name", base.Name}}}},
-		{{"$group", bson.D{{"_id", "$series"}, {"revision", bson.D{{"$max", "$promulgated-revision"}}}}}},
-	}).Iter()
-	var res result
-	for iter.Next(&res) {
-		latestPromulgated[res.Series] = res.Revision
+	oldMultiSeries := false
+	var e mongodoc.Entity
+	for iter.Next(&e) {
+		oldMultiSeries = oldMultiSeries || e.Series == ""
+		entitySeries := e.SupportedSeries
+		if e.Series == "bundle" {
+			entitySeries = []string{"bundle"}
+		}
+		for _, series := range entitySeries {
+			if rev, ok := latestPromulgated[series]; !ok || rev < e.PromulgatedRevision {
+				latestPromulgated[series] = e.PromulgatedRevision
+			}
+		}
 	}
-	if err := iter.Close(); err != nil {
+	if err := iter.Err(); err != nil {
 		return errgo.Notef(err, "cannot close mgo iterator")
 	}
 
-	// Update the newest entity in each series with a base URL that matches the newly promulgated
-	// base entity to have a promulgated URL, if it does not already have one.
+	// Find the latest revision in each series of entities with the promulgated base URL.
+	// After this, latestOwned will have an entry for each series, with multi-series
+	// charms having an empty series.
+	type result struct {
+		URL             *charm.URL
+		Series          string `bson:"_id"`
+		SupportedSeries []string
+		Revision        int
+	}
+	latestOwned := make(map[string]result)
+	iter = s.DB.Entities().Pipe([]bson.D{
+		{{"$match", bson.D{{"baseurl", base}}}},
+		{{"$sort", bson.D{{"revision", 1}}}},
+		{{"$group", bson.D{
+			{"_id", "$series"},
+			{"url", bson.D{{"$last", "$_id"}}},
+			{"supportedseries", bson.D{{"$last", "$supportedseries"}}},
+			{"revision", bson.D{{"$last", "$revision"}}},
+		}}},
+	}).Iter()
+	var r result
+	for iter.Next(&r) {
+		latestOwned[r.Series] = r
+	}
+	if err := iter.Err(); err != nil {
+		return errgo.Notef(err, "cannot close mgo iterator")
+	}
+
+	// Delete all series we don't want to promulgate.
+	if _, ok := latestOwned[""]; ok || oldMultiSeries {
+		// The newly promulgated charm will be multi-series or
+		// there was previously a multi-series charm, so do not
+		// promulgate any single series charms.
+		for series, r := range latestOwned {
+			if series != "" {
+				logger.Infof("ignoring non-multi-series entity for promulgation %v", r.URL)
+				delete(latestOwned, series)
+			}
+		}
+	}
+
+	// Update the newest entity in each series with the new base URL to have a
+	// promulgated URL if it does not already have one.
 	for _, r := range latestOwned {
-		id := *base
-		id.Series = r.Series
-		id.Revision = r.Revision
-		pID := id
+		// Assign the entity a promulgated revision of one more than the maximum
+		// of the promulgated revision of any of the supported
+		// series.
+		entitySeries := r.SupportedSeries
+		if r.Series == "bundle" {
+			entitySeries = []string{"bundle"}
+		}
+		maxRev := -1
+		for _, series := range entitySeries {
+			if rev, ok := latestPromulgated[series]; ok && rev > maxRev {
+				maxRev = rev
+			}
+		}
+		pID := *r.URL
 		pID.User = ""
-		pID.Revision = latestPromulgated[r.Series] + 1
+		pID.Revision = maxRev + 1
+		logger.Infof("updating promulgation URL of %v to %v", r.URL, &pID)
 		err := s.DB.Entities().Update(
 			bson.D{
-				{"_id", &id},
+				{"_id", r.URL},
 				{"promulgated-revision", -1},
 			},
 			bson.D{
