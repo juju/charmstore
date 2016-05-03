@@ -2872,6 +2872,153 @@ var promulgateTests = []struct {
 		baseEntity("~test-charmers/wordpress", true),
 	},
 }, {
+	about: "multi-series with old single series",
+	entities: []*mongodoc.Entity{
+		entity("~charmers/trusty/wordpress-0", "trusty/wordpress-2"),
+		entity("~charmers/precise/wordpress-0", "precise/wordpress-3"),
+		entity("~test-charmers/wordpress-0", "", "trusty", "precise", "xenial"),
+	},
+	baseEntities: []*mongodoc.BaseEntity{
+		baseEntity("~charmers/wordpress", true),
+		baseEntity("~test-charmers/wordpress", true),
+	},
+	url:        "~test-charmers/wordpress-0",
+	promulgate: true,
+	expectEntities: []*mongodoc.Entity{
+		entity("~charmers/trusty/wordpress-0", "trusty/wordpress-2"),
+		entity("~charmers/precise/wordpress-0", "precise/wordpress-3"),
+		entity("~test-charmers/wordpress-0", "wordpress-4", "trusty", "precise", "xenial"),
+	},
+	expectBaseEntities: []*mongodoc.BaseEntity{
+		baseEntity("~charmers/wordpress", false),
+		baseEntity("~test-charmers/wordpress", true),
+	},
+}, {
+	about: "multi-series with old multi-series",
+	entities: []*mongodoc.Entity{
+		entity("~charmers/trusty/wordpress-0", "trusty/wordpress-2"),
+		entity("~charmers/precise/wordpress-0", "precise/wordpress-3"),
+		entity("~charmers/wordpress-0", "wordpress-3", "trusty", "xenial"),
+		entity("~test-charmers/trusty/wordpress-0", ""),
+		entity("~test-charmers/precise/wordpress-3", ""),
+		entity("~test-charmers/wordpress-4", "", "precise", "xenial"),
+	},
+	baseEntities: []*mongodoc.BaseEntity{
+		baseEntity("~charmers/wordpress", true),
+		baseEntity("~test-charmers/wordpress", true),
+	},
+	url:        "~test-charmers/wordpress-0",
+	promulgate: true,
+	expectEntities: []*mongodoc.Entity{
+		entity("~charmers/trusty/wordpress-0", "trusty/wordpress-2"),
+		entity("~charmers/precise/wordpress-0", "precise/wordpress-3"),
+		entity("~charmers/wordpress-0", "wordpress-3", "trusty", "xenial"),
+		entity("~test-charmers/trusty/wordpress-0", ""),
+		entity("~test-charmers/precise/wordpress-3", ""),
+		entity("~test-charmers/wordpress-4", "wordpress-4", "precise", "xenial"),
+	},
+	expectBaseEntities: []*mongodoc.BaseEntity{
+		baseEntity("~charmers/wordpress", false),
+		baseEntity("~test-charmers/wordpress", true),
+	},
+}, {
+	about: "multi-series with different sets of supported series",
+	entities: []*mongodoc.Entity{
+		entity("~test-charmers/wordpress-0", "", "precise", "xenial"),
+		entity("~test-charmers/wordpress-1", "", "trusty", "xenial"),
+	},
+	baseEntities: []*mongodoc.BaseEntity{
+		baseEntity("~test-charmers/wordpress", false),
+	},
+	url:        "~test-charmers/wordpress-0",
+	promulgate: true,
+	expectEntities: []*mongodoc.Entity{
+		entity("~test-charmers/wordpress-0", "", "precise", "xenial"),
+		entity("~test-charmers/wordpress-1", "wordpress-0", "trusty", "xenial"),
+	},
+	expectBaseEntities: []*mongodoc.BaseEntity{
+		baseEntity("~test-charmers/wordpress", true),
+	},
+}, {
+	// The single-series entity doesn't get promulgated because it's a single series
+	// charm and we only promulgate single-series charms if the
+	// new charm has no multi-series entities.
+	about: "multi-series with different sets of supported series and previous multi-series",
+	entities: []*mongodoc.Entity{
+		entity("~charmers/precise/wordpress-5", "wordpress-5"),
+		entity("~charmers/wordpress-0", "wordpress-6", "precise", "xenial"),
+		entity("~charmers/wordpress-1", "wordpress-7", "trusty", "xenial"),
+		entity("~test-charmers/precise/wordpress-9", ""),
+		entity("~test-charmers/wordpress-0", "", "trusty"),
+		entity("~test-charmers/wordpress-1", "", "trusty", "xenial"),
+	},
+	baseEntities: []*mongodoc.BaseEntity{
+		baseEntity("~charmers/wordpress", true),
+		baseEntity("~test-charmers/wordpress", false),
+	},
+	url:        "~test-charmers/wordpress-1",
+	promulgate: true,
+	expectEntities: []*mongodoc.Entity{
+		entity("~charmers/precise/wordpress-5", "wordpress-5"),
+		entity("~charmers/wordpress-0", "wordpress-6", "precise", "xenial"),
+		entity("~charmers/wordpress-1", "wordpress-7", "trusty", "xenial"),
+		entity("~test-charmers/precise/wordpress-9", ""),
+		entity("~test-charmers/wordpress-0", "", "trusty"),
+		entity("~test-charmers/wordpress-1", "wordpress-8", "trusty", "xenial"),
+	},
+	expectBaseEntities: []*mongodoc.BaseEntity{
+		baseEntity("~charmers/wordpress", false),
+		baseEntity("~test-charmers/wordpress", true),
+	},
+}, {
+	// The non-multi-series charm should be left alone because
+	// we never move from multi-series to non-multi-series.
+	about: "old multi-series with new non-multi-series",
+	entities: []*mongodoc.Entity{
+		entity("~charmers/precise/wordpress-5", "wordpress-5"),
+		entity("~charmers/wordpress-1", "wordpress-7", "trusty", "xenial"),
+		entity("~test-charmers/precise/wordpress-9", ""),
+	},
+	baseEntities: []*mongodoc.BaseEntity{
+		baseEntity("~charmers/wordpress", true),
+		baseEntity("~test-charmers/wordpress", false),
+	},
+	url:        "~test-charmers/precise/wordpress-9",
+	promulgate: true,
+	expectEntities: []*mongodoc.Entity{
+		entity("~charmers/precise/wordpress-5", "wordpress-5"),
+		entity("~charmers/wordpress-1", "wordpress-7", "trusty", "xenial"),
+		entity("~test-charmers/precise/wordpress-9", ""),
+	},
+	expectBaseEntities: []*mongodoc.BaseEntity{
+		baseEntity("~charmers/wordpress", false),
+		baseEntity("~test-charmers/wordpress", true),
+	},
+}, {
+	about: "promulgate bundle",
+	entities: []*mongodoc.Entity{
+		entity("~charmers/bundle/wordpress-0", "bundle/wordpress-2"),
+		entity("~charmers/bundle/wordpress-1", "bundle/wordpress-3"),
+		entity("~test-charmers/bundle/wordpress-0", "bundle/wordpress-0"),
+		entity("~test-charmers/bundle/wordpress-1", ""),
+	},
+	baseEntities: []*mongodoc.BaseEntity{
+		baseEntity("~charmers/wordpress", true),
+		baseEntity("~test-charmers/wordpress", false),
+	},
+	url:        "~test-charmers/bundle/wordpress-1",
+	promulgate: true,
+	expectEntities: []*mongodoc.Entity{
+		entity("~charmers/bundle/wordpress-0", "bundle/wordpress-2"),
+		entity("~charmers/bundle/wordpress-1", "bundle/wordpress-3"),
+		entity("~test-charmers/bundle/wordpress-0", "bundle/wordpress-0"),
+		entity("~test-charmers/bundle/wordpress-1", "bundle/wordpress-4"),
+	},
+	expectBaseEntities: []*mongodoc.BaseEntity{
+		baseEntity("~charmers/wordpress", false),
+		baseEntity("~test-charmers/wordpress", true),
+	},
+}, {
 	about: "unpromulgate single promulgated charm ",
 	entities: []*mongodoc.Entity{
 		entity("~charmers/trusty/wordpress-0", "trusty/wordpress-0"),
@@ -2909,7 +3056,7 @@ func (s *StoreSuite) TestSetPromulgated(c *gc.C) {
 	store := s.newStore(c, false)
 	defer store.Close()
 	for i, test := range promulgateTests {
-		c.Logf("test %d. %s", i, test.about)
+		c.Logf("\ntest %d. %s", i, test.about)
 		url := router.MustNewResolvedURL(test.url, -1)
 		_, err := store.DB.Entities().RemoveAll(nil)
 		c.Assert(err, gc.IsNil)
@@ -2935,10 +3082,10 @@ func (s *StoreSuite) TestSetPromulgated(c *gc.C) {
 		n, err = store.DB.BaseEntities().Count()
 		c.Assert(err, gc.IsNil)
 		c.Assert(n, gc.Equals, len(test.expectBaseEntities))
-		for _, expectEntity := range test.expectEntities {
+		for i, expectEntity := range test.expectEntities {
 			entity, err := store.FindEntity(EntityResolvedURL(expectEntity), nil)
 			c.Assert(err, gc.IsNil)
-			c.Assert(entity, jc.DeepEquals, expectEntity)
+			c.Assert(entity, jc.DeepEquals, expectEntity, gc.Commentf("entity %d", i))
 		}
 		for _, expectBaseEntity := range test.expectBaseEntities {
 			baseEntity, err := store.FindBaseEntity(expectBaseEntity.URL, nil)
@@ -3819,15 +3966,16 @@ func (s *StoreSuite) TestPublishWithFailedESInsert(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, "cannot index cs:~charmers/precise/wordpress-12 to ElasticSearch: .*")
 }
 
-func entity(url, purl string) *mongodoc.Entity {
+func entity(url, purl string, supportedSeries ...string) *mongodoc.Entity {
 	id := charm.MustParseURL(url)
 	var pid *charm.URL
 	if purl != "" {
 		pid = charm.MustParseURL(purl)
 	}
 	e := &mongodoc.Entity{
-		URL:            id,
-		PromulgatedURL: pid,
+		URL:             id,
+		PromulgatedURL:  pid,
+		SupportedSeries: supportedSeries,
 	}
 	denormalizeEntity(e)
 	return e
