@@ -546,21 +546,24 @@ type ListResult struct {
 // queryFields provides a map of fields to weighting to use with the
 // elasticsearch query.
 func queryFields(sp SearchParams) map[string]float64 {
-	fields := map[string]float64{
-		"URL.ngrams":              8,
-		"CharmMeta.Categories":    5,
-		"CharmMeta.Tags":          5,
-		"BundleData.Tags":         5,
-		"Series.ngrams":           5,
-		"CharmProvidedInterfaces": 3,
-		"CharmRequiredInterfaces": 3,
-		"CharmMeta.Description":   1,
-		"BundleReadMe":            1,
-	}
+	var fields map[string]float64
 	if sp.AutoComplete {
-		fields["CharmMeta.Name.ngrams"] = 10
+		fields = map[string]float64{
+			"Name.ngrams": 10,
+		}
 	} else {
-		fields["CharmMeta.Name"] = 10
+		fields = map[string]float64{
+			"Name":                    10,
+			"User":                    7,
+			"CharmMeta.Categories":    5,
+			"CharmMeta.Tags":          5,
+			"BundleData.Tags":         5,
+			"Series":                  5,
+			"CharmProvidedInterfaces": 3,
+			"CharmRequiredInterfaces": 3,
+			"CharmMeta.Description":   1,
+			"BundleReadMe":            1,
+		}
 	}
 	return fields
 }

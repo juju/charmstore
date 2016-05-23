@@ -5,7 +5,6 @@ package charmstore // import "gopkg.in/juju/charmstore.v5-unstable/internal/char
 
 import (
 	"encoding/json"
-	"fmt"
 	"sort"
 	"strings"
 	"sync"
@@ -152,6 +151,21 @@ var searchEntities = map[string]searchEntity{
 		},
 		acl:       []string{params.Everyone},
 		downloads: 1,
+	},
+	// Note: "squid-forwardproxy" shares a trigram "dpr" with "wordpress".
+	"squid-forwardproxy": searchEntity{
+		entity:    newEntity("cs:~charmers/wily/squid-forwardproxy-3", 3),
+		charmMeta: &charm.Meta{},
+		acl:       []string{params.Everyone},
+		downloads: 2,
+	},
+	// Note: "cloud-controller-worker-v2" shares a trigram "wor" with "wordpress".
+
+	"cloud-controller-worker-v2": searchEntity{
+		entity:    newEntity("cs:~cf-charmers/trusty/cloud-controller-worker-v2-7", -1),
+		charmMeta: &charm.Meta{},
+		acl:       []string{params.Everyone},
+		downloads: 4,
 	},
 }
 
@@ -331,7 +345,7 @@ func (s *StoreSearchSuite) TestExportSearchDocument(c *gc.C) {
 var searchTests = []struct {
 	about     string
 	sp        SearchParams
-	results   []*mongodoc.Entity
+	results   Entities
 	totalDiff int // len(results) + totalDiff = expected total
 }{
 	{
@@ -339,7 +353,7 @@ var searchTests = []struct {
 		sp: SearchParams{
 			Text: "wordpress",
 		},
-		results: []*mongodoc.Entity{
+		results: Entities{
 			searchEntities["wordpress"].entity,
 			searchEntities["wordpress-simple"].entity,
 		},
@@ -348,10 +362,12 @@ var searchTests = []struct {
 		sp: SearchParams{
 			Text: "",
 		},
-		results: []*mongodoc.Entity{
+		results: Entities{
+			searchEntities["cloud-controller-worker-v2"].entity,
 			searchEntities["wordpress"].entity,
 			searchEntities["mysql"].entity,
 			searchEntities["varnish"].entity,
+			searchEntities["squid-forwardproxy"].entity,
 			searchEntities["wordpress-simple"].entity,
 		},
 	}, {
@@ -360,10 +376,17 @@ var searchTests = []struct {
 			Text:         "word",
 			AutoComplete: true,
 		},
-		results: []*mongodoc.Entity{
+		results: Entities{
 			searchEntities["wordpress"].entity,
 			searchEntities["wordpress-simple"].entity,
 		},
+	}, {
+		about: "non-matching autocomplete search",
+		sp: SearchParams{
+			Text:         "worm",
+			AutoComplete: true,
+		},
+		results: Entities{},
 	}, {
 		about: "description filter search",
 		sp: SearchParams{
@@ -372,7 +395,7 @@ var searchTests = []struct {
 				"description": {"blog"},
 			},
 		},
-		results: []*mongodoc.Entity{
+		results: Entities{
 			searchEntities["wordpress"].entity,
 		},
 	}, {
@@ -383,7 +406,7 @@ var searchTests = []struct {
 				"name": {"wordpress"},
 			},
 		},
-		results: []*mongodoc.Entity{
+		results: Entities{
 			searchEntities["wordpress"].entity,
 		},
 	}, {
@@ -394,7 +417,7 @@ var searchTests = []struct {
 				"owner": {"foo"},
 			},
 		},
-		results: []*mongodoc.Entity{
+		results: Entities{
 			searchEntities["varnish"].entity,
 		},
 	}, {
@@ -405,7 +428,7 @@ var searchTests = []struct {
 				"provides": {"mysql"},
 			},
 		},
-		results: []*mongodoc.Entity{
+		results: Entities{
 			searchEntities["mysql"].entity,
 		},
 	}, {
@@ -416,7 +439,7 @@ var searchTests = []struct {
 				"requires": {"mysql"},
 			},
 		},
-		results: []*mongodoc.Entity{
+		results: Entities{
 			searchEntities["wordpress"].entity,
 		},
 	}, {
@@ -427,7 +450,7 @@ var searchTests = []struct {
 				"series": {"xenial"},
 			},
 		},
-		results: []*mongodoc.Entity{
+		results: Entities{
 			searchEntities["mysql"].entity,
 			searchEntities["varnish"].entity,
 		},
@@ -439,7 +462,7 @@ var searchTests = []struct {
 				"summary": {"Database engine"},
 			},
 		},
-		results: []*mongodoc.Entity{
+		results: Entities{
 			searchEntities["mysql"].entity,
 			searchEntities["varnish"].entity,
 		},
@@ -451,7 +474,7 @@ var searchTests = []struct {
 				"tags": {"wordpress"},
 			},
 		},
-		results: []*mongodoc.Entity{
+		results: Entities{
 			searchEntities["wordpress"].entity,
 			searchEntities["wordpress-simple"].entity,
 		},
@@ -463,7 +486,7 @@ var searchTests = []struct {
 				"type": {"bundle"},
 			},
 		},
-		results: []*mongodoc.Entity{
+		results: Entities{
 			searchEntities["wordpress-simple"].entity,
 		},
 	}, {
@@ -474,10 +497,12 @@ var searchTests = []struct {
 				"type": {"charm"},
 			},
 		},
-		results: []*mongodoc.Entity{
+		results: Entities{
+			searchEntities["cloud-controller-worker-v2"].entity,
 			searchEntities["wordpress"].entity,
 			searchEntities["mysql"].entity,
 			searchEntities["varnish"].entity,
+			searchEntities["squid-forwardproxy"].entity,
 		},
 	}, {
 		about: "charm & bundle type filter search",
@@ -487,10 +512,12 @@ var searchTests = []struct {
 				"type": {"charm", "bundle"},
 			},
 		},
-		results: []*mongodoc.Entity{
+		results: Entities{
+			searchEntities["cloud-controller-worker-v2"].entity,
 			searchEntities["wordpress"].entity,
 			searchEntities["mysql"].entity,
 			searchEntities["varnish"].entity,
+			searchEntities["squid-forwardproxy"].entity,
 			searchEntities["wordpress-simple"].entity,
 		},
 	}, {
@@ -501,10 +528,12 @@ var searchTests = []struct {
 				"no such filter": {"foo"},
 			},
 		},
-		results: []*mongodoc.Entity{
+		results: Entities{
+			searchEntities["cloud-controller-worker-v2"].entity,
 			searchEntities["wordpress"].entity,
 			searchEntities["mysql"].entity,
 			searchEntities["varnish"].entity,
+			searchEntities["squid-forwardproxy"].entity,
 			searchEntities["wordpress-simple"].entity,
 		},
 	}, {
@@ -516,10 +545,12 @@ var searchTests = []struct {
 				"type":           {"charm"},
 			},
 		},
-		results: []*mongodoc.Entity{
+		results: Entities{
+			searchEntities["cloud-controller-worker-v2"].entity,
 			searchEntities["wordpress"].entity,
 			searchEntities["mysql"].entity,
 			searchEntities["varnish"].entity,
+			searchEntities["squid-forwardproxy"].entity,
 		},
 	}, {
 		about: "paginated search",
@@ -535,11 +566,13 @@ var searchTests = []struct {
 		sp: SearchParams{
 			Groups: []string{"charmers"},
 		},
-		results: []*mongodoc.Entity{
+		results: Entities{
 			searchEntities["riak"].entity,
+			searchEntities["cloud-controller-worker-v2"].entity,
 			searchEntities["wordpress"].entity,
 			searchEntities["mysql"].entity,
 			searchEntities["varnish"].entity,
+			searchEntities["squid-forwardproxy"].entity,
 			searchEntities["wordpress-simple"].entity,
 		},
 	}, {
@@ -547,11 +580,13 @@ var searchTests = []struct {
 		sp: SearchParams{
 			Admin: true,
 		},
-		results: []*mongodoc.Entity{
+		results: Entities{
 			searchEntities["riak"].entity,
+			searchEntities["cloud-controller-worker-v2"].entity,
 			searchEntities["wordpress"].entity,
 			searchEntities["mysql"].entity,
 			searchEntities["varnish"].entity,
+			searchEntities["squid-forwardproxy"].entity,
 			searchEntities["wordpress-simple"].entity,
 		},
 	}, {
@@ -562,7 +597,7 @@ var searchTests = []struct {
 				"tags": {"wordpressTAG"},
 			},
 		},
-		results: []*mongodoc.Entity{
+		results: Entities{
 			searchEntities["wordpress"].entity,
 		},
 	}, {
@@ -573,9 +608,10 @@ var searchTests = []struct {
 				"owner": {""},
 			},
 		},
-		results: []*mongodoc.Entity{
+		results: Entities{
 			searchEntities["wordpress"].entity,
 			searchEntities["mysql"].entity,
+			searchEntities["squid-forwardproxy"].entity,
 			searchEntities["wordpress-simple"].entity,
 		},
 	}, {
@@ -586,9 +622,10 @@ var searchTests = []struct {
 				"promulgated": {"1"},
 			},
 		},
-		results: []*mongodoc.Entity{
+		results: Entities{
 			searchEntities["wordpress"].entity,
 			searchEntities["mysql"].entity,
+			searchEntities["squid-forwardproxy"].entity,
 			searchEntities["wordpress-simple"].entity,
 		},
 	}, {
@@ -599,7 +636,8 @@ var searchTests = []struct {
 				"promulgated": {"0"},
 			},
 		},
-		results: []*mongodoc.Entity{
+		results: Entities{
+			searchEntities["cloud-controller-worker-v2"].entity,
 			searchEntities["varnish"].entity,
 		},
 	}, {
@@ -611,7 +649,7 @@ var searchTests = []struct {
 				"owner":       {"openstack-charmers"},
 			},
 		},
-		results: []*mongodoc.Entity{
+		results: Entities{
 			searchEntities["mysql"].entity,
 		},
 	},
@@ -623,23 +661,14 @@ func (s *StoreSearchSuite) TestSearches(c *gc.C) {
 		c.Logf("test %d: %s", i, test.about)
 		res, err := s.store.Search(test.sp)
 		c.Assert(err, gc.IsNil)
-		c.Logf("results: %s", listEntities(res.Results))
 		sort.Sort(resolvedURLsByString(res.Results))
 		sort.Sort(resolvedURLsByString(test.results))
-		c.Check(res.Results, jc.DeepEquals, test.results, gc.Commentf("expected: %s, obtained: %s", listEntities(test.results), listEntities(res.Results)))
+		c.Check(Entities(res.Results), jc.DeepEquals, test.results)
 		c.Check(res.Total, gc.Equals, len(test.results)+test.totalDiff)
 	}
 }
 
-func listEntities(ents []*mongodoc.Entity) string {
-	urls := make([]string, len(ents))
-	for i, e := range ents {
-		urls[i] = fmt.Sprintf("%q", e.URL.String())
-	}
-	return "[" + strings.Join(urls, ", ") + "]"
-}
-
-type resolvedURLsByString []*mongodoc.Entity
+type resolvedURLsByString Entities
 
 func (r resolvedURLsByString) Less(i, j int) bool {
 	return r[i].URL.String() < r[j].URL.String()
@@ -697,8 +726,7 @@ func (s *StoreSearchSuite) TestPromulgatedRank(c *gc.C) {
 	}
 	res, err := s.store.Search(sp)
 	c.Assert(err, gc.IsNil)
-	c.Logf("results: %#v", res.Results)
-	c.Assert(res.Results, jc.DeepEquals, []*mongodoc.Entity{
+	c.Assert(Entities(res.Results), jc.DeepEquals, Entities{
 		ent,
 		searchEntities["varnish"].entity,
 	})
@@ -709,12 +737,14 @@ func (s *StoreSearchSuite) TestSorting(c *gc.C) {
 	tests := []struct {
 		about     string
 		sortQuery string
-		results   []*mongodoc.Entity
+		results   Entities
 	}{{
 		about:     "name ascending",
 		sortQuery: "name",
-		results: []*mongodoc.Entity{
+		results: Entities{
+			searchEntities["cloud-controller-worker-v2"].entity,
 			searchEntities["mysql"].entity,
+			searchEntities["squid-forwardproxy"].entity,
 			searchEntities["varnish"].entity,
 			searchEntities["wordpress"].entity,
 			searchEntities["wordpress-simple"].entity,
@@ -722,34 +752,42 @@ func (s *StoreSearchSuite) TestSorting(c *gc.C) {
 	}, {
 		about:     "name descending",
 		sortQuery: "-name",
-		results: []*mongodoc.Entity{
+		results: Entities{
 			searchEntities["wordpress-simple"].entity,
 			searchEntities["wordpress"].entity,
 			searchEntities["varnish"].entity,
+			searchEntities["squid-forwardproxy"].entity,
 			searchEntities["mysql"].entity,
+			searchEntities["cloud-controller-worker-v2"].entity,
 		},
 	}, {
 		about:     "series ascending",
 		sortQuery: "series,name",
-		results: []*mongodoc.Entity{
+		results: Entities{
 			searchEntities["wordpress-simple"].entity,
 			searchEntities["wordpress"].entity,
+			searchEntities["cloud-controller-worker-v2"].entity,
+			searchEntities["squid-forwardproxy"].entity,
 			searchEntities["mysql"].entity,
 			searchEntities["varnish"].entity,
 		},
 	}, {
 		about:     "series descending",
 		sortQuery: "-series,name",
-		results: []*mongodoc.Entity{
+		results: Entities{
 			searchEntities["mysql"].entity,
 			searchEntities["varnish"].entity,
+			searchEntities["squid-forwardproxy"].entity,
+			searchEntities["cloud-controller-worker-v2"].entity,
 			searchEntities["wordpress"].entity,
 			searchEntities["wordpress-simple"].entity,
 		},
 	}, {
 		about:     "owner ascending",
 		sortQuery: "owner,name",
-		results: []*mongodoc.Entity{
+		results: Entities{
+			searchEntities["cloud-controller-worker-v2"].entity,
+			searchEntities["squid-forwardproxy"].entity,
 			searchEntities["wordpress"].entity,
 			searchEntities["wordpress-simple"].entity,
 			searchEntities["varnish"].entity,
@@ -758,27 +796,33 @@ func (s *StoreSearchSuite) TestSorting(c *gc.C) {
 	}, {
 		about:     "owner descending",
 		sortQuery: "-owner,name",
-		results: []*mongodoc.Entity{
+		results: Entities{
 			searchEntities["mysql"].entity,
 			searchEntities["varnish"].entity,
+			searchEntities["squid-forwardproxy"].entity,
 			searchEntities["wordpress"].entity,
 			searchEntities["wordpress-simple"].entity,
+			searchEntities["cloud-controller-worker-v2"].entity,
 		},
 	}, {
 		about:     "downloads ascending",
 		sortQuery: "downloads",
-		results: []*mongodoc.Entity{
+		results: Entities{
 			searchEntities["wordpress"].entity,
 			searchEntities["wordpress-simple"].entity,
+			searchEntities["squid-forwardproxy"].entity,
 			searchEntities["mysql"].entity,
+			searchEntities["cloud-controller-worker-v2"].entity,
 			searchEntities["varnish"].entity,
 		},
 	}, {
 		about:     "downloads descending",
 		sortQuery: "-downloads",
-		results: []*mongodoc.Entity{
+		results: Entities{
 			searchEntities["varnish"].entity,
+			searchEntities["cloud-controller-worker-v2"].entity,
 			searchEntities["mysql"].entity,
+			searchEntities["squid-forwardproxy"].entity,
 			searchEntities["wordpress-simple"].entity,
 			searchEntities["wordpress"].entity,
 		},
@@ -790,7 +834,7 @@ func (s *StoreSearchSuite) TestSorting(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 		res, err := s.store.Search(sp)
 		c.Assert(err, gc.IsNil)
-		c.Assert(res.Results, jc.DeepEquals, test.results)
+		c.Assert(Entities(res.Results), jc.DeepEquals, test.results)
 		c.Assert(res.Total, gc.Equals, len(test.results))
 	}
 }
@@ -800,13 +844,13 @@ func (s *StoreSearchSuite) TestBoosting(c *gc.C) {
 	var sp SearchParams
 	res, err := s.store.Search(sp)
 	c.Assert(err, gc.IsNil)
-	c.Assert(res.Results, gc.HasLen, 4)
-	c.Logf("results: %#v", res.Results)
-	c.Assert(res.Results, jc.DeepEquals, []*mongodoc.Entity{
+	c.Assert(Entities(res.Results), jc.DeepEquals, Entities{
 		searchEntities["wordpress-simple"].entity,
 		searchEntities["mysql"].entity,
 		searchEntities["wordpress"].entity,
+		searchEntities["squid-forwardproxy"].entity,
 		searchEntities["varnish"].entity,
+		searchEntities["cloud-controller-worker-v2"].entity,
 	})
 }
 
@@ -1006,10 +1050,12 @@ func (s *StoreSearchSuite) TestMultiSeriesCharmSortsSeriesCorrectly(c *gc.C) {
 	sp.ParseSortFields("-series", "owner")
 	res, err := s.store.Search(sp)
 	c.Assert(err, gc.IsNil)
-	c.Assert(res.Results, jc.DeepEquals, []*mongodoc.Entity{
+	c.Assert(Entities(res.Results), jc.DeepEquals, Entities{
 		newEntity("cs:~charmers/juju-gui-25", -1, "trusty", "xenial", "utopic", "vivid", "wily"),
 		newEntity("cs:~foo/xenial/varnish-1", -1),
 		newEntity("cs:~openstack-charmers/xenial/mysql-7", 7),
+		newEntity("cs:~charmers/wily/squid-forwardproxy-3", 3),
+		searchEntities["cloud-controller-worker-v2"].entity,
 		newEntity("cs:~charmers/precise/wordpress-23", 23),
 		newEntity("cs:~charmers/bundle/wordpress-simple-4", 4),
 	})
@@ -1092,4 +1138,18 @@ func addBundleForSearch(c *gc.C, s *Store, id *router.ResolvedURL, b charm.Bundl
 	c.Assert(err, gc.IsNil)
 	err = s.Publish(id, nil, params.StableChannel)
 	c.Assert(err, gc.IsNil)
+}
+
+type Entities []*mongodoc.Entity
+
+func (es Entities) GoString() string {
+	return es.String()
+}
+
+func (es Entities) String() string {
+	urls := make([]string, len(es))
+	for i, e := range es {
+		urls[i] = e.URL.String()
+	}
+	return "[" + strings.Join(urls, ", ") + "]"
 }

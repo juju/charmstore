@@ -10,7 +10,7 @@ var (
 	esMapping = mustParseJSON(esMappingJSON)
 )
 
-const esSettingsVersion = 8
+const esSettingsVersion = 9
 
 func mustParseJSON(s string) interface{} {
 	var j json.RawMessage
@@ -27,7 +27,7 @@ const esIndexJSON = `
         "analysis": {
             "filter": {
                 "n3_20grams_filter": {
-                    "type":     "nGram",
+                    "type":     "edgeNGram",
                     "min_gram": 3,
                     "max_gram": 20
                 }
@@ -35,7 +35,7 @@ const esIndexJSON = `
             "analyzer": {
                 "n3_20grams": {
                     "type":      "custom",
-                    "tokenizer": "standard",
+                    "tokenizer": "keyword",
                     "filter": [
                         "lowercase",
                         "n3_20grams_filter"
@@ -49,280 +49,255 @@ const esIndexJSON = `
 
 const esMappingJSON = `
 {
-  "entity" : {
-    "dynamic" : "false",
-    "properties" : {
-      "URL" : {
-        "type" : "multi_field",
-        "fields" : {
-          "URL" : {
-            "type" : "string",
-            "index" : "not_analyzed",
-            "omit_norms" : true,
-            "index_options" : "docs"
+  "entity": {
+    "dynamic": "false",
+    "properties": {
+      "URL": {
+        "type": "string",
+        "index": "not_analyzed",
+        "omit_norms": true,
+        "index_options": "docs"
+      },
+      "PromulgatedURL": {
+        "type": "string",
+        "index": "not_analyzed",
+        "index_options": "docs"
+      },
+      "BaseURL": {
+        "type": "string",
+        "index": "not_analyzed",
+        "index_options": "docs"
+      },
+      "User": {
+        "type": "string",
+        "index": "not_analyzed",
+        "omit_norms": true,
+        "index_options": "docs"
+      },
+      "Name": {
+        "type": "multi_field",
+        "fields": {
+          "Name": {
+            "type": "string",
+            "index": "not_analyzed",
+            "omit_norms": true,
+            "index_options": "docs"
           },
-          "ngrams" : {
-            "type" : "string",
-            "analyzer" : "n3_20grams",
-            "include_in_all" : false
+          "ngrams": {
+            "type": "string",
+            "index_analyzer": "n3_20grams",
+            "include_in_all": false
           }
         }
       },
-      "PromulgatedURL" : {
-        "type" : "string",
+      "Revision": {
+        "type": "integer",
+        "index": "not_analyzed"
+      },
+      "Series": {
+        "type": "string",
         "index": "not_analyzed",
-        "index_options" : "docs"
-      },
-      "BaseURL" : {
-        "type" : "string",
-        "index": "not_analyzed",
-        "index_options" : "docs"
-      },
-      "User" : {
-        "type" : "string",
-        "index" : "not_analyzed",
-        "omit_norms" : true,
-        "index_options" : "docs"
-      },
-      "Name" : {
-        "type" : "string",
-        "index" : "not_analyzed",
-        "omit_norms" : true,
-        "index_options" : "docs"
-      },
-      "Revision" : {
-        "type" : "integer",
-        "index" : "not_analyzed"
-      },
-      "Series" : {
-        "type" : "multi_field",
-        "fields" : {
-          "Series" : {
-            "type" : "string",
-            "index" : "not_analyzed",
-            "omit_norms" : true,
-            "index_options" : "docs"
-          },
-          "ngrams" : {
-            "type" : "string",
-            "analyzer" : "n3_20grams",
-            "include_in_all" : false
-          }
-        }
+        "omit_norms": true,
+        "index_options": "docs"
       },
       "TotalDownloads": {
         "type": "long"
       },
-      "BlobHash" : {
-        "type" : "string",
-        "index" : "not_analyzed",
-        "omit_norms" : true,
-        "index_options" : "docs"
+      "BlobHash": {
+        "type": "string",
+        "index": "not_analyzed",
+        "omit_norms": true,
+        "index_options": "docs"
       },
-      "UploadTime" : {
-        "type" : "date",
-        "format" : "dateOptionalTime"
+      "UploadTime": {
+        "type": "date",
+        "format": "dateOptionalTime"
       },
-      "CharmMeta" : {
-        "dynamic" : "false",
-        "properties" : {
-          "Name" : {
-            "type" : "multi_field",
-            "fields" : {
-              "Name" : {
-                "type" : "string",
-                "index" : "not_analyzed",
-                "omit_norms" : true,
-                "index_options" : "docs"
+      "CharmMeta": {
+        "dynamic": "false",
+        "properties": {
+          "Name": {
+            "type": "string"
+          },
+          "Summary": {
+            "type": "string"
+          },
+          "Description": {
+            "type": "string"
+          },
+          "Provides": {
+            "dynamic": "false",
+            "properties": {
+              "Name": {
+                "type": "string",
+                "index": "not_analyzed",
+                "omit_norms": true,
+                "index_options": "docs"
               },
-              "ngrams" : {
-                "type" : "string",
-                "analyzer" : "n3_20grams",
-                "include_in_all" : false
+              "Role": {
+                "type": "string",
+                "index": "not_analyzed",
+                "omit_norms": true,
+                "index_options": "docs"
+              },
+              "Interface": {
+                "type": "string",
+                "index": "not_analyzed",
+                "omit_norms": true,
+                "index_options": "docs"
+              },
+              "Scope": {
+                "type": "string",
+                "index": "not_analyzed",
+                "omit_norms": true,
+                "index_options": "docs"
               }
             }
           },
-          "Summary" : {
-            "type" : "string"
-          },
-          "Description" : {
-            "type" : "string"
-          },
-          "Provides" : {
-            "dynamic" : "false",
-            "properties" : {
-              "Name" : {
-                "type" : "string",
-                "index" : "not_analyzed",
-                "omit_norms" : true,
-                "index_options" : "docs"
+          "Requires": {
+            "dynamic": "false",
+            "properties": {
+              "Name": {
+                "type": "string",
+                "index": "not_analyzed",
+                "omit_norms": true,
+                "index_options": "docs"
               },
-              "Role" : {
-                "type" : "string",
-                "index" : "not_analyzed",
-                "omit_norms" : true,
-                "index_options" : "docs"
+              "Role": {
+                "type": "string",
+                "index": "not_analyzed",
+                "omit_norms": true,
+                "index_options": "docs"
               },
-              "Interface" : {
-                "type" : "string",
-                "index" : "not_analyzed",
-                "omit_norms" : true,
-                "index_options" : "docs"
+              "Interface": {
+                "type": "string",
+                "index": "not_analyzed",
+                "omit_norms": true,
+                "index_options": "docs"
               },
-              "Scope" : {
-                "type" : "string",
-                "index" : "not_analyzed",
-                "omit_norms" : true,
-                "index_options" : "docs"
+              "Scope": {
+                "type": "string",
+                "index": "not_analyzed",
+                "omit_norms": true,
+                "index_options": "docs"
               }
             }
           },
-          "Requires" : {
-            "dynamic" : "false",
-            "properties" : {
-              "Name" : {
-                "type" : "string",
-                "index" : "not_analyzed",
-                "omit_norms" : true,
-                "index_options" : "docs"
+          "Peers": {
+            "dynamic": "false",
+            "properties": {
+              "Name": {
+                "type": "string",
+                "index": "not_analyzed",
+                "omit_norms": true,
+                "index_options": "docs"
               },
-              "Role" : {
-                "type" : "string",
-                "index" : "not_analyzed",
-                "omit_norms" : true,
-                "index_options" : "docs"
+              "Role": {
+                "type": "string",
+                "index": "not_analyzed",
+                "omit_norms": true,
+                "index_options": "docs"
               },
-              "Interface" : {
-                "type" : "string",
-                "index" : "not_analyzed",
-                "omit_norms" : true,
-                "index_options" : "docs"
+              "Interface": {
+                "type": "string",
+                "index": "not_analyzed",
+                "omit_norms": true,
+                "index_options": "docs"
               },
-              "Scope" : {
-                "type" : "string",
-                "index" : "not_analyzed",
-                "omit_norms" : true,
-                "index_options" : "docs"
+              "Scope": {
+                "type": "string",
+                "index": "not_analyzed",
+                "omit_norms": true,
+                "index_options": "docs"
               }
             }
           },
-          "Peers" : {
-            "dynamic" : "false",
-            "properties" : {
-              "Name" : {
-                "type" : "string",
-                "index" : "not_analyzed",
-                "omit_norms" : true,
-                "index_options" : "docs"
-              },
-              "Role" : {
-                "type" : "string",
-                "index" : "not_analyzed",
-                "omit_norms" : true,
-                "index_options" : "docs"
-              },
-              "Interface" : {
-                "type" : "string",
-                "index" : "not_analyzed",
-                "omit_norms" : true,
-                "index_options" : "docs"
-              },
-              "Scope" : {
-                "type" : "string",
-                "index" : "not_analyzed",
-                "omit_norms" : true,
-                "index_options" : "docs"
-              }
-            }
+          "Categories": {
+            "type": "string",
+            "index": "not_analyzed",
+            "omit_norms": true,
+            "index_options": "docs"
           },
-          "Categories" : {
-            "type" : "string",
-            "index" : "not_analyzed",
-            "omit_norms" : true,
-            "index_options" : "docs"
-          },
-          "Tags" : {
-            "type" : "string",
-            "index" : "not_analyzed",
-            "omit_norms" : true,
-            "index_options" : "docs"
+          "Tags": {
+            "type": "string",
+            "index": "not_analyzed",
+            "omit_norms": true,
+            "index_options": "docs"
           }
         }
       },
-      "charmactions" : {
-        "dynamic" : "false",
-        "properties" : {
-          "description" : {
-            "type" : "string"
+      "charmactions": {
+        "dynamic": "false",
+        "properties": {
+          "description": {
+            "type": "string"
           },
-          "action_name" : {
-            "type" : "string",
-            "index" : "not_analyzed",
-            "omit_norms" : true,
-            "index_options" : "docs"
+          "action_name": {
+            "type": "string",
+            "index": "not_analyzed",
+            "omit_norms": true,
+            "index_options": "docs"
           }
         }
       },
-      "CharmProvidedInterfaces" : {
-        "type" : "string",
-        "index" : "not_analyzed",
-        "omit_norms" : true,
-        "index_options" : "docs"
+      "CharmProvidedInterfaces": {
+        "type": "string",
+        "index": "not_analyzed",
+        "omit_norms": true,
+        "index_options": "docs"
       },
-      "CharmRequiredInterfaces" : {
-        "type" : "string",
-        "index" : "not_analyzed",
-        "omit_norms" : true,
-        "index_options" : "docs"
+      "CharmRequiredInterfaces": {
+        "type": "string",
+        "index": "not_analyzed",
+        "omit_norms": true,
+        "index_options": "docs"
       },
-
-
-      "BundleData" : {
+      "BundleData": {
         "type": "object",
         "dynamic": "false",
-        "properties" : {
-          "Services" : {
+        "properties": {
+          "Services": {
             "type": "object",
             "dynamic": "false",
             "properties": {
               "Charm": {
-                "type" : "string",
-                "index" : "not_analyzed",
-                "omit_norms" : true,
-                "index_options" : "docs"
+                "type": "string",
+                "index": "not_analyzed",
+                "omit_norms": true,
+                "index_options": "docs"
               },
               "NumUnits": {
-                "type" : "integer",
+                "type": "integer",
                 "index": "not_analyzed"
               }
             }
           },
-          "Series" : {
-            "type" : "string"
+          "Series": {
+            "type": "string"
           },
-          "Relations" : {
-            "type" : "string",
+          "Relations": {
+            "type": "string",
             "index": "not_analyzed"
           },
-         "Tags" : {
-            "type" : "string",
+          "Tags": {
+            "type": "string",
             "index": "not_analyzed",
-            "omit_norms" : true,
-            "index_options" : "docs"
+            "omit_norms": true,
+            "index_options": "docs"
           }
         }
       },
-      "BundleReadMe" : {
+      "BundleReadMe": {
         "type": "string",
         "index": "not_analyzed",
-        "omit_norms" : true,
-        "index_options" : "docs"
+        "omit_norms": true,
+        "index_options": "docs"
       },
       "BundleCharms": {
         "type": "string",
         "index": "not_analyzed",
-        "omit_norms" : true,
-        "index_options" : "docs"
+        "omit_norms": true,
+        "index_options": "docs"
       },
       "BundleMachineCount": {
         "type": "integer"
@@ -330,32 +305,29 @@ const esMappingJSON = `
       "BundleUnitCount": {
         "type": "integer"
       },
-      "TotalDownloads": {
-        "type": "long"
-      },
       "Public": {
         "type": "boolean",
-        "index" : "not_analyzed",
-        "omit_norms" : true,
-        "index_options" : "docs"
-      },
-      "ReadACLs" : {
-        "type" : "string",
         "index": "not_analyzed",
-        "omit_norms" : true,
-        "index_options" : "docs"
+        "omit_norms": true,
+        "index_options": "docs"
+      },
+      "ReadACLs": {
+        "type": "string",
+        "index": "not_analyzed",
+        "omit_norms": true,
+        "index_options": "docs"
       },
       "SingleSeries": {
         "type": "boolean",
-        "index" : "not_analyzed",
-        "omit_norms" : true,
-        "index_options" : "docs"
+        "index": "not_analyzed",
+        "omit_norms": true,
+        "index_options": "docs"
       },
       "AllSeries": {
         "type": "boolean",
-        "index" : "not_analyzed",
-        "omit_norms" : true,
-        "index_options" : "docs"
+        "index": "not_analyzed",
+        "omit_norms": true,
+        "index_options": "docs"
       }
     }
   }
