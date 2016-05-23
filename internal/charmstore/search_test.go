@@ -656,7 +656,6 @@ var searchTests = []struct {
 }
 
 func (s *StoreSearchSuite) TestSearches(c *gc.C) {
-	c.ExpectFailure("search matches too aggressively")
 	s.store.ES.Database.RefreshIndex(s.TestIndex)
 	for i, test := range searchTests {
 		c.Logf("test %d: %s", i, test.about)
@@ -684,7 +683,6 @@ func (r resolvedURLsByString) Len() int {
 }
 
 func (s *StoreSearchSuite) TestPaginatedSearch(c *gc.C) {
-	c.ExpectFailure("search matches too aggressively")
 	err := s.store.ES.Database.RefreshIndex(s.TestIndex)
 	c.Assert(err, gc.IsNil)
 	sp := SearchParams{
