@@ -672,7 +672,6 @@ var searchTests = []struct {
 }
 
 func (s *StoreSearchSuite) TestSearches(c *gc.C) {
-	c.ExpectFailure("autocomplete query not analyzed properly")
 	s.store.ES.Database.RefreshIndex(s.TestIndex)
 	for i, test := range searchTests {
 		c.Logf("test %d: %s", i, test.about)

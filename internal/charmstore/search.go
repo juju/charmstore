@@ -543,31 +543,6 @@ type ListResult struct {
 	Results []*mongodoc.Entity
 }
 
-// queryFields provides a map of fields to weighting to use with the
-// elasticsearch query.
-func queryFields(sp SearchParams) map[string]float64 {
-	var fields map[string]float64
-	if sp.AutoComplete {
-		fields = map[string]float64{
-			"Name.ngrams": 10,
-		}
-	} else {
-		fields = map[string]float64{
-			"Name":                    10,
-			"User":                    7,
-			"CharmMeta.Categories":    5,
-			"CharmMeta.Tags":          5,
-			"BundleData.Tags":         5,
-			"Series":                  5,
-			"CharmProvidedInterfaces": 3,
-			"CharmRequiredInterfaces": 3,
-			"CharmMeta.Description":   1,
-			"BundleReadMe":            1,
-		}
-	}
-	return fields
-}
-
 // encodeFields takes a map of field name to weight and builds a slice of strings
 // representing those weighted fields for a MultiMatchQuery.
 func encodeFields(fields map[string]float64) []string {
@@ -590,10 +565,27 @@ func createSearchDSL(sp SearchParams) elasticsearch.QueryDSL {
 	var q elasticsearch.Query
 	if sp.Text == "" {
 		q = elasticsearch.MatchAllQuery{}
+	} else if sp.AutoComplete {
+		q = elasticsearch.MatchQuery{
+			Field:    "Name.ngrams",
+			Query:    sp.Text,
+			Analyzer: "keyword",
+		}
 	} else {
 		q = elasticsearch.MultiMatchQuery{
-			Query:  sp.Text,
-			Fields: encodeFields(queryFields(sp)),
+			Query: sp.Text,
+			Fields: encodeFields(map[string]float64{
+				"Name":                    10,
+				"User":                    7,
+				"CharmMeta.Categories":    5,
+				"CharmMeta.Tags":          5,
+				"BundleData.Tags":         5,
+				"Series":                  5,
+				"CharmProvidedInterfaces": 3,
+				"CharmRequiredInterfaces": 3,
+				"CharmMeta.Description":   1,
+				"BundleReadMe":            1,
+			}),
 		}
 	}
 
