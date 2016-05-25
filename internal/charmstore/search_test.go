@@ -142,8 +142,8 @@ var searchEntities = map[string]searchEntity{
 	"wordpress-simple": searchEntity{
 		entity: newEntity("cs:~charmers/bundle/wordpress-simple-4", 4),
 		bundleData: &charm.BundleData{
-			Services: map[string]*charm.ServiceSpec{
-				"wordpress": &charm.ServiceSpec{
+			Applications: map[string]*charm.ApplicationSpec{
+				"wordpress": &charm.ApplicationSpec{
 					Charm: "wordpress",
 				},
 			},

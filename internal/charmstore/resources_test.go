@@ -176,7 +176,7 @@ func (s *resourceSuite) TestListResourcesBundle(c *gc.C) {
 
 	id := MustParseResolvedURL("cs:~charmers/bundle/wordpress-simple-0")
 	b := storetesting.NewBundle(&charm.BundleData{
-		Services: map[string]*charm.ServiceSpec{
+		Applications: map[string]*charm.ApplicationSpec{
 			"wordpress": {
 				Charm: "cs:utopic/wordpress-0",
 			},

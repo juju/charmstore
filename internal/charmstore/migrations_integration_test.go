@@ -60,7 +60,7 @@ var migrationHistory = []versionSpec{{
 			id:            "~charmers/bundle/promulgatedbundle-0",
 			promulgatedId: "bundle/promulgatedbundle-0",
 			entity: storetesting.NewBundle(&charm.BundleData{
-				Services: map[string]*charm.ServiceSpec{
+				Applications: map[string]*charm.ApplicationSpec{
 					"promulgated": {
 						Charm: "promulgated",
 					},
@@ -69,7 +69,7 @@ var migrationHistory = []versionSpec{{
 		}, {
 			id: "~charmers/bundle/nonpromulgatedbundle-0",
 			entity: storetesting.NewBundle(&charm.BundleData{
-				Services: map[string]*charm.ServiceSpec{
+				Applications: map[string]*charm.ApplicationSpec{
 					"promulgated": {
 						Charm: "promulgated",
 					},

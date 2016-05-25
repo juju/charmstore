@@ -66,7 +66,7 @@ func (s *APISuite) TestServeDiagramErrors(c *gc.C) {
 
 func (s *APISuite) TestServeDiagram(c *gc.C) {
 	bundle := storetesting.NewBundle(&charm.BundleData{
-		Services: map[string]*charm.ServiceSpec{
+		Applications: map[string]*charm.ApplicationSpec{
 			"wordpress": {
 				Charm: "wordpress",
 				Annotations: map[string]string{
@@ -102,7 +102,7 @@ func (s *APISuite) TestServeDiagram(c *gc.C) {
 	// Check that the output contains valid XML with an SVG tag,
 	// but don't check the details of the output so that this test doesn't
 	// break every time the jujusvg presentation changes.
-	// Also check that we get an image for each service containing the charm
+	// Also check that we get an image for each application containing the charm
 	// icon link.
 	assertXMLContains(c, rec.Body.Bytes(), map[string]func(xml.Token) bool{
 		"svg element":    isStartElementWithName("svg"),
@@ -121,7 +121,7 @@ func (s *APISuite) TestServeDiagram(c *gc.C) {
 	// Check that the output contains valid XML with an SVG tag,
 	// but don't check the details of the output so that this test doesn't
 	// break every time the jujusvg presentation changes.
-	// Also check that we get an image for each service containing the charm
+	// Also check that we get an image for each application containing the charm
 	// icon link.
 	assertXMLContains(c, rec.Body.Bytes(), map[string]func(xml.Token) bool{
 		"svg element":    isStartElementWithName("svg"),
@@ -133,7 +133,7 @@ func (s *APISuite) TestServeDiagram(c *gc.C) {
 func (s *APISuite) TestServeDiagramNoPosition(c *gc.C) {
 	bundle := storetesting.NewBundle(
 		&charm.BundleData{
-			Services: map[string]*charm.ServiceSpec{
+			Applications: map[string]*charm.ApplicationSpec{
 				"wordpress": {
 					Charm: "wordpress",
 				},

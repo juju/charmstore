@@ -210,7 +210,7 @@ var uploadEntityErrorsTests = []struct {
 	about: "bundle uploaded to charm URL",
 	url:   "~charmers/precise/foo-0",
 	upload: storetesting.NewBundle(&charm.BundleData{
-		Services: map[string]*charm.ServiceSpec{
+		Applications: map[string]*charm.ApplicationSpec{
 			"foo": {
 				Charm: "foo",
 			},
@@ -259,19 +259,19 @@ var uploadEntityErrorsTests = []struct {
 	about: "bundle refers to non-existent charm",
 	url:   "~charmers/bundle/foo-0",
 	upload: storetesting.NewBundle(&charm.BundleData{
-		Services: map[string]*charm.ServiceSpec{
+		Applications: map[string]*charm.ApplicationSpec{
 			"foo": {
 				Charm: "bad-charm",
 			},
 		},
 	}),
-	expectError: regexp.QuoteMeta(`bundle verification failed: ["service \"foo\" refers to non-existent charm \"bad-charm\""]`),
+	expectError: regexp.QuoteMeta(`bundle verification failed: ["application \"foo\" refers to non-existent charm \"bad-charm\""]`),
 	expectCause: params.ErrInvalidEntity,
 }, {
 	about:       "bundle verification fails",
 	url:         "~charmers/bundle/foo-0",
 	upload:      storetesting.NewBundle(&charm.BundleData{}),
-	expectError: regexp.QuoteMeta(`bundle verification failed: ["at least one service must be specified"]`),
+	expectError: regexp.QuoteMeta(`bundle verification failed: ["at least one application must be specified"]`),
 	expectCause: params.ErrInvalidEntity,
 }, {
 	about:       "invalid zip format",
