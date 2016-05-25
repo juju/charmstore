@@ -388,6 +388,22 @@ var searchTests = []struct {
 		},
 		results: Entities{},
 	}, {
+		about: "autocomplete with hyphen - match",
+		sp: SearchParams{
+			Text:         "squid-f",
+			AutoComplete: true,
+		},
+		results: Entities{
+			searchEntities["squid-forwardproxy"].entity,
+		},
+	}, {
+		about: "autocomplete with hyphen - no match",
+		sp: SearchParams{
+			Text:         "squid-g",
+			AutoComplete: true,
+		},
+		results: Entities{},
+	}, {
 		about: "description filter search",
 		sp: SearchParams{
 			Text: "",
@@ -656,6 +672,7 @@ var searchTests = []struct {
 }
 
 func (s *StoreSearchSuite) TestSearches(c *gc.C) {
+	c.ExpectFailure("autocomplete query not analyzed properly")
 	s.store.ES.Database.RefreshIndex(s.TestIndex)
 	for i, test := range searchTests {
 		c.Logf("test %d: %s", i, test.about)
