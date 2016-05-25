@@ -654,19 +654,19 @@ func sameMetaAnyResponses(expect interface{}) httptesting.BodyAsserter {
 // relationTestingBundle returns a bundle for use in relation
 // testing. The urls parameter holds a list of charm references
 // to be included in the bundle.
-// For each URL, a corresponding service is automatically created.
+// For each URL, a corresponding application is automatically created.
 func relationTestingBundle(urls []string) charm.Bundle {
-	services := make(map[string]*charm.ServiceSpec, len(urls))
+	applications := make(map[string]*charm.ApplicationSpec, len(urls))
 	for i, url := range urls {
-		service := &charm.ServiceSpec{
+		application := &charm.ApplicationSpec{
 			Charm:    url,
 			NumUnits: 1,
 		}
-		services[fmt.Sprintf("service-%d", i)] = service
+		applications[fmt.Sprintf("application-%d", i)] = application
 	}
 	return storetesting.NewBundle(
 		&charm.BundleData{
-			Services: services,
+			Applications: applications,
 		})
 
 }

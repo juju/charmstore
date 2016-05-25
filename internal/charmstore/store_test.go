@@ -483,7 +483,7 @@ var bundleUnitCountTests = []struct {
 }{{
 	about: "no units",
 	data: &charm.BundleData{
-		Services: map[string]*charm.ServiceSpec{
+		Applications: map[string]*charm.ApplicationSpec{
 			"wordpress": {
 				Charm:    "cs:utopic/wordpress-0",
 				NumUnits: 0,
@@ -497,7 +497,7 @@ var bundleUnitCountTests = []struct {
 }, {
 	about: "a single unit",
 	data: &charm.BundleData{
-		Services: map[string]*charm.ServiceSpec{
+		Applications: map[string]*charm.ApplicationSpec{
 			"wordpress": {
 				Charm:    "cs:trusty/wordpress-42",
 				NumUnits: 1,
@@ -512,7 +512,7 @@ var bundleUnitCountTests = []struct {
 }, {
 	about: "multiple units",
 	data: &charm.BundleData{
-		Services: map[string]*charm.ServiceSpec{
+		Applications: map[string]*charm.ApplicationSpec{
 			"wordpress": {
 				Charm:    "cs:utopic/wordpress-1",
 				NumUnits: 1,
@@ -562,7 +562,7 @@ var bundleMachineCountTests = []struct {
 }{{
 	about: "no machines",
 	data: &charm.BundleData{
-		Services: map[string]*charm.ServiceSpec{
+		Applications: map[string]*charm.ApplicationSpec{
 			"mysql": {
 				Charm:    "cs:utopic/mysql-0",
 				NumUnits: 0,
@@ -576,7 +576,7 @@ var bundleMachineCountTests = []struct {
 }, {
 	about: "a single machine (no placement)",
 	data: &charm.BundleData{
-		Services: map[string]*charm.ServiceSpec{
+		Applications: map[string]*charm.ApplicationSpec{
 			"mysql": {
 				Charm:    "cs:trusty/mysql-42",
 				NumUnits: 1,
@@ -591,7 +591,7 @@ var bundleMachineCountTests = []struct {
 }, {
 	about: "a single machine (machine placement)",
 	data: &charm.BundleData{
-		Services: map[string]*charm.ServiceSpec{
+		Applications: map[string]*charm.ApplicationSpec{
 			"mysql": {
 				Charm:    "cs:trusty/mysql-42",
 				NumUnits: 1,
@@ -606,7 +606,7 @@ var bundleMachineCountTests = []struct {
 }, {
 	about: "a single machine (hulk smash)",
 	data: &charm.BundleData{
-		Services: map[string]*charm.ServiceSpec{
+		Applications: map[string]*charm.ApplicationSpec{
 			"mysql": {
 				Charm:    "cs:trusty/mysql-42",
 				NumUnits: 1,
@@ -626,7 +626,7 @@ var bundleMachineCountTests = []struct {
 }, {
 	about: "a single machine (co-location)",
 	data: &charm.BundleData{
-		Services: map[string]*charm.ServiceSpec{
+		Applications: map[string]*charm.ApplicationSpec{
 			"mysql": {
 				Charm:    "cs:trusty/mysql-42",
 				NumUnits: 1,
@@ -642,7 +642,7 @@ var bundleMachineCountTests = []struct {
 }, {
 	about: "a single machine (containerization)",
 	data: &charm.BundleData{
-		Services: map[string]*charm.ServiceSpec{
+		Applications: map[string]*charm.ApplicationSpec{
 			"mysql": {
 				Charm:    "cs:trusty/mysql-42",
 				NumUnits: 1,
@@ -667,7 +667,7 @@ var bundleMachineCountTests = []struct {
 }, {
 	about: "multiple machines (no placement)",
 	data: &charm.BundleData{
-		Services: map[string]*charm.ServiceSpec{
+		Applications: map[string]*charm.ApplicationSpec{
 			"mysql": {
 				Charm:    "cs:utopic/mysql-1",
 				NumUnits: 1,
@@ -686,7 +686,7 @@ var bundleMachineCountTests = []struct {
 }, {
 	about: "multiple machines (machine placement)",
 	data: &charm.BundleData{
-		Services: map[string]*charm.ServiceSpec{
+		Applications: map[string]*charm.ApplicationSpec{
 			"mysql": {
 				Charm:    "cs:utopic/mysql-1",
 				NumUnits: 2,
@@ -706,7 +706,7 @@ var bundleMachineCountTests = []struct {
 }, {
 	about: "multiple machines (hulk smash)",
 	data: &charm.BundleData{
-		Services: map[string]*charm.ServiceSpec{
+		Applications: map[string]*charm.ApplicationSpec{
 			"mysql": {
 				Charm:    "cs:trusty/mysql-42",
 				NumUnits: 1,
@@ -731,7 +731,7 @@ var bundleMachineCountTests = []struct {
 }, {
 	about: "multiple machines (co-location)",
 	data: &charm.BundleData{
-		Services: map[string]*charm.ServiceSpec{
+		Applications: map[string]*charm.ApplicationSpec{
 			"mysql": {
 				Charm:    "cs:trusty/mysql-42",
 				NumUnits: 2,
@@ -747,7 +747,7 @@ var bundleMachineCountTests = []struct {
 }, {
 	about: "multiple machines (containerization)",
 	data: &charm.BundleData{
-		Services: map[string]*charm.ServiceSpec{
+		Applications: map[string]*charm.ApplicationSpec{
 			"mysql": {
 				Charm:    "cs:trusty/mysql-42",
 				NumUnits: 2,
@@ -772,7 +772,7 @@ var bundleMachineCountTests = []struct {
 }, {
 	about: "multiple machines (partial placement in a container)",
 	data: &charm.BundleData{
-		Services: map[string]*charm.ServiceSpec{
+		Applications: map[string]*charm.ApplicationSpec{
 			"mysql": {
 				Charm:    "cs:trusty/mysql-42",
 				NumUnits: 1,
@@ -792,7 +792,7 @@ var bundleMachineCountTests = []struct {
 }, {
 	about: "multiple machines (partial placement in a new machine)",
 	data: &charm.BundleData{
-		Services: map[string]*charm.ServiceSpec{
+		Applications: map[string]*charm.ApplicationSpec{
 			"mysql": {
 				Charm:    "cs:trusty/mysql-42",
 				NumUnits: 1,
@@ -812,7 +812,7 @@ var bundleMachineCountTests = []struct {
 }, {
 	about: "multiple machines (partial placement with new machines)",
 	data: &charm.BundleData{
-		Services: map[string]*charm.ServiceSpec{
+		Applications: map[string]*charm.ApplicationSpec{
 			"mysql": {
 				Charm:    "cs:trusty/mysql-42",
 				NumUnits: 3,
@@ -836,7 +836,7 @@ var bundleMachineCountTests = []struct {
 }, {
 	about: "placement into container on new machine",
 	data: &charm.BundleData{
-		Services: map[string]*charm.ServiceSpec{
+		Applications: map[string]*charm.ApplicationSpec{
 			"wordpress": {
 				Charm:    "cs:trusty/wordpress-47",
 				NumUnits: 6,
@@ -1476,11 +1476,11 @@ var findBestEntityBundles = []struct {
 }{{
 	id: router.MustNewResolvedURL("~charmers/bundle/wordpress-simple-0", 0),
 	bundle: storetesting.NewBundle(&charm.BundleData{
-		Services: map[string]*charm.ServiceSpec{
-			"wordpress": {
+		Applications: map[string]*charm.ApplicationSpec{
+			"wordpress": &charm.ApplicationSpec{
 				Charm: "cs:wordpress",
 			},
-			"mysql": {
+			"mysql": &charm.ApplicationSpec{
 				Charm: "cs:mysql",
 			},
 		},
@@ -1490,11 +1490,11 @@ var findBestEntityBundles = []struct {
 }, {
 	id: router.MustNewResolvedURL("~charmers/bundle/wordpress-simple-1", 1),
 	bundle: storetesting.NewBundle(&charm.BundleData{
-		Services: map[string]*charm.ServiceSpec{
-			"wordpress": {
+		Applications: map[string]*charm.ApplicationSpec{
+			"wordpress": &charm.ApplicationSpec{
 				Charm: "cs:wordpress",
 			},
-			"mysql": {
+			"mysql": &charm.ApplicationSpec{
 				Charm: "cs:mysql",
 			},
 		},
@@ -1504,11 +1504,11 @@ var findBestEntityBundles = []struct {
 }, {
 	id: router.MustNewResolvedURL("~charmers/bundle/wordpress-simple-2", 2),
 	bundle: storetesting.NewBundle(&charm.BundleData{
-		Services: map[string]*charm.ServiceSpec{
-			"wordpress": {
+		Applications: map[string]*charm.ApplicationSpec{
+			"wordpress": &charm.ApplicationSpec{
 				Charm: "cs:wordpress",
 			},
-			"mysql": {
+			"mysql": &charm.ApplicationSpec{
 				Charm: "cs:mysql",
 			},
 		},
@@ -1518,11 +1518,11 @@ var findBestEntityBundles = []struct {
 }, {
 	id: router.MustNewResolvedURL("~charmers/bundle/wordpress-simple-3", 3),
 	bundle: storetesting.NewBundle(&charm.BundleData{
-		Services: map[string]*charm.ServiceSpec{
-			"wordpress": {
+		Applications: map[string]*charm.ApplicationSpec{
+			"wordpress": &charm.ApplicationSpec{
 				Charm: "cs:wordpress",
 			},
-			"mysql": {
+			"mysql": &charm.ApplicationSpec{
 				Charm: "cs:mysql",
 			},
 		},

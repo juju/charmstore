@@ -267,7 +267,7 @@ func storeURL(path string) string {
 // addRequiredCharms adds any charms required by the given
 // bundle that are not already in the store.
 func (s *commonSuite) addRequiredCharms(c *gc.C, bundle charm.Bundle) {
-	for _, svc := range bundle.Data().Services {
+	for _, svc := range bundle.Data().Applications {
 		u := charm.MustParseURL(svc.Charm)
 		if _, err := s.store.FindBestEntity(u, params.StableChannel, nil); err == nil {
 			continue

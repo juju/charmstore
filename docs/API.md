@@ -826,7 +826,7 @@ file for a bundle. The id must refer to a bundle, not a charm.
 
 ```go
 type BundleData struct {
-        Services map[string] ServiceSpec
+        Applications map[string] ApplicationSpec
         Machines map[string] MachineSpec `json:",omitempty"`
         Series string                    `json:",omitempty"`
         Relations [][]string             `json:",omitempty"`
@@ -837,13 +837,13 @@ type MachineSpec struct {
         Annotations map[string]string    `json:",omitempty"`
 }
 
-type ServiceSpec struct {
+type ApplicationSpec struct {
         Charm string
         NumUnits int
         To []string                      `json:",omitempty"`
 
         // Options holds the configuration values
-        // to apply to the new service. They should
+        // to apply to the new application. They should
         // be compatible with the charm configuration.
         Options map[string]interface{}   `json:",omitempty"`
         Annotations map[string]string    `json:",omitempty"`
@@ -855,7 +855,7 @@ Example: `GET mediawiki/meta/bundle-metadata`
 
 ```json
 {
-    "Services": {
+    "Applications": {
         "mediawiki": {
             "Charm": "cs:precise/mediawiki-10",
             "NumUnits": 1,

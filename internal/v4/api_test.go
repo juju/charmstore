@@ -128,7 +128,7 @@ var metaEndpoints = []metaEndpoint{{
 	get:       entityFieldGetter("BundleData"),
 	checkURL:  newResolvedURL("cs:~charmers/bundle/wordpress-simple-42", 42),
 	assertCheckData: func(c *gc.C, data interface{}) {
-		c.Assert(data.(*charm.BundleData).Services["wordpress"].Charm, gc.Equals, "wordpress")
+		c.Assert(data.(*charm.BundleData).Applications["wordpress"].Charm, gc.Equals, "wordpress")
 	},
 }, {
 	name:      "bundle-unit-count",
@@ -1505,7 +1505,7 @@ func (s *APISuite) TestBundleTags(c *gc.C) {
 	url := newResolvedURL("~charmers/bundle/wordpress-simple-2", -1)
 	s.addPublicBundle(c, storetesting.NewBundle(&charm.BundleData{
 		Tags: []string{"foo", "bar"},
-		Services: map[string]*charm.ServiceSpec{
+		Applications: map[string]*charm.ApplicationSpec{
 			"wordpress": {
 				Charm: "wordpress",
 			},
@@ -1523,7 +1523,7 @@ func (s *APISuite) TestPromulgatedBundleTags(c *gc.C) {
 	url := newResolvedURL("~charmers/bundle/wordpress-simple-2", 2)
 	s.addPublicBundle(c, storetesting.NewBundle(&charm.BundleData{
 		Tags: []string{"foo", "bar"},
-		Services: map[string]*charm.ServiceSpec{
+		Applications: map[string]*charm.ApplicationSpec{
 			"wordpress": {
 				Charm: "wordpress",
 			},
