@@ -40,15 +40,19 @@ func (m MatchAllQuery) MarshalJSON() ([]byte, error) {
 // MatchQuery provides a query that matches against
 // a complete field.
 type MatchQuery struct {
-	Field string
-	Query string
-	Type  string
+	Field    string
+	Query    string
+	Type     string
+	Analyzer string
 }
 
 func (m MatchQuery) MarshalJSON() ([]byte, error) {
 	params := map[string]interface{}{"query": m.Query}
 	if m.Type != "" {
 		params["type"] = m.Type
+	}
+	if m.Analyzer != "" {
+		params["analyzer"] = m.Analyzer
 	}
 
 	return marshalNamedObject("match", map[string]interface{}{m.Field: params})
