@@ -42,11 +42,11 @@ var (
 // from the pool that can be used to process short-lived requests
 // to access and modify the store.
 type Pool struct {
-	db           StoreDatabase
-	es           *SearchIndex
-	bakeryParams *bakery.NewServiceParams
-	stats        stats
-	run          *parallel.Run
+	db     StoreDatabase
+	es     *SearchIndex
+	bakery *bakery.Service
+	stats  stats
+	run    *parallel.Run
 
 	// statsCache holds a cache of AggregatedCounts
 	// values, keyed by entity id. When the id has no
@@ -72,6 +72,9 @@ type Pool struct {
 
 	// closed holds whether the handler has been closed.
 	closed bool
+
+	// rootKeys holds the cache of macaroon root keys.
+	rootKeys *mgostorage.RootKeys
 }
 
 // reqStoreCacheSize holds the maximum number of store
@@ -102,6 +105,7 @@ func NewPool(db *mgo.Database, si *SearchIndex, bakeryParams *bakery.NewServiceP
 		config:      config,
 		run:         parallel.NewRun(maxAsyncGoroutines),
 		auditLogger: config.AuditLogger,
+		rootKeys:    mgostorage.NewRootKeys(100),
 	}
 	if config.MaxMgoSessions > 0 {
 		p.reqStoreC = make(chan *Store, config.MaxMgoSessions)
@@ -109,23 +113,11 @@ func NewPool(db *mgo.Database, si *SearchIndex, bakeryParams *bakery.NewServiceP
 		p.reqStoreC = make(chan *Store, reqStoreCacheSize)
 	}
 	if bakeryParams != nil {
-		bp := *bakeryParams
-		// Fill out any bakery parameters explicitly here so
-		// that we use the same values when each Store is
-		// created. We don't fill out bp.Store field though, as
-		// that needs to hold the correct mongo session which we
-		// only know when the Store is created from the Pool.
-		if bp.Key == nil {
-			var err error
-			bp.Key, err = bakery.GenerateKey()
-			if err != nil {
-				return nil, errgo.Notef(err, "cannot generate bakery key")
-			}
+		bakerySvc, err := bakery.NewService(*bakeryParams)
+		if err != nil {
+			return nil, errgo.Notef(err, "cannot create bakery service")
 		}
-		if bp.Locator == nil {
-			bp.Locator = bakery.PublicKeyLocatorMap(nil)
-		}
-		p.bakeryParams = &bp
+		p.bakery = bakerySvc
 	}
 
 	if config.AuditLogger != nil {
@@ -231,10 +223,19 @@ func (p *Pool) requestStoreNB(always bool) (*Store, error) {
 		stats:     &p.stats,
 		pool:      p,
 	}
-	if p.bakeryParams != nil {
-		store.Bakery = newBakery(db, *p.bakeryParams)
-	}
+	store.Bakery = store.BakeryWithPolicy(p.config.RootKeyPolicy)
 	return store, nil
+}
+
+// BakeryWithPolicy returns a copy of the Store's Bakery with a macaroon
+// storage that returns root keys conforming to the given policy.
+//
+// If there is no configured bakery, it returns nil.
+func (s *Store) BakeryWithPolicy(policy mgostorage.Policy) *bakery.Service {
+	if s.pool.bakery == nil {
+		return nil
+	}
+	return s.pool.bakery.WithRootKeyStore(s.pool.rootKeys.NewStorage(s.DB.Macaroons(), policy))
 }
 
 func newBakery(db StoreDatabase, bp bakery.NewServiceParams) *bakery.Service {
@@ -274,9 +275,7 @@ func (s *Store) Copy() *Store {
 	s1 := *s
 	s1.DB = s.DB.clone()
 	s1.BlobStore = blobstore.New(s1.DB.Database, "entitystore")
-	if s.Bakery != nil {
-		s1.Bakery = newBakery(s1.DB, *s.pool.bakeryParams)
-	}
+	s1.Bakery = s1.BakeryWithPolicy(s.pool.config.RootKeyPolicy)
 
 	s.pool.mu.Lock()
 	s.pool.storeCount++

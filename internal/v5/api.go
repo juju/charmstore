@@ -23,6 +23,7 @@ import (
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v1/bakery/mgostorage"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -1282,8 +1283,11 @@ func (h *ReqHandler) serveDelegatableMacaroon(_ http.Header, req *http.Request) 
 		if auth.Username == "" {
 			return nil, errgo.WithCausef(nil, params.ErrForbidden, "delegatable macaroon is not obtainable using admin credentials")
 		}
+		shortTermBakery := h.Store.BakeryWithPolicy(mgostorage.Policy{
+			ExpiryDuration: DelegatableMacaroonExpiry,
+		})
 		// TODO propagate expiry time from macaroons in request.
-		m, err := h.Store.Bakery.NewMacaroon("", nil, []checkers.Caveat{
+		m, err := shortTermBakery.NewMacaroon("", nil, []checkers.Caveat{
 			checkers.DeclaredCaveat(UsernameAttr, auth.Username),
 			checkers.TimeBeforeCaveat(time.Now().Add(DelegatableMacaroonExpiry)),
 			checkers.AllowCaveat(authnCheckableOps...),
@@ -1329,12 +1333,16 @@ func (h *ReqHandler) serveDelegatableMacaroon(_ http.Header, req *http.Request) 
 		return nil, errgo.WithCausef(nil, params.ErrForbidden, "delegatable macaroon is not obtainable using admin credentials (admin %v)", auth.Admin)
 	}
 
+	longTermBakery := h.Store.BakeryWithPolicy(mgostorage.Policy{
+		ExpiryDuration:   1e6 * time.Hour,     // 116 years...
+		GenerateInterval: 30 * 24 * time.Hour, // Roughly monthly.
+	})
 	// After this time, clients will be forced to renew the macaroon, even
 	// though it remains technically valid.
 	activeExpireTime := time.Now().Add(DelegatableMacaroonExpiry)
 
 	// TODO propagate expiry time from macaroons in request.
-	m, err := h.Store.Bakery.NewMacaroon("", nil, []checkers.Caveat{
+	m, err := longTermBakery.NewMacaroon("", nil, []checkers.Caveat{
 		checkers.DeclaredCaveat(UsernameAttr, auth.Username),
 		isEntityCaveat(ids),
 		activeTimeBeforeCaveat(activeExpireTime),

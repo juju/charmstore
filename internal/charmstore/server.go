@@ -13,6 +13,7 @@ import (
 
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
+	"gopkg.in/macaroon-bakery.v1/bakery/mgostorage"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/natefinch/lumberjack.v2"
 
@@ -83,7 +84,13 @@ type ServerParams struct {
 	// AuditLogger optionally holds the logger which will be used to
 	// write audit log entries.
 	AuditLogger *lumberjack.Logger
+
+	// RootKeyPolicy holds the default policy used when creating
+	// macaroon root keys.
+	RootKeyPolicy mgostorage.Policy
 }
+
+const defaultRootKeyExpiryDuration = 24 * time.Hour
 
 // NewServer returns a handler that serves the given charm store API
 // versions using db to store that charm store data.
@@ -114,6 +121,9 @@ func NewServer(db *mgo.Database, si *SearchIndex, config ServerParams, versions 
 		// the macaroon location for anything.
 		Location: "charmstore",
 		Locator:  config.PublicKeyLocator,
+	}
+	if config.RootKeyPolicy.ExpiryDuration == 0 {
+		config.RootKeyPolicy.ExpiryDuration = defaultRootKeyExpiryDuration
 	}
 	pool, err := NewPool(db, si, &bparams, config)
 	if err != nil {
