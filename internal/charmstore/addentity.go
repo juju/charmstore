@@ -665,8 +665,8 @@ func bundleCharms(data *charm.BundleData) ([]*charm.URL, error) {
 	// Use a map to de-duplicate the URL list: a bundle can include services
 	// deployed by the same charm.
 	urlMap := make(map[string]*charm.URL)
-	for _, service := range data.Services {
-		url, err := charm.ParseURL(service.Charm)
+	for _, application := range data.Applications {
+		url, err := charm.ParseURL(application.Charm)
 		if err != nil {
 			return nil, errgo.Mask(err)
 		}
@@ -689,8 +689,8 @@ func newInt(x int) *int {
 // bundleUnitCount returns the number of units created by the bundle.
 func bundleUnitCount(b *charm.BundleData) int {
 	count := 0
-	for _, service := range b.Services {
-		count += service.NumUnits
+	for _, application := range b.Applications {
+		count += application.NumUnits
 	}
 	return count
 }
@@ -699,14 +699,14 @@ func bundleUnitCount(b *charm.BundleData) int {
 // that will be created or used by the bundle.
 func bundleMachineCount(b *charm.BundleData) int {
 	count := len(b.Machines)
-	for _, service := range b.Services {
+	for _, applications := range b.Applications {
 		// The default placement is "new".
 		placement := &charm.UnitPlacement{
 			Machine: "new",
 		}
 		// Check for "new" placements, which means a new machine
 		// must be added.
-		for _, location := range service.To {
+		for _, location := range applications.To {
 			var err error
 			placement, err = charm.ParsePlacement(location)
 			if err != nil {
@@ -723,7 +723,7 @@ func bundleMachineCount(b *charm.BundleData) int {
 		// element is replicated. For this reason, if the last element is
 		// "new", we need to add more machines.
 		if placement != nil && placement.Machine == "new" {
-			count += service.NumUnits - len(service.To)
+			count += applications.NumUnits - len(applications.To)
 		}
 	}
 	return count

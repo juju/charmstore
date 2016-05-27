@@ -272,6 +272,22 @@ const esMappingJSON = `
               }
             }
           },
+          "Applications": {
+            "type": "object",
+            "dynamic": "false",
+            "properties": {
+              "Charm": {
+                "type": "string",
+                "index": "not_analyzed",
+                "omit_norms": true,
+                "index_options": "docs"
+              },
+              "NumUnits": {
+                "type": "integer",
+                "index": "not_analyzed"
+              }
+            }
+          },
           "Series": {
             "type": "string"
           },

@@ -39,8 +39,8 @@ func (s *commonSuite) newStore(c *gc.C, withElasticSearch bool) *Store {
 }
 
 func addRequiredCharms(c *gc.C, store *Store, bundle charm.Bundle) {
-	for _, svc := range bundle.Data().Services {
-		u := charm.MustParseURL(svc.Charm)
+	for _, app := range bundle.Data().Applications {
+		u := charm.MustParseURL(app.Charm)
 		if _, err := store.FindBestEntity(u, params.NoChannel, nil); err == nil {
 			continue
 		}

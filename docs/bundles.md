@@ -15,7 +15,7 @@ baskets will still be imported, and split up into their component bundles.
 ## Version 4 bundles
 
 Version 4 bundles are identical to version 3 bundles except for a few key
-differences: the `branch` attribute of the service spec is no longer supported,
+differences: the `branch` attribute of the application spec is no longer supported,
 they may contain a machine specification, and their deployment directives are
 different from version 3 bundles.
 
@@ -53,7 +53,7 @@ Machines are specified under the `machines` top-level attribute.
 
 ### Deployment directives
 
-Version 4 deployment directives (the `to` attribute on the service spec) is a
+Version 4 deployment directives (the `to` attribute on the application spec) is a
 YAML list of items following the format:
 
     (<containertype>:)?(<unit>|<machine>|new)
@@ -64,13 +64,13 @@ co-locating it with any other units that happen to be there, which may result in
 unintended behavior.
 
 The second part (after the colon) specifies where the new unit should be placed;
-it may refer to a unit of another service specified in the bundle, a machine
+it may refer to a unit of another application specified in the bundle, a machine
 id specified in the machines section, or the special name "new" which specifies
 a newly created machine.
 
-A unit placement may be specified with a service name only, in which case its
+A unit placement may be specified with a application name only, in which case its
 unit number is assumed to be one more than the unit number of the previous unit
-in the list with the same service, or zero if there were none.
+in the list with the same application, or zero if there were none.
 
 If there are less elements in To than NumUnits, the last element is replicated
 to fill it. If there are no elements (or To is omitted), "new" is replicated.
@@ -80,7 +80,7 @@ For example:
     wordpress/0 wordpress/1 lxc:0 kvm:new
 
 specifies that the first two units get hulk-smashed onto the first two units of
-the wordpress service, the third unit gets allocated onto an lxc container on
+the wordpress application, the third unit gets allocated onto an lxc container on
 machine 0, and subsequent units get allocated on kvm containers on new machines.
 
 The above example is the same as this:
@@ -89,10 +89,10 @@ The above example is the same as this:
 
 Version 3 placement directives take the format:
 
-    ((<containertype>:)?<service>(=<unitnumber>)?|0)
+    ((<containertype>:)?<application>(=<unitnumber>)?|0)
 
 meaning that a machine cannot be specified beyond colocating (either through a
-container or hulk-smash) along with a specified unit of another service.
+container or hulk-smash) along with a specified unit of another application.
 Version 3 placement directives may be either a string of a single directive or a
 YAML list of directives in the above format.  The only machine that may be
 specified is machine 0, allowing colocation on the bootstrap node.
@@ -128,7 +128,7 @@ services:
 
 ```yaml
 series: precise
-services:
+applications:
   # Automatically place
   nova-compute:
     charm: cs:precise/nova-compute
