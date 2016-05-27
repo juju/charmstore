@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"gopkg.in/macaroon-bakery.v1/bakery"
+	"gopkg.in/macaroon-bakery.v1/bakery/mgostorage"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/natefinch/lumberjack.v2"
 
@@ -50,7 +51,7 @@ func Versions() []string {
 	return vs
 }
 
-// ServerParams holds configuration for a new API server.
+// ServerParams holds configuration for a new internal API server.
 type ServerParams struct {
 	// AuthUsername and AuthPassword hold the credentials
 	// used for HTTP basic authentication.
@@ -102,6 +103,10 @@ type ServerParams struct {
 	// AuditLogger optionally holds the logger which will be used to
 	// write audit log entries.
 	AuditLogger *lumberjack.Logger
+
+	// RootKeyPolicy holds the default policy used when creating
+	// macaroon root keys.
+	RootKeyPolicy mgostorage.Policy
 }
 
 // NewServer returns a new handler that handles charm store requests and stores

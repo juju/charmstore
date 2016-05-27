@@ -8,6 +8,7 @@ import (
 
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/macaroon-bakery.v1/bakery/mgostorage"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
@@ -122,6 +123,9 @@ func (s *ServerSuite) TestNewServerWithConfig(c *gc.C) {
 			AuthPassword:     "test-password",
 			IdentityAPIURL:   "http://0.1.2.3",
 			IdentityLocation: "http://0.1.2.3",
+			RootKeyPolicy: mgostorage.Policy{
+				ExpiryDuration: defaultRootKeyExpiryDuration,
+			},
 		},
 	})
 }
@@ -153,6 +157,9 @@ func (s *ServerSuite) TestNewServerWithElasticSearch(c *gc.C) {
 			AuthPassword:     "test-password",
 			IdentityAPIURL:   "http://0.1.2.3",
 			IdentityLocation: "http://0.1.2.3",
+			RootKeyPolicy: mgostorage.Policy{
+				ExpiryDuration: defaultRootKeyExpiryDuration,
+			},
 		},
 	})
 }

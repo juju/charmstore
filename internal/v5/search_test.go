@@ -776,6 +776,25 @@ func (s *SearchSuite) TestSearchWithUserMacaroon(c *gc.C) {
 	assertResultSet(c, sr, expected)
 }
 
+func (s *SearchSuite) TestSearchDoesNotCreateExtraMacaroons(c *gc.C) {
+	// Ensure that there's a macaroon already in the store
+	// that can be reused.
+	_, err := s.store.Bakery.NewMacaroon("", nil, nil)
+	c.Assert(err, gc.IsNil)
+	n, err := s.store.DB.Macaroons().Find(nil).Count()
+	c.Assert(err, gc.IsNil)
+	c.Assert(n, gc.Equals, 1)
+	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
+		Handler: s.srv,
+		URL:     storeURL("search"),
+		Do:      s.bakeryDoAsUser(c, "noone"),
+	})
+	c.Assert(rec.Code, gc.Equals, http.StatusOK)
+	n, err = s.store.DB.Macaroons().Find(nil).Count()
+	c.Assert(err, gc.IsNil)
+	c.Assert(n, gc.Equals, 1)
+}
+
 func (s *SearchSuite) TestSearchWithUserInGroups(c *gc.C) {
 	s.idM.groups = map[string][]string{
 		"bob": {"test-user", "test-user2"},
