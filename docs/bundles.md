@@ -8,7 +8,7 @@ version 3 bundles, charmstore (API v4) supports version 3 and version 4.
 ## Version 3 bundles
 
 Version 3 bundles are currently existing bundles that specify a deployment as a
-list of applications and, optionally, relations.  The charmstore will not support
+list of services and, optionally, relations.  The charmstore will not support
 the idea of a "basket" or multiple bundles within one file.  However, existing
 baskets will still be imported, and split up into their component bundles.
 
@@ -103,7 +103,7 @@ specified is machine 0, allowing colocation on the bootstrap node.
 
 ```yaml
 series: precise
-applications:
+services:
   nova-compute:
     charm: cs:precise/nova-compute
     units: 3
