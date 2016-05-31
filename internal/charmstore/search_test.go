@@ -30,17 +30,6 @@ var _ = gc.Suite(&StoreSearchSuite{})
 
 func (s *StoreSearchSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoESSuite.SetUpTest(c)
-
-	// Temporarily set LegacyDownloadCountsEnabled to false, so that the real
-	// code path can be reached by tests in this suite.
-	// TODO (frankban): remove this block when removing the legacy counts
-	// logic.
-	original := LegacyDownloadCountsEnabled
-	LegacyDownloadCountsEnabled = false
-	s.AddCleanup(func(*gc.C) {
-		LegacyDownloadCountsEnabled = original
-	})
-
 	s.index = SearchIndex{s.ES, s.TestIndex}
 	s.ES.RefreshIndex(".versions")
 	pool, err := NewPool(s.Session.DB("foo"), &s.index, nil, ServerParams{})
@@ -88,12 +77,12 @@ type searchEntity struct {
 }
 
 var searchEntities = map[string]searchEntity{
-	"wordpress": searchEntity{
+	"wordpress": {
 		entity: newEntity("cs:~charmers/precise/wordpress-23", 23),
 		charmMeta: &charm.Meta{
 			Description: "blog",
 			Requires: map[string]charm.Relation{
-				"mysql": charm.Relation{
+				"mysql": {
 					Name:      "mysql",
 					Interface: "mysql",
 					Scope:     charm.ScopeGlobal,
@@ -104,12 +93,12 @@ var searchEntities = map[string]searchEntity{
 		},
 		acl: []string{params.Everyone},
 	},
-	"mysql": searchEntity{
+	"mysql": {
 		entity: newEntity("cs:~openstack-charmers/xenial/mysql-7", 7),
 		charmMeta: &charm.Meta{
 			Summary: "Database Engine",
 			Provides: map[string]charm.Relation{
-				"mysql": charm.Relation{
+				"mysql": {
 					Name:      "mysql",
 					Interface: "mysql",
 					Scope:     charm.ScopeGlobal,
@@ -121,7 +110,7 @@ var searchEntities = map[string]searchEntity{
 		acl:       []string{params.Everyone},
 		downloads: 3,
 	},
-	"varnish": searchEntity{
+	"varnish": {
 		entity: newEntity("cs:~foo/xenial/varnish-1", -1),
 		charmMeta: &charm.Meta{
 			Summary:    "Database Engine",
@@ -131,7 +120,7 @@ var searchEntities = map[string]searchEntity{
 		acl:       []string{params.Everyone},
 		downloads: 5,
 	},
-	"riak": searchEntity{
+	"riak": {
 		entity: newEntity("cs:~charmers/xenial/riak-67", 67),
 		charmMeta: &charm.Meta{
 			Categories: []string{"riak"},
@@ -139,11 +128,11 @@ var searchEntities = map[string]searchEntity{
 		},
 		acl: []string{"charmers"},
 	},
-	"wordpress-simple": searchEntity{
+	"wordpress-simple": {
 		entity: newEntity("cs:~charmers/bundle/wordpress-simple-4", 4),
 		bundleData: &charm.BundleData{
 			Services: map[string]*charm.ServiceSpec{
-				"wordpress": &charm.ServiceSpec{
+				"wordpress": {
 					Charm: "wordpress",
 				},
 			},
@@ -153,7 +142,7 @@ var searchEntities = map[string]searchEntity{
 		downloads: 1,
 	},
 	// Note: "squid-forwardproxy" shares a trigram "dpr" with "wordpress".
-	"squid-forwardproxy": searchEntity{
+	"squid-forwardproxy": {
 		entity:    newEntity("cs:~charmers/wily/squid-forwardproxy-3", 3),
 		charmMeta: &charm.Meta{},
 		acl:       []string{params.Everyone},
@@ -161,7 +150,7 @@ var searchEntities = map[string]searchEntity{
 	},
 	// Note: "cloud-controller-worker-v2" shares a trigram "wor" with "wordpress".
 
-	"cloud-controller-worker-v2": searchEntity{
+	"cloud-controller-worker-v2": {
 		entity:    newEntity("cs:~cf-charmers/trusty/cloud-controller-worker-v2-7", -1),
 		charmMeta: &charm.Meta{},
 		acl:       []string{params.Everyone},
@@ -1036,8 +1025,8 @@ func (s *StoreSearchSuite) TestMultiSeriesCharmFiltersSeriesCorrectly(c *gc.C) {
 		c.Logf("%d. %s", i, test.series)
 		res, err := s.store.Search(SearchParams{
 			Filters: map[string][]string{
-				"name":   []string{"juju-gui"},
-				"series": []string{test.series},
+				"name":   {"juju-gui"},
+				"series": {test.series},
 			},
 		})
 		c.Assert(err, gc.IsNil)

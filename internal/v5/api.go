@@ -515,10 +515,6 @@ func (h *ReqHandler) updateEntity(id *router.ResolvedURL, fields map[string]inte
 	if err != nil {
 		return errgo.Notef(err, "cannot update %q", &id.URL)
 	}
-	err = h.Store.UpdateSearchFields(id, fields)
-	if err != nil {
-		return errgo.Notef(err, "cannot update %q", &id.URL)
-	}
 	h.processEntries(entries)
 	return nil
 }

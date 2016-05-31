@@ -4,6 +4,9 @@
 package charmstore // import "gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
 
 import (
+	"encoding/json"
+	"time"
+
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
@@ -22,6 +25,7 @@ const (
 	migrationAddPreV5CompatBlobBogus mongodoc.MigrationName = "add pre-v5 compatibility blobs"
 	migrationAddPreV5CompatBlob      mongodoc.MigrationName = "add pre-v5 compatibility blobs; second try"
 	migrationNewChannelsModel        mongodoc.MigrationName = "new channels model"
+	migrationStats                   mongodoc.MigrationName = "remove legacy download stats"
 )
 
 // migrations holds all the migration functions that are executed in the order
@@ -64,6 +68,9 @@ var migrations = []migration{{
 }, {
 	name:    migrationNewChannelsModel,
 	migrate: migrateToNewChannelsModel,
+}, {
+	name:    migrationStats,
+	migrate: migrateToArchiveDownloadStatsOnly,
 }}
 
 // migration holds a migration function with its corresponding name.
@@ -346,6 +353,77 @@ func ncmUpdateBaseEntity(db StoreDatabase, baseEntity *preNCMBaseEntity) error {
 	}})
 	if err != nil {
 		return errgo.Notef(err, "cannot update base entity")
+	}
+	return nil
+}
+
+func migrateToArchiveDownloadStatsOnly(db StoreDatabase) error {
+	entities := db.Entities()
+	// Find entities with the highest revision where extra-info is set
+	// then recreate a structure that can be used on mongodoc.Entity
+	iter := entities.Pipe(
+		[]bson.D{
+			{{"$match", bson.D{{"extrainfo.legacy-download-stats", bson.D{{"$exists", true}}}}}},
+			{{"$sort", bson.D{{"revision", 1}}}},
+			{{"$group", bson.D{
+				{"_id", "$baseurl"},
+				{"url", bson.D{{"$last", "$_id"}}},
+				{"promulgated-url", bson.D{{"$last", "$promulgated-url"}}},
+				{"revision", bson.D{{"$max", "revision"}}},
+				{"legacy-download-stats", bson.D{{"$last", "$extrainfo.legacy-download-stats"}}},
+			}}},
+			{{"$project", bson.D{
+				{"_id", "$url"},
+				{"promulgated-url", "$promulgated-url"},
+				{"extrainfo.legacy-download-stats", "$legacy-download-stats"},
+			}}},
+		}).Iter()
+
+	var stats stats
+	var entity mongodoc.Entity
+	for iter.Next(&entity) {
+		legacyDownloadStats, ok := entity.ExtraInfo[params.LegacyDownloadStats]
+		if !ok {
+			return errgo.Newf("cannot retrieve the legacy download stats on entity: %v", entity.URL)
+		}
+		if len(legacyDownloadStats) == 0 {
+			continue
+		}
+		key, err := stats.key(db, EntityStatsKey(entity.URL, params.StatsArchiveDownload), true)
+		if err != nil {
+			return errgo.Mask(err)
+		}
+		err = incrementArchiveDownloadStats(db, key, legacyDownloadStats)
+		if err != nil {
+			return errgo.Notef(err, "cannot set the download count on entity: %v", entity.URL)
+		}
+		if entity.PromulgatedURL != nil {
+			key, err := stats.key(db, EntityStatsKey(entity.PromulgatedURL, params.StatsArchiveDownloadPromulgated), true)
+			if err != nil {
+				return errgo.Mask(err)
+			}
+			err = incrementArchiveDownloadStats(db, key, legacyDownloadStats)
+			if err != nil {
+				return errgo.Notef(err, "cannot set the download count on entity: %v", entity.URL)
+			}
+		}
+	}
+	if err := iter.Err(); err != nil {
+		return errgo.Notef(err, "cannot iterate through entities")
+	}
+	return nil
+}
+
+func incrementArchiveDownloadStats(db StoreDatabase, key string, legacyDownloadStats []byte) error {
+	counters := db.StatCounters()
+	var total int64
+	if err := json.Unmarshal(legacyDownloadStats, &total); err != nil {
+		return errgo.Notef(err, "cannot unmarshal extra-info value")
+	}
+	var counterEpoch = time.Date(2015, time.January, 1, 0, 0, 0, 0, time.UTC)
+	_, err := counters.Upsert(bson.D{{"k", key}, {"t", timeToStamp(counterEpoch)}}, bson.D{{"$inc", bson.D{{"c", total}}}})
+	if err != nil {
+		return errgo.Mask(err)
 	}
 	return nil
 }

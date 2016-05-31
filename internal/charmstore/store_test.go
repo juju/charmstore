@@ -1468,10 +1468,10 @@ var findBestEntityBundles = []struct {
 	id: router.MustNewResolvedURL("~charmers/bundle/wordpress-simple-0", 0),
 	bundle: storetesting.NewBundle(&charm.BundleData{
 		Services: map[string]*charm.ServiceSpec{
-			"wordpress": &charm.ServiceSpec{
+			"wordpress": {
 				Charm: "cs:wordpress",
 			},
-			"mysql": &charm.ServiceSpec{
+			"mysql": {
 				Charm: "cs:mysql",
 			},
 		},
@@ -1482,10 +1482,10 @@ var findBestEntityBundles = []struct {
 	id: router.MustNewResolvedURL("~charmers/bundle/wordpress-simple-1", 1),
 	bundle: storetesting.NewBundle(&charm.BundleData{
 		Services: map[string]*charm.ServiceSpec{
-			"wordpress": &charm.ServiceSpec{
+			"wordpress": {
 				Charm: "cs:wordpress",
 			},
-			"mysql": &charm.ServiceSpec{
+			"mysql": {
 				Charm: "cs:mysql",
 			},
 		},
@@ -1496,10 +1496,10 @@ var findBestEntityBundles = []struct {
 	id: router.MustNewResolvedURL("~charmers/bundle/wordpress-simple-2", 2),
 	bundle: storetesting.NewBundle(&charm.BundleData{
 		Services: map[string]*charm.ServiceSpec{
-			"wordpress": &charm.ServiceSpec{
+			"wordpress": {
 				Charm: "cs:wordpress",
 			},
-			"mysql": &charm.ServiceSpec{
+			"mysql": {
 				Charm: "cs:mysql",
 			},
 		},
@@ -1510,10 +1510,10 @@ var findBestEntityBundles = []struct {
 	id: router.MustNewResolvedURL("~charmers/bundle/wordpress-simple-3", 3),
 	bundle: storetesting.NewBundle(&charm.BundleData{
 		Services: map[string]*charm.ServiceSpec{
-			"wordpress": &charm.ServiceSpec{
+			"wordpress": {
 				Charm: "cs:wordpress",
 			},
-			"mysql": &charm.ServiceSpec{
+			"mysql": {
 				Charm: "cs:mysql",
 			},
 		},

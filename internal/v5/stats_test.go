@@ -307,7 +307,7 @@ func (s *StatsSuite) TestServerStatsUpdatePartOfStatsUpdateGroup(c *gc.C) {
 
 	s.discharge = dischargeForUser("statsupdate")
 	s.idM.groups = map[string][]string{
-		"statsupdate": []string{"statsupdate@cs"},
+		"statsupdate": {"statsupdate@cs"},
 	}
 
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{

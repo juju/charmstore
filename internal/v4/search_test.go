@@ -591,8 +591,6 @@ func (s *SearchSuite) TestSortUnsupportedField(c *gc.C) {
 }
 
 func (s *SearchSuite) TestDownloadsBoost(c *gc.C) {
-	// TODO (frankban): remove this call when removing the legacy counts logic.
-	patchLegacyDownloadCountsEnabled(s.AddCleanup, false)
 	charmDownloads := map[string]int{
 		"mysql":     0,
 		"wordpress": 1,
@@ -620,18 +618,6 @@ func (s *SearchSuite) TestDownloadsBoost(c *gc.C) {
 	c.Assert(sr.Results[0].Id.Name, gc.Equals, "varnish")
 	c.Assert(sr.Results[1].Id.Name, gc.Equals, "wordpress")
 	c.Assert(sr.Results[2].Id.Name, gc.Equals, "mysql")
-}
-
-// TODO(mhilton) remove this test when removing legacy counts logic.
-func (s *SearchSuite) TestLegacyStatsUpdatesSearch(c *gc.C) {
-	patchLegacyDownloadCountsEnabled(s.AddCleanup, true)
-	doc, err := s.store.ES.GetSearchDocument(charm.MustParseURL("~openstack-charmers/trusty/mysql-7"))
-	c.Assert(err, gc.IsNil)
-	c.Assert(doc.TotalDownloads, gc.Equals, int64(0))
-	s.assertPutAsAdmin(c, "~openstack-charmers/trusty/mysql-7/meta/extra-info/"+params.LegacyDownloadStats, 57)
-	doc, err = s.store.ES.GetSearchDocument(charm.MustParseURL("~openstack-charmers/trusty/mysql-7"))
-	c.Assert(err, gc.IsNil)
-	c.Assert(doc.TotalDownloads, gc.Equals, int64(57))
 }
 
 func (s *SearchSuite) TestSearchWithAdminCredentials(c *gc.C) {

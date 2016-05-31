@@ -349,7 +349,7 @@ func (s *ArchiveSuite) TestConcurrentUploads(c *gc.C) {
 	// by closing errorBodies.
 	try := make(chan struct{})
 	go func(try chan struct{}) {
-		for _ = range try {
+		for range try {
 			var wg sync.WaitGroup
 			for p := 0; p < 5; p++ {
 				wg.Add(1)
@@ -1446,8 +1446,6 @@ func (s *ArchiveSearchSuite) SetUpSuite(c *gc.C) {
 
 func (s *ArchiveSearchSuite) SetUpTest(c *gc.C) {
 	s.commonSuite.SetUpTest(c)
-	// TODO (frankban): remove this call when removing the legacy counts logic.
-	patchLegacyDownloadCountsEnabled(s.AddCleanup, false)
 }
 
 func (s *ArchiveSearchSuite) TestGetSearchUpdate(c *gc.C) {

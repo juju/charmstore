@@ -74,17 +74,6 @@ var newResolvedURL = router.MustNewResolvedURL
 
 var _ = gc.Suite(&APISuite{})
 
-// patchLegacyDownloadCountsEnabled sets LegacyDownloadCountsEnabled to the
-// given value for the duration of the test.
-// TODO (frankban): remove this function when removing the legacy counts logic.
-func patchLegacyDownloadCountsEnabled(addCleanup func(func(*gc.C)), value bool) {
-	original := charmstore.LegacyDownloadCountsEnabled
-	charmstore.LegacyDownloadCountsEnabled = value
-	addCleanup(func(*gc.C) {
-		charmstore.LegacyDownloadCountsEnabled = original
-	})
-}
-
 type metaEndpointExpectedValueGetter func(*charmstore.Store, *router.ResolvedURL) (interface{}, error)
 
 type metaEndpoint struct {
@@ -2600,9 +2589,6 @@ func (s *APISuite) TestMetaStats(c *gc.C) {
 	if !storetesting.MongoJSEnabled() {
 		c.Skip("MongoDB JavaScript not available")
 	}
-	// TODO (frankban): remove this call when removing the legacy counts logic.
-	patchLegacyDownloadCountsEnabled(s.AddCleanup, false)
-
 	today := time.Now()
 	for i, test := range metaStatsTests {
 		c.Logf("test %d: %s", i, test.about)
@@ -2649,80 +2635,6 @@ func (s *APISuite) TestMetaStats(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 		_, err = s.store.DB.StatCounters().RemoveAll(nil)
 		c.Assert(err, gc.IsNil)
-	}
-}
-
-var metaStatsWithLegacyDownloadCountsTests = []struct {
-	about       string
-	count       string
-	expectValue int64
-	expectError string
-}{{
-	about: "no extra-info",
-}, {
-	about: "zero downloads",
-	count: "0",
-}, {
-	about:       "some downloads",
-	count:       "47",
-	expectValue: 47,
-}, {
-	about:       "invalid value",
-	count:       "invalid",
-	expectError: "cannot unmarshal extra-info value: invalid character 'i' looking for beginning of value",
-}}
-
-// Tests meta/stats with LegacyDownloadCountsEnabled set to true.
-// TODO (frankban): remove this test case when removing the legacy counts
-// logic.
-func (s *APISuite) TestMetaStatsWithLegacyDownloadCounts(c *gc.C) {
-	patchLegacyDownloadCountsEnabled(s.AddCleanup, true)
-	id, _ := s.addPublicCharmFromRepo(c, "wordpress", newResolvedURL("~charmers/utopic/wordpress-42", 42))
-	url := storeURL("utopic/wordpress-42/meta/stats")
-
-	for i, test := range metaStatsWithLegacyDownloadCountsTests {
-		c.Logf("test %d: %s", i, test.about)
-
-		// Update the entity extra info if required.
-		if test.count != "" {
-			extraInfo := map[string][]byte{
-				params.LegacyDownloadStats: []byte(test.count),
-			}
-			err := s.store.UpdateEntity(id, bson.D{{
-				"$set", bson.D{{"extrainfo", extraInfo}},
-			}})
-			c.Assert(err, gc.IsNil)
-		}
-
-		var expectBody interface{}
-		var expectStatus int
-		if test.expectError == "" {
-			// Ensure the downloads count is correctly returned.
-			expectBody = params.StatsResponse{
-				ArchiveDownloadCount: test.expectValue,
-				ArchiveDownload: params.StatsCount{
-					Total: test.expectValue,
-				},
-				ArchiveDownloadAllRevisions: params.StatsCount{
-					Total: test.expectValue,
-				},
-			}
-			expectStatus = http.StatusOK
-		} else {
-			// Ensure an error is returned.
-			expectBody = params.Error{
-				Message: test.expectError,
-			}
-			expectStatus = http.StatusInternalServerError
-		}
-
-		// Perform the request.
-		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-			Handler:      s.srv,
-			URL:          url,
-			ExpectStatus: expectStatus,
-			ExpectBody:   expectBody,
-		})
 	}
 }
 
