@@ -2526,7 +2526,6 @@ var findBestEntityTests = []struct {
 }}
 
 func (s *StoreSuite) TestFindBestEntity(c *gc.C) {
-	c.ExpectFailure("multiple multi-series charms do not resolve predictably")
 	store := s.newStore(c, false)
 	defer store.Close()
 	for _, ch := range findBestEntityCharms {

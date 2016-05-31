@@ -570,9 +570,26 @@ func (s *Store) findEntityInChannel(url *charm.URL, ch params.Channel, fields ma
 	}
 	var entityURL *charm.URL
 	if url.Series == "" {
-		for _, u := range baseEntity.ChannelEntities[ch] {
-			if entityURL == nil || seriesScore[u.Series] > seriesScore[entityURL.Series] {
+		var entitySeries string
+		for s, u := range baseEntity.ChannelEntities[ch] {
+			// Determine the preferred URL from the available series.
+			//
+			// Note that because each of the series has a different
+			// score the only situation where the score in the URL is
+			// where there is more than one series supported by a
+			// multi-series charm. In this case the tie is broken by
+			// looking for the preferred series from the ones
+			// supported by the charm. To save fetching every charm
+			// to look at the supported series the key is used,
+			// because when a charm is listed as the published
+			// version for a series it must support that series.
+			if entityURL == nil ||
+				seriesScore[u.Series] > seriesScore[entityURL.Series] ||
+				// Note that if the two series are the same, they must both be
+				// multi-series URLs.
+				seriesScore[u.Series] == seriesScore[entityURL.Series] && seriesScore[s] > seriesScore[entitySeries] {
 				entityURL = u
+				entitySeries = s
 			}
 		}
 	} else {
