@@ -1283,11 +1283,11 @@ func (h *ReqHandler) serveDelegatableMacaroon(_ http.Header, req *http.Request) 
 		if auth.Username == "" {
 			return nil, errgo.WithCausef(nil, params.ErrForbidden, "delegatable macaroon is not obtainable using admin credentials")
 		}
-		shortTermBakery := h.Store.BakeryWithPolicy(mgostorage.Policy{
-			ExpiryDuration: DelegatableMacaroonExpiry,
-		})
 		// TODO propagate expiry time from macaroons in request.
-		m, err := shortTermBakery.NewMacaroon("", nil, []checkers.Caveat{
+
+		// Note that we don't use a root key store with a short term
+		// expiry, as we don't want to create a new root key every minute.
+		m, err := h.Store.Bakery.NewMacaroon("", nil, []checkers.Caveat{
 			checkers.DeclaredCaveat(UsernameAttr, auth.Username),
 			checkers.TimeBeforeCaveat(time.Now().Add(DelegatableMacaroonExpiry)),
 			checkers.AllowCaveat(authnCheckableOps...),
