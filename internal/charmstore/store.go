@@ -414,6 +414,9 @@ func (s *Store) ensureIndexes() error {
 			return errgo.Notef(err, "cannot ensure index with keys %v on collection %s", idx.i, idx.c.Name)
 		}
 	}
+	if err := s.pool.rootKeys.EnsureIndex(s.DB.Macaroons()); err != nil {
+		return errgo.Notef(err, "cannot ensure root keys index")
+	}
 	return nil
 }
 
@@ -1227,8 +1230,6 @@ func (s StoreDatabase) Macaroons() *mgo.Collection {
 
 // allCollections holds for each collection used by the charm store a
 // function returns that collection.
-// The macaroons collection is omitted because it does
-// not exist until a macaroon is actually created.
 var allCollections = []func(StoreDatabase) *mgo.Collection{
 	StoreDatabase.StatCounters,
 	StoreDatabase.StatTokens,
@@ -1237,6 +1238,7 @@ var allCollections = []func(StoreDatabase) *mgo.Collection{
 	StoreDatabase.Resources,
 	StoreDatabase.Logs,
 	StoreDatabase.Migrations,
+	StoreDatabase.Macaroons,
 }
 
 // Collections returns a slice of all the collections used
