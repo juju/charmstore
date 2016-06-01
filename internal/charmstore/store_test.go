@@ -1457,6 +1457,16 @@ var findBestEntityCharms = []struct {
 	charm:       storetesting.NewCharm(nil),
 	development: true,
 	stable:      false,
+}, {
+	id:          router.MustNewResolvedURL("~charmers/elasticsearch-0", -1),
+	charm:       storetesting.NewCharm(storetesting.MetaWithSupportedSeries(nil, "trusty")),
+	development: true,
+	stable:      true,
+}, {
+	id:          router.MustNewResolvedURL("~charmers/elasticsearch-1", -1),
+	charm:       storetesting.NewCharm(storetesting.MetaWithSupportedSeries(nil, "xenial")),
+	development: true,
+	stable:      true,
 }}
 
 var findBestEntityBundles = []struct {
@@ -2509,6 +2519,10 @@ var findBestEntityTests = []struct {
 	url:      "ceph",
 	channel:  params.UnpublishedChannel,
 	expectID: router.MustNewResolvedURL("~openstack-charmers/trusty/ceph-0", 1),
+}, {
+	url:      "~charmers/elasticsearch",
+	channel:  params.StableChannel,
+	expectID: router.MustNewResolvedURL("~charmers/elasticsearch-1", -1),
 }}
 
 func (s *StoreSuite) TestFindBestEntity(c *gc.C) {
@@ -2546,16 +2560,19 @@ func (s *StoreSuite) TestFindBestEntity(c *gc.C) {
 
 	for i, test := range findBestEntityTests {
 		c.Logf("test %d: %s (%s)", i, test.url, test.channel)
-		entity, err := store.FindBestEntity(charm.MustParseURL(test.url), test.channel, nil)
-		if test.expectError != "" {
-			c.Assert(err, gc.ErrorMatches, test.expectError)
-			if test.expectErrorCause != nil {
-				c.Assert(errgo.Cause(err), gc.Equals, test.expectErrorCause)
+		// Run FindBestEntity a number of times to make sure resolution is predicatable.
+		for j := 0; j < 10; j++ {
+			entity, err := store.FindBestEntity(charm.MustParseURL(test.url), test.channel, nil)
+			if test.expectError != "" {
+				c.Assert(err, gc.ErrorMatches, test.expectError)
+				if test.expectErrorCause != nil {
+					c.Assert(errgo.Cause(err), gc.Equals, test.expectErrorCause)
+				}
+				continue
 			}
-			continue
+			c.Assert(err, gc.IsNil)
+			c.Assert(EntityResolvedURL(entity), jc.DeepEquals, test.expectID)
 		}
-		c.Assert(err, gc.IsNil)
-		c.Assert(EntityResolvedURL(entity), jc.DeepEquals, test.expectID)
 	}
 }
 
