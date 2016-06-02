@@ -366,7 +366,7 @@ func migrateToArchiveDownloadStatsOnly(db StoreDatabase) error {
 			{{"$match", bson.D{{"extrainfo.legacy-download-stats", bson.D{{"$exists", true}}}}}},
 			{{"$sort", bson.D{{"revision", 1}}}},
 			{{"$group", bson.D{
-				{"_id", "$baseurl"},
+				{"_id", bson.D{{"baseurl", "$baseurl"}, {"series", "$series"}}},
 				{"url", bson.D{{"$last", "$_id"}}},
 				{"promulgated-url", bson.D{{"$last", "$promulgated-url"}}},
 				{"revision", bson.D{{"$max", "revision"}}},
