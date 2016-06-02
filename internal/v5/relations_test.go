@@ -261,7 +261,7 @@ var metaCharmRelatedTests = []struct {
 	about:  "don't show charms if you don't have perms for 'em",
 	charms: metaCharmRelatedCharms,
 	readACLs: map[string][]string{
-		"~charmers/memcached": []string{"noone"},
+		"~charmers/memcached": {"noone"},
 	},
 	id: "utopic/wordpress-0",
 	expectBody: params.RelatedResponse{

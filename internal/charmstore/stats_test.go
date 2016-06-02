@@ -4,7 +4,6 @@
 package charmstore_test // import "gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
 
 import (
-	"fmt"
 	"strconv"
 	"sync"
 	"time"
@@ -432,12 +431,11 @@ func (s *StatsSuite) TestListCountersBy(c *gc.C) {
 }
 
 type testStatsEntity struct {
-	id          *router.ResolvedURL
-	lastDay     int
-	lastWeek    int
-	lastMonth   int
-	total       int
-	legacyTotal int
+	id        *router.ResolvedURL
+	lastDay   int
+	lastWeek  int
+	lastMonth int
+	total     int
 }
 
 var archiveDownloadCountsTests = []struct {
@@ -449,12 +447,11 @@ var archiveDownloadCountsTests = []struct {
 }{{
 	about: "single revision",
 	charms: []testStatsEntity{{
-		id:          charmstore.MustParseResolvedURL("~charmers/trusty/wordpress-0"),
-		lastDay:     1,
-		lastWeek:    2,
-		lastMonth:   3,
-		total:       4,
-		legacyTotal: 0,
+		id:        charmstore.MustParseResolvedURL("~charmers/trusty/wordpress-0"),
+		lastDay:   1,
+		lastWeek:  2,
+		lastMonth: 3,
+		total:     4,
 	}},
 	id: charm.MustParseURL("~charmers/trusty/wordpress-0"),
 	expectThisRevision: charmstore.AggregatedCounts{
@@ -468,46 +465,21 @@ var archiveDownloadCountsTests = []struct {
 		LastWeek:  3,
 		LastMonth: 6,
 		Total:     10,
-	},
-}, {
-	about: "single revision with legacy count",
-	charms: []testStatsEntity{{
-		id:          charmstore.MustParseResolvedURL("~charmers/trusty/wordpress-0"),
-		lastDay:     1,
-		lastWeek:    2,
-		lastMonth:   3,
-		total:       4,
-		legacyTotal: 10,
-	}},
-	id: charm.MustParseURL("~charmers/trusty/wordpress-0"),
-	expectThisRevision: charmstore.AggregatedCounts{
-		LastDay:   1,
-		LastWeek:  3,
-		LastMonth: 6,
-		Total:     20,
-	},
-	expectAllRevisions: charmstore.AggregatedCounts{
-		LastDay:   1,
-		LastWeek:  3,
-		LastMonth: 6,
-		Total:     20,
 	},
 }, {
 	about: "multiple revisions",
 	charms: []testStatsEntity{{
-		id:          charmstore.MustParseResolvedURL("~charmers/trusty/wordpress-0"),
-		lastDay:     1,
-		lastWeek:    2,
-		lastMonth:   3,
-		total:       4,
-		legacyTotal: 0,
+		id:        charmstore.MustParseResolvedURL("~charmers/trusty/wordpress-0"),
+		lastDay:   1,
+		lastWeek:  2,
+		lastMonth: 3,
+		total:     4,
 	}, {
-		id:          charmstore.MustParseResolvedURL("~charmers/trusty/wordpress-1"),
-		lastDay:     2,
-		lastWeek:    3,
-		lastMonth:   4,
-		total:       5,
-		legacyTotal: 0,
+		id:        charmstore.MustParseResolvedURL("~charmers/trusty/wordpress-1"),
+		lastDay:   2,
+		lastWeek:  3,
+		lastMonth: 4,
+		total:     5,
 	}},
 	id: charm.MustParseURL("~charmers/trusty/wordpress-1"),
 	expectThisRevision: charmstore.AggregatedCounts{
@@ -523,44 +495,13 @@ var archiveDownloadCountsTests = []struct {
 		Total:     24,
 	},
 }, {
-	about: "multiple revisions with legacy count",
-	charms: []testStatsEntity{{
-		id:          charmstore.MustParseResolvedURL("~charmers/trusty/wordpress-0"),
-		lastDay:     1,
-		lastWeek:    2,
-		lastMonth:   3,
-		total:       4,
-		legacyTotal: 100,
-	}, {
-		id:          charmstore.MustParseResolvedURL("~charmers/trusty/wordpress-1"),
-		lastDay:     2,
-		lastWeek:    3,
-		lastMonth:   4,
-		total:       5,
-		legacyTotal: 100,
-	}},
-	id: charm.MustParseURL("~charmers/trusty/wordpress-1"),
-	expectThisRevision: charmstore.AggregatedCounts{
-		LastDay:   2,
-		LastWeek:  5,
-		LastMonth: 9,
-		Total:     114,
-	},
-	expectAllRevisions: charmstore.AggregatedCounts{
-		LastDay:   3,
-		LastWeek:  8,
-		LastMonth: 15,
-		Total:     124,
-	},
-}, {
 	about: "promulgated revision",
 	charms: []testStatsEntity{{
-		id:          charmstore.MustParseResolvedURL("0 ~charmers/trusty/wordpress-0"),
-		lastDay:     1,
-		lastWeek:    2,
-		lastMonth:   3,
-		total:       4,
-		legacyTotal: 0,
+		id:        charmstore.MustParseResolvedURL("0 ~charmers/trusty/wordpress-0"),
+		lastDay:   1,
+		lastWeek:  2,
+		lastMonth: 3,
+		total:     4,
 	}},
 	id: charm.MustParseURL("trusty/wordpress-0"),
 	expectThisRevision: charmstore.AggregatedCounts{
@@ -574,60 +515,33 @@ var archiveDownloadCountsTests = []struct {
 		LastWeek:  3,
 		LastMonth: 6,
 		Total:     10,
-	},
-}, {
-	about: "promulgated revision with legacy count",
-	charms: []testStatsEntity{{
-		id:          charmstore.MustParseResolvedURL("0 ~charmers/trusty/wordpress-0"),
-		lastDay:     1,
-		lastWeek:    2,
-		lastMonth:   3,
-		total:       4,
-		legacyTotal: 10,
-	}},
-	id: charm.MustParseURL("trusty/wordpress-0"),
-	expectThisRevision: charmstore.AggregatedCounts{
-		LastDay:   1,
-		LastWeek:  3,
-		LastMonth: 6,
-		Total:     20,
-	},
-	expectAllRevisions: charmstore.AggregatedCounts{
-		LastDay:   1,
-		LastWeek:  3,
-		LastMonth: 6,
-		Total:     20,
 	},
 }, {
 	about: "promulgated revision with changed owner",
 	charms: []testStatsEntity{{
-		id:          charmstore.MustParseResolvedURL("0 ~charmers/trusty/wordpress-0"),
-		lastDay:     1,
-		lastWeek:    10,
-		lastMonth:   100,
-		total:       1000,
-		legacyTotal: 0,
+		id:        charmstore.MustParseResolvedURL("0 ~charmers/trusty/wordpress-0"),
+		lastDay:   1,
+		lastWeek:  10,
+		lastMonth: 100,
+		total:     1000,
 	}, {
-		id:          charmstore.MustParseResolvedURL("~charmers/trusty/wordpress-1"),
-		lastDay:     2,
-		lastWeek:    20,
-		lastMonth:   200,
-		total:       2000,
-		legacyTotal: 0,
+		id:        charmstore.MustParseResolvedURL("~charmers/trusty/wordpress-1"),
+		lastDay:   2,
+		lastWeek:  20,
+		lastMonth: 200,
+		total:     2000,
 	}, {
-		id:          charmstore.MustParseResolvedURL("~wordpress-charmers/trusty/wordpress-0"),
-		lastDay:     3,
-		lastWeek:    30,
-		lastMonth:   300,
-		total:       3000,
-		legacyTotal: 0,
+		id:        charmstore.MustParseResolvedURL("~wordpress-charmers/trusty/wordpress-0"),
+		lastDay:   3,
+		lastWeek:  30,
+		lastMonth: 300,
+		total:     3000,
 	}, {
-		id:          charmstore.MustParseResolvedURL("1 ~wordpress-charmers/trusty/wordpress-1"),
-		lastDay:     4,
-		lastWeek:    40,
-		lastMonth:   400,
-		total:       4000,
-		legacyTotal: 0,
+		id:        charmstore.MustParseResolvedURL("1 ~wordpress-charmers/trusty/wordpress-1"),
+		lastDay:   4,
+		lastWeek:  40,
+		lastMonth: 400,
+		total:     4000,
 	}},
 	id: charm.MustParseURL("trusty/wordpress-1"),
 	expectThisRevision: charmstore.AggregatedCounts{
@@ -645,7 +559,6 @@ var archiveDownloadCountsTests = []struct {
 }}
 
 func (s *StatsSuite) TestArchiveDownloadCounts(c *gc.C) {
-	s.PatchValue(&charmstore.LegacyDownloadCountsEnabled, true)
 	for i, test := range archiveDownloadCountsTests {
 		c.Logf("%d: %s", i, test.about)
 		// Clear everything
@@ -670,13 +583,6 @@ func (s *StatsSuite) TestArchiveDownloadCounts(c *gc.C) {
 				setDownloadCounts(c, s.store, &url, now.Add(-10*24*time.Hour), charm.lastMonth)
 				setDownloadCounts(c, s.store, &url, now.Add(-100*24*time.Hour), charm.total)
 			}
-			extraInfo := map[string][]byte{
-				params.LegacyDownloadStats: []byte(fmt.Sprintf("%d", charm.legacyTotal)),
-			}
-			err = s.store.UpdateEntity(charm.id, bson.D{{
-				"$set", bson.D{{"extrainfo", extraInfo}},
-			}})
-			c.Assert(err, gc.IsNil)
 		}
 		thisRevision, allRevisions, err := s.store.ArchiveDownloadCounts(test.id, true)
 		c.Assert(err, gc.IsNil)

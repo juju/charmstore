@@ -4,7 +4,6 @@
 package charmstore // import "gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
 
 import (
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strconv"
@@ -471,20 +470,6 @@ type AggregatedCounts struct {
 	LastDay, LastWeek, LastMonth, Total int64
 }
 
-// LegacyDownloadCountsEnabled represents whether aggregated download counts
-// must be retrieved from the legacy infrastructure. In essence, if the value
-// is true (enabled), aggregated counts are not calculated based on the data
-// stored in the charm store stats; they are instead retrieved from the entity
-// extra-info. For this reason, enabling this we assume an external program
-// updated the extra-info for the entity, specifically the
-// "legacy-download-stats" key.
-// TODO (frankban): this is a temporary hack, and can be removed once we have
-// a more consistent way to import the download counts from the legacy charm
-// store (charms) and from charmworld (bundles). To remove the legacy download
-// counts logic in the future, grep the code for "LegacyDownloadCountsEnabled"
-// and remove as required.
-var LegacyDownloadCountsEnabled = true
-
 // ArchiveDownloadCounts calculates the aggregated download counts for
 // a charm or bundle.
 func (s *Store) ArchiveDownloadCounts(id *charm.URL, refresh bool) (thisRevision, allRevisions AggregatedCounts, err error) {
@@ -527,40 +512,6 @@ func (s *Store) statsCacheFetch(id *charm.URL) (interface{}, error) {
 	counts, err := s.aggregateStats(EntityStatsKey(id, kind), prefix)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot get aggregated count for %q", id)
-	}
-	if !LegacyDownloadCountsEnabled {
-		return counts, nil
-	}
-	// TODO (frankban): remove this code when removing the legacy counts logic.
-	legacy, err := s.legacyDownloadCounts(id)
-	if err != nil {
-		return nil, err
-	}
-	counts.LastDay += legacy.LastDay
-	counts.LastWeek += legacy.LastWeek
-	counts.LastMonth += legacy.LastMonth
-	counts.Total += legacy.Total
-	return counts, nil
-}
-
-// legacyDownloadCounts retrieves the aggregated stats from the entity
-// extra-info. This is used when LegacyDownloadCountsEnabled is true.
-// TODO (frankban): remove this method when removing the legacy counts logic.
-func (s *Store) legacyDownloadCounts(id *charm.URL) (AggregatedCounts, error) {
-	counts := AggregatedCounts{}
-	entities, err := s.FindEntities(id, FieldSelector("extrainfo"))
-	if err != nil {
-		return counts, errgo.Mask(err, errgo.Is(params.ErrNotFound))
-	}
-	if len(entities) == 0 {
-		return counts, errgo.WithCausef(nil, params.ErrNotFound, "entity not found")
-	}
-	entity := entities[0]
-	data, ok := entity.ExtraInfo[params.LegacyDownloadStats]
-	if ok {
-		if err := json.Unmarshal(data, &counts.Total); err != nil {
-			return counts, errgo.Notef(err, "cannot unmarshal extra-info value")
-		}
 	}
 	return counts, nil
 }
