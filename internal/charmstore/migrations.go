@@ -368,19 +368,30 @@ func migrateToArchiveDownloadStatsOnly(db StoreDatabase) error {
 			{{"$group", bson.D{
 				{"_id", bson.D{{"baseurl", "$baseurl"}, {"series", "$series"}}},
 				{"url", bson.D{{"$last", "$_id"}}},
+				{"series", bson.D{{"$last", "$series"}}},
+				{"name", bson.D{{"$last", "$name"}}},
 				{"promulgated-url", bson.D{{"$last", "$promulgated-url"}}},
+				{"promulgated-revision", bson.D{{"$last", "$promulgated-revision"}}},
 				{"revision", bson.D{{"$max", "revision"}}},
 				{"legacy-download-stats", bson.D{{"$last", "$extrainfo.legacy-download-stats"}}},
 			}}},
 			{{"$project", bson.D{
 				{"_id", "$url"},
+				{"series", "$series"},
+				{"name", "$name"},
 				{"promulgated-url", "$promulgated-url"},
+				{"promulgated-revision", "$promulgated-revision"},
 				{"extrainfo.legacy-download-stats", "$legacy-download-stats"},
 			}}},
 		}).Iter()
 
 	var stats stats
 	var entity mongodoc.Entity
+	type promulgatedKey struct {
+		series string
+		name   string
+	}
+	promulgatedBySeriesAndName := make(map[promulgatedKey]mongodoc.Entity)
 	for iter.Next(&entity) {
 		legacyDownloadStats, ok := entity.ExtraInfo[params.LegacyDownloadStats]
 		if !ok {
@@ -398,19 +409,37 @@ func migrateToArchiveDownloadStatsOnly(db StoreDatabase) error {
 			return errgo.Notef(err, "cannot set the download count on entity: %v", entity.URL)
 		}
 		if entity.PromulgatedURL != nil {
-			key, err := stats.key(db, EntityStatsKey(entity.PromulgatedURL, params.StatsArchiveDownloadPromulgated), true)
-			if err != nil {
-				return errgo.Mask(err)
+			mykey := promulgatedKey {
+				series: entity.Series,
+				name: entity.Name,
 			}
-			err = incrementArchiveDownloadStats(db, key, legacyDownloadStats)
-			if err != nil {
-				return errgo.Notef(err, "cannot set the download count on entity: %v", entity.URL)
+			if e,ok := promulgatedBySeriesAndName[mykey]; !ok || entity.PromulgatedRevision > e.PromulgatedRevision {
+				promulgatedBySeriesAndName[mykey] = entity
 			}
 		}
 	}
 	if err := iter.Err(); err != nil {
 		return errgo.Notef(err, "cannot iterate through entities")
 	}
+
+	for _, promulgated := range  promulgatedBySeriesAndName {
+		legacyDownloadStats, ok := promulgated.ExtraInfo[params.LegacyDownloadStats]
+		if !ok {
+			return errgo.Newf("cannot retrieve the legacy download stats on promulgated: %v", promulgated.URL)
+		}
+		if len(legacyDownloadStats) == 0 {
+			continue
+		}
+		key, err := stats.key(db, EntityStatsKey(promulgated.PromulgatedURL, params.StatsArchiveDownloadPromulgated), true)
+		if err != nil {
+			return errgo.Mask(err)
+		}
+		err = incrementArchiveDownloadStats(db, key, legacyDownloadStats)
+		if err != nil {
+			return errgo.Notef(err, "cannot set the download count on promulgated entity: %v", promulgated.URL)
+		}
+	}
+
 	return nil
 }
 
