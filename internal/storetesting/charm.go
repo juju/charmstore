@@ -70,12 +70,12 @@ func NewBundle(data *charm.BundleData) *Bundle {
 		panic(err)
 	}
 	readMe := "boring"
-	blob, hash := newBlob([]file{{
-		name: "bundle.yaml",
-		data: dataYAML,
+	blob, hash := NewBlob([]File{{
+		Name: "bundle.yaml",
+		Data: dataYAML,
 	}, {
-		name: "README.md",
-		data: []byte(readMe),
+		Name: "README.md",
+		Data: []byte(readMe),
 	}})
 	return &Bundle{
 		blob:     blob,
@@ -109,12 +109,12 @@ func NewCharm(meta *charm.Meta) *Charm {
 	if err != nil {
 		panic(err)
 	}
-	blob, hash := newBlob([]file{{
-		name: "metadata.yaml",
-		data: metaYAML,
+	blob, hash := NewBlob([]File{{
+		Name: "metadata.yaml",
+		Data: metaYAML,
 	}, {
-		name: "README.md",
-		data: []byte("boring"),
+		Name: "README.md",
+		Data: []byte("boring"),
 	}})
 	return &Charm{
 		blob:     blob,
@@ -164,21 +164,23 @@ func (c *Charm) Size() int64 {
 	return int64(len(c.blob))
 }
 
-type file struct {
-	name string
-	data []byte
+// File represents a file which will be added to a new blob.
+type File struct {
+	Name string
+	Data []byte
 }
 
-// newBlob returns a zip archive containing the given files.
-func newBlob(files []file) ([]byte, string) {
+// NewBlob returns a zip archive containing the given files, along with
+// its blobstore hash.
+func NewBlob(files []File) ([]byte, string) {
 	var blob bytes.Buffer
 	zw := zip.NewWriter(&blob)
 	for _, f := range files {
-		w, err := zw.Create(f.name)
+		w, err := zw.Create(f.Name)
 		if err != nil {
 			panic(err)
 		}
-		if _, err := w.Write(f.data); err != nil {
+		if _, err := w.Write(f.Data); err != nil {
 			panic(err)
 		}
 	}

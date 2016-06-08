@@ -174,7 +174,7 @@ func (s *ListSuite) TestMetadataFields(c *gc.C) {
 		about: "bundle-metadata",
 		query: "name=wordpress-simple&type=bundle&include=bundle-metadata",
 		meta: map[string]interface{}{
-			"bundle-metadata": getListBundle("wordpress-simple").Data(),
+			"bundle-metadata": v4BundleMetadata(getListBundle("wordpress-simple").Data()), // V4 SPECIFIC
 		},
 	}, {
 		about: "bundle-machine-count",

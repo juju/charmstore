@@ -29,6 +29,7 @@ import (
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2/bson"
+	"gopkg.in/yaml.v2"
 
 	"gopkg.in/juju/charmstore.v5-unstable/elasticsearch"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
@@ -125,10 +126,27 @@ var metaEndpoints = []metaEndpoint{{
 }, {
 	name:      "bundle-metadata",
 	exclusive: bundleOnly,
-	get:       entityFieldGetter("BundleData"),
-	checkURL:  newResolvedURL("cs:~charmers/bundle/wordpress-simple-42", 42),
+	get: func(s *charmstore.Store, r *router.ResolvedURL) (interface{}, error) {
+		// V4 SPECIFIC
+		data, err := entityFieldGetter("BundleData")(s, r)
+		if err != nil {
+			return nil, err
+		}
+		if data == nil {
+			return nil, nil
+		}
+		return v4BundleMetadata(data.(*charm.BundleData)), nil
+	},
+	checkURL: newResolvedURL("cs:~charmers/bundle/wordpress-simple-42", 42),
 	assertCheckData: func(c *gc.C, data interface{}) {
-		c.Assert(data.(*charm.BundleData).Applications["wordpress"].Charm, gc.Equals, "wordpress")
+		// V4 SPECIFIC
+		services, ok := data.(map[string]interface{})["Services"]
+		c.Assert(ok, gc.Equals, true)
+		wordpress, ok := services.(map[string]interface{})["wordpress"]
+		c.Assert(ok, gc.Equals, true)
+		charm, ok := wordpress.(map[string]interface{})["Charm"]
+		c.Assert(ok, gc.Equals, true)
+		c.Assert(charm.(string), gc.Equals, "wordpress")
 	},
 }, {
 	name:      "bundle-unit-count",
@@ -177,7 +195,7 @@ var metaEndpoints = []metaEndpoint{{
 	name: "hash",
 	get: entityGetter(func(entity *mongodoc.Entity) interface{} {
 		return &params.HashResponse{
-			Sum: entity.BlobHash,
+			Sum: entity.PreV5BlobHash, // V4 SPECIFIC
 		}
 	}),
 	checkURL: newResolvedURL("~charmers/precise/wordpress-23", 23),
@@ -188,7 +206,7 @@ var metaEndpoints = []metaEndpoint{{
 	name: "hash256",
 	get: entityGetter(func(entity *mongodoc.Entity) interface{} {
 		return &params.HashResponse{
-			Sum: entity.BlobHash256,
+			Sum: entity.PreV5BlobHash256, // V4 SPECIFIC
 		}
 	}),
 	checkURL: newResolvedURL("~charmers/precise/wordpress-23", 23),
@@ -1396,6 +1414,65 @@ func (s *APISuite) TestMetaCharmMetadataElidesSeriesFromMultiSeriesCharm(c *gc.C
 	c.Assert(expectMeta.Series, gc.Not(gc.HasLen), 0)
 	expectMeta.Series = nil
 	s.assertGet(c, "multi-series/meta/charm-metadata", &expectMeta)
+}
+
+// V4 SPECIFIC
+func (s *APISuite) TestMetaBundleMetadataReplacesApplicationsWithServices(c *gc.C) {
+	url := newResolvedURL("~charmers/bundle/wordpress-simple-2", 2)
+	s.addPublicBundle(c, storetesting.NewBundle(&charm.BundleData{
+		Applications: map[string]*charm.ApplicationSpec{
+			"wordpress": {
+				Charm: "wordpress",
+			},
+		},
+	}), url, true)
+	expectMeta := map[string]interface{}{
+		"Services": map[string]interface{}{
+			"wordpress": map[string]interface{}{
+				"Charm": "wordpress",
+			},
+		},
+	}
+	s.assertGet(c, "bundle/wordpress-simple/meta/bundle-metadata", &expectMeta)
+}
+
+// V4 SPECIFIC
+func (s *APISuite) TestBundleArchiveReplacesApplicationsWithServices(c *gc.C) {
+	url := newResolvedURL("~charmers/bundle/wordpress-simple-2", 2)
+	s.addPublicBundle(c, storetesting.NewBundle(&charm.BundleData{
+		Applications: map[string]*charm.ApplicationSpec{
+			"wordpress": {
+				Charm: "wordpress",
+			},
+		},
+	}), url, true)
+	rr := httptesting.DoRequest(c, httptesting.DoRequestParams{
+		Handler: s.srv,
+		URL:     storeURL("bundle/wordpress-simple/archive"),
+	})
+	c.Assert(rr.Code, gc.Equals, http.StatusOK)
+	r, err := zip.NewReader(bytes.NewReader(rr.Body.Bytes()), int64(rr.Body.Len()))
+	c.Assert(err, jc.ErrorIsNil)
+	var bundleMetadataFound bool
+	for _, f := range r.File {
+		if f.Name != "bundle.yaml" {
+			continue
+		}
+		bundleMetadataFound = true
+		rc, err := f.Open()
+		c.Assert(err, jc.ErrorIsNil)
+		metadata, err := ioutil.ReadAll(rc)
+		c.Assert(err, jc.ErrorIsNil)
+		var m map[string]interface{}
+		err = yaml.Unmarshal(metadata, &m)
+		c.Assert(err, jc.ErrorIsNil)
+		_, ok := m["services"]
+		c.Assert(ok, gc.Equals, true)
+		_, ok = m["applications"]
+		c.Assert(ok, gc.Equals, false)
+		defer rc.Close()
+	}
+	c.Assert(bundleMetadataFound, gc.Equals, true)
 }
 
 func (s *APISuite) TestBulkMeta(c *gc.C) {
@@ -3268,4 +3345,23 @@ func entityACLs(store *charmstore.Store, url *router.ResolvedURL) (mongodoc.ACL,
 		ch = params.DevelopmentChannel
 	}
 	return be.ChannelACLs[ch], nil
+}
+
+// V4 SPECIFIC
+// v4BundleMetadata creates a representation of data with the v4
+// compatible format.
+func v4BundleMetadata(data *charm.BundleData) map[string]interface{} {
+	buf, err := json.Marshal(data)
+	if err != nil {
+		panic(err)
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(buf, &m); err != nil {
+		panic(err)
+	}
+	if ap, ok := m["applications"]; ok {
+		m["Services"] = ap
+		delete(m, "applications")
+	}
+	return m
 }

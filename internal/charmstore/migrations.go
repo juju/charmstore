@@ -151,10 +151,10 @@ func addPreV5CompatBlob(db StoreDatabase) error {
 	}).Iter()
 	var entity mongodoc.Entity
 	for iter.Next(&entity) {
-		var info *preV5CompatibilityHackBlobInfo
+		var info *compatibilityHackBlobInfo
 
 		if entity.CharmMeta == nil || len(entity.CharmMeta.Series) == 0 {
-			info = &preV5CompatibilityHackBlobInfo{
+			info = &compatibilityHackBlobInfo{
 				hash:    entity.BlobHash,
 				hash256: entity.BlobHash256,
 				size:    entity.Size,
@@ -164,7 +164,7 @@ func addPreV5CompatBlob(db StoreDatabase) error {
 			if err != nil {
 				return errgo.Notef(err, "cannot open original blob")
 			}
-			info, err = addPreV5CompatibilityHackBlob(blobStore, r, entity.BlobName, entity.Size)
+			info, err = addPreV5CharmCompatibilityHackBlob(blobStore, r, entity.BlobName, entity.Size)
 			r.Close()
 			if err != nil {
 				return errgo.Mask(err)
@@ -409,11 +409,11 @@ func migrateToArchiveDownloadStatsOnly(db StoreDatabase) error {
 			return errgo.Notef(err, "cannot set the download count on entity: %v", entity.URL)
 		}
 		if entity.PromulgatedURL != nil {
-			mykey := promulgatedKey {
+			mykey := promulgatedKey{
 				series: entity.Series,
-				name: entity.Name,
+				name:   entity.Name,
 			}
-			if e,ok := promulgatedBySeriesAndName[mykey]; !ok || entity.PromulgatedRevision > e.PromulgatedRevision {
+			if e, ok := promulgatedBySeriesAndName[mykey]; !ok || entity.PromulgatedRevision > e.PromulgatedRevision {
 				promulgatedBySeriesAndName[mykey] = entity
 			}
 		}
@@ -422,7 +422,7 @@ func migrateToArchiveDownloadStatsOnly(db StoreDatabase) error {
 		return errgo.Notef(err, "cannot iterate through entities")
 	}
 
-	for _, promulgated := range  promulgatedBySeriesAndName {
+	for _, promulgated := range promulgatedBySeriesAndName {
 		legacyDownloadStats, ok := promulgated.ExtraInfo[params.LegacyDownloadStats]
 		if !ok {
 			return errgo.Newf("cannot retrieve the legacy download stats on promulgated: %v", promulgated.URL)
