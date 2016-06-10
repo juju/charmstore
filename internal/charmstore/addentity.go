@@ -185,14 +185,30 @@ func (s *Store) addEntityFromReader(id *router.ResolvedURL, r io.ReadSeeker, blo
 		chans:            chans,
 	}
 	if id.URL.Series == "bundle" {
+		var addedCompat bool
 		b, err := s.newBundle(id, r, blobSize)
 		if err != nil {
 			return errgo.Mask(err, errgo.Is(params.ErrInvalidEntity), errgo.Is(params.ErrDuplicateUpload), errgo.Is(params.ErrEntityIdNotAllowed))
 		}
-		if err := s.addBundle(b, p); err != nil {
-			return errgo.Mask(err, errgo.Is(params.ErrDuplicateUpload), errgo.Is(params.ErrEntityIdNotAllowed))
+		info, err := addPreV5BundleCompatibilityHackBlob(s.BlobStore, r, p.blobName, p.blobSize)
+		if err != nil && errgo.Cause(err) != errNoCompat {
+			return errgo.Notef(err, "cannot add pre-v5 compatibility blob")
 		}
-		return nil
+		if err == nil {
+			addedCompat = true
+			p.preV5BlobHash = info.hash
+			p.preV5BlobHash256 = info.hash256
+			p.preV5BlobSize = info.size
+		}
+		err = s.addBundle(b, p)
+		if err != nil && addedCompat {
+			// We added a compatibility blob so we need to remove it.
+			compatBlobName := preV5CompatibilityBlobName(p.blobName)
+			if err1 := s.BlobStore.Remove(compatBlobName); err1 != nil {
+				logger.Errorf("cannot remove blob %s after error: %v", compatBlobName, err1)
+			}
+		}
+		return errgo.Mask(err, errgo.Is(params.ErrDuplicateUpload), errgo.Is(params.ErrEntityIdNotAllowed))
 	}
 	ch, err := s.newCharm(id, r, blobSize)
 	if err != nil {
@@ -203,7 +219,7 @@ func (s *Store) addEntityFromReader(id *router.ResolvedURL, r io.ReadSeeker, blo
 			return errgo.Notef(err, "cannot seek to start of archive")
 		}
 		logger.Infof("adding pre-v5 compat blob for %#v", id)
-		info, err := addPreV5CompatibilityHackBlob(s.BlobStore, r, p.blobName, p.blobSize)
+		info, err := addPreV5CharmCompatibilityHackBlob(s.BlobStore, r, p.blobName, p.blobSize)
 		if err != nil {
 			return errgo.Notef(err, "cannot add pre-v5 compatibility blob")
 		}
@@ -225,89 +241,31 @@ func (s *Store) addEntityFromReader(id *router.ResolvedURL, r io.ReadSeeker, blo
 	return nil
 }
 
-type preV5CompatibilityHackBlobInfo struct {
+type compatibilityHackBlobInfo struct {
 	hash    string
 	hash256 string
 	size    int64
 }
 
-// addPreV5CompatibilityHackBlob adds a second blob to the blob store that
+// addPreV5CharmCompatibilityHackBlob adds a second blob to the blob store that
 // contains a suffix to the zipped charm archive file that updates the zip
 // index to point to an updated version of metadata.yaml that does
 // not have a series field. The original blob is held in r.
-// It updates the fields in p accordingly.
 //
 // We do this because earlier versions of the charm package have a version
 // of the series field that holds a single string rather than a slice of string
 // so will fail when reading the new slice-of-string form, and we
 // don't want to change the field name from "series".
-func addPreV5CompatibilityHackBlob(blobStore *blobstore.Store, r io.ReadSeeker, blobName string, blobSize int64) (*preV5CompatibilityHackBlobInfo, error) {
-	readerAt := ReaderAtSeeker(r)
-	z, err := jujuzip.NewReader(readerAt, blobSize)
+func addPreV5CharmCompatibilityHackBlob(blobStore *blobstore.Store, r io.ReadSeeker, blobName string, blobSize int64) (*compatibilityHackBlobInfo, error) {
+	data, err := updateZipFile(r, blobSize, "metadata.yaml", removeSeriesField)
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot open charm archive")
+		return nil, errgo.Mask(err)
 	}
-	var metadataf *jujuzip.File
-	for _, f := range z.File {
-		if f.Name == "metadata.yaml" {
-			metadataf = f
-			break
-		}
-	}
-	if metadataf == nil {
-		return nil, errgo.New("no metadata.yaml file found")
-	}
-	fr, err := metadataf.Open()
+	info, err := addCompatibilityHackBlob(blobStore, r, preV5CompatibilityBlobName(blobName), blobSize, data)
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot open metadata.yaml from archive")
+		return nil, errgo.Mask(err)
 	}
-	defer fr.Close()
-	data, err := removeSeriesField(fr)
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot remove series field from metadata")
-	}
-	var appendedBlob bytes.Buffer
-	zw := z.Append(&appendedBlob)
-	updatedf := metadataf.FileHeader // Work around invalid duplicate FileHeader issue.
-	zwf, err := zw.CreateHeader(&updatedf)
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot create appended metadata entry")
-	}
-	if _, err := zwf.Write(data); err != nil {
-		return nil, errgo.Notef(err, "cannot write appended metadata data")
-	}
-	if err := zw.Close(); err != nil {
-		return nil, errgo.Notef(err, "cannot close zip file")
-	}
-	data = appendedBlob.Bytes()
-	sha384sum := sha512.Sum384(data)
-
-	err = blobStore.PutUnchallenged(&appendedBlob, preV5CompatibilityBlobName(blobName), int64(len(data)), fmt.Sprintf("%x", sha384sum[:]))
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot put archive blob")
-	}
-
-	sha384w := sha512.New384()
-	sha256w := sha256.New()
-	hashw := io.MultiWriter(sha384w, sha256w)
-	if _, err := r.Seek(0, 0); err != nil {
-		return nil, errgo.Notef(err, "cannnot seek to start of blob")
-	}
-	if _, err := io.Copy(hashw, r); err != nil {
-		return nil, errgo.Notef(err, "cannot recalculate blob checksum")
-	}
-	hashw.Write(data)
-	return &preV5CompatibilityHackBlobInfo{
-		size:    blobSize + int64(len(data)),
-		hash256: fmt.Sprintf("%x", sha256w.Sum(nil)),
-		hash:    fmt.Sprintf("%x", sha384w.Sum(nil)),
-	}, nil
-}
-
-// preV5CompatibilityBlobName returns the name of the zip file suffix used
-// to overwrite the metadata.yaml file for pre-v5 compatibility purposes.
-func preV5CompatibilityBlobName(blobName string) string {
-	return blobName + ".pre-v5-suffix"
+	return info, nil
 }
 
 func removeSeriesField(r io.Reader) ([]byte, error) {
@@ -325,6 +283,135 @@ func removeSeriesField(r io.Reader) ([]byte, error) {
 		return nil, errgo.Notef(err, "cannot re-marshal metadata.yaml")
 	}
 	return data, nil
+}
+
+var errNoCompat = errgo.New("no compatibility blob required")
+
+// addPreV5BundleCompatibilityHackBlob adds a second blob to the blob
+// store that contains a suffix to the zipped charm archive file that
+// updates the zip index to point to an updated version of bundle.yaml
+// that has a services field instead of a applications field.
+//
+// We do this because the bundle format has changed to use an
+// applications field rather than a services field. This updates those
+// bundles to be compatible with the older version of juju that cannot
+// parse an applications field.
+func addPreV5BundleCompatibilityHackBlob(blobStore *blobstore.Store, r io.ReadSeeker, blobName string, blobSize int64) (*compatibilityHackBlobInfo, error) {
+	r.Seek(0, 0)
+	data, err := updateZipFile(r, blobSize, "bundle.yaml", applicationsToServices)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(errNoCompat))
+	}
+	info, err := addCompatibilityHackBlob(blobStore, r, preV5CompatibilityBlobName(blobName), blobSize, data)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return info, nil
+}
+
+func applicationsToServices(r io.Reader) ([]byte, error) {
+	data, err := ioutil.ReadAll(r)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	var meta map[string]interface{}
+	if err := yaml.Unmarshal(data, &meta); err != nil {
+		return nil, errgo.Notef(err, "cannot unmarshal bundle.yaml")
+	}
+	if _, ok := meta["services"]; ok {
+		return nil, errNoCompat
+	}
+	meta["services"] = meta["applications"]
+	delete(meta, "applications")
+	data, err = yaml.Marshal(meta)
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot re-marshal bundle.yaml")
+	}
+	return data, nil
+}
+
+// addCompatibilityHackBlob adds a new blob to blobStore containing
+// appendData. It then calculates the size, sha256 & sha384 of the
+// combined contents of r and appendData and returns these values.
+func addCompatibilityHackBlob(blobStore *blobstore.Store, r io.ReadSeeker, blobName string, blobSize int64, appendData []byte) (*compatibilityHackBlobInfo, error) {
+	sha384sum := sha512.Sum384(appendData)
+
+	if err := blobStore.PutUnchallenged(
+		bytes.NewReader(appendData),
+		blobName,
+		int64(len(appendData)),
+		fmt.Sprintf("%x", sha384sum[:]),
+	); err != nil {
+		return nil, errgo.Notef(err, "cannot put archive blob")
+	}
+
+	sha384w := sha512.New384()
+	sha256w := sha256.New()
+	hashw := io.MultiWriter(sha384w, sha256w)
+	if _, err := r.Seek(0, 0); err != nil {
+		return nil, errgo.Notef(err, "cannnot seek to start of blob")
+	}
+	if _, err := io.Copy(hashw, r); err != nil {
+		return nil, errgo.Notef(err, "cannot recalculate blob checksum")
+	}
+	hashw.Write(appendData)
+	return &compatibilityHackBlobInfo{
+		size:    blobSize + int64(len(appendData)),
+		hash256: fmt.Sprintf("%x", sha256w.Sum(nil)),
+		hash:    fmt.Sprintf("%x", sha384w.Sum(nil)),
+	}, nil
+}
+
+// UpdateZipFile finds filename in r and passes it to updatef for
+// modification. It then returns the bytes that could be appended to r
+// that cause the zip file to reference the modified version of the file.
+//
+// Any errors returned from updatef will not have the cause masked.
+func updateZipFile(r io.ReadSeeker, size int64, filename string, updatef func(io.Reader) ([]byte, error)) ([]byte, error) {
+	readerAt := ReaderAtSeeker(r)
+	z, err := jujuzip.NewReader(readerAt, size)
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot open archive")
+	}
+	var uf *jujuzip.File
+	for _, f := range z.File {
+		if f.Name == filename {
+			uf = f
+			break
+		}
+	}
+	if uf == nil {
+		return nil, errgo.Newf("no %q file found", filename)
+	}
+	fr, err := uf.Open()
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot open %q from archive", filename)
+	}
+	defer fr.Close()
+	data, err := updatef(fr)
+	if err != nil {
+		return nil, errgo.NoteMask(err, fmt.Sprintf("cannot update %q", filename), errgo.Any)
+	}
+	var appendedBlob bytes.Buffer
+	zw := z.Append(&appendedBlob)
+	header := uf.FileHeader // Work around invalid duplicate FileHeader issue.
+	zwf, err := zw.CreateHeader(&header)
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot create appended %q entry", filename)
+	}
+	if _, err := zwf.Write(data); err != nil {
+		return nil, errgo.Notef(err, "cannot write appended %q data", filename)
+	}
+	if err := zw.Close(); err != nil {
+		return nil, errgo.Notef(err, "cannot close zip file")
+	}
+	return appendedBlob.Bytes(), nil
+}
+
+// preV5CompatibilityBlobName returns the name of the zip file suffix used
+// to overwrite the metadata.yaml file for pre-v5 compatibility purposes.
+func preV5CompatibilityBlobName(blobName string) string {
+	return blobName + ".pre-v5-suffix"
 }
 
 // newCharm returns a new charm implementation from the archive blob
@@ -665,8 +752,8 @@ func bundleCharms(data *charm.BundleData) ([]*charm.URL, error) {
 	// Use a map to de-duplicate the URL list: a bundle can include services
 	// deployed by the same charm.
 	urlMap := make(map[string]*charm.URL)
-	for _, service := range data.Services {
-		url, err := charm.ParseURL(service.Charm)
+	for _, application := range data.Applications {
+		url, err := charm.ParseURL(application.Charm)
 		if err != nil {
 			return nil, errgo.Mask(err)
 		}
@@ -689,8 +776,8 @@ func newInt(x int) *int {
 // bundleUnitCount returns the number of units created by the bundle.
 func bundleUnitCount(b *charm.BundleData) int {
 	count := 0
-	for _, service := range b.Services {
-		count += service.NumUnits
+	for _, application := range b.Applications {
+		count += application.NumUnits
 	}
 	return count
 }
@@ -699,14 +786,14 @@ func bundleUnitCount(b *charm.BundleData) int {
 // that will be created or used by the bundle.
 func bundleMachineCount(b *charm.BundleData) int {
 	count := len(b.Machines)
-	for _, service := range b.Services {
+	for _, applications := range b.Applications {
 		// The default placement is "new".
 		placement := &charm.UnitPlacement{
 			Machine: "new",
 		}
 		// Check for "new" placements, which means a new machine
 		// must be added.
-		for _, location := range service.To {
+		for _, location := range applications.To {
 			var err error
 			placement, err = charm.ParsePlacement(location)
 			if err != nil {
@@ -723,7 +810,7 @@ func bundleMachineCount(b *charm.BundleData) int {
 		// element is replicated. For this reason, if the last element is
 		// "new", we need to add more machines.
 		if placement != nil && placement.Machine == "new" {
-			count += service.NumUnits - len(service.To)
+			count += applications.NumUnits - len(applications.To)
 		}
 	}
 	return count

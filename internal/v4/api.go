@@ -4,6 +4,7 @@
 package v4 // import "gopkg.in/juju/charmstore.v5-unstable/internal/v4"
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/url"
 
@@ -125,6 +126,7 @@ func newReqHandler() ReqHandler {
 	authId := h.AuthIdHandler
 	handlers := v5.RouterHandlers(h.ReqHandler)
 	handlers.Global["search"] = router.HandleJSON(h.serveSearch)
+	handlers.Meta["bundle-metadata"] = h.EntityHandler(h.metaBundleMetadata, "bundledata")
 	handlers.Meta["charm-related"] = h.EntityHandler(h.metaCharmRelated, "charmprovidedinterfaces", "charmrequiredinterfaces")
 	handlers.Meta["charm-metadata"] = h.EntityHandler(h.metaCharmMetadata, "charmmeta")
 	handlers.Meta["revision-info"] = router.SingleIncludeHandler(h.metaRevisionInfo)
@@ -209,6 +211,28 @@ func (h ReqHandler) Close() {
 // the given HTTP request.
 func StatsEnabled(req *http.Request) bool {
 	return v5.StatsEnabled(req)
+}
+
+// GET id/meta/bundle-metadata
+// https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetabundle-metadata
+func (h ReqHandler) metaBundleMetadata(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
+	m := entity.BundleData
+	if m == nil {
+		return nil, nil
+	}
+	data, err := json.Marshal(m)
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot marshal bundle-metadata")
+	}
+	var metadata map[string]interface{}
+	if err := json.Unmarshal(data, &metadata); err != nil {
+		return nil, errgo.Notef(err, "cannot unmarshal bundle-metadata")
+	}
+	if ap, ok := metadata["applications"]; ok {
+		metadata["Services"] = ap
+		delete(metadata, "applications")
+	}
+	return metadata, nil
 }
 
 // GET id/meta/charm-metadata

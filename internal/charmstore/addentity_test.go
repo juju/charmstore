@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"time"
@@ -210,7 +211,7 @@ var uploadEntityErrorsTests = []struct {
 	about: "bundle uploaded to charm URL",
 	url:   "~charmers/precise/foo-0",
 	upload: storetesting.NewBundle(&charm.BundleData{
-		Services: map[string]*charm.ServiceSpec{
+		Applications: map[string]*charm.ApplicationSpec{
 			"foo": {
 				Charm: "foo",
 			},
@@ -259,19 +260,19 @@ var uploadEntityErrorsTests = []struct {
 	about: "bundle refers to non-existent charm",
 	url:   "~charmers/bundle/foo-0",
 	upload: storetesting.NewBundle(&charm.BundleData{
-		Services: map[string]*charm.ServiceSpec{
+		Applications: map[string]*charm.ApplicationSpec{
 			"foo": {
 				Charm: "bad-charm",
 			},
 		},
 	}),
-	expectError: regexp.QuoteMeta(`bundle verification failed: ["service \"foo\" refers to non-existent charm \"bad-charm\""]`),
+	expectError: regexp.QuoteMeta(`bundle verification failed: ["application \"foo\" refers to non-existent charm \"bad-charm\""]`),
 	expectCause: params.ErrInvalidEntity,
 }, {
 	about:       "bundle verification fails",
 	url:         "~charmers/bundle/foo-0",
 	upload:      storetesting.NewBundle(&charm.BundleData{}),
-	expectError: regexp.QuoteMeta(`bundle verification failed: ["at least one service must be specified"]`),
+	expectError: regexp.QuoteMeta(`bundle verification failed: ["at least one application must be specified"]`),
 	expectCause: params.ErrInvalidEntity,
 }, {
 	about:       "invalid zip format",
@@ -320,6 +321,33 @@ func (s *AddEntitySuite) TestUploadEntityErrors(c *gc.C) {
 			c.Assert(errgo.Cause(err), gc.Equals, err)
 		}
 	}
+}
+
+func (s *AddEntitySuite) TestUploadBundleWithServices(c *gc.C) {
+	store := s.newStore(c, true)
+	defer store.Close()
+	blob, _ := storetesting.NewBlob([]storetesting.File{{
+		Name: "README.md",
+		Data: []byte("Readme\n"),
+	}, {
+		Name: "bundle.yaml",
+		Data: []byte(`
+services:
+  mysql:
+    charm: mysql
+    num_units: 1
+  wordpress:
+    charm: wordpress
+    num_units: 1
+`),
+	}})
+	file := filepath.Join(c.MkDir(), "bundle.zip")
+	ioutil.WriteFile(file, blob, 0666)
+	ba, err := charm.ReadBundle(file)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(ba.Data().Applications, gc.HasLen, 2)
+
+	s.checkAddBundle(c, ba, router.MustNewResolvedURL("cs:~who/bundle/wordpress-bundle-33", 33))
 }
 
 func (s *AddEntitySuite) checkAddCharm(c *gc.C, ch charm.Charm, url *router.ResolvedURL) {
@@ -462,12 +490,23 @@ func assertBlobFields(c *gc.C, doc *mongodoc.Entity, url *router.ResolvedURL, ha
 	if doc.CharmMeta != nil && len(doc.CharmMeta.Series) > 0 {
 		// It's a multi-series charm, so the PreV5* fields should be active.
 		if doc.PreV5BlobSize <= doc.Size {
-			c.Fatalf("pre-v5 blobsize %d is unexpectedly less than original blob size %d", doc.PreV5BlobSize, doc.Size)
+			c.Fatalf("pre-v5 blobsize %d is unexpectedly less than or equal to original blob size %d", doc.PreV5BlobSize, doc.Size)
 		}
 		c.Assert(doc.PreV5BlobHash, gc.Not(gc.Equals), "")
 		c.Assert(doc.PreV5BlobHash, gc.Not(gc.Equals), hash)
 		c.Assert(doc.PreV5BlobHash256, gc.Not(gc.Equals), "")
 		c.Assert(doc.PreV5BlobHash256, gc.Not(gc.Equals), hash256)
+	} else if url.URL.Series == "bundle" && doc.PreV5BlobHash != doc.BlobHash {
+		// It's a bundle with a different PreV5BlobHash, check
+		// that all other fields are consistently different.
+		// TODO(mhilton) use BundleData.UnmarshaledWithServices
+		// to determine whether to make this check.
+		c.Assert(doc.PreV5BlobHash, gc.Not(gc.Equals), "")
+		c.Assert(doc.PreV5BlobHash256, gc.Not(gc.Equals), "")
+		c.Assert(doc.PreV5BlobHash256, gc.Not(gc.Equals), hash256)
+		if doc.PreV5BlobSize <= doc.Size {
+			c.Fatalf("pre-v5 blobsize %d is unexpectedly less than or equal to original blob size %d", doc.PreV5BlobSize, doc.Size)
+		}
 	} else {
 		c.Assert(doc.PreV5BlobSize, gc.Equals, doc.Size)
 		c.Assert(doc.PreV5BlobHash, gc.Equals, doc.BlobHash)

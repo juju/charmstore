@@ -718,9 +718,9 @@ func (s *ArchiveSuite) TestPostInvalidBundleData(c *gc.C) {
 	// Here we exercise both bundle internal verification (bad relation) and
 	// validation with respect to charms (wordpress and mysql are missing).
 	expectErr := `bundle verification failed: [` +
-		`"relation [\"foo:db\" \"mysql:server\"] refers to service \"foo\" not defined in this bundle",` +
-		`"service \"mysql\" refers to non-existent charm \"mysql\"",` +
-		`"service \"wordpress\" refers to non-existent charm \"wordpress\""]`
+		`"application \"mysql\" refers to non-existent charm \"mysql\"",` +
+		`"application \"wordpress\" refers to non-existent charm \"wordpress\"",` +
+		`"relation [\"foo:db\" \"mysql:server\"] refers to application \"foo\" not defined in this bundle"]`
 	s.assertCannotUpload(c, "~charmers/bundle/wordpress", f, http.StatusBadRequest, params.ErrInvalidEntity, expectErr)
 }
 
@@ -870,7 +870,7 @@ func (s *ArchiveSuite) assertUploadBundle(c *gc.C, method string, url *router.Re
 		Id: id,
 		Meta: entityMetaInfo{
 			ArchiveSize: &params.ArchiveSizeResponse{Size: size},
-			BundleMeta:  b.Data(),
+			BundleMeta:  v4BundleMetadata(b.Data()), // V4 SPECIFIC
 		},
 	},
 	)
@@ -1371,7 +1371,7 @@ type entityMetaInfo struct {
 	CharmMeta    *charm.Meta                 `json:"charm-metadata,omitempty"`
 	CharmConfig  *charm.Config               `json:"charm-config,omitempty"`
 	CharmActions *charm.Actions              `json:"charm-actions,omitempty"`
-	BundleMeta   *charm.BundleData           `json:"bundle-metadata,omitempty"`
+	BundleMeta   interface{}                 `json:"bundle-metadata,omitempty"` // V4 SPECIFIC
 }
 
 func (s *ArchiveSuite) assertEntityInfo(c *gc.C, expect entityInfo) {

@@ -65,7 +65,7 @@ func (s *APISuite) TestServeDiagramErrors(c *gc.C) {
 
 func (s *APISuite) TestServeDiagram(c *gc.C) {
 	bundle := storetesting.NewBundle(&charm.BundleData{
-		Services: map[string]*charm.ServiceSpec{
+		Applications: map[string]*charm.ApplicationSpec{
 			"wordpress": {
 				Charm: "wordpress",
 				Annotations: map[string]string{
@@ -132,7 +132,7 @@ func (s *APISuite) TestServeDiagram(c *gc.C) {
 func (s *APISuite) TestServeDiagramNoPosition(c *gc.C) {
 	bundle := storetesting.NewBundle(
 		&charm.BundleData{
-			Services: map[string]*charm.ServiceSpec{
+			Applications: map[string]*charm.ApplicationSpec{
 				"wordpress": {
 					Charm: "wordpress",
 				},

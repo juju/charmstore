@@ -374,7 +374,7 @@ var metaBundlesContainingTests = []struct {
 		Id: charm.MustParseURL("bundle/wordpress-complex-1"),
 		Meta: map[string]interface{}{
 			"id-name":         params.IdNameResponse{"wordpress-complex"},
-			"bundle-metadata": metaBundlesContainingBundles["1 ~charmers/bundle/wordpress-complex-1"].Data(),
+			"bundle-metadata": v4BundleMetadata(metaBundlesContainingBundles["1 ~charmers/bundle/wordpress-complex-1"].Data()), // V4 SPECIFIC
 		},
 	}},
 }, {
@@ -527,19 +527,19 @@ var metaBundlesContainingTests = []struct {
 		Id: charm.MustParseURL("bundle/useless-0"),
 		Meta: map[string]interface{}{
 			"id-name":         params.IdNameResponse{"useless"},
-			"bundle-metadata": metaBundlesContainingBundles["0 ~charmers/bundle/useless-0"].Data(),
+			"bundle-metadata": v4BundleMetadata(metaBundlesContainingBundles["0 ~charmers/bundle/useless-0"].Data()), //V4 SPECIFIC
 		},
 	}, {
 		Id: charm.MustParseURL("bundle/wordpress-complex-1"),
 		Meta: map[string]interface{}{
 			"id-name":         params.IdNameResponse{"wordpress-complex"},
-			"bundle-metadata": metaBundlesContainingBundles["1 ~charmers/bundle/wordpress-complex-1"].Data(),
+			"bundle-metadata": v4BundleMetadata(metaBundlesContainingBundles["1 ~charmers/bundle/wordpress-complex-1"].Data()), //V4 SPECIFIC
 		},
 	}, {
 		Id: charm.MustParseURL("bundle/wordpress-simple-1"),
 		Meta: map[string]interface{}{
 			"id-name":         params.IdNameResponse{"wordpress-simple"},
-			"bundle-metadata": metaBundlesContainingBundles["1 ~charmers/bundle/wordpress-simple-1"].Data(),
+			"bundle-metadata": v4BundleMetadata(metaBundlesContainingBundles["1 ~charmers/bundle/wordpress-simple-1"].Data()), //V4 SPECIFIC
 		},
 	}},
 }, {
@@ -627,17 +627,17 @@ func sameMetaAnyResponses(expect interface{}) httptesting.BodyAsserter {
 // to be included in the bundle.
 // For each URL, a corresponding service is automatically created.
 func relationTestingBundle(urls []string) charm.Bundle {
-	services := make(map[string]*charm.ServiceSpec, len(urls))
+	applications := make(map[string]*charm.ApplicationSpec, len(urls))
 	for i, url := range urls {
-		service := &charm.ServiceSpec{
+		application := &charm.ApplicationSpec{
 			Charm:    url,
 			NumUnits: 1,
 		}
-		services[fmt.Sprintf("service-%d", i)] = service
+		applications[fmt.Sprintf("application-%d", i)] = application
 	}
 	return storetesting.NewBundle(
 		&charm.BundleData{
-			Services: services,
+			Applications: applications,
 		})
 
 }
