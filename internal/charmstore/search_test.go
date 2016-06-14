@@ -380,6 +380,16 @@ var searchTests = []struct {
 			searchEntities["wordpress-simple"].entity,
 		},
 	}, {
+		about: "autocomplete end of word",
+		sp: SearchParams{
+			Text:         "PRESS",
+			AutoComplete: true,
+		},
+		results: Entities{
+			searchEntities["wordpress"].entity,
+			searchEntities["wordpress-simple"].entity,
+		},
+	}, {
 		about: "non-matching autocomplete search",
 		sp: SearchParams{
 			Text:         "worm",
