@@ -370,6 +370,16 @@ var searchTests = []struct {
 			searchEntities["wordpress-simple"].entity,
 		},
 	}, {
+		about: "autocomplete case insensitive",
+		sp: SearchParams{
+			Text:         "woRd",
+			AutoComplete: true,
+		},
+		results: Entities{
+			searchEntities["wordpress"].entity,
+			searchEntities["wordpress-simple"].entity,
+		},
+	}, {
 		about: "non-matching autocomplete search",
 		sp: SearchParams{
 			Text:         "worm",
@@ -656,6 +666,24 @@ var searchTests = []struct {
 		},
 		results: Entities{
 			searchEntities["mysql"].entity,
+		},
+	}, {
+		about: "name search",
+		sp: SearchParams{
+			Text: "wordpress",
+		},
+		results: Entities{
+			searchEntities["wordpress"].entity,
+			searchEntities["wordpress-simple"].entity,
+		},
+	}, {
+		about: "case insensitive search",
+		sp: SearchParams{
+			Text: "WORDPRESS",
+		},
+		results: Entities{
+			searchEntities["wordpress"].entity,
+			searchEntities["wordpress-simple"].entity,
 		},
 	},
 }
