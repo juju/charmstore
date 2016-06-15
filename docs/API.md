@@ -270,7 +270,8 @@ entity must exist that matches the id).
 If Promulgate is true, it means that any new charms published
 to ~*user*/*x*/*name* will also be given the alias
 *x*/*name*. The latest revision for all ids ~*user*/*anyseries*/*name*
-will also be aliased likewise.
+will also be aliased likewise. If any of the old or new entities are multi-series,
+then only the latest multi-series id will be aliased.
 
 If Promulgate is false, any new charms published
 to ~*user*/*anyseries*/*name* will not be given a promulgated
