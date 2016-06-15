@@ -541,28 +541,21 @@ func createSearchDSL(sp SearchParams) elasticsearch.QueryDSL {
 
 	// Full text search
 	var q elasticsearch.Query
+	nameField := "Name.tok"
+	if sp.AutoComplete {
+		nameField = "Name.ngrams"
+	}
 	if sp.Text == "" {
 		q = elasticsearch.MatchAllQuery{}
-	} else if sp.AutoComplete {
-		q = elasticsearch.MatchQuery{
-			Field:    "Name.ngrams",
-			Query:    sp.Text,
-			Analyzer: "keyword",
-		}
 	} else {
 		q = elasticsearch.MultiMatchQuery{
 			Query: sp.Text,
 			Fields: encodeFields(map[string]float64{
-				"Name":                    10,
-				"User":                    7,
-				"CharmMeta.Categories":    5,
-				"CharmMeta.Tags":          5,
-				"BundleData.Tags":         5,
-				"Series":                  5,
-				"CharmProvidedInterfaces": 3,
-				"CharmRequiredInterfaces": 3,
-				"CharmMeta.Description":   1,
-				"BundleReadMe":            1,
+				nameField:              10,
+				"User":                 7,
+				"CharmMeta.Categories": 5,
+				"CharmMeta.Tags":       5,
+				"BundleData.Tags":      5,
 			}),
 		}
 	}
