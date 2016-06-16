@@ -557,6 +557,7 @@ func createSearchDSL(sp SearchParams) elasticsearch.QueryDSL {
 				"CharmMeta.Tags":       5,
 				"BundleData.Tags":      5,
 			}),
+			MinimumShouldMatch: "100%",
 		}
 	}
 

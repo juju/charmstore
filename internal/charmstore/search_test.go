@@ -695,6 +695,24 @@ var searchTests = []struct {
 			searchEntities["wordpress"].entity,
 			searchEntities["wordpress-simple"].entity,
 		},
+	}, {
+		about: "autocomplete with spaces",
+		sp: SearchParams{
+			Text:         "wordpress simple",
+			AutoComplete: true,
+		},
+		results: Entities{
+			searchEntities["wordpress-simple"].entity,
+		},
+	}, {
+		about: "autocomplete with spaces, reversed",
+		sp: SearchParams{
+			Text:         "simple wordpress",
+			AutoComplete: true,
+		},
+		results: Entities{
+			searchEntities["wordpress-simple"].entity,
+		},
 	},
 }
 

@@ -10,7 +10,7 @@ var (
 	esMapping = mustParseJSON(esMappingJSON)
 )
 
-const esSettingsVersion = 10
+const esSettingsVersion = 11
 
 func mustParseJSON(s string) interface{} {
 	var j json.RawMessage
@@ -41,9 +41,9 @@ const esIndexJSON = `
                         "n3_20grams_filter"
                     ]
                 },
-                "lowercase": {
+                "lowercase_words": {
                     "type":      "custom",
-                    "tokenizer": "keyword",
+                    "tokenizer": "whitespace",
                     "filter": [
                         "lowercase"
                     ]
@@ -93,7 +93,7 @@ const esMappingJSON = `
           "ngrams": {
             "type": "string",
             "analyzer": "n3_20grams",
-            "search_analyzer": "lowercase",
+            "search_analyzer": "lowercase_words",
             "include_in_all": false
           },
           "tok": {
