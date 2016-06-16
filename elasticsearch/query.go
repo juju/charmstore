@@ -62,13 +62,23 @@ func (m MatchQuery) MarshalJSON() ([]byte, error) {
 type MultiMatchQuery struct {
 	Query  string
 	Fields []string
+
+	// MinimumShouldMatch optionally contains the value for the
+	// minimum_should_match parameter, For details of possible values
+	// please see:
+	// https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-minimum-should-match.html
+	MinimumShouldMatch string
 }
 
 func (m MultiMatchQuery) MarshalJSON() ([]byte, error) {
-	return marshalNamedObject("multi_match", map[string]interface{}{
+	mm := map[string]interface{}{
 		"query":  m.Query,
 		"fields": m.Fields,
-	})
+	}
+	if m.MinimumShouldMatch != "" {
+		mm["minimum_should_match"] = m.MinimumShouldMatch
+	}
+	return marshalNamedObject("multi_match", mm)
 }
 
 // FilteredQuery provides a query that includes a filter.
