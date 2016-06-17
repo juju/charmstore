@@ -59,22 +59,22 @@ var migrationHistory = []versionSpec{{
 		}, {
 			id:            "~charmers/bundle/promulgatedbundle-0",
 			promulgatedId: "bundle/promulgatedbundle-0",
-			entity: storetesting.NewBundle(&charm.BundleData{
-				Applications: map[string]*charm.ApplicationSpec{
-					"promulgated": {
-						Charm: "promulgated",
-					},
-				},
-			}),
+			entity: storetesting.NewBlob([]storetesting.File{{
+				Name: "README.md",
+				Data: []byte("something"),
+			}, {
+				Name: "bundle.yaml",
+				Data: []byte(`services: {promulgated: {charm: promulgated}}`),
+			}}),
 		}, {
 			id: "~charmers/bundle/nonpromulgatedbundle-0",
-			entity: storetesting.NewBundle(&charm.BundleData{
-				Applications: map[string]*charm.ApplicationSpec{
-					"promulgated": {
-						Charm: "promulgated",
-					},
-				},
-			}),
+			entity: storetesting.NewBlob([]storetesting.File{{
+				Name: "README.md",
+				Data: []byte("something"),
+			}, {
+				Name: "bundle.yaml",
+				Data: []byte(`services: {promulgated: {charm: promulgated}}`),
+			}}),
 		}})
 		if err != nil {
 			return errgo.Mask(err)
@@ -215,6 +215,19 @@ var migrationHistory = []versionSpec{{
 		}, {
 			id:     "~charmers/trusty/legacystats-1rev-notset-0",
 			entity: storetesting.NewCharm(nil),
+		}, {
+			id:     "~someone/trusty/empty-metered-42",
+			entity: storetesting.NewCharm(nil).WithMetrics(&charm.Metrics{}),
+		}, {
+			id: "~someone/trusty/metered-42",
+			entity: storetesting.NewCharm(nil).WithMetrics(&charm.Metrics{
+				Metrics: map[string]charm.Metric{
+					"pings": {
+						Type:        "gauge",
+						Description: "some metrics",
+					},
+				},
+			}),
 		}})
 
 		if err != nil {
@@ -324,6 +337,24 @@ var migrationFromDumpEntityTests = []struct {
 		hasCompatibilityBlob(false),
 		isDevelopment(true),
 		isStable(true),
+		hasMetrics(nil),
+	},
+}, {
+	id: "~someone/trusty/empty-metered-42",
+	checkers: []entityChecker{
+		hasMetrics(nil),
+	},
+}, {
+	id: "~someone/trusty/metered-42",
+	checkers: []entityChecker{
+		hasMetrics(&charm.Metrics{
+			Metrics: map[string]charm.Metric{
+				"pings": {
+					Type:        "gauge",
+					Description: "some metrics",
+				},
+			},
+		}),
 	},
 }}
 
@@ -688,6 +719,12 @@ func isDevelopment(isDev bool) entityChecker {
 func isStable(isStable bool) entityChecker {
 	return func(c *gc.C, entity *mongodoc.Entity) {
 		c.Assert(entity.Stable, gc.Equals, isStable)
+	}
+}
+
+func hasMetrics(metrics *charm.Metrics) entityChecker {
+	return func(c *gc.C, entity *mongodoc.Entity) {
+		c.Assert(entity.CharmMetrics, jc.DeepEquals, metrics)
 	}
 }
 

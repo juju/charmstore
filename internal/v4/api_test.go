@@ -124,6 +124,22 @@ var metaEndpoints = []metaEndpoint{{
 		c.Assert(data.(*charm.Meta).Summary, gc.Equals, "Blog engine")
 	},
 }, {
+	name:      "charm-metrics",
+	exclusive: charmOnly,
+	get: entityGetter(func(entity *mongodoc.Entity) interface{} {
+		if entity.CharmMetrics == nil {
+			return nil
+		}
+		return entity.CharmMetrics
+	}),
+	checkURL: newResolvedURL("~charmers/xenial/metered-42", 42),
+	assertCheckData: func(c *gc.C, data interface{}) {
+		c.Assert(data.(*charm.Metrics).Metrics, gc.DeepEquals, map[string]charm.Metric{
+			"juju-units": {Type: "", Description: ""},
+			"pings":      {Type: "gauge", Description: "Description of the metric."},
+		})
+	},
+}, {
 	name:      "bundle-metadata",
 	exclusive: bundleOnly,
 	get: func(s *charmstore.Store, r *router.ResolvedURL) (interface{}, error) {
@@ -573,6 +589,8 @@ var testEntities = []*router.ResolvedURL{
 	newResolvedURL("cs:~charmers/utopic/category-2", 2),
 	// A charm with a different user.
 	newResolvedURL("cs:~bob/utopic/wordpress-2", -1),
+	// A charm with metrics.
+	newResolvedURL("cs:~charmers/xenial/metered-42", 42),
 }
 
 func (s *APISuite) addTestEntities(c *gc.C) []*router.ResolvedURL {
