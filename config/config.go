@@ -15,6 +15,8 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/yaml.v2"
+
+	"gopkg.in/juju/charmstore.v5-unstable/internal/blobstore"
 )
 
 type Config struct {
@@ -32,15 +34,16 @@ type Config struct {
 	TermsPublicKey    *bakery.PublicKey `yaml:"terms-public-key,omitempty"`
 	TermsLocation     string            `yaml:"terms-location,omitempty"`
 	// The identity API is optional
-	IdentityAPIURL    string          `yaml:"identity-api-url,omitempty"`
-	AgentUsername     string          `yaml:"agent-username,omitempty"`
-	AgentKey          *bakery.KeyPair `yaml:"agent-key,omitempty"`
-	MaxMgoSessions    int             `yaml:"max-mgo-sessions,omitempty"`
-	RequestTimeout    DurationString  `yaml:"request-timeout,omitempty"`
-	StatsCacheMaxAge  DurationString  `yaml:"stats-cache-max-age,omitempty"`
-	SearchCacheMaxAge DurationString  `yaml:"search-cache-max-age,omitempty"`
-	Database          string          `yaml:"database,omitempty"`
-	AccessLog         string          `yaml:"access-log"`
+	IdentityAPIURL       string                     `yaml:"identity-api-url,omitempty"`
+	AgentUsername        string                     `yaml:"agent-username,omitempty"`
+	AgentKey             *bakery.KeyPair            `yaml:"agent-key,omitempty"`
+	MaxMgoSessions       int                        `yaml:"max-mgo-sessions,omitempty"`
+	RequestTimeout       DurationString             `yaml:"request-timeout,omitempty"`
+	StatsCacheMaxAge     DurationString             `yaml:"stats-cache-max-age,omitempty"`
+	SearchCacheMaxAge    DurationString             `yaml:"search-cache-max-age,omitempty"`
+	Database             string                     `yaml:"database,omitempty"`
+	AccessLog            string                     `yaml:"access-log"`
+	BlobStorageProviders []blobstore.ProviderConfig `yaml:"provider-config"`
 }
 
 func (c *Config) validate() error {

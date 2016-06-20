@@ -15,6 +15,7 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 
 	"gopkg.in/juju/charmstore.v5-unstable/elasticsearch"
+	"gopkg.in/juju/charmstore.v5-unstable/internal/blobstore"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/legacy"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/v4"
@@ -107,6 +108,12 @@ type ServerParams struct {
 	// RootKeyPolicy holds the default policy used when creating
 	// macaroon root keys.
 	RootKeyPolicy mgostorage.Policy
+
+	// StorageProviders holds a list of storage providers in priority order.
+	// During a migration it will likely be configured to s3 and gridfs.
+	// AWS recommends using ~/.aws/configuration file for secure credentials,
+	// thus this provider does not take credential configuration.
+	BlobStorageProviders []blobstore.ProviderConfig
 }
 
 // NewServer returns a new handler that handles charm store requests and stores

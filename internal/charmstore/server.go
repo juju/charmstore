@@ -18,6 +18,7 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/natefinch/lumberjack.v2"
 
+	"gopkg.in/juju/charmstore.v5-unstable/internal/blobstore"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/monitoring"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
 )
@@ -90,6 +91,12 @@ type ServerParams struct {
 	// RootKeyPolicy holds the default policy used when creating
 	// macaroon root keys.
 	RootKeyPolicy mgostorage.Policy
+
+	// StorageProviders holds a list of storage providers in priority order.
+	// During a migration it will likely be configured to s3 and gridfs.
+	// AWS recommends using ~/.aws/configuration file for secure credentials,
+	// thus this provider does not take credential configuration.
+	BlobStorageProviders []blobstore.ProviderConfig
 }
 
 const defaultRootKeyExpiryDuration = 24 * time.Hour
