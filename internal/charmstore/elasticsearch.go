@@ -10,7 +10,7 @@ var (
 	esMapping = mustParseJSON(esMappingJSON)
 )
 
-const esSettingsVersion = 11
+const esSettingsVersion = 12
 
 func mustParseJSON(s string) interface{} {
 	var j json.RawMessage
@@ -76,10 +76,20 @@ const esMappingJSON = `
         "index_options": "docs"
       },
       "User": {
-        "type": "string",
-        "index": "not_analyzed",
-        "omit_norms": true,
-        "index_options": "docs"
+        "type": "multi_field",
+        "fields": {
+          "User": {
+	    "type": "string",
+	    "index": "not_analyzed",
+	    "omit_norms": true,
+	    "index_options": "docs"
+          },
+          "tok": {
+	    "type": "string",
+	    "analyzer": "lowercase_words",
+	    "include_in_all": false
+          }
+        }
       },
       "Name": {
         "type": "multi_field",
@@ -226,16 +236,36 @@ const esMappingJSON = `
             }
           },
           "Categories": {
-            "type": "string",
-            "index": "not_analyzed",
-            "omit_norms": true,
-            "index_options": "docs"
+	    "type": "multi_field",
+	    "fields": {
+	      "Categories": {
+		"type": "string",
+		"index": "not_analyzed",
+		"omit_norms": true,
+		"index_options": "docs"
+	      },
+	      "tok": {
+		"type": "string",
+		"analyzer": "lowercase_words",
+		"include_in_all": false
+	      }
+	    }
           },
           "Tags": {
-            "type": "string",
-            "index": "not_analyzed",
-            "omit_norms": true,
-            "index_options": "docs"
+	    "type": "multi_field",
+	    "fields": {
+	      "Tags": {
+		"type": "string",
+		"index": "not_analyzed",
+		"omit_norms": true,
+		"index_options": "docs"
+	      },
+	      "tok": {
+		"type": "string",
+		"analyzer": "lowercase_words",
+		"include_in_all": false
+	      }
+	    }
           }
         }
       },
@@ -309,10 +339,20 @@ const esMappingJSON = `
             "index": "not_analyzed"
           },
           "Tags": {
-            "type": "string",
-            "index": "not_analyzed",
-            "omit_norms": true,
-            "index_options": "docs"
+	    "type": "multi_field",
+	    "fields": {
+	      "Tags": {
+		"type": "string",
+		"index": "not_analyzed",
+		"omit_norms": true,
+		"index_options": "docs"
+	      },
+	      "tok": {
+		"type": "string",
+		"analyzer": "lowercase_words",
+		"include_in_all": false
+	      }
+	    }
           }
         }
       },
