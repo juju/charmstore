@@ -477,7 +477,7 @@ func addMetrics(db StoreDatabase) error {
 	for iter.Next(&entity) {
 		metrics, err := getEntityMetrics(blobStore, entity)
 		if err != nil {
-			return errgo.Mask(err)
+			return errgo.Notef(err, "cannot get metrics for %q", entity.URL)
 		}
 		if err := entities.UpdateId(entity.URL, bson.D{{
 			"$set", bson.D{{"charmmetrics", metrics}},
