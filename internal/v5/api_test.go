@@ -140,7 +140,7 @@ var metaEndpoints = []metaEndpoint{{
 	checkURL: newResolvedURL("~charmers/xenial/metered-42", 42),
 	assertCheckData: func(c *gc.C, data interface{}) {
 		c.Assert(data.(*charm.Metrics).Metrics, gc.DeepEquals, map[string]charm.Metric{
-			"juju-units": {Type: "", Description: ""},
+			"juju-units": {},
 			"pings":      {Type: "gauge", Description: "Description of the metric."},
 		})
 	},

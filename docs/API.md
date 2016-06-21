@@ -825,8 +825,8 @@ Example: `GET wordpress/meta/charm-metadata`
 #### GET *id*/meta/charm-metrics
 
 The `/meta/charm-metrics` path returns the contents of the charm metrics file
-for a charm, or an empty response if no metrics are defined for the charm. The
-id must refer to a charm, not a bundle.
+for a charm, or a 404 not found response if no metrics are defined for the
+charm. The id must refer to a charm, not a bundle.
 
 ```go
 // Metrics contains the metrics declarations encoded in the metrics.yaml file.
@@ -836,16 +836,12 @@ type Metrics struct {
 
 // Metric represents a single metric definition
 type Metric struct {
-    Type        MetricType
+    Type        string
     Description string
 }
-
-// MetricType is used to identify metric types supported by juju.
-type MetricType string
-
 ```
 
-The possible values of a `MetricType` are
+The possible values of a Metric Type are
 
 * gauge
 * absolute
@@ -854,14 +850,14 @@ Example: `GET wordpress/meta/charm-metrics`
 
 ```json
 {
-    Metrics: {
-        juju-units: {
-            Type: "absolute",
-            Description: "The units!"
+    "Metrics": {
+        "juju-units": {
+            "Type": "absolute",
+            "Description": "The units!"
         },
-        pings: {
-            Type: "gauge",
-            Description: "Description of the metric."
+        "pings": {
+            "Type": "gauge",
+            "Description": "Description of the metric."
         }
     }
 }
