@@ -478,6 +478,7 @@ Example: `GET /meta`
     "charm-actions",
     "charm-config",
     "charm-metadata",
+    "charm-metrics",
     "charm-related",
     "extra-info",
     "hash",
@@ -635,6 +636,7 @@ Example: `GET foo/meta`
     "charm-actions",
     "charm-config",
     "charm-metadata",
+    "charm-metrics",
     "charm-related",
     "extra-info",
     "id",
@@ -754,7 +756,7 @@ Response body:
 
 #### GET *id*/meta/charm-metadata
 
-The `/meta/charm.metadata` path returns the contents of the charm metadata file
+The `/meta/charm-metadata` path returns the contents of the charm metadata file
 for a charm. The id must refer to a charm, not a bundle.
 
 ```go
@@ -817,6 +819,47 @@ Example: `GET wordpress/meta/charm-metadata`
     "Tags": [
         "applications"
     ]
+}
+```
+
+#### GET *id*/meta/charm-metrics
+
+The `/meta/charm-metrics` path returns the contents of the charm metrics file
+for a charm, or a 404 not found response if no metrics are defined for the
+charm. The id must refer to a charm, not a bundle.
+
+```go
+// Metrics contains the metrics declarations encoded in the metrics.yaml file.
+type Metrics struct {
+    Metrics map[string]Metric
+}
+
+// Metric represents a single metric definition
+type Metric struct {
+    Type        string
+    Description string
+}
+```
+
+The possible values of a Metric Type are
+
+* gauge
+* absolute
+
+Example: `GET wordpress/meta/charm-metrics`
+
+```json
+{
+    "Metrics": {
+        "juju-units": {
+            "Type": "absolute",
+            "Description": "The units!"
+        },
+        "pings": {
+            "Type": "gauge",
+            "Description": "Description of the metric."
+        }
+    }
 }
 ```
 
@@ -1104,7 +1147,7 @@ type PublishedInfo struct {
 #### GET *id*/meta/terms
 
 The `meta/terms` path returns a list of terms and conditions (as recorded in
-the terms field of the charm metadata) the user must agree to in order to 
+the terms field of the charm metadata) the user must agree to in order to
 obtain the archive of the given charm id.
 
 Example: `GET some-charm/meta/terms`
@@ -1993,7 +2036,7 @@ will match.  By default, only the charm store id is included.
 The results are sorted according to the given sort field, which may be one of
 `owner`, `name` or `series`, corresponding to the filters of the same names. If
 the field is prefixed with a hyphen (-), the sorting order will be reversed. If
-the sort field is not specified the order will be a server side logical order. 
+the sort field is not specified the order will be a server side logical order.
 It is possible to specify more than one sort field to get
 multi-level sorting, e.g. sort=name,-series will get charms in order of the
 charm name and then in reverse order of series.
@@ -2190,8 +2233,8 @@ Request body:
 
 #### GET /macaroon
 
-This endpoint returns a macaroon in JSON format that, when its third party 
-caveats are discharged, will allow access to the charm store. No prior 
+This endpoint returns a macaroon in JSON format that, when its third party
+caveats are discharged, will allow access to the charm store. No prior
 authorization is required.
 
 #### GET /delegatable-macaroon
@@ -2199,16 +2242,16 @@ authorization is required.
 This endpoint returns a macaroon in JSON format that can be passed to
 third parties to allow them to access the charm store on the user's
 behalf. If the "id" parameter is specified (url encoded), the returned
-macaroon will be restricted for use only with the entity with the 
+macaroon will be restricted for use only with the entity with the
 given id.
 
-A delegatable macaroon will only be returned to an authorized user (not 
-including admin). It will carry the same privileges as the macaroon used 
+A delegatable macaroon will only be returned to an authorized user (not
+including admin). It will carry the same privileges as the macaroon used
 to authorize the request, but is suitable for use by third parties.
 
 #### GET /whoami
 
-This endpoint returns the user name of the client and the list of groups the 
+This endpoint returns the user name of the client and the list of groups the
 user is a member of. This endpoint requires authorization.
 
 Example: `GET whoami`

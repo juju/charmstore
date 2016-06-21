@@ -26,6 +26,7 @@ const (
 	migrationAddPreV5CompatBlob      mongodoc.MigrationName = "add pre-v5 compatibility blobs; second try"
 	migrationNewChannelsModel        mongodoc.MigrationName = "new channels model"
 	migrationStats                   mongodoc.MigrationName = "remove legacy download stats"
+	migrationAddMetrics              mongodoc.MigrationName = "store metrics into entities"
 )
 
 // migrations holds all the migration functions that are executed in the order
@@ -71,6 +72,9 @@ var migrations = []migration{{
 }, {
 	name:    migrationStats,
 	migrate: migrateToArchiveDownloadStatsOnly,
+}, {
+	name:    migrationAddMetrics,
+	migrate: addMetrics,
 }}
 
 // migration holds a migration function with its corresponding name.
@@ -455,6 +459,53 @@ func incrementArchiveDownloadStats(db StoreDatabase, key string, legacyDownloadS
 		return errgo.Mask(err)
 	}
 	return nil
+}
+
+// addMetrics stores metrics into entities.
+func addMetrics(db StoreDatabase) error {
+	blobStore := blobstore.New(db.Database, "entitystore")
+	entities := db.Entities()
+	iter := entities.Find(bson.D{{
+		"charmmetrics", bson.D{{"$exists", false}},
+	}, {
+		"series", bson.D{{"$ne", "bundle"}},
+	}}).Select(map[string]int{
+		"blobname": 1,
+		"size":     1,
+	}).Iter()
+	var entity mongodoc.Entity
+	for iter.Next(&entity) {
+		metrics, err := getEntityMetrics(blobStore, entity)
+		if err != nil {
+			return errgo.Mask(err)
+		}
+		if err := entities.UpdateId(entity.URL, bson.D{{
+			"$set", bson.D{{"charmmetrics", metrics}},
+		}}); err != nil {
+			return errgo.Notef(err, "cannot update charm entity with metrics")
+		}
+	}
+	if err := iter.Err(); err != nil {
+		return errgo.Notef(err, "cannot iterate through entities")
+	}
+	return nil
+}
+
+func getEntityMetrics(blobStore *blobstore.Store, entity mongodoc.Entity) (*charm.Metrics, error) {
+	r, _, err := blobStore.Open(entity.BlobName)
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot open charm blob")
+	}
+	defer r.Close()
+	ch, err := charm.ReadCharmArchiveFromReader(ReaderAtSeeker(r), entity.Size)
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot read charm archive bytes")
+	}
+	metrics := ch.Metrics()
+	if metrics != nil && len(metrics.Metrics) > 0 {
+		return metrics, nil
+	}
+	return nil, nil
 }
 
 func setExecuted(db StoreDatabase, name mongodoc.MigrationName) error {

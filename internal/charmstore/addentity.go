@@ -527,6 +527,10 @@ func (s *Store) addCharm(c charm.Charm, p addParams) (err error) {
 		CharmRequiredInterfaces: interfacesForRelations(c.Meta().Requires),
 		SupportedSeries:         c.Meta().Series,
 	}
+	metrics := c.Metrics()
+	if metrics != nil && len(metrics.Metrics) > 0 {
+		entity.CharmMetrics = metrics
+	}
 	denormalizeEntity(entity)
 	setEntityChannels(entity, p.chans)
 

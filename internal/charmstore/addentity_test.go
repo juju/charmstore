@@ -326,7 +326,7 @@ func (s *AddEntitySuite) TestUploadEntityErrors(c *gc.C) {
 func (s *AddEntitySuite) TestUploadBundleWithServices(c *gc.C) {
 	store := s.newStore(c, true)
 	defer store.Close()
-	blob, _ := storetesting.NewBlob([]storetesting.File{{
+	blob := storetesting.NewBlob([]storetesting.File{{
 		Name: "README.md",
 		Data: []byte("Readme\n"),
 	}, {
@@ -342,7 +342,7 @@ services:
 `),
 	}})
 	file := filepath.Join(c.MkDir(), "bundle.zip")
-	ioutil.WriteFile(file, blob, 0666)
+	ioutil.WriteFile(file, blob.Bytes(), 0666)
 	ba, err := charm.ReadBundle(file)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(ba.Data().Applications, gc.HasLen, 2)

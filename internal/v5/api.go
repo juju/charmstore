@@ -268,6 +268,7 @@ func RouterHandlers(h *ReqHandler) *router.Handlers {
 			"charm-actions":        h.EntityHandler(h.metaCharmActions, "charmactions"),
 			"charm-config":         h.EntityHandler(h.metaCharmConfig, "charmconfig"),
 			"charm-metadata":       h.EntityHandler(h.metaCharmMetadata, "charmmeta"),
+			"charm-metrics":        h.EntityHandler(h.metaCharmMetrics, "charmmetrics"),
 			"charm-related":        h.EntityHandler(h.metaCharmRelated, "charmprovidedinterfaces", "charmrequiredinterfaces"),
 			"common-info": h.puttableBaseEntityHandler(
 				h.metaCommonInfo,
@@ -637,6 +638,12 @@ func badRequestf(underlying error, f string, a ...interface{}) error {
 // https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetacharm-metadata
 func (h *ReqHandler) metaCharmMetadata(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	return entity.CharmMeta, nil
+}
+
+// GET id/meta/charm-metrics
+// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetacharm-metrics
+func (h *ReqHandler) metaCharmMetrics(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
+	return entity.CharmMetrics, nil
 }
 
 // GET id/meta/bundle-metadata
