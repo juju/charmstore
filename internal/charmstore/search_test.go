@@ -88,7 +88,7 @@ var searchEntities = map[string]searchEntity{
 					Scope:     charm.ScopeGlobal,
 				},
 			},
-			Categories: []string{"wordpress"},
+			Categories: []string{"wordpress", "wordpressCAT"},
 			Tags:       []string{"wordpressTAG"},
 		},
 		acl: []string{params.Everyone},
@@ -132,7 +132,7 @@ var searchEntities = map[string]searchEntity{
 		entity: newEntity("cs:~charmers/bundle/wordpress-simple-4", 4),
 		bundleData: &charm.BundleData{
 			Applications: map[string]*charm.ApplicationSpec{
-				"wordpress": &charm.ApplicationSpec{
+				"wordpress": {
 					Charm: "wordpress",
 				},
 			},
@@ -694,6 +694,22 @@ var searchTests = []struct {
 		results: Entities{
 			searchEntities["wordpress"].entity,
 			searchEntities["wordpress-simple"].entity,
+		},
+	}, {
+		about: "case insensitive search on tags",
+		sp: SearchParams{
+			Text: "WORDPRESSTAG",
+		},
+		results: Entities{
+			searchEntities["wordpress"].entity,
+		},
+	}, {
+		about: "case insensitive search on categories",
+		sp: SearchParams{
+			Text: "WORDPRESSCAT",
+		},
+		results: Entities{
+			searchEntities["wordpress"].entity,
 		},
 	}, {
 		about: "autocomplete with spaces",

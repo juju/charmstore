@@ -551,11 +551,11 @@ func createSearchDSL(sp SearchParams) elasticsearch.QueryDSL {
 		q = elasticsearch.MultiMatchQuery{
 			Query: sp.Text,
 			Fields: encodeFields(map[string]float64{
-				nameField:              10,
-				"User":                 7,
-				"CharmMeta.Categories": 5,
-				"CharmMeta.Tags":       5,
-				"BundleData.Tags":      5,
+				nameField:                  10,
+				"User.tok":                 7,
+				"CharmMeta.Categories.tok": 5,
+				"CharmMeta.Tags.tok":       5,
+				"BundleData.Tags.tok":      5,
 			}),
 			MinimumShouldMatch: "100%",
 		}
