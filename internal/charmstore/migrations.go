@@ -499,7 +499,11 @@ func getEntityMetrics(blobStore *blobstore.Store, entity mongodoc.Entity) (*char
 	defer r.Close()
 	ch, err := charm.ReadCharmArchiveFromReader(ReaderAtSeeker(r), entity.Size)
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot read charm archive bytes")
+		// Some of the entities in the store are no longer readable due to
+		// unmarshaling differences between yaml.v1 and yaml.v2, in which the
+		// former allowed type mismatches when deserielizing empty values.
+		logger.Errorf("skipping %q: error reading the charm: %s", entity.URL, err)
+		return nil, nil
 	}
 	metrics := ch.Metrics()
 	if metrics != nil && len(metrics.Metrics) > 0 {
