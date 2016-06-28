@@ -2656,6 +2656,80 @@ func (s *APISuite) TestMetaStats(c *gc.C) {
 	}
 }
 
+func (s *APISuite) TestMetaStatsWhenChangedtoMultiSeries(c *gc.C) {
+	if !storetesting.MongoJSEnabled() {
+		c.Skip("MongoDB JavaScript not available")
+	}
+	today := time.Now()
+	url := &router.ResolvedURL{
+		URL:                 *charm.MustParseURL("utopic/django-0"),
+		PromulgatedRevision: -1,
+	}
+	url.URL.User = "charmers"
+	url.PromulgatedRevision = url.URL.Revision
+
+	// Add the required entities to the database.
+	s.addPublicCharmFromRepo(c, "wordpress", url)
+
+	// Simulate the entity was downloaded at the specified dates.
+	downloadsPerDay := map[int]int{2: 5}
+	for daysAgo, downloads := range downloadsPerDay {
+		date := today.AddDate(0, 0, -daysAgo)
+		key := []string{params.StatsArchiveDownload, url.URL.Series, url.URL.Name, url.URL.User, strconv.Itoa(url.URL.Revision)}
+		for i := 0; i < downloads; i++ {
+			err := s.store.IncCounterAtTime(key, date)
+			c.Assert(err, gc.IsNil)
+		}
+		if url.PromulgatedRevision > -1 {
+			key := []string{params.StatsArchiveDownloadPromulgated, url.URL.Series, url.URL.Name, "", strconv.Itoa(url.PromulgatedRevision)}
+			for i := 0; i < downloads; i++ {
+				err := s.store.IncCounterAtTime(key, date)
+				c.Assert(err, gc.IsNil)
+			}
+		}
+	}
+	expectResponse := params.StatsResponse{
+		ArchiveDownloadCount: 5,
+		ArchiveDownload: params.StatsCount{
+			Total: 5,
+			Week:  5,
+			Month: 5,
+		},
+		ArchiveDownloadAllRevisions: params.StatsCount{
+			Total: 5,
+			Week:  5,
+			Month: 5,
+		},
+	}
+	s.assertGet(c, "utopic/django-0/meta/stats", expectResponse)
+
+	// change it to a multiseries charm.
+	s.addPublicCharmFromRepo(c, "multi-series", newResolvedURL("cs:~charmers/django-1", 1))
+
+	// Check we get the counts from previous revision on utopic.
+	expectResponse = params.StatsResponse{
+		ArchiveDownloadCount: 0,
+		ArchiveDownload: params.StatsCount{
+			Total: 0,
+			Week:  0,
+			Month: 0,
+		},
+		ArchiveDownloadAllRevisions: params.StatsCount{
+			Total: 5,
+			Week:  5,
+			Month: 5,
+		},
+	}
+	s.assertGet(c, "django-1/meta/stats", expectResponse)
+
+	// Clean up the collections.
+	_, err := s.store.DB.Entities().RemoveAll(nil)
+	c.Assert(err, gc.IsNil)
+	_, err = s.store.DB.StatCounters().RemoveAll(nil)
+	c.Assert(err, gc.IsNil)
+
+}
+
 type publishSpec struct {
 	id   *router.ResolvedURL
 	time string
