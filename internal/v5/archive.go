@@ -125,6 +125,7 @@ func (h *ReqHandler) SendEntityArchive(id *router.ResolvedURL, w http.ResponseWr
 	setArchiveCacheControl(w.Header(), h.isPublic(id))
 	header.Set(params.ContentHashHeader, blob.Hash)
 	header.Set(params.EntityIdHeader, id.PreferredURL().String())
+	header.Set("Content-Disposition", "attachment; filename="+id.PreferredURL().Name+".zip")
 
 	if StatsEnabled(req) {
 		h.Store.IncrementDownloadCountsAsync(id)

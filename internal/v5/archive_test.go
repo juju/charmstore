@@ -88,6 +88,7 @@ func (s *ArchiveSuite) TestGet(c *gc.C) {
 		ch.Bytes(),
 	)
 	c.Assert(rec.Header().Get(params.EntityIdHeader), gc.Equals, "cs:~charmers/precise/wordpress-0")
+	c.Assert(rec.Header().Get("Content-Disposition"), gc.Equals, "attachment; filename=wordpress.zip")
 	assertCacheControl(c, rec.Header(), true)
 
 	// Check that the HTTP range logic is plugged in OK. If this
