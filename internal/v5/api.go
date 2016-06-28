@@ -306,7 +306,7 @@ func RouterHandlers(h *ReqHandler) *router.Handlers {
 			"resources":        h.EntityHandler(h.metaResources, "charmmeta"),
 			"resources/":       h.EntityHandler(h.metaResourcesSingle, "charmmeta"),
 			"revision-info":    router.SingleIncludeHandler(h.metaRevisionInfo),
-			"stats":            h.EntityHandler(h.metaStats),
+			"stats":            h.EntityHandler(h.metaStats, "supportedseries"),
 			"supported-series": h.EntityHandler(h.metaSupportedSeries, "supportedseries"),
 			"tags":             h.EntityHandler(h.metaTags, "charmmeta", "bundledata"),
 			"terms":            h.EntityHandler(h.metaTerms, "charmmeta"),
@@ -780,9 +780,29 @@ func (h *ReqHandler) metaStats(entity *mongodoc.Entity, id *router.ResolvedURL, 
 	if err != nil {
 		return charmstore.SearchParams{}, badRequestf(err, "invalid refresh parameter")
 	}
-	counts, countsAllRevisions, err := h.Store.ArchiveDownloadCounts(id.PreferredURL(), refresh)
+
+	preferredURL := id.PreferredURL()
+	counts, countsAllRevisions, err := h.Store.ArchiveDownloadCounts(preferredURL, refresh)
 	if err != nil {
 		return nil, errgo.Mask(err)
+	}
+	if entity.Series == "" {
+		// Concatenate all the supported series for a multi-series entity.
+		for _, series := range entity.SupportedSeries {
+			preferredURL.Series = series
+			countsSeries, countsAllRevisionsSeries, err := h.Store.ArchiveDownloadCounts(preferredURL, refresh)
+			if err != nil {
+				return nil, errgo.Mask(err)
+			}
+			counts.Total += countsSeries.Total
+			counts.LastDay += countsSeries.LastDay
+			counts.LastWeek += countsSeries.LastWeek
+			counts.LastMonth += countsSeries.LastMonth
+			countsAllRevisions.Total += countsAllRevisionsSeries.Total
+			countsAllRevisions.LastDay += countsAllRevisionsSeries.LastDay
+			countsAllRevisions.LastWeek += countsAllRevisionsSeries.LastWeek
+			countsAllRevisions.LastMonth += countsAllRevisionsSeries.LastMonth
+		}
 	}
 	// Return the response.
 	return &params.StatsResponse{
