@@ -218,16 +218,6 @@ var migrationHistory = []versionSpec{{
 		}, {
 			id:     "~someone/trusty/empty-metered-42",
 			entity: storetesting.NewCharm(nil).WithMetrics(&charm.Metrics{}),
-		}, {
-			id: "~someone/trusty/metered-42",
-			entity: storetesting.NewCharm(nil).WithMetrics(&charm.Metrics{
-				Metrics: map[string]charm.Metric{
-					"pings": {
-						Type:        "gauge",
-						Description: "some metrics",
-					},
-				},
-			}),
 		}})
 
 		if err != nil {
@@ -343,18 +333,6 @@ var migrationFromDumpEntityTests = []struct {
 	id: "~someone/trusty/empty-metered-42",
 	checkers: []entityChecker{
 		hasMetrics(nil),
-	},
-}, {
-	id: "~someone/trusty/metered-42",
-	checkers: []entityChecker{
-		hasMetrics(&charm.Metrics{
-			Metrics: map[string]charm.Metric{
-				"pings": {
-					Type:        "gauge",
-					Description: "some metrics",
-				},
-			},
-		}),
 	},
 }}
 
