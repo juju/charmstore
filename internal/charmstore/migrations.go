@@ -26,7 +26,6 @@ const (
 	migrationAddPreV5CompatBlob      mongodoc.MigrationName = "add pre-v5 compatibility blobs; second try"
 	migrationNewChannelsModel        mongodoc.MigrationName = "new channels model"
 	migrationStats                   mongodoc.MigrationName = "remove legacy download stats"
-	migrationAddMetrics              mongodoc.MigrationName = "store metrics into entities"
 )
 
 // migrations holds all the migration functions that are executed in the order
@@ -72,9 +71,6 @@ var migrations = []migration{{
 }, {
 	name:    migrationStats,
 	migrate: migrateToArchiveDownloadStatsOnly,
-}, {
-	name:    migrationAddMetrics,
-	migrate: addMetrics,
 }}
 
 // migration holds a migration function with its corresponding name.
