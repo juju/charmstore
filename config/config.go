@@ -40,6 +40,7 @@ type Config struct {
 	StatsCacheMaxAge  DurationString  `yaml:"stats-cache-max-age,omitempty"`
 	SearchCacheMaxAge DurationString  `yaml:"search-cache-max-age,omitempty"`
 	Database          string          `yaml:"database,omitempty"`
+	AccessLog         string          `yaml:"access-log"`
 }
 
 func (c *Config) validate() error {

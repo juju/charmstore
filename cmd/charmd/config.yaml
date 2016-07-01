@@ -22,3 +22,4 @@ identity-location: https://api.jujucharms.com/identity/v1/discharger
 #search-cache-max-age: 0s
 # Uncomment to test with a terms service running locally
 #terms-location: localhost:8085
+access-log: /var/log/charmstore/access.log
