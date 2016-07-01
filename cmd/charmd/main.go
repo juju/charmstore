@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/gorilla/handlers"
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
@@ -20,7 +21,6 @@ import (
 	"gopkg.in/juju/charmstore.v5-unstable"
 	"gopkg.in/juju/charmstore.v5-unstable/config"
 	"gopkg.in/juju/charmstore.v5-unstable/elasticsearch"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/debug"
 )
 
 var (
@@ -116,9 +116,18 @@ func serve(confPath string) error {
 	if err != nil {
 		return errgo.Notef(err, "cannot create new server at %q", conf.APIAddr)
 	}
-
+	handler := server.(http.Handler)
+	if conf.AccessLog != "" {
+		accesslog := &lumberjack.Logger{
+			Filename:   conf.AccessLog,
+			MaxSize:    500, // megabytes
+			MaxBackups: 3,
+			MaxAge:     28, //days
+		}
+		handler = handlers.CombinedLoggingHandler(accesslog, handler)
+	}
 	logger.Infof("starting the API server")
-	return http.ListenAndServe(conf.APIAddr, debug.Handler("", server))
+	return http.ListenAndServe(conf.APIAddr, handler)
 }
 
 func addPublicKey(ring *bakery.PublicKeyRing, loc string, key *bakery.PublicKey) error {
