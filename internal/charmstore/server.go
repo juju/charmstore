@@ -1,4 +1,4 @@
-// Copyright 2014 Canonical Ltd.
+// Copyright 2014-2016 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
 // This is the internal version of the charmstore package.
@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/bakery/mgostorage"
@@ -146,6 +147,7 @@ func NewServer(db *mgo.Database, si *SearchIndex, config ServerParams, versions 
 	}
 	// Version independent API.
 	handle(srv.mux, "/debug", newServiceDebugHandler(pool, config, srv.mux))
+	handle(srv.mux, "/metrics", prometheus.Handler())
 	for vers, newAPI := range versions {
 		root := "/" + vers
 		h := newAPI(pool, config, root)

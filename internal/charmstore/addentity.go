@@ -25,6 +25,7 @@ import (
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/blobstore"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5-unstable/internal/monitoring"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/series"
 )
@@ -131,6 +132,8 @@ func (s *Store) UploadEntity(url *router.ResolvedURL, blob io.Reader, blobHash s
 	if err != nil {
 		return errgo.Mask(err)
 	}
+	m_upload := monitoring.NewUploadProcessingDuration()
+	defer m_upload.ObserveMetric()
 	r, _, err := s.BlobStore.Open(blobName)
 	if err != nil {
 		return errgo.Notef(err, "cannot open newly created blob")

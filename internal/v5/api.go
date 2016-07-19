@@ -1,4 +1,4 @@
-// Copyright 2014 Canonical Ltd.
+// Copyright 2014-2016 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
 package v5 // import "gopkg.in/juju/charmstore.v5-unstable/internal/v5"
@@ -34,6 +34,7 @@ import (
 	"gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/entitycache"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5-unstable/internal/monitoring"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
 )
 
@@ -89,6 +90,9 @@ type ReqHandler struct {
 
 	// cache holds the per-request entity cache.
 	Cache *entitycache.Cache
+
+	// Monitor times the request
+	Monitor monitoring.Request
 }
 
 const (
@@ -346,7 +350,9 @@ func (h *Handler) GroupsForUser(username string) ([]string, error) {
 
 // ServeHTTP implements http.Handler by calling h.Router.ServeHTTP.
 func (h *ReqHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	h.Monitor.Reset(req.URL)
 	h.Router.ServeHTTP(w, req)
+	h.Monitor.ObserveMetric()
 }
 
 // NewAPIHandler returns a new Handler as an http Handler.

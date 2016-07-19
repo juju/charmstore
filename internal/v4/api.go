@@ -1,4 +1,4 @@
-// Copyright 2015 Canonical Ltd.
+// Copyright 2015-2016 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
 package v4 // import "gopkg.in/juju/charmstore.v5-unstable/internal/v4"
@@ -204,6 +204,7 @@ func (h ReqHandler) Close() {
 	h.Store.Close()
 	h.Cache.Close()
 	h.Reset()
+	h.Monitor.ObserveMetric()
 	reqHandlerPool.Put(h)
 }
 
