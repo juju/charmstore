@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"sort"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
+	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"gopkg.in/yaml.v2"
@@ -29,6 +31,52 @@ import (
 	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/series"
 )
+
+func newTermsServiceClient(termsServiceLocation string) *termsServiceClient {
+	return &termsServiceClient{
+		termServiceLocation: termsServiceLocation,
+	}
+}
+
+type termsServiceClient struct {
+	termServiceLocation string
+}
+
+// CheckTerms implements the TermsServiceClient interface. It checks
+// with the terms service, if the specified terms exist.
+func (c *termsServiceClient) CheckTerms(terms []string) error {
+	client := httpbakery.NewClient()
+
+	req, err := http.NewRequest("GET", c.termServiceLocation+"/terms", nil)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	values := req.URL.Query()
+	for _, term := range terms {
+		values.Add("term", term)
+	}
+	req.URL.RawQuery = values.Encode()
+	response, err := client.Do(req)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	if response.StatusCode != http.StatusOK {
+		var e struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		}
+		decoder := json.NewDecoder(response.Body)
+		err = decoder.Decode(&e)
+		if err != nil {
+			return errgo.Notef(nil, "terms service request failed with: %d", response.StatusCode)
+		}
+		if e.Code == "terms do not exist" {
+			return errgo.Notef(nil, "the following terms do not exist: %v", e.Message)
+		}
+		return errgo.WithCausef(nil, params.ErrBadRequest, "terms service returned: %s [%s]", e.Message, e.Code)
+	}
+	return nil
+}
 
 // addParams holds parameters held in common between the
 // Store.addCharm and Store.addBundle methods.
@@ -144,6 +192,7 @@ func (s *Store) UploadEntity(url *router.ResolvedURL, blob io.Reader, blobHash s
 			logger.Errorf("cannot remove blob %s after error: %v", blobName, err1)
 		}
 		return errgo.Mask(err,
+			errgo.Is(params.ErrBadRequest),
 			errgo.Is(params.ErrDuplicateUpload),
 			errgo.Is(params.ErrEntityIdNotAllowed),
 			errgo.Is(params.ErrInvalidEntity),
@@ -216,6 +265,12 @@ func (s *Store) addEntityFromReader(id *router.ResolvedURL, r io.ReadSeeker, blo
 	ch, err := s.newCharm(id, r, blobSize)
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrInvalidEntity), errgo.Is(params.ErrDuplicateUpload), errgo.Is(params.ErrEntityIdNotAllowed))
+	}
+	if len(ch.Meta().Terms) > 0 && s.pool.config.TermsLocation != "" {
+		err = s.pool.config.TermsClient.CheckTerms(ch.Meta().Terms)
+		if err != nil {
+			return errgo.Mask(err, errgo.Is(params.ErrBadRequest))
+		}
 	}
 	if len(ch.Meta().Series) > 0 {
 		if _, err := r.Seek(0, 0); err != nil {

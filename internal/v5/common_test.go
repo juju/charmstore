@@ -85,6 +85,7 @@ type commonSuite struct {
 
 	dischargeTerms  func(cav, arg string) ([]checkers.Caveat, error)
 	termsDischarger *bakerytest.Discharger
+	termsClientStub *jujutesting.Stub
 	enableTerms     bool
 
 	// The following fields may be set before
@@ -150,6 +151,8 @@ func (s *commonSuite) TearDownTest(c *gc.C) {
 
 // startServer creates a new charmstore server.
 func (s *commonSuite) startServer(c *gc.C) {
+	s.termsClientStub = &jujutesting.Stub{}
+
 	// Disable group caching.
 	s.PatchValue(&v5.PermCacheExpiry, time.Duration(0))
 	config := charmstore.ServerParams{
@@ -159,6 +162,7 @@ func (s *commonSuite) startServer(c *gc.C) {
 		MaxMgoSessions:   s.maxMgoSessions,
 		AgentUsername:    "notused",
 		AgentKey:         new(bakery.KeyPair),
+		TermsClient:      &mockTermsServiceClient{s.termsClientStub},
 	}
 	keyring := bakery.NewPublicKeyRing()
 	if s.enableIdentity {
@@ -527,4 +531,13 @@ func (idM *idM) serveGroups(w http.ResponseWriter, req *http.Request, p httprout
 	if err := enc.Encode(idM.groups[u]); err != nil {
 		panic(err)
 	}
+}
+
+type mockTermsServiceClient struct {
+	stub *jujutesting.Stub
+}
+
+func (c *mockTermsServiceClient) CheckTerms(terms []string) error {
+	c.stub.AddCall("CheckTerms", terms)
+	return nil
 }

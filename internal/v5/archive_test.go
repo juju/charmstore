@@ -1795,9 +1795,11 @@ func (s *ArchiveSuiteWithTerms) TestGetUserHasNotAgreedToTerms(c *gc.C) {
 	}
 	client := httpbakery.NewHTTPClient()
 
+	s.termsClientStub.ResetCalls()
 	s.addPublicCharm(c, storetesting.NewCharm(&charm.Meta{
 		Terms: []string{"terms-1/1", "terms-2/5"},
 	}), newResolvedURL("cs:~charmers/precise/terms-0", -1))
+	s.termsClientStub.CheckCall(c, 0, "CheckTerms", []string{"terms-1/1", "terms-2/5"})
 
 	archiveUrl := storeURL("~charmers/precise/terms-0/archive")
 	httptesting.DoRequest(c, httptesting.DoRequestParams{

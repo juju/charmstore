@@ -3,7 +3,10 @@
 
 package charmstore // import "gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
 
-var TimeToStamp = timeToStamp
+var (
+	TimeToStamp     = timeToStamp
+	CheckTermsExist = &checkTermsExist
+)
 
 // StatsCacheEvictAll removes everything from the stats cache.
 func StatsCacheEvictAll(s *Store) {

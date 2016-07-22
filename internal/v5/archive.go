@@ -198,6 +198,7 @@ func (h *ReqHandler) servePostArchive(id *charm.URL, w http.ResponseWriter, req 
 	}
 	if err := h.Store.UploadEntity(rid, req.Body, hash, req.ContentLength, nil); err != nil {
 		return errgo.Mask(err,
+			errgo.Is(params.ErrBadRequest),
 			errgo.Is(params.ErrDuplicateUpload),
 			errgo.Is(params.ErrEntityIdNotAllowed),
 			errgo.Is(params.ErrInvalidEntity),

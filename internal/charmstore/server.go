@@ -33,6 +33,12 @@ type HTTPCloseHandler interface {
 	http.Handler
 }
 
+// TermsServiceClient reprensents the terms service client
+// that can be used to check terms existence.
+type TermsServiceClient interface {
+	CheckTerms([]string) error
+}
+
 // ServerParams holds configuration for a new internal API server.
 type ServerParams struct {
 	// AuthUsername and AuthPassword hold the credentials
@@ -50,6 +56,7 @@ type ServerParams struct {
 	// terms service, which knows about user agreements to
 	// Terms and Conditions required by the charm.
 	TermsLocation string
+	TermsClient   TermsServiceClient
 
 	// PublicKeyLocator holds a public key store.
 	// It may be nil.
@@ -125,6 +132,9 @@ func NewServer(db *mgo.Database, si *SearchIndex, config ServerParams, versions 
 	}
 	if config.RootKeyPolicy.ExpiryDuration == 0 {
 		config.RootKeyPolicy.ExpiryDuration = defaultRootKeyExpiryDuration
+	}
+	if config.TermsClient == nil {
+		config.TermsClient = newTermsServiceClient(config.TermsLocation)
 	}
 	pool, err := NewPool(db, si, &bparams, config)
 	if err != nil {
