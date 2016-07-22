@@ -343,11 +343,17 @@ services:
 	}})
 	file := filepath.Join(c.MkDir(), "bundle.zip")
 	ioutil.WriteFile(file, blob.Bytes(), 0666)
-	ba, err := charm.ReadBundle(file)
+	bundle, err := charm.ReadBundle(file)
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(ba.Data().Applications, gc.HasLen, 2)
+	c.Assert(bundle.Data().Applications, gc.HasLen, 2)
 
-	s.checkAddBundle(c, ba, router.MustNewResolvedURL("cs:~who/bundle/wordpress-bundle-33", 33))
+	url := router.MustNewResolvedURL("cs:~who/bundle/wordpress-bundle-33", 33)
+	s.addRequiredCharms(c, bundle)
+	err = store.AddBundleWithArchive(url, bundle)
+	c.Assert(err, gc.IsNil)
+	entity, err := store.FindEntity(url, nil)
+	c.Assert(err, gc.IsNil)
+	c.Assert(entity.BundleData.Applications, gc.DeepEquals, bundle.Data().Applications)
 }
 
 func (s *AddEntitySuite) checkAddCharm(c *gc.C, ch charm.Charm, url *router.ResolvedURL) {
