@@ -89,14 +89,23 @@ func (s *SearchSuite) TestParseSearchParams(c *gc.C) {
 	}{{
 		about: "bare search",
 		query: "",
+		expectParams: charmstore.SearchParams{
+			AutoComplete: true,
+		},
 	}, {
 		about: "text search",
-		query: "text=test",
+		query: "text=test&autocomplete=0",
 		expectParams: charmstore.SearchParams{
 			Text: "test",
 		},
 	}, {
-		about: "autocomplete",
+		about: "autocomplete=0",
+		query: "autocomplete=0",
+		expectParams: charmstore.SearchParams{
+			AutoComplete: false,
+		},
+	}, {
+		about: "autocomplete=1",
 		query: "autocomplete=1",
 		expectParams: charmstore.SearchParams{
 			AutoComplete: true,
@@ -107,39 +116,39 @@ func (s *SearchSuite) TestParseSearchParams(c *gc.C) {
 		expectError: `invalid autocomplete parameter: unexpected bool value "true" (must be "0" or "1")`,
 	}, {
 		about: "limit",
-		query: "limit=20",
+		query: "limit=20&autocomplete=0",
 		expectParams: charmstore.SearchParams{
 			Limit: 20,
 		},
 	}, {
 		about:       "invalid limit",
-		query:       "limit=twenty",
+		query:       "limit=twenty&autocomplete=0",
 		expectError: `invalid limit parameter: could not parse integer: strconv.ParseInt: parsing "twenty": invalid syntax`,
 	}, {
 		about:       "limit too low",
-		query:       "limit=-1",
+		query:       "limit=-1&autocomplete=0",
 		expectError: "invalid limit parameter: expected integer greater than zero",
 	}, {
 		about: "include",
-		query: "include=archive-size",
+		query: "include=archive-size&autocomplete=0",
 		expectParams: charmstore.SearchParams{
 			Include: []string{"archive-size"},
 		},
 	}, {
 		about: "include many",
-		query: "include=archive-size&include=bundle-data",
+		query: "include=archive-size&include=bundle-data&autocomplete=0",
 		expectParams: charmstore.SearchParams{
 			Include: []string{"archive-size", "bundle-data"},
 		},
 	}, {
 		about: "include many with blanks",
-		query: "include=archive-size&include=&include=bundle-data",
+		query: "include=archive-size&include=&include=bundle-data&autocomplete=0",
 		expectParams: charmstore.SearchParams{
 			Include: []string{"archive-size", "bundle-data"},
 		},
 	}, {
 		about: "description filter",
-		query: "description=text",
+		query: "description=text&autocomplete=0",
 		expectParams: charmstore.SearchParams{
 			Filters: map[string][]string{
 				"description": {"text"},
@@ -147,7 +156,7 @@ func (s *SearchSuite) TestParseSearchParams(c *gc.C) {
 		},
 	}, {
 		about: "name filter",
-		query: "name=text",
+		query: "name=text&autocomplete=0",
 		expectParams: charmstore.SearchParams{
 			Filters: map[string][]string{
 				"name": {"text"},
@@ -155,7 +164,7 @@ func (s *SearchSuite) TestParseSearchParams(c *gc.C) {
 		},
 	}, {
 		about: "owner filter",
-		query: "owner=text",
+		query: "owner=text&autocomplete=0",
 		expectParams: charmstore.SearchParams{
 			Filters: map[string][]string{
 				"owner": {"text"},
@@ -163,7 +172,7 @@ func (s *SearchSuite) TestParseSearchParams(c *gc.C) {
 		},
 	}, {
 		about: "provides filter",
-		query: "provides=text",
+		query: "provides=text&autocomplete=0",
 		expectParams: charmstore.SearchParams{
 			Filters: map[string][]string{
 				"provides": {"text"},
@@ -171,7 +180,7 @@ func (s *SearchSuite) TestParseSearchParams(c *gc.C) {
 		},
 	}, {
 		about: "requires filter",
-		query: "requires=text",
+		query: "requires=text&autocomplete=0",
 		expectParams: charmstore.SearchParams{
 			Filters: map[string][]string{
 				"requires": {"text"},
@@ -179,7 +188,7 @@ func (s *SearchSuite) TestParseSearchParams(c *gc.C) {
 		},
 	}, {
 		about: "series filter",
-		query: "series=text",
+		query: "series=text&autocomplete=0",
 		expectParams: charmstore.SearchParams{
 			Filters: map[string][]string{
 				"series": {"text"},
@@ -187,7 +196,7 @@ func (s *SearchSuite) TestParseSearchParams(c *gc.C) {
 		},
 	}, {
 		about: "tags filter",
-		query: "tags=text",
+		query: "tags=text&autocomplete=0",
 		expectParams: charmstore.SearchParams{
 			Filters: map[string][]string{
 				"tags": {"text"},
@@ -195,7 +204,7 @@ func (s *SearchSuite) TestParseSearchParams(c *gc.C) {
 		},
 	}, {
 		about: "type filter",
-		query: "type=text",
+		query: "type=text&autocomplete=0",
 		expectParams: charmstore.SearchParams{
 			Filters: map[string][]string{
 				"type": {"text"},
@@ -203,7 +212,7 @@ func (s *SearchSuite) TestParseSearchParams(c *gc.C) {
 		},
 	}, {
 		about: "many filters",
-		query: "name=name&owner=owner&series=series1&series=series2",
+		query: "name=name&owner=owner&series=series1&series=series2&autocomplete=0",
 		expectParams: charmstore.SearchParams{
 			Filters: map[string][]string{
 				"name":   {"name"},
@@ -217,7 +226,7 @@ func (s *SearchSuite) TestParseSearchParams(c *gc.C) {
 		expectError: "invalid parameter: a",
 	}, {
 		about: "skip",
-		query: "skip=20",
+		query: "skip=20&autocomplete=0",
 		expectParams: charmstore.SearchParams{
 			Skip: 20,
 		},
@@ -231,7 +240,7 @@ func (s *SearchSuite) TestParseSearchParams(c *gc.C) {
 		expectError: "invalid skip parameter: expected non-negative integer",
 	}, {
 		about: "promulgated filter",
-		query: "promulgated=1",
+		query: "promulgated=1&autocomplete=0",
 		expectParams: charmstore.SearchParams{
 			Filters: map[string][]string{
 				"promulgated": {"1"},
