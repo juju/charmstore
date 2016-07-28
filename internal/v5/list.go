@@ -18,6 +18,7 @@ import (
 // https://github.com/juju/charmstore/blob/v4/docs/API.md#get-list
 func (h *ReqHandler) serveList(_ http.Header, req *http.Request) (interface{}, error) {
 	sp, err := ParseSearchParams(req)
+	sp.AutoComplete = false
 	if err != nil {
 		return "", err
 	}

@@ -110,6 +110,7 @@ func (h *ReqHandler) serveSearchInteresting(w http.ResponseWriter, req *http.Req
 // ParseSearchParms extracts the search paramaters from the request
 func ParseSearchParams(req *http.Request) (charmstore.SearchParams, error) {
 	sp := charmstore.SearchParams{}
+	sp.AutoComplete = true
 	var err error
 	for k, v := range req.Form {
 		switch k {

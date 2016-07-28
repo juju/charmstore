@@ -15,6 +15,7 @@ const maxConcurrency = 20
 // https://github.com/juju/charmstore/blob/v4/docs/API.md#get-search
 func (h ReqHandler) serveSearch(_ http.Header, req *http.Request) (interface{}, error) {
 	sp, err := v5.ParseSearchParams(req)
+	sp.AutoComplete = true
 	if err != nil {
 		return "", err
 	}
