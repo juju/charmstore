@@ -32,6 +32,36 @@ type AddEntitySuite struct {
 
 var _ = gc.Suite(&AddEntitySuite{})
 
+func (s *AddEntitySuite) TestAddCharmWithTerms(c *gc.C) {
+	store := s.newStore(c, false)
+	defer store.Close()
+
+	termsCharm := storetesting.Charms.CharmDir("terms")
+	c.Assert(termsCharm.Meta().Terms, gc.DeepEquals, []string{"terms-1/1", "terms-2/5"})
+	url := router.MustNewResolvedURL("cs:~charmers/precise/terms-1", -1)
+
+	s.termsServiceClient.stub.ResetCalls()
+	err := store.AddCharmWithArchive(url, termsCharm)
+	c.Assert(err, gc.IsNil)
+	assertBaseEntity(c, store, mongodoc.BaseURL(&url.URL), false)
+	s.termsServiceClient.stub.CheckCall(c, 0, "CheckTerms", []string{"terms-1/1", "terms-2/5"})
+}
+
+func (s *AddEntitySuite) TestAddCharmWithNonExistentTerms(c *gc.C) {
+	store := s.newStore(c, false)
+	defer store.Close()
+
+	s.termsServiceClient.stub.SetErrors(errgo.New("missing terms: \"terms-2/5\""))
+
+	termsCharm := storetesting.Charms.CharmDir("terms")
+	c.Assert(termsCharm.Meta().Terms, gc.DeepEquals, []string{"terms-1/1", "terms-2/5"})
+	url := router.MustNewResolvedURL("cs:~charmers/precise/terms-1", -1)
+
+	s.termsServiceClient.stub.ResetCalls()
+	err := store.AddCharmWithArchive(url, termsCharm)
+	c.Assert(err, gc.ErrorMatches, "missing terms: \"terms-2/5\"")
+}
+
 func (s *AddEntitySuite) TestAddCharmWithUser(c *gc.C) {
 	store := s.newStore(c, false)
 	defer store.Close()

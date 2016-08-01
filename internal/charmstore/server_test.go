@@ -93,11 +93,12 @@ func (s *ServerSuite) TestNewServerWithVersions(c *gc.C) {
 }
 
 func (s *ServerSuite) TestNewServerWithConfig(c *gc.C) {
-
+	termsClient := &mockTermsServiceClient{}
 	params := ServerParams{
 		AuthUsername:   "test-user",
 		AuthPassword:   "test-password",
 		IdentityAPIURL: "http://0.1.2.3/",
+		TermsClient:    termsClient,
 	}
 	serveConfig := func(p *Pool, config ServerParams, _ string) HTTPCloseHandler {
 		return nopCloseHandler{
@@ -126,15 +127,18 @@ func (s *ServerSuite) TestNewServerWithConfig(c *gc.C) {
 			RootKeyPolicy: mgostorage.Policy{
 				ExpiryDuration: defaultRootKeyExpiryDuration,
 			},
+			TermsClient: termsClient,
 		},
 	})
 }
 
 func (s *ServerSuite) TestNewServerWithElasticSearch(c *gc.C) {
+	termsClient := &mockTermsServiceClient{}
 	params := ServerParams{
 		AuthUsername:   "test-user",
 		AuthPassword:   "test-password",
 		IdentityAPIURL: "http://0.1.2.3",
+		TermsClient:    termsClient,
 	}
 	serveConfig := func(p *Pool, config ServerParams, _ string) HTTPCloseHandler {
 		return nopCloseHandler{
@@ -160,6 +164,7 @@ func (s *ServerSuite) TestNewServerWithElasticSearch(c *gc.C) {
 			RootKeyPolicy: mgostorage.Policy{
 				ExpiryDuration: defaultRootKeyExpiryDuration,
 			},
+			TermsClient: termsClient,
 		},
 	})
 }

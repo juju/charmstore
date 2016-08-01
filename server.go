@@ -68,6 +68,7 @@ type ServerParams struct {
 	// terms service, which knows about user agreements to
 	// Terms and Conditions required by the charm.
 	TermsLocation string
+	TermsClient   charmstore.TermsServiceClient
 
 	// PublicKeyLocator holds a public key store.
 	// It may be nil.

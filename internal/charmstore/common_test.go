@@ -4,6 +4,7 @@
 package charmstore // import "gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
 
 import (
+	"github.com/juju/testing"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
@@ -15,7 +16,8 @@ import (
 
 type commonSuite struct {
 	storetesting.IsolatedMgoESSuite
-	index string
+	index              string
+	termsServiceClient mockTermsServiceClient
 }
 
 // addRequiredCharms adds any charms required by the given
@@ -31,7 +33,10 @@ func (s *commonSuite) newStore(c *gc.C, withElasticSearch bool) *Store {
 	if withElasticSearch {
 		si = &SearchIndex{s.ES, s.TestIndex}
 	}
-	p, err := NewPool(s.Session.DB("juju_test"), si, &bakery.NewServiceParams{}, ServerParams{})
+	p, err := NewPool(s.Session.DB("juju_test"), si, &bakery.NewServiceParams{}, ServerParams{
+		TermsClient:   &s.termsServiceClient,
+		TermsLocation: "http://test.terms.com",
+	})
 	c.Assert(err, gc.IsNil)
 	store := p.Store()
 	defer p.Close()
@@ -64,4 +69,16 @@ func addRequiredCharms(c *gc.C, store *Store, bundle charm.Bundle) {
 		err = store.Publish(&rurl, nil, params.StableChannel)
 		c.Assert(err, gc.IsNil)
 	}
+}
+
+type mockTermsServiceClient struct {
+	stub testing.Stub
+}
+
+func (c *mockTermsServiceClient) CheckTerms(terms []string) error {
+	if err := c.stub.NextErr(); err != nil {
+		return err
+	}
+	c.stub.AddCall("CheckTerms", terms)
+	return nil
 }

@@ -45,9 +45,12 @@ type termsServiceClient struct {
 // CheckTerms implements the TermsServiceClient interface. It checks
 // with the terms service, if the specified terms exist.
 func (c *termsServiceClient) CheckTerms(terms []string) error {
+	if c.termServiceLocation == "" {
+		return errgo.Notef(nil, "charmstore not configured to serve charms with terms")
+	}
 	client := httpbakery.NewClient()
 
-	req, err := http.NewRequest("GET", c.termServiceLocation+"/terms", nil)
+	req, err := http.NewRequest("GET", c.termServiceLocation+"/v1/terms", nil)
 	if err != nil {
 		return errgo.Mask(err)
 	}
@@ -266,7 +269,7 @@ func (s *Store) addEntityFromReader(id *router.ResolvedURL, r io.ReadSeeker, blo
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrInvalidEntity), errgo.Is(params.ErrDuplicateUpload), errgo.Is(params.ErrEntityIdNotAllowed))
 	}
-	if len(ch.Meta().Terms) > 0 && s.pool.config.TermsLocation != "" {
+	if len(ch.Meta().Terms) > 0 {
 		err = s.pool.config.TermsClient.CheckTerms(ch.Meta().Terms)
 		if err != nil {
 			return errgo.Mask(err, errgo.Is(params.ErrBadRequest))
