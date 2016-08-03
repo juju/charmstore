@@ -292,10 +292,10 @@ var resolveResourceTests = []struct {
 	channel:        params.StableChannel,
 	expectResource: 1,
 }, {
-	about:          "revision specified on development channel",
+	about:          "revision specified on edge channel",
 	name:           "someResource",
 	revision:       2,
-	channel:        params.DevelopmentChannel,
+	channel:        params.EdgeChannel,
 	expectResource: 2,
 }, {
 	about:            "revision specified that doesn't exist",
@@ -317,10 +317,10 @@ var resolveResourceTests = []struct {
 	channel:        params.StableChannel,
 	expectResource: 0,
 }, {
-	about:          "no revision specified on development channel",
+	about:          "no revision specified on edge channel",
 	name:           "someResource",
 	revision:       -1,
-	channel:        params.DevelopmentChannel,
+	channel:        params.EdgeChannel,
 	expectResource: 1,
 }, {
 	about:          "no revision specified on unpublished channel",
@@ -360,7 +360,7 @@ func (s *resourceSuite) TestResolveResource(c *gc.C) {
 
 	err = store.Publish(id, map[string]int{
 		"someResource": 1,
-	}, params.DevelopmentChannel)
+	}, params.EdgeChannel)
 	c.Assert(err, gc.IsNil)
 
 	for i, test := range resolveResourceTests {

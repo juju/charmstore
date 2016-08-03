@@ -97,7 +97,7 @@ public information is returned. In this case, results requiring authorization
 
 Any entity in the charm store is considered to be part of one or more "channels"
 (think "distribution channels"). Currently supported channels are "unpublished",
-"development" and "stable". All entities are initially (and always) part
+"edge" and "stable". All entities are initially (and always) part
 of the "unpublished" channel; subsequent operations on the publish
 endpoint can make entities available in other channels.
 
@@ -106,8 +106,8 @@ accept a "channel" query parameter that influences what channel
 is chosen to resolve the ids. The default channel is "stable".
 
 For example, if wordpress-3 has just been published to the stable
-channel, and wordpress-4 has been published to the development
- then a GET of wordpress/meta/id-revision?channel=development
+channel, and wordpress-4 has been published to the edge one,
+then a GET of wordpress/meta/id-revision?channel=edge
 will return {"Revision": 4} and a GET of wordpress/wordpress/meta/id-revision
 will return {"Revision": 3} because the default channel is "stable".
 
@@ -134,9 +134,6 @@ signifying true, or empty or "0", signifying false.
 The expand-id path expands a general id into a set of specific ids. It strips
 any revision number and series from id, and returns a slice of all the possible
 ids matched by that, including all the versions and series.
-If *id* is in the development channel, all development and non-development
-revisions will be returned; if it is not, then only non-development
-revisions will be returned.
 
 ```go
 []Id
@@ -167,19 +164,6 @@ Example: `GET precise/wordpress-34/expand-id`
     {"Id": "precise/wordpress-1"},
 ]
 ```
-
-Example: `GET development/precise/wordpress-34/expand-id`
-
-```json
-[
-    {"Id": "development/trusty/wordpress-3"},
-    {"Id": "trusty/wordpress-2"},
-    {"Id": "trusty/wordpress-1"},
-    {"Id": "precise/wordpress-2"},
-    {"Id": "precise/wordpress-1"},
- ]
-```
-
 
 ### Archive
 

@@ -77,14 +77,14 @@ var preferredURLTests = []struct {
 	entity: &mongodoc.Entity{
 		URL:            charm.MustParseURL("~dmr/trusty/c-1"),
 		PromulgatedURL: charm.MustParseURL("trusty/c-2"),
-		Development:    true,
+		Edge:           true,
 	},
 	expectURLFalse: "cs:~dmr/trusty/c-1",
 	expectURLTrue:  "cs:trusty/c-2",
 }, {
 	entity: &mongodoc.Entity{
-		URL:         charm.MustParseURL("~dmr/trusty/c-1"),
-		Development: true,
+		URL:  charm.MustParseURL("~dmr/trusty/c-1"),
+		Edge: true,
 	},
 	expectURLFalse: "cs:~dmr/trusty/c-1",
 	expectURLTrue:  "cs:~dmr/trusty/c-1",

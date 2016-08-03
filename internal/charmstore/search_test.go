@@ -1147,7 +1147,7 @@ func (s *StoreSearchSuite) TestOnlyIndexStableCharms(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	err = s.store.SetPerms(&id.URL, "read", "test", params.Everyone)
 	c.Assert(err, gc.IsNil)
-	err = s.store.SetPerms(&id.URL, "development.read", "test", params.Everyone)
+	err = s.store.SetPerms(&id.URL, "edge.read", "test", params.Everyone)
 	c.Assert(err, gc.IsNil)
 	err = s.store.SetPerms(&id.URL, "stable.read", "test", params.Everyone)
 	c.Assert(err, gc.IsNil)
@@ -1159,7 +1159,7 @@ func (s *StoreSearchSuite) TestOnlyIndexStableCharms(c *gc.C) {
 	err = s.store.ES.GetDocument(s.TestIndex, typeName, s.store.ES.getID(&id.URL), &actual)
 	c.Assert(err, gc.ErrorMatches, "elasticsearch document not found")
 
-	err = s.store.Publish(id, nil, params.DevelopmentChannel)
+	err = s.store.Publish(id, nil, params.EdgeChannel)
 	c.Assert(err, gc.IsNil)
 	err = s.store.UpdateSearch(id)
 	c.Assert(err, gc.IsNil)

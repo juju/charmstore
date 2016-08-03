@@ -139,9 +139,8 @@ type Entity struct {
 	// TODO we could potentially use map[params.Channel] bool
 	// instead of having a separate field for each channel.
 
-	// Development holds whether the entity has been published in the
-	// "development" channel.
-	Development bool
+	// Edge holds whether the entity has been published in the "edge" channel.
+	Edge bool
 
 	// Stable holds whether the entity has been published in the
 	// "stable" channel.
