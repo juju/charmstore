@@ -459,26 +459,6 @@ var migrationFromDumpBaseEntityTests = []struct {
 	},
 }}
 
-var migrationFromDumpStatsTests = []struct {
-	id    string
-	total int64
-}{{
-	id:    "~charmers/trusty/legacystats-setonlast-2",
-	total: 10,
-}, {
-	id:    "~charmers/trusty/legacystats-setonsecond-2",
-	total: 100,
-}, {
-	id:    "~charmers/trusty/legacystats-setonfirst-2",
-	total: 1000,
-}, {
-	id:    "~charmers/trusty/legacystats-3rev-notset-1",
-	total: 0,
-}, {
-	id:    "~charmers/trusty/legacystats-1rev-notset-0",
-	total: 0,
-}}
-
 func (s *migrationsIntegrationSuite) TestMigrationFromDump(c *gc.C) {
 	db := s.Session.DB("juju_test")
 	err := createDatabaseAtVersion(db, migrationHistory[len(migrationHistory)-1].version)
@@ -511,13 +491,6 @@ func (s *migrationsIntegrationSuite) TestMigrationFromDump(c *gc.C) {
 			c.Logf("test %d: base entity %v; check %d", i, test.id, j)
 			check(c, e)
 		}
-	}
-
-	for i, test := range migrationFromDumpStatsTests {
-		c.Logf("test %d: entity %v", i, test.id)
-		_, countsAllRevisions, err := store.ArchiveDownloadCounts(charm.MustParseURL(test.id), true)
-		c.Assert(err, gc.IsNil)
-		c.Assert(countsAllRevisions.Total, gc.Equals, test.total)
 	}
 }
 
