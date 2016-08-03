@@ -20,6 +20,8 @@ const (
 	migrationAddPreV5CompatBlob      mongodoc.MigrationName = "add pre-v5 compatibility blobs; second try"
 	migrationNewChannelsModel        mongodoc.MigrationName = "new channels model"
 	migrationStats                   mongodoc.MigrationName = "remove legacy download stats"
+	migrationEdgeEntities            mongodoc.MigrationName = "rename development to edge in entities"
+	migrationEdgeBaseEntities        mongodoc.MigrationName = "rename development to edge in base entities"
 )
 
 // migrations holds all the migration functions that are executed in the order
@@ -62,6 +64,12 @@ var migrations = []migration{{
 	name: migrationNewChannelsModel,
 }, {
 	name: migrationStats,
+}, {
+	name:    migrationEdgeEntities,
+	migrate: migrateEdgeEntities,
+}, {
+	name:    migrationEdgeBaseEntities,
+	migrate: migrateEdgeBaseEntities,
 }}
 
 // migration holds a migration function with its corresponding name.
@@ -135,6 +143,31 @@ func setExecuted(db StoreDatabase, name mongodoc.MigrationName) error {
 		"$addToSet", bson.D{{"executed", name}},
 	}}); err != nil {
 		return errgo.Notef(err, "cannot add %s to executed migrations", name)
+	}
+	return nil
+}
+
+// migrateEdgeEntities renames the "development" entity field to "edge".
+func migrateEdgeEntities(db StoreDatabase) error {
+	if _, err := db.Entities().UpdateAll(nil, bson.D{{
+		"$rename", bson.D{{"development", "edge"}},
+	}}); err != nil {
+		return errgo.Notef(err, "cannot rename development field in entities")
+	}
+	return nil
+}
+
+// migrateEdgeBaseEntities renames all "development" keys in base entity
+// embedded documents to "edge".
+func migrateEdgeBaseEntities(db StoreDatabase) error {
+	if _, err := db.BaseEntities().UpdateAll(nil, bson.D{{
+		"$rename", bson.D{
+			{"channelacls.development", "channelacls.edge"},
+			{"channelentities.development", "channelentities.edge"},
+			{"channelresources.development", "channelresources.edge"},
+		},
+	}}); err != nil {
+		return errgo.Notef(err, "cannot rename development keys in base entities")
 	}
 	return nil
 }

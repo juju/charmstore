@@ -154,7 +154,7 @@ var (
 		"series",
 		"promulgated-revision",
 		"promulgated-url",
-		"development",
+		"edge",
 		"stable",
 	)
 	RequiredBaseEntityFields = charmstore.FieldSelector(
@@ -185,7 +185,7 @@ func (s *StoreWithChannel) FindBaseEntity(url *charm.URL, fields map[string]int)
 // that can be passed as a "?channel=" parameter.
 var ValidChannels = map[params.Channel]bool{
 	params.UnpublishedChannel: true,
-	params.DevelopmentChannel: true,
+	params.EdgeChannel:        true,
 	params.StableChannel:      true,
 }
 
@@ -268,7 +268,7 @@ func RouterHandlers(h *ReqHandler) *router.Handlers {
 			"bundle-metadata":      h.EntityHandler(h.metaBundleMetadata, "bundledata"),
 			"bundles-containing":   h.EntityHandler(h.metaBundlesContaining),
 			"bundle-unit-count":    h.EntityHandler(h.metaBundleUnitCount, "bundleunitcount"),
-			"published":            h.EntityHandler(h.metaPublished, "development", "stable"),
+			"published":            h.EntityHandler(h.metaPublished, "edge", "stable"),
 			"charm-actions":        h.EntityHandler(h.metaCharmActions, "charmactions"),
 			"charm-config":         h.EntityHandler(h.metaCharmConfig, "charmconfig"),
 			"charm-metadata":       h.EntityHandler(h.metaCharmMetadata, "charmmeta"),
@@ -848,7 +848,7 @@ func (h *ReqHandler) metaRevisionInfo(id *router.ResolvedURL, path string, flags
 		if err := h.AuthorizeEntityForOp(rurl, req, OpReadWithNoTerms); err != nil {
 			// We're not authorized to see the entity, so leave it out.
 			// Note that the only time this will happen is when
-			// the original URL is promulgated and has a development channel,
+			// the original URL is promulgated and has a edge channel,
 			// the charm has changed owners, and the old owner and
 			// the new one have different dev ACLs. It's easiest
 			// and most reliable just to check everything though.
@@ -1189,9 +1189,9 @@ func (h *ReqHandler) metaPublished(entity *mongodoc.Entity, id *router.ResolvedU
 		return nil, errgo.Mask(err)
 	}
 	info := make([]params.PublishedInfo, 0, 2)
-	if entity.Development {
+	if entity.Edge {
 		info = append(info, params.PublishedInfo{
-			Channel: params.DevelopmentChannel,
+			Channel: params.EdgeChannel,
 		})
 	}
 	if entity.Stable {
@@ -1463,8 +1463,8 @@ func (h *ReqHandler) servePromulgate(id *router.ResolvedURL, w http.ResponseWrit
 // validPublishChannels holds the set of channels that can
 // be the target of a publish request.
 var validPublishChannels = map[params.Channel]bool{
-	params.DevelopmentChannel: true,
-	params.StableChannel:      true,
+	params.EdgeChannel:   true,
+	params.StableChannel: true,
 }
 
 // PUT id/publish

@@ -664,7 +664,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Read:  []string{"charmers"},
 			Write: []string{"charmers"},
 		},
-		params.DevelopmentChannel: {
+		params.EdgeChannel: {
 			Read:  []string{"charmers"},
 			Write: []string{"charmers"},
 		},
@@ -706,7 +706,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Read:  []string{"bob"},
 			Write: []string{"admin"},
 		},
-		params.DevelopmentChannel: {
+		params.EdgeChannel: {
 			Read:  []string{"charmers"},
 			Write: []string{"charmers"},
 		},
@@ -716,20 +716,20 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 		},
 	})
 
-	// Publish one of the revisions to development, then PUT to meta/perm
-	// and check that the development ACLs have changed.
-	err := s.store.Publish(newResolvedURL("~charmers/precise/wordpress-23", 23), nil, params.DevelopmentChannel)
+	// Publish one of the revisions to edge, then PUT to meta/perm
+	// and check that the edge ACLs have changed.
+	err := s.store.Publish(newResolvedURL("~charmers/precise/wordpress-23", 23), nil, params.EdgeChannel)
 	c.Assert(err, gc.IsNil)
 
 	s.doAsUser("bob", func() {
 		// Check that we aren't allowed to put to the newly published entity as bob.
-		s.assertPutIsUnauthorized(c, "~charmers/precise/wordpress/meta/perm/read?channel=development", []string{}, `unauthorized: access denied for user "bob"`)
+		s.assertPutIsUnauthorized(c, "~charmers/precise/wordpress/meta/perm/read?channel=edge", []string{}, `unauthorized: access denied for user "bob"`)
 	})
 
 	s.doAsUser("charmers", func() {
 		s.discharge = dischargeForUser("charmers")
 		s.assertPut(c, "precise/wordpress-23/meta/perm/read", []string{"bob", "charlie"})
-		s.assertGetIsUnauthorized(c, "~charmers/precise/wordpress/meta/perm/read?channel=development", `unauthorized: access denied for user "charmers"`)
+		s.assertGetIsUnauthorized(c, "~charmers/precise/wordpress/meta/perm/read?channel=edge", `unauthorized: access denied for user "charmers"`)
 	})
 
 	s.doAsUser("bob", func() {
@@ -759,7 +759,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Read:  []string{"bob"},
 			Write: []string{"admin"},
 		},
-		params.DevelopmentChannel: {
+		params.EdgeChannel: {
 			Read:  []string{"bob", "charlie"},
 			Write: []string{"charmers"},
 		},
@@ -800,7 +800,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			},
 		})
 
-		// The development-channel entity should still see the development ACLS.
+		// The edge-channel entity should still see the edge ACLS.
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 			Handler: s.srv,
 			Do:      bakeryDo(nil),
@@ -817,7 +817,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Read:  []string{"bob"},
 			Write: []string{"admin"},
 		},
-		params.DevelopmentChannel: {
+		params.EdgeChannel: {
 			Read:  []string{"bob", "charlie"},
 			Write: []string{"charmers"},
 		},
@@ -839,7 +839,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Read:  []string{"bob"},
 			Write: []string{"admin"},
 		},
-		params.DevelopmentChannel: {
+		params.EdgeChannel: {
 			Read:  []string{"bob", "charlie"},
 			Write: []string{"charmers"},
 		},
@@ -861,7 +861,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Read:  []string{"bob"},
 			Write: []string{"admin"},
 		},
-		params.DevelopmentChannel: {
+		params.EdgeChannel: {
 			Read:  []string{"bob", "charlie"},
 			Write: []string{"charmers"},
 		},
@@ -899,7 +899,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Read:  []string{"bob"},
 			Write: []string{"admin"},
 		},
-		params.DevelopmentChannel: {
+		params.EdgeChannel: {
 			Read:  []string{"bob", "charlie"},
 			Write: []string{"charmers"},
 		},
@@ -919,7 +919,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Read:  []string{"bob"},
 			Write: []string{"admin"},
 		},
-		params.DevelopmentChannel: {
+		params.EdgeChannel: {
 			Read:  []string{"bob", "charlie"},
 			Write: []string{"charmers"},
 		},
@@ -941,7 +941,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Read:  []string{"bob"},
 			Write: []string{"admin"},
 		},
-		params.DevelopmentChannel: {
+		params.EdgeChannel: {
 			Read:  []string{"bob", "charlie"},
 			Write: []string{"charmers"},
 		},
@@ -967,11 +967,11 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 				Read:  []string{"foo"},
 				Write: []string{"bar"},
 			},
-			URL:          storeURL("trusty/wordpress-1/meta/perm?channel=development"),
+			URL:          storeURL("trusty/wordpress-1/meta/perm?channel=edge"),
 			ExpectStatus: http.StatusNotFound,
 			ExpectBody: params.Error{
 				Code:    params.ErrNotFound,
-				Message: `cs:trusty/wordpress-1 not found in development channel`,
+				Message: `cs:trusty/wordpress-1 not found in edge channel`,
 			},
 		})
 	})
@@ -983,7 +983,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Read:  []string{"bob"},
 			Write: []string{"admin"},
 		})
-		s.assertGet(c, "wordpress/meta/perm?channel=development", params.PermResponse{
+		s.assertGet(c, "wordpress/meta/perm?channel=edge", params.PermResponse{
 			Read:  []string{"bob", "charlie"},
 			Write: []string{"charmers"},
 		})
@@ -996,11 +996,11 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Do:           bakeryDo(nil),
 			Method:       "PUT",
 			JSONBody:     []string{"arble"},
-			URL:          storeURL("trusty/wordpress-1/meta/perm/read?channel=development"),
+			URL:          storeURL("trusty/wordpress-1/meta/perm/read?channel=edge"),
 			ExpectStatus: http.StatusNotFound,
 			ExpectBody: params.Error{
 				Code:    params.ErrNotFound,
-				Message: `cs:trusty/wordpress-1 not found in development channel`,
+				Message: `cs:trusty/wordpress-1 not found in edge channel`,
 			},
 		})
 	})
@@ -1009,7 +1009,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Read:  []string{"bob"},
 			Write: []string{"admin"},
 		},
-		params.DevelopmentChannel: {
+		params.EdgeChannel: {
 			Read:  []string{"bob", "charlie"},
 			Write: []string{"charmers"},
 		},
@@ -1861,7 +1861,7 @@ func (s *APISuite) TestServeExpandId(c *gc.C) {
 	s.addPublicCharmFromRepo(c, "wordpress", newResolvedURL("cs:~charmers/trusty/wordpress-47", 47))
 	err := s.store.AddCharmWithArchive(newResolvedURL("cs:~charmers/trusty/wordpress-48", 48), storetesting.NewCharm(nil))
 	c.Assert(err, gc.IsNil)
-	err = s.store.Publish(newResolvedURL("cs:~charmers/trusty/wordpress-48", 48), nil, params.DevelopmentChannel)
+	err = s.store.Publish(newResolvedURL("cs:~charmers/trusty/wordpress-48", 48), nil, params.EdgeChannel)
 	c.Assert(err, gc.IsNil)
 	s.addPublicCharmFromRepo(c, "multi-series", newResolvedURL("cs:~charmers/wordpress-5", 49))
 
@@ -2604,7 +2604,7 @@ var urlChannelResolvingEntities = []struct {
 	channel: params.StableChannel,
 }, {
 	id:      newResolvedURL("~charmers/precise/wordpress-1", 1),
-	channel: params.DevelopmentChannel,
+	channel: params.EdgeChannel,
 }, {
 	id:      newResolvedURL("~charmers/precise/wordpress-2", 2),
 	channel: params.UnpublishedChannel,
@@ -2628,7 +2628,7 @@ var urlChannelResolvingTests = []struct {
 	expectURL: "cs:precise/wordpress-0",
 }, {
 	url:       "wordpress",
-	channel:   params.DevelopmentChannel,
+	channel:   params.EdgeChannel,
 	expectURL: "cs:precise/wordpress-1",
 }, {
 	url:       "wordpress",
@@ -3359,8 +3359,8 @@ func entityACLs(store *charmstore.Store, url *router.ResolvedURL) (mongodoc.ACL,
 	ch := params.UnpublishedChannel
 	if e.Stable {
 		ch = params.StableChannel
-	} else if e.Development {
-		ch = params.DevelopmentChannel
+	} else if e.Edge {
+		ch = params.EdgeChannel
 	}
 	return be.ChannelACLs[ch], nil
 }
