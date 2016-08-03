@@ -23,7 +23,7 @@ type migrationsIntegrationSuite struct {
 
 var _ = gc.Suite(&migrationsIntegrationSuite{})
 
-const earliestDeployedVersion = "4.4.3"
+const earliestDeployedVersion = "4.5.6"
 
 var dumpMigrationHistoryFlag = flag.Bool("dump-migration-history", false, "dump migration history to file")
 
@@ -235,6 +235,11 @@ var migrationHistory = []versionSpec{{
 		}
 		return nil
 	},
+}, {
+	// V5 API.
+	// Rename the development channel to "edge", in both entities and base
+	// entities.
+	version: "4.5.6",
 }}
 
 var migrationFromDumpEntityTests = []struct {
@@ -348,7 +353,7 @@ var migrationFromDumpBaseEntityTests = []struct {
 				Read:  []string{"charmers"},
 				Write: []string{"charmers"},
 			},
-			params.DevelopmentChannel: {
+			params.EdgeChannel: {
 				Read:  []string{"charmers"},
 				Write: []string{"charmers"},
 			},
@@ -358,7 +363,7 @@ var migrationFromDumpBaseEntityTests = []struct {
 			},
 		}),
 		hasChannelEntities(map[params.Channel]map[string]*charm.URL{
-			params.DevelopmentChannel: {
+			params.EdgeChannel: {
 				"precise": charm.MustParseURL("~charmers/precise/promulgated-1"),
 			},
 			params.StableChannel: {
@@ -375,7 +380,7 @@ var migrationFromDumpBaseEntityTests = []struct {
 				Read:  []string{"bobgroup"},
 				Write: []string{"bob", "someoneelse"},
 			},
-			params.DevelopmentChannel: {
+			params.EdgeChannel: {
 				Read:  []string{"bobgroup"},
 				Write: []string{"bob", "someoneelse"},
 			},
@@ -385,7 +390,7 @@ var migrationFromDumpBaseEntityTests = []struct {
 			},
 		}),
 		hasChannelEntities(map[params.Channel]map[string]*charm.URL{
-			params.DevelopmentChannel: {
+			params.EdgeChannel: {
 				"trusty": charm.MustParseURL("~bob/trusty/nonpromulgated-0"),
 			},
 			params.StableChannel: {
@@ -399,7 +404,7 @@ var migrationFromDumpBaseEntityTests = []struct {
 		isPromulgated(true),
 		hasAllACLs("charmers"),
 		hasChannelEntities(map[params.Channel]map[string]*charm.URL{
-			params.DevelopmentChannel: {
+			params.EdgeChannel: {
 				"bundle": charm.MustParseURL("~charmers/bundle/promulgatedbundle-0"),
 			},
 			params.StableChannel: {
@@ -413,7 +418,7 @@ var migrationFromDumpBaseEntityTests = []struct {
 		isPromulgated(false),
 		hasAllACLs("charmers"),
 		hasChannelEntities(map[params.Channel]map[string]*charm.URL{
-			params.DevelopmentChannel: {
+			params.EdgeChannel: {
 				"bundle": charm.MustParseURL("~charmers/bundle/nonpromulgatedbundle-0"),
 			},
 			params.StableChannel: {
@@ -427,7 +432,7 @@ var migrationFromDumpBaseEntityTests = []struct {
 		isPromulgated(false),
 		hasAllACLs("charmers"),
 		hasChannelEntities(map[params.Channel]map[string]*charm.URL{
-			params.DevelopmentChannel: {
+			params.EdgeChannel: {
 				"precise": charm.MustParseURL("~charmers/multiseries-1"),
 				"trusty":  charm.MustParseURL("~charmers/multiseries-1"),
 				"utopic":  charm.MustParseURL("~charmers/multiseries-0"),
@@ -447,7 +452,7 @@ var migrationFromDumpBaseEntityTests = []struct {
 		isPromulgated(false),
 		hasAllACLs("someone"),
 		hasChannelEntities(map[params.Channel]map[string]*charm.URL{
-			params.DevelopmentChannel: {
+			params.EdgeChannel: {
 				"precise": charm.MustParseURL("~someone/precise/southerncharm-3"),
 				"trusty":  charm.MustParseURL("~someone/trusty/southerncharm-6"),
 			},
@@ -613,8 +618,8 @@ func checkBaseEntityInvariants(c *gc.C, e *mongodoc.BaseEntity, store *Store) {
 			ce, err := store.FindEntity(MustParseResolvedURL(url.String()), nil)
 			c.Assert(err, gc.IsNil)
 			switch ch {
-			case params.DevelopmentChannel:
-				c.Assert(ce.Development, gc.Equals, true)
+			case params.EdgeChannel:
+				c.Assert(ce.Edge, gc.Equals, true)
 			case params.StableChannel:
 				c.Assert(ce.Stable, gc.Equals, true)
 			default:
@@ -663,7 +668,7 @@ func hasCompatibilityBlob(hasBlob bool) entityChecker {
 
 func isDevelopment(isDev bool) entityChecker {
 	return func(c *gc.C, entity *mongodoc.Entity) {
-		c.Assert(entity.Development, gc.Equals, isDev)
+		c.Assert(entity.Edge, gc.Equals, isDev)
 	}
 }
 
@@ -700,7 +705,7 @@ func hasAllACLs(user string) baseEntityChecker {
 	}
 	return hasACLs(map[params.Channel]mongodoc.ACL{
 		params.UnpublishedChannel: userACL,
-		params.DevelopmentChannel: userACL,
+		params.EdgeChannel:        userACL,
 		params.StableChannel:      userACL,
 	})
 }

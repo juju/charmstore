@@ -564,8 +564,8 @@ func (s *Store) addCharm(c charm.Charm, p addParams) (err error) {
 func setEntityChannels(entity *mongodoc.Entity, chans []params.Channel) {
 	for _, c := range chans {
 		switch c {
-		case params.DevelopmentChannel:
-			entity.Development = true
+		case params.EdgeChannel:
+			entity.Edge = true
 		case params.StableChannel:
 			entity.Stable = true
 		}
@@ -636,7 +636,7 @@ func (s *Store) addEntity(entity *mongodoc.Entity) (err error) {
 		Name: entity.Name,
 		ChannelACLs: map[params.Channel]mongodoc.ACL{
 			params.UnpublishedChannel: acls,
-			params.DevelopmentChannel: acls,
+			params.EdgeChannel:        acls,
 			params.StableChannel:      acls,
 		},
 		Promulgated: entity.PromulgatedURL != nil,

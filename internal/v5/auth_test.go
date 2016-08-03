@@ -194,8 +194,8 @@ var readAuthorizationTests = []struct {
 	// unpublishedReadPerm stores a list of users with read permissions on
 	// on the unpublished entities.
 	unpublishedReadPerm []string
-	// developmentReadPerm stores a list of users with read permissions on the development channel.
-	developmentReadPerm []string
+	// edgeReadPerm stores a list of users with read permissions on the edge channel.
+	edgeReadPerm []string
 	// stableReadPerm stores a list of users with read permissions on the stable channel.
 	stableReadPerm []string
 	// channels contains a list of channels, to which the entity belongs.
@@ -282,18 +282,18 @@ var readAuthorizationTests = []struct {
 		Message: `unauthorized: access denied for user "kirk"`,
 	},
 }, {
-	about:               "access provided through development channel",
+	about:               "access provided through edge channel",
 	username:            "kirk",
 	groups:              []string{"group1", "group2", "group3"},
 	unpublishedReadPerm: []string{"picard", "sisko", "group42", "group47"},
-	developmentReadPerm: []string{"group1"},
-	channels:            []params.Channel{params.DevelopmentChannel},
+	edgeReadPerm:        []string{"group1"},
+	channels:            []params.Channel{params.EdgeChannel},
 }, {
-	about:               "access provided through development channel, but charm not published",
+	about:               "access provided through edge channel, but charm not published",
 	username:            "kirk",
 	groups:              []string{"group1", "group2", "group3"},
 	unpublishedReadPerm: []string{"picard", "sisko", "group42", "group47"},
-	developmentReadPerm: []string{"group1"},
+	edgeReadPerm:        []string{"group1"},
 	expectStatus:        http.StatusUnauthorized,
 	expectBody: params.Error{
 		Code:    params.ErrUnauthorized,
@@ -304,31 +304,31 @@ var readAuthorizationTests = []struct {
 	username:            "kirk",
 	groups:              []string{"group1", "group2", "group3"},
 	unpublishedReadPerm: []string{"picard", "sisko", "group42", "group47"},
-	developmentReadPerm: []string{"group12"},
+	edgeReadPerm:        []string{"group12"},
 	stableReadPerm:      []string{"group2"},
-	channels:            []params.Channel{params.DevelopmentChannel, params.StableChannel},
+	channels:            []params.Channel{params.EdgeChannel, params.StableChannel},
 }, {
 	about:               "access provided through stable channel, but charm not published",
 	username:            "kirk",
 	groups:              []string{"group1", "group2", "group3"},
 	unpublishedReadPerm: []string{"picard", "sisko", "group42", "group47"},
-	developmentReadPerm: []string{"group12"},
+	edgeReadPerm:        []string{"group12"},
 	stableReadPerm:      []string{"group2"},
-	channels:            []params.Channel{params.DevelopmentChannel},
+	channels:            []params.Channel{params.EdgeChannel},
 	expectStatus:        http.StatusUnauthorized,
 	expectBody: params.Error{
 		Code:    params.ErrUnauthorized,
 		Message: `unauthorized: access denied for user "kirk"`,
 	},
 }, {
-	about:               "access provided through development channel, but charm on stable channel",
+	about:               "access provided through edge channel, but charm on stable channel",
 	username:            "kirk",
 	groups:              []string{"group1", "group2", "group3"},
 	unpublishedReadPerm: []string{"picard", "sisko", "group42", "group47"},
-	developmentReadPerm: []string{"group1"},
+	edgeReadPerm:        []string{"group1"},
 	stableReadPerm:      []string{"group11"},
 	channels: []params.Channel{
-		params.DevelopmentChannel,
+		params.EdgeChannel,
 		params.StableChannel,
 	},
 	expectStatus: http.StatusUnauthorized,
@@ -343,7 +343,7 @@ var readAuthorizationTests = []struct {
 	unpublishedReadPerm: []string{"picard", "sisko", "group42", "group1"},
 	stableReadPerm:      []string{"group11"},
 	channels: []params.Channel{
-		params.DevelopmentChannel,
+		params.EdgeChannel,
 		params.StableChannel,
 	},
 	expectStatus: http.StatusUnauthorized,
@@ -352,13 +352,13 @@ var readAuthorizationTests = []struct {
 		Message: `unauthorized: access denied for user "kirk"`,
 	},
 }, {
-	about:               "access provided through unpublished ACL, but charm on development channel",
+	about:               "access provided through unpublished ACL, but charm on edge channel",
 	username:            "kirk",
 	groups:              []string{"group1", "group2", "group3"},
 	unpublishedReadPerm: []string{"picard", "sisko", "group42", "group1"},
-	developmentReadPerm: []string{"group11"},
+	edgeReadPerm:        []string{"group11"},
 	channels: []params.Channel{
-		params.DevelopmentChannel,
+		params.EdgeChannel,
 	},
 	expectStatus: http.StatusUnauthorized,
 	expectBody: params.Error{
@@ -390,7 +390,7 @@ func (s *authSuite) TestReadAuthorization(c *gc.C) {
 		// Change the ACLs for the testing charm.
 		err = s.store.SetPerms(&rurl.URL, "unpublished.read", test.unpublishedReadPerm...)
 		c.Assert(err, gc.IsNil)
-		err = s.store.SetPerms(&rurl.URL, "development.read", test.developmentReadPerm...)
+		err = s.store.SetPerms(&rurl.URL, "edge.read", test.edgeReadPerm...)
 		c.Assert(err, gc.IsNil)
 		err = s.store.SetPerms(&rurl.URL, "stable.read", test.stableReadPerm...)
 		c.Assert(err, gc.IsNil)
@@ -434,8 +434,8 @@ var writeAuthorizationTests = []struct {
 	groups []string
 	// writePerm stores a list of users with write permissions.
 	unpublishedWritePerm []string
-	// developmentWritePerm stores a list of users with write permissions on the development channel.
-	developmentWritePerm []string
+	// edgeWritePerm stores a list of users with write permissions on the edge channel.
+	edgeWritePerm []string
 	// stableWritePerm stores a list of users with write permissions on the stable channel.
 	stableWritePerm []string
 	// channels contains a list of channels, to which the entity belongs.
@@ -509,18 +509,18 @@ var writeAuthorizationTests = []struct {
 		Message: `unauthorized: access denied for user "kirk"`,
 	},
 }, {
-	about:                "access provided through development channel",
+	about:                "access provided through edge channel",
 	username:             "kirk",
 	groups:               []string{"group1", "group2", "group3"},
 	unpublishedWritePerm: []string{"picard", "sisko", "group42", "group47"},
-	developmentWritePerm: []string{"group1"},
-	channels:             []params.Channel{params.DevelopmentChannel},
+	edgeWritePerm:        []string{"group1"},
+	channels:             []params.Channel{params.EdgeChannel},
 }, {
-	about:                "access provided through development channel, but charm not published",
+	about:                "access provided through edge channel, but charm not published",
 	username:             "kirk",
 	groups:               []string{"group1", "group2", "group3"},
 	unpublishedWritePerm: []string{"picard", "sisko", "group42", "group47"},
-	developmentWritePerm: []string{"group1"},
+	edgeWritePerm:        []string{"group1"},
 	expectStatus:         http.StatusUnauthorized,
 	expectBody: params.Error{
 		Code:    params.ErrUnauthorized,
@@ -531,31 +531,31 @@ var writeAuthorizationTests = []struct {
 	username:             "kirk",
 	groups:               []string{"group1", "group2", "group3"},
 	unpublishedWritePerm: []string{"picard", "sisko", "group42", "group47"},
-	developmentWritePerm: []string{"group12"},
+	edgeWritePerm:        []string{"group12"},
 	stableWritePerm:      []string{"group2"},
-	channels:             []params.Channel{params.DevelopmentChannel, params.StableChannel},
+	channels:             []params.Channel{params.EdgeChannel, params.StableChannel},
 }, {
 	about:                "access provided through stable channel, but charm not published",
 	username:             "kirk",
 	groups:               []string{"group1", "group2", "group3"},
 	unpublishedWritePerm: []string{"picard", "sisko", "group42", "group47"},
-	developmentWritePerm: []string{"group12"},
+	edgeWritePerm:        []string{"group12"},
 	stableWritePerm:      []string{"group2"},
-	channels:             []params.Channel{params.DevelopmentChannel},
+	channels:             []params.Channel{params.EdgeChannel},
 	expectStatus:         http.StatusUnauthorized,
 	expectBody: params.Error{
 		Code:    params.ErrUnauthorized,
 		Message: `unauthorized: access denied for user "kirk"`,
 	},
 }, {
-	about:                "access provided through development channel, but charm on stable channel",
+	about:                "access provided through edge channel, but charm on stable channel",
 	username:             "kirk",
 	groups:               []string{"group1", "group2", "group3"},
 	unpublishedWritePerm: []string{"picard", "sisko", "group42", "group47"},
-	developmentWritePerm: []string{"group1"},
+	edgeWritePerm:        []string{"group1"},
 	stableWritePerm:      []string{"group11"},
 	channels: []params.Channel{
-		params.DevelopmentChannel,
+		params.EdgeChannel,
 		params.StableChannel,
 	},
 	expectStatus: http.StatusUnauthorized,
@@ -570,7 +570,7 @@ var writeAuthorizationTests = []struct {
 	unpublishedWritePerm: []string{"picard", "sisko", "group42", "group1"},
 	stableWritePerm:      []string{"group11"},
 	channels: []params.Channel{
-		params.DevelopmentChannel,
+		params.EdgeChannel,
 		params.StableChannel,
 	},
 	expectStatus: http.StatusUnauthorized,
@@ -579,13 +579,13 @@ var writeAuthorizationTests = []struct {
 		Message: `unauthorized: access denied for user "kirk"`,
 	},
 }, {
-	about:                "access provided through unpublished ACL, but charm on development channel",
+	about:                "access provided through unpublished ACL, but charm on edge channel",
 	username:             "kirk",
 	groups:               []string{"group1", "group2", "group3"},
 	unpublishedWritePerm: []string{"picard", "sisko", "group42", "group1"},
-	developmentWritePerm: []string{"group11"},
+	edgeWritePerm:        []string{"group11"},
 	channels: []params.Channel{
-		params.DevelopmentChannel,
+		params.EdgeChannel,
 	},
 	expectStatus: http.StatusUnauthorized,
 	expectBody: params.Error{
@@ -617,7 +617,7 @@ func (s *authSuite) TestWriteAuthorization(c *gc.C) {
 		// Change the ACLs for the testing charm.
 		err = s.store.SetPerms(&rurl.URL, "unpublished.write", test.unpublishedWritePerm...)
 		c.Assert(err, gc.IsNil)
-		err = s.store.SetPerms(&rurl.URL, "development.write", test.developmentWritePerm...)
+		err = s.store.SetPerms(&rurl.URL, "edge.write", test.edgeWritePerm...)
 		c.Assert(err, gc.IsNil)
 		err = s.store.SetPerms(&rurl.URL, "stable.write", test.stableWritePerm...)
 		c.Assert(err, gc.IsNil)

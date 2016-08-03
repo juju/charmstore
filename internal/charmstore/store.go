@@ -390,10 +390,10 @@ func (s *Store) ensureIndexes() error {
 		mgo.Index{Key: []string{"bundlecharms"}},
 	}, {
 		s.DB.Entities(),
-		mgo.Index{Key: []string{"name", "development", "-promulgated-revision", "-supportedseries"}},
+		mgo.Index{Key: []string{"name", "edge", "-promulgated-revision", "-supportedseries"}},
 	}, {
 		s.DB.Entities(),
-		mgo.Index{Key: []string{"name", "development", "user", "-revision", "-supportedseries"}},
+		mgo.Index{Key: []string{"name", "edge", "user", "-revision", "-supportedseries"}},
 	}, {
 		s.DB.BaseEntities(),
 		mgo.Index{Key: []string{"name"}},
@@ -496,7 +496,7 @@ func (s *Store) FindBestEntity(url *charm.URL, channel params.Channel, fields ma
 			"promulgated-revision": 1,
 			"series":               1,
 			"revision":             1,
-			"development":          1,
+			"edge":                 1,
 			"stable":               1,
 		}
 		for f := range fields {
@@ -520,9 +520,9 @@ func (s *Store) FindBestEntity(url *charm.URL, channel params.Channel, fields ma
 			if !entity.Stable {
 				return nil, errgo.WithCausef(nil, params.ErrNotFound, "%s not found in stable channel", url)
 			}
-		case params.DevelopmentChannel:
-			if !entity.Development {
-				return nil, errgo.WithCausef(nil, params.ErrNotFound, "%s not found in development channel", url)
+		case params.EdgeChannel:
+			if !entity.Edge {
+				return nil, errgo.WithCausef(nil, params.ErrNotFound, "%s not found in edge channel", url)
 			}
 		}
 		return entity, nil
@@ -660,11 +660,9 @@ var seriesScore = map[string]int{
 
 var seriesBundleOrEmpty = bson.D{{"$or", []bson.D{{{"series", "bundle"}}, {{"series", ""}}}}}
 
-// EntitiesQuery creates a mgo.Query object that can be used to find
-// entities matching the given URL. If the given URL has no user then
-// the produced query will only match promulgated entities. If the given URL
-// channel is not "development" then the produced query will only match
-// published entities.
+// EntitiesQuery creates a mgo.Query object that can be used to find entities
+// matching the given URL. If the given URL has no user then the produced query
+// will only match promulgated entities.
 func (s *Store) EntitiesQuery(url *charm.URL) *mgo.Query {
 	entities := s.DB.Entities()
 	query := make(bson.D, 1, 5)
@@ -769,7 +767,7 @@ var ErrPublishResourceMismatch = errgo.Newf("charm published with incorrect reso
 
 // Publish assigns channels to the entity corresponding to the given URL.
 // An error is returned if no channels are provided. For the time being,
-// the only supported channels are "development" and "stable".
+// the only supported channels are "edge" and "stable".
 //
 // If the given resources do not match those expected or they're not
 // found, an error with a ErrPublichResourceMismatch cause will be returned.
@@ -782,7 +780,7 @@ func (s *Store) Publish(url *router.ResolvedURL, resources map[string]int, chann
 		case params.StableChannel:
 			updateSearch = true
 			fallthrough
-		case params.DevelopmentChannel:
+		case params.EdgeChannel:
 			actualChannels = append(actualChannels, c)
 		}
 	}
@@ -1070,10 +1068,9 @@ func (s *Store) SetPromulgated(url *router.ResolvedURL, promulgate bool) error {
 
 // SetPerms sets the ACL specified by which for the base entity with the
 // given id. The which parameter is in the form "[channel].operation",
-// where channel, if specified, is one of "development" or "stable" and
-// operation is one of "read" or "write". If which does not specify a
-// channel then the unpublished ACL is updated. This is only provided for
-// testing.
+// where channel, if specified, is one of "edge" or "stable" and operation
+// is one of "read" or "write". If which does not specify a channel then
+// the unpublished ACL is updated. This is only provided for testing.
 func (s *Store) SetPerms(id *charm.URL, which string, acl ...string) error {
 	return s.DB.BaseEntities().UpdateId(mongodoc.BaseURL(id), bson.D{{"$set",
 		bson.D{{"channelacls." + which, acl}},
@@ -1398,7 +1395,7 @@ func (store *Store) ListQuery(sp SearchParams) (*ListQuery, error) {
 func (lq *ListQuery) Iter(fields map[string]int) *mgo.Iter {
 	qfields := FieldSelector(
 		"promulgated-url",
-		"development",
+		"edge",
 		"name",
 		"user",
 		"series",
@@ -1416,7 +1413,7 @@ func (lq *ListQuery) Iter(fields map[string]int) *mgo.Iter {
 			"$baseurl",
 			"$series",
 			bson.D{{
-				"$cond", []string{"$development", "true", "false"},
+				"$cond", []string{"$edge", "true", "false"},
 			}},
 		},
 	}}})
