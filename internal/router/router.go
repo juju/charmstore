@@ -20,7 +20,7 @@ import (
 	"gopkg.in/errgo.v1"
 	charm "gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/monitoring"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/series"

@@ -15,9 +15,9 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
-	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
-	"gopkg.in/macaroon.v1"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon.v2-unstable"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
@@ -647,7 +647,7 @@ func (s *SearchSuite) TestSearchWithAdminCredentials(c *gc.C) {
 }
 
 func (s *SearchSuite) TestSearchWithUserMacaroon(c *gc.C) {
-	m, err := s.store.Bakery.NewMacaroon("", nil, []checkers.Caveat{
+	m, err := s.store.Bakery.NewMacaroon([]checkers.Caveat{
 		checkers.DeclaredCaveat("username", "test-user"),
 	})
 	c.Assert(err, gc.IsNil)
@@ -678,7 +678,7 @@ func (s *SearchSuite) TestSearchWithUserMacaroon(c *gc.C) {
 }
 
 func (s *SearchSuite) TestSearchWithUserInGroups(c *gc.C) {
-	m, err := s.store.Bakery.NewMacaroon("", nil, []checkers.Caveat{
+	m, err := s.store.Bakery.NewMacaroon([]checkers.Caveat{
 		checkers.DeclaredCaveat(v4.UsernameAttr, "bob"),
 	})
 	c.Assert(err, gc.IsNil)
@@ -712,7 +712,7 @@ func (s *SearchSuite) TestSearchWithUserInGroups(c *gc.C) {
 }
 
 func (s *SearchSuite) TestSearchWithBadAdminCredentialsAndACookie(c *gc.C) {
-	m, err := s.store.Bakery.NewMacaroon("", nil, []checkers.Caveat{
+	m, err := s.store.Bakery.NewMacaroon([]checkers.Caveat{
 		checkers.DeclaredCaveat("username", "test-user"),
 	})
 	c.Assert(err, gc.IsNil)

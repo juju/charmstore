@@ -12,10 +12,10 @@ import (
 
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
-	"gopkg.in/macaroon-bakery.v1/bakery"
-	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
-	"gopkg.in/macaroon.v1"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon.v2-unstable"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
@@ -408,7 +408,7 @@ func (h *ReqHandler) checkRequest(p authorizeParams) (authorization, error) {
 	// The active time period of the macaroon has expired, but it's
 	// otherwise still valid. Mint another macaroon with a later expiration
 	// date but all other first party caveats the same.
-	newm, err := h.Store.Bakery.NewMacaroon("", nil, nil)
+	newm, err := h.Store.Bakery.NewMacaroon(nil)
 	if err != nil {
 		return authorization{}, errgo.Notef(err, "cannot make renewed macaroon")
 	}
@@ -473,11 +473,12 @@ func renewMacaroon(newm *macaroon.Macaroon, ms macaroon.Slice, newExpiry time.Ti
 				// Ignore third party caveat.
 				continue
 			}
-			if strings.HasPrefix(c.Id, condActiveTimeBefore+" ") {
+			id := string(c.Id)
+			if strings.HasPrefix(id, condActiveTimeBefore+" ") {
 				// Ignore any old active-time-before caveats.
 				continue
 			}
-			if err := newm.AddFirstPartyCaveat(c.Id); err != nil {
+			if err := newm.AddFirstPartyCaveat(id); err != nil {
 				// Can't happen in fact, as the only failure
 				// mode is when the id is too big but we know
 				// it's small enough because it came from a macaroon.
@@ -599,7 +600,7 @@ func (h *ReqHandler) newMacaroon(
 			},
 		)
 	}
-	return h.Store.Bakery.NewMacaroon("", nil, caveats)
+	return h.Store.Bakery.NewMacaroon(caveats)
 }
 
 var errNoCreds = errgo.New("missing HTTP auth header")

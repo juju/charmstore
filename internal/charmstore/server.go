@@ -13,8 +13,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v1/bakery"
-	"gopkg.in/macaroon-bakery.v1/bakery/mgostorage"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgostorage"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/natefinch/lumberjack.v2"
 

@@ -24,10 +24,10 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
-	"gopkg.in/macaroon-bakery.v1/bakery"
-	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
-	"gopkg.in/macaroon.v1"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon.v2-unstable"
 	"gopkg.in/mgo.v2/bson"
 
 	"gopkg.in/juju/charmstore.v5-unstable/audit"
@@ -4086,7 +4086,7 @@ var dischargeRequiredBody httptesting.BodyAsserter = func(c *gc.C, body json.Raw
 }
 
 func (s *APISuite) TestSetAuthCookie(c *gc.C) {
-	m, err := macaroon.New([]byte("key"), "id", "location")
+	m, err := macaroon.New([]byte("key"), []byte("id"), "location")
 	c.Assert(err, jc.ErrorIsNil)
 	ms := macaroon.Slice{m}
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
@@ -4094,7 +4094,7 @@ func (s *APISuite) TestSetAuthCookie(c *gc.C) {
 		URL:     storeURL("set-auth-cookie"),
 		Method:  "PUT",
 		Header:  http.Header{"Origin": []string{"https://1.2.3.4"}},
-		JSONBody: params.SetAuthCookie{
+		JSONBody: v5.SetAuthCookie{
 			Macaroons: ms,
 		},
 	})
@@ -4115,7 +4115,7 @@ func (s *APISuite) TestSetAuthCookie(c *gc.C) {
 }
 
 func (s *APISuite) TestSetAuthCookieBodyError(c *gc.C) {
-	m, err := macaroon.New([]byte("key"), "id", "location")
+	m, err := macaroon.New([]byte("key"), []byte("id"), "location")
 	c.Assert(err, jc.ErrorIsNil)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:      s.srv,
@@ -4124,13 +4124,13 @@ func (s *APISuite) TestSetAuthCookieBodyError(c *gc.C) {
 		JSONBody:     macaroon.Slice{m},
 		ExpectStatus: http.StatusInternalServerError,
 		ExpectBody: params.Error{
-			Message: "cannot unmarshal macaroons: json: cannot unmarshal array into Go value of type params.SetAuthCookie",
+			Message: "cannot unmarshal macaroons: json: cannot unmarshal array into Go value of type v5.SetAuthCookie",
 		},
 	})
 }
 
 func (s *APISuite) TestSetAuthCookieMethodError(c *gc.C) {
-	m, err := macaroon.New([]byte("key"), "id", "location")
+	m, err := macaroon.New([]byte("key"), []byte("id"), "location")
 	c.Assert(err, jc.ErrorIsNil)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:      s.srv,
@@ -4146,7 +4146,7 @@ func (s *APISuite) TestSetAuthCookieMethodError(c *gc.C) {
 }
 
 func (s *APISuite) TestLogout(c *gc.C) {
-	m, err := macaroon.New([]byte("key"), "id", "location")
+	m, err := macaroon.New([]byte("key"), []byte("id"), "location")
 	c.Assert(err, jc.ErrorIsNil)
 	ms := macaroon.Slice{m}
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
@@ -4160,7 +4160,7 @@ func (s *APISuite) TestLogout(c *gc.C) {
 			Name:  "test cookie",
 			Value: "test value also",
 		}},
-		JSONBody: params.SetAuthCookie{
+		JSONBody: v5.SetAuthCookie{
 			Macaroons: ms,
 		},
 	})

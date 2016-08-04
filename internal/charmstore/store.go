@@ -17,8 +17,8 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
-	"gopkg.in/macaroon-bakery.v1/bakery"
-	"gopkg.in/macaroon-bakery.v1/bakery/mgostorage"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgostorage"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -235,24 +235,7 @@ func (s *Store) BakeryWithPolicy(policy mgostorage.Policy) *bakery.Service {
 	if s.pool.bakery == nil {
 		return nil
 	}
-	return s.pool.bakery.WithRootKeyStore(s.pool.rootKeys.NewStorage(s.DB.Macaroons(), policy))
-}
-
-func newBakery(db StoreDatabase, bp bakery.NewServiceParams) *bakery.Service {
-	macStore, err := mgostorage.New(db.Macaroons())
-	if err != nil {
-		// Should never happen.
-		panic(errgo.Newf("unexpected error from mgostorage.New: %v", err))
-	}
-	bp.Store = macStore
-	bsvc, err := bakery.NewService(bp)
-	if err != nil {
-		// This should never happen because the only reason bakery.NewService
-		// can fail is if it can't generate a key, and we have already made
-		// sure that the key is generated.
-		panic(errgo.Notef(err, "cannot make bakery service"))
-	}
-	return bsvc
+	return s.pool.bakery.WithStore(s.pool.rootKeys.NewStorage(s.DB.Macaroons(), policy))
 }
 
 // Store holds a connection to the underlying charm and blob

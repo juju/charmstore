@@ -113,7 +113,7 @@ func (s *SearchSuite) TestParseSearchParams(c *gc.C) {
 	}, {
 		about:       "invalid autocomplete",
 		query:       "autocomplete=true",
-		expectError: `invalid autocomplete parameter: unexpected bool value "true" (must be "0" or "1")`,
+		expectError: `invalid autocomplete parameter: unexpected bool value "true" \(must be "0" or "1"\)`,
 	}, {
 		about: "limit",
 		query: "limit=20&autocomplete=0",
@@ -123,7 +123,7 @@ func (s *SearchSuite) TestParseSearchParams(c *gc.C) {
 	}, {
 		about:       "invalid limit",
 		query:       "limit=twenty&autocomplete=0",
-		expectError: `invalid limit parameter: could not parse integer: strconv.ParseInt: parsing "twenty": invalid syntax`,
+		expectError: `invalid limit parameter: could not parse integer: strconv.(ParseInt|Atoi): parsing "twenty": invalid syntax`,
 	}, {
 		about:       "limit too low",
 		query:       "limit=-1&autocomplete=0",
@@ -233,7 +233,7 @@ func (s *SearchSuite) TestParseSearchParams(c *gc.C) {
 	}, {
 		about:       "invalid skip",
 		query:       "skip=twenty",
-		expectError: `invalid skip parameter: could not parse integer: strconv.ParseInt: parsing "twenty": invalid syntax`,
+		expectError: `invalid skip parameter: could not parse integer: strconv.(ParseInt|Atoi): parsing "twenty": invalid syntax`,
 	}, {
 		about:       "skip too low",
 		query:       "skip=-1",
@@ -249,7 +249,7 @@ func (s *SearchSuite) TestParseSearchParams(c *gc.C) {
 	}, {
 		about:       "promulgated filter - bad",
 		query:       "promulgated=bad",
-		expectError: `invalid promulgated filter parameter: unexpected bool value "bad" (must be "0" or "1")`,
+		expectError: `invalid promulgated filter parameter: unexpected bool value "bad" \(must be "0" or "1"\)`,
 	}}
 	for i, test := range tests {
 		c.Logf("test %d. %s", i, test.about)
@@ -259,8 +259,7 @@ func (s *SearchSuite) TestParseSearchParams(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 		sp, err := v5.ParseSearchParams(&req)
 		if test.expectError != "" {
-			c.Assert(err, gc.Not(gc.IsNil))
-			c.Assert(err.Error(), gc.Equals, test.expectError)
+			c.Assert(err, gc.ErrorMatches, test.expectError)
 		} else {
 			c.Assert(err, gc.IsNil)
 		}
@@ -774,7 +773,7 @@ func (s *SearchSuite) TestSearchWithUserMacaroon(c *gc.C) {
 func (s *SearchSuite) TestSearchDoesNotCreateExtraMacaroons(c *gc.C) {
 	// Ensure that there's a macaroon already in the store
 	// that can be reused.
-	_, err := s.store.Bakery.NewMacaroon("", nil, nil)
+	_, err := s.store.Bakery.NewMacaroon(nil)
 	c.Assert(err, gc.IsNil)
 	n, err := s.store.DB.Macaroons().Find(nil).Count()
 	c.Assert(err, gc.IsNil)
