@@ -560,17 +560,32 @@ func (s *Store) addCharm(c charm.Charm, p addParams) (err error) {
 }
 
 // setEntityChannels associates the entity with the given channels, ignoring
-// unknown channels.
+// unknown channels and the unpublished channel.
 func setEntityChannels(entity *mongodoc.Entity, chans []params.Channel) {
+	entity.Published = make(map[params.Channel]bool, len(chans))
 	for _, c := range chans {
-		switch c {
-		case params.EdgeChannel:
-			entity.Edge = true
-		case params.StableChannel:
-			entity.Stable = true
+		if ValidChannels[c] && c != params.UnpublishedChannel {
+			entity.Published[c] = true
 		}
 	}
 }
+
+// OrderedChannels holds the list of valid channels in order of publishing
+// status, most stable first.
+var OrderedChannels = []params.Channel{
+	params.StableChannel,
+	params.EdgeChannel,
+	params.UnpublishedChannel,
+}
+
+// ValidChannels holds the set of all allowed channels for an entity.
+var ValidChannels = func() map[params.Channel]bool {
+	channels := make(map[params.Channel]bool, len(OrderedChannels))
+	for _, ch := range OrderedChannels {
+		channels[ch] = true
+	}
+	return channels
+}()
 
 // addBundle adds a bundle to the entities collection with the given
 // parameters. If p.URL cannot be used as a name for the bundle then the
