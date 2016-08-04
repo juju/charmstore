@@ -3357,9 +3357,9 @@ func entityACLs(store *charmstore.Store, url *router.ResolvedURL) (mongodoc.ACL,
 		return mongodoc.ACL{}, err
 	}
 	ch := params.UnpublishedChannel
-	if e.Stable {
+	if e.Published[params.StableChannel] {
 		ch = params.StableChannel
-	} else if e.Edge {
+	} else if e.Published[params.EdgeChannel] {
 		ch = params.EdgeChannel
 	}
 	return be.ChannelACLs[ch], nil

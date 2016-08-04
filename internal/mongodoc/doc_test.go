@@ -7,6 +7,7 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 	"gopkg.in/mgo.v2/bson"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
@@ -77,14 +78,18 @@ var preferredURLTests = []struct {
 	entity: &mongodoc.Entity{
 		URL:            charm.MustParseURL("~dmr/trusty/c-1"),
 		PromulgatedURL: charm.MustParseURL("trusty/c-2"),
-		Edge:           true,
+		Published: map[params.Channel]bool{
+			params.EdgeChannel: true,
+		},
 	},
 	expectURLFalse: "cs:~dmr/trusty/c-1",
 	expectURLTrue:  "cs:trusty/c-2",
 }, {
 	entity: &mongodoc.Entity{
-		URL:  charm.MustParseURL("~dmr/trusty/c-1"),
-		Edge: true,
+		URL: charm.MustParseURL("~dmr/trusty/c-1"),
+		Published: map[params.Channel]bool{
+			params.EdgeChannel: true,
+		},
 	},
 	expectURLFalse: "cs:~dmr/trusty/c-1",
 	expectURLTrue:  "cs:~dmr/trusty/c-1",

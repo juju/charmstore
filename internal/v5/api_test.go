@@ -2958,7 +2958,7 @@ var publishErrorsTests = []struct {
 	}),
 	expectStatus: http.StatusBadRequest,
 	expectBody: params.Error{
-		Message: `cannot publish to "bad"`,
+		Message: `unrecognized channel "bad"`,
 		Code:    params.ErrBadRequest,
 	},
 }, {
@@ -2970,7 +2970,7 @@ var publishErrorsTests = []struct {
 	}),
 	expectStatus: http.StatusBadRequest,
 	expectBody: params.Error{
-		Message: `cannot publish to ""`,
+		Message: `cannot publish to an empty channel`,
 		Code:    params.ErrBadRequest,
 	},
 }, {
@@ -2982,7 +2982,7 @@ var publishErrorsTests = []struct {
 	}),
 	expectStatus: http.StatusBadRequest,
 	expectBody: params.Error{
-		Message: `cannot publish to "unpublished"`,
+		Message: `cannot publish to the unpublished channel`,
 		Code:    params.ErrBadRequest,
 	},
 }, {
@@ -4093,9 +4093,9 @@ func entityACLs(store *charmstore.Store, url *router.ResolvedURL) (mongodoc.ACL,
 		return mongodoc.ACL{}, err
 	}
 	ch := params.UnpublishedChannel
-	if e.Stable {
+	if e.Published[params.StableChannel] {
 		ch = params.StableChannel
-	} else if e.Edge {
+	} else if e.Published[params.EdgeChannel] {
 		ch = params.EdgeChannel
 	}
 	return be.ChannelACLs[ch], nil

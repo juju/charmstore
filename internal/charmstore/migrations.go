@@ -5,6 +5,8 @@ package charmstore // import "gopkg.in/juju/charmstore.v5-unstable/internal/char
 
 import (
 	"gopkg.in/errgo.v1"
+	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
@@ -22,6 +24,7 @@ const (
 	migrationStats                   mongodoc.MigrationName = "remove legacy download stats"
 	migrationEdgeEntities            mongodoc.MigrationName = "rename development to edge in entities"
 	migrationEdgeBaseEntities        mongodoc.MigrationName = "rename development to edge in base entities"
+	migrationPublishedEntities       mongodoc.MigrationName = "include published status in a single entity field"
 )
 
 // migrations holds all the migration functions that are executed in the order
@@ -70,6 +73,9 @@ var migrations = []migration{{
 }, {
 	name:    migrationEdgeBaseEntities,
 	migrate: migrateEdgeBaseEntities,
+}, {
+	name:    migrationPublishedEntities,
+	migrate: migratePublishedEntities,
 }}
 
 // migration holds a migration function with its corresponding name.
@@ -168,6 +174,51 @@ func migrateEdgeBaseEntities(db StoreDatabase) error {
 		},
 	}}); err != nil {
 		return errgo.Notef(err, "cannot rename development keys in base entities")
+	}
+	return nil
+}
+
+type preMigratePublishedEntitiesEntity struct {
+	URL          *charm.URL `bson:"_id"`
+	Stable, Edge bool
+}
+
+// migratePublishedEntities deletes the "edge" and "stable" boolean fields in
+// the entity document and replaces them with a single "published" map.
+func migratePublishedEntities(db StoreDatabase) error {
+	entities := db.Entities()
+	iter := entities.Find(bson.D{{
+		// Assume that if an entity has the "stable" field, it also has the
+		// "edge" one and it hasn't been migrated yet.
+		"stable", bson.D{{"$exists", true}},
+	}}).Select(map[string]int{
+		"stable": 1,
+		"edge":   1,
+	}).Iter()
+
+	// For every resulting entity populate the "published" field and then
+	// remove "stable" and "edge" ones.
+	var entity preMigratePublishedEntitiesEntity
+	for iter.Next(&entity) {
+		err := entities.UpdateId(entity.URL, bson.D{{
+			"$set", bson.D{
+				{"published", map[params.Channel]bool{
+					params.StableChannel: entity.Stable,
+					params.EdgeChannel:   entity.Edge,
+				}},
+			},
+		}, {
+			"$unset", bson.D{
+				{"stable", ""},
+				{"edge", ""},
+			},
+		}})
+		if err != nil {
+			return errgo.Notef(err, "cannot update entity")
+		}
+	}
+	if err := iter.Err(); err != nil {
+		return errgo.Notef(err, "cannot iterate through entities")
 	}
 	return nil
 }

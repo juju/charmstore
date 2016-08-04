@@ -250,7 +250,7 @@ var migrationFromDumpEntityTests = []struct {
 	checkers: []entityChecker{
 		hasPromulgatedRevision(0),
 		hasCompatibilityBlob(false),
-		isDevelopment(true),
+		isEdge(true),
 		isStable(true),
 	},
 }, {
@@ -258,7 +258,7 @@ var migrationFromDumpEntityTests = []struct {
 	checkers: []entityChecker{
 		hasPromulgatedRevision(1),
 		hasCompatibilityBlob(false),
-		isDevelopment(true),
+		isEdge(true),
 		isStable(false),
 	},
 }, {
@@ -266,7 +266,7 @@ var migrationFromDumpEntityTests = []struct {
 	checkers: []entityChecker{
 		hasPromulgatedRevision(-1),
 		hasCompatibilityBlob(false),
-		isDevelopment(true),
+		isEdge(true),
 		isStable(true),
 	},
 }, {
@@ -274,7 +274,7 @@ var migrationFromDumpEntityTests = []struct {
 	checkers: []entityChecker{
 		hasPromulgatedRevision(0),
 		hasCompatibilityBlob(false),
-		isDevelopment(true),
+		isEdge(true),
 		isStable(true),
 	},
 }, {
@@ -282,7 +282,7 @@ var migrationFromDumpEntityTests = []struct {
 	checkers: []entityChecker{
 		hasPromulgatedRevision(-1),
 		hasCompatibilityBlob(false),
-		isDevelopment(true),
+		isEdge(true),
 		isStable(true),
 	},
 }, {
@@ -290,7 +290,7 @@ var migrationFromDumpEntityTests = []struct {
 	checkers: []entityChecker{
 		hasPromulgatedRevision(-1),
 		hasCompatibilityBlob(true),
-		isDevelopment(true),
+		isEdge(true),
 		isStable(true),
 	},
 }, {
@@ -298,7 +298,7 @@ var migrationFromDumpEntityTests = []struct {
 	checkers: []entityChecker{
 		hasPromulgatedRevision(-1),
 		hasCompatibilityBlob(true),
-		isDevelopment(true),
+		isEdge(true),
 		isStable(true),
 	},
 }, {
@@ -306,7 +306,7 @@ var migrationFromDumpEntityTests = []struct {
 	checkers: []entityChecker{
 		hasPromulgatedRevision(-1),
 		hasCompatibilityBlob(false),
-		isDevelopment(true),
+		isEdge(true),
 		isStable(true),
 	},
 }, {
@@ -314,7 +314,7 @@ var migrationFromDumpEntityTests = []struct {
 	checkers: []entityChecker{
 		hasPromulgatedRevision(-1),
 		hasCompatibilityBlob(false),
-		isDevelopment(true),
+		isEdge(true),
 		isStable(false),
 	},
 }, {
@@ -322,7 +322,7 @@ var migrationFromDumpEntityTests = []struct {
 	checkers: []entityChecker{
 		hasPromulgatedRevision(-1),
 		hasCompatibilityBlob(false),
-		isDevelopment(true),
+		isEdge(true),
 		isStable(false),
 	},
 }, {
@@ -330,7 +330,7 @@ var migrationFromDumpEntityTests = []struct {
 	checkers: []entityChecker{
 		hasPromulgatedRevision(-1),
 		hasCompatibilityBlob(false),
-		isDevelopment(true),
+		isEdge(true),
 		isStable(true),
 		hasMetrics(nil),
 	},
@@ -617,18 +617,13 @@ func checkBaseEntityInvariants(c *gc.C, e *mongodoc.BaseEntity, store *Store) {
 			}
 			ce, err := store.FindEntity(MustParseResolvedURL(url.String()), nil)
 			c.Assert(err, gc.IsNil)
-			switch ch {
-			case params.EdgeChannel:
-				c.Assert(ce.Edge, gc.Equals, true)
-			case params.StableChannel:
-				c.Assert(ce.Stable, gc.Equals, true)
-			default:
+			if !ValidChannels[ch] {
 				c.Fatalf("unknown channel %q found", ch)
 			}
+			c.Assert(ce.Published[ch], gc.Equals, true)
 			if series != "bundle" && !stringInSlice(series, ce.SupportedSeries) {
 				c.Fatalf("series %q not found in supported series %q", series, ce.SupportedSeries)
 			}
-
 		}
 	}
 }
@@ -666,15 +661,15 @@ func hasCompatibilityBlob(hasBlob bool) entityChecker {
 	}
 }
 
-func isDevelopment(isDev bool) entityChecker {
+func isEdge(isDev bool) entityChecker {
 	return func(c *gc.C, entity *mongodoc.Entity) {
-		c.Assert(entity.Edge, gc.Equals, isDev)
+		c.Assert(entity.Published[params.EdgeChannel], gc.Equals, isDev)
 	}
 }
 
 func isStable(isStable bool) entityChecker {
 	return func(c *gc.C, entity *mongodoc.Entity) {
-		c.Assert(entity.Stable, gc.Equals, isStable)
+		c.Assert(entity.Published[params.StableChannel], gc.Equals, isStable)
 	}
 }
 

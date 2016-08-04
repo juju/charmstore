@@ -541,23 +541,19 @@ func (h *ReqHandler) entityChannel(id *router.ResolvedURL) (params.Channel, erro
 	if h.Store.Channel != params.NoChannel {
 		return h.Store.Channel, nil
 	}
-	entity, err := h.Cache.Entity(&id.URL, charmstore.FieldSelector("edge", "stable"))
+	entity, err := h.Cache.Entity(&id.URL, charmstore.FieldSelector("published"))
 	if err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
 			return params.NoChannel, errgo.WithCausef(nil, params.ErrNotFound, "entity %q not found", id)
 		}
 		return params.NoChannel, errgo.Notef(err, "cannot retrieve entity %q for authorization", id)
 	}
-	var ch params.Channel
-	switch {
-	case entity.Stable:
-		ch = params.StableChannel
-	case entity.Edge:
-		ch = params.EdgeChannel
-	default:
-		ch = params.UnpublishedChannel
+	for _, ch := range charmstore.OrderedChannels {
+		if entity.Published[ch] {
+			return ch, nil
+		}
 	}
-	return ch, nil
+	return params.UnpublishedChannel, nil
 }
 
 // newMacaroon returns a new macaroon that allows only the given operations
