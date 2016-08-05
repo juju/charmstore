@@ -239,7 +239,36 @@ var migrationHistory = []versionSpec{{
 	// V5 API.
 	// Rename the development channel to "edge", in both entities and base
 	// entities.
+	// Deletes the "edge" and "stable" boolean fields in the entity document
+	// and replace them with a single "published" map.
+	// Populate base entity ACLs for the candidate and beta channels.
 	version: "4.5.6",
+	update: func(db *mgo.Database, csv *charmStoreVersion) error {
+		err := csv.Upload("v5", []uploadSpec{{
+			id:     "~charmers/trusty/different-acls-0",
+			entity: storetesting.NewCharm(nil),
+		}})
+		if err != nil {
+			return errgo.Mask(err)
+		}
+		url := charm.MustParseURL("~charmers/different-acls")
+		err = db.C("base_entities").UpdateId(url, bson.D{{
+			"$set", bson.D{
+				{"channelacls.unpublished", mongodoc.ACL{
+					Read:  []string{"everyone", "unpublished"},
+					Write: []string{"everyone", "charmers", "unpublished"},
+				}},
+				{"channelacls.development", mongodoc.ACL{
+					Read:  []string{"everyone", "edge"},
+					Write: []string{"everyone", "charmers", "edge"},
+				}},
+			},
+		}})
+		if err != nil {
+			return errgo.Notef(err, "cannot update ACLs for base entity %q", url)
+		}
+		return nil
+	},
 }}
 
 var migrationFromDumpEntityTests = []struct {
@@ -357,6 +386,14 @@ var migrationFromDumpBaseEntityTests = []struct {
 				Read:  []string{"charmers"},
 				Write: []string{"charmers"},
 			},
+			params.BetaChannel: {
+				Read:  []string{"charmers"},
+				Write: []string{"charmers"},
+			},
+			params.CandidateChannel: {
+				Read:  []string{"charmers"},
+				Write: []string{"charmers"},
+			},
 			params.StableChannel: {
 				Read:  []string{"everyone"},
 				Write: []string{"alice", "bob", "charmers"},
@@ -381,6 +418,14 @@ var migrationFromDumpBaseEntityTests = []struct {
 				Write: []string{"bob", "someoneelse"},
 			},
 			params.EdgeChannel: {
+				Read:  []string{"bobgroup"},
+				Write: []string{"bob", "someoneelse"},
+			},
+			params.BetaChannel: {
+				Read:  []string{"bobgroup"},
+				Write: []string{"bob", "someoneelse"},
+			},
+			params.CandidateChannel: {
 				Read:  []string{"bobgroup"},
 				Write: []string{"bob", "someoneelse"},
 			},
@@ -459,6 +504,32 @@ var migrationFromDumpBaseEntityTests = []struct {
 			params.StableChannel: {
 				"precise": charm.MustParseURL("~someone/precise/southerncharm-0"),
 				"trusty":  charm.MustParseURL("~someone/trusty/southerncharm-6"),
+			},
+		}),
+	},
+}, {
+	id: "cs:~charmers/different-acls",
+	checkers: []baseEntityChecker{
+		hasACLs(map[params.Channel]mongodoc.ACL{
+			params.UnpublishedChannel: {
+				Read:  []string{"everyone", "unpublished"},
+				Write: []string{"everyone", "charmers", "unpublished"},
+			},
+			params.EdgeChannel: {
+				Read:  []string{"everyone", "edge"},
+				Write: []string{"everyone", "charmers", "edge"},
+			},
+			params.BetaChannel: {
+				Read:  []string{"everyone", "unpublished"},
+				Write: []string{"everyone", "charmers", "unpublished"},
+			},
+			params.CandidateChannel: {
+				Read:  []string{"everyone", "unpublished"},
+				Write: []string{"everyone", "charmers", "unpublished"},
+			},
+			params.StableChannel: {
+				Read:  []string{"charmers"},
+				Write: []string{"charmers"},
 			},
 		}),
 	},
@@ -701,6 +772,8 @@ func hasAllACLs(user string) baseEntityChecker {
 	return hasACLs(map[params.Channel]mongodoc.ACL{
 		params.UnpublishedChannel: userACL,
 		params.EdgeChannel:        userACL,
+		params.BetaChannel:        userACL,
+		params.CandidateChannel:   userACL,
 		params.StableChannel:      userACL,
 	})
 }

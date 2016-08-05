@@ -359,6 +359,14 @@ var findBaseEntityTests = []struct {
 				Read:  []string{"charmers"},
 				Write: []string{"charmers"},
 			},
+			params.BetaChannel: {
+				Read:  []string{"charmers"},
+				Write: []string{"charmers"},
+			},
+			params.CandidateChannel: {
+				Read:  []string{"charmers"},
+				Write: []string{"charmers"},
+			},
 			params.StableChannel: {
 				Read:  []string{"charmers"},
 				Write: []string{"charmers"},
@@ -387,6 +395,14 @@ var findBaseEntityTests = []struct {
 				Write: []string{"who"},
 			},
 			params.EdgeChannel: {
+				Read:  []string{"who"},
+				Write: []string{"who"},
+			},
+			params.BetaChannel: {
+				Read:  []string{"who"},
+				Write: []string{"who"},
+			},
+			params.CandidateChannel: {
 				Read:  []string{"who"},
 				Write: []string{"who"},
 			},
@@ -3843,6 +3859,72 @@ var publishTests = []struct {
 		},
 	},
 }, {
+	about:    "unpublished, multi series, publish beta",
+	url:      MustParseResolvedURL("~who/django-42"),
+	channels: []params.Channel{params.BetaChannel},
+	initialEntity: &mongodoc.Entity{
+		URL:             charm.MustParseURL("~who/django-42"),
+		SupportedSeries: []string{"trusty", "wily", "precise"},
+	},
+	initialBaseEntity: &mongodoc.BaseEntity{
+		URL: charm.MustParseURL("~who/django"),
+	},
+	expectedEntity: &mongodoc.Entity{
+		URL:             charm.MustParseURL("~who/django-42"),
+		SupportedSeries: []string{"trusty", "wily", "precise"},
+		Published: map[params.Channel]bool{
+			params.BetaChannel: true,
+		},
+	},
+	expectedBaseEntity: &mongodoc.BaseEntity{
+		URL: charm.MustParseURL("~who/django"),
+		ChannelEntities: map[params.Channel]map[string]*charm.URL{
+			params.BetaChannel: {
+				"trusty":  charm.MustParseURL("~who/django-42"),
+				"wily":    charm.MustParseURL("~who/django-42"),
+				"precise": charm.MustParseURL("~who/django-42"),
+			},
+		},
+	},
+}, {
+	about:    "beta, multi series, publish candidate",
+	url:      MustParseResolvedURL("~who/django-42"),
+	channels: []params.Channel{params.CandidateChannel},
+	initialEntity: &mongodoc.Entity{
+		URL:             charm.MustParseURL("~who/django-42"),
+		SupportedSeries: []string{"wily"},
+		Published: map[params.Channel]bool{
+			params.BetaChannel: true,
+		},
+	},
+	initialBaseEntity: &mongodoc.BaseEntity{
+		URL: charm.MustParseURL("~who/django"),
+		ChannelEntities: map[params.Channel]map[string]*charm.URL{
+			params.BetaChannel: {
+				"trusty": charm.MustParseURL("~who/django-0"),
+			},
+		},
+	},
+	expectedEntity: &mongodoc.Entity{
+		URL:             charm.MustParseURL("~who/django-42"),
+		SupportedSeries: []string{"wily"},
+		Published: map[params.Channel]bool{
+			params.BetaChannel:      true,
+			params.CandidateChannel: true,
+		},
+	},
+	expectedBaseEntity: &mongodoc.BaseEntity{
+		URL: charm.MustParseURL("~who/django"),
+		ChannelEntities: map[params.Channel]map[string]*charm.URL{
+			params.CandidateChannel: {
+				"wily": charm.MustParseURL("~who/django-42"),
+			},
+			params.BetaChannel: {
+				"trusty": charm.MustParseURL("~who/django-0"),
+			},
+		},
+	},
+}, {
 	about:    "stable, multi series, publish stable",
 	url:      MustParseResolvedURL("~who/django-42"),
 	channels: []params.Channel{params.StableChannel},
@@ -3908,9 +3990,15 @@ var publishTests = []struct {
 		},
 	},
 }, {
-	about:    "unpublished, multi series, publish multiple channels",
-	url:      MustParseResolvedURL("~who/django-42"),
-	channels: []params.Channel{params.EdgeChannel, params.StableChannel, params.Channel("no-such")},
+	about: "unpublished, multi series, publish multiple channels",
+	url:   MustParseResolvedURL("~who/django-42"),
+	channels: []params.Channel{
+		params.EdgeChannel,
+		params.StableChannel,
+		params.Channel("no-such"),
+		params.UnpublishedChannel,
+		params.CandidateChannel,
+	},
 	initialEntity: &mongodoc.Entity{
 		URL:             charm.MustParseURL("~who/django-42"),
 		SupportedSeries: []string{"trusty", "wily"},
@@ -3931,14 +4019,19 @@ var publishTests = []struct {
 		URL:             charm.MustParseURL("~who/django-42"),
 		SupportedSeries: []string{"trusty", "wily"},
 		Published: map[params.Channel]bool{
-			params.EdgeChannel:   true,
-			params.StableChannel: true,
+			params.EdgeChannel:      true,
+			params.CandidateChannel: true,
+			params.StableChannel:    true,
 		},
 	},
 	expectedBaseEntity: &mongodoc.BaseEntity{
 		URL: charm.MustParseURL("~who/django"),
 		ChannelEntities: map[params.Channel]map[string]*charm.URL{
 			params.EdgeChannel: {
+				"trusty": charm.MustParseURL("~who/django-42"),
+				"wily":   charm.MustParseURL("~who/django-42"),
+			},
+			params.CandidateChannel: {
 				"trusty": charm.MustParseURL("~who/django-42"),
 				"wily":   charm.MustParseURL("~who/django-42"),
 			},
@@ -3964,6 +4057,17 @@ var publishTests = []struct {
 	about:    "no valid channels provided",
 	url:      MustParseResolvedURL("~who/trusty/django-42"),
 	channels: []params.Channel{params.Channel("not-valid")},
+	initialEntity: &mongodoc.Entity{
+		URL: charm.MustParseURL("~who/trusty/django-42"),
+	},
+	initialBaseEntity: &mongodoc.BaseEntity{
+		URL: charm.MustParseURL("~who/django"),
+	},
+	expectedErr: `cannot update "cs:~who/trusty/django-42": no valid channels provided`,
+}, {
+	about:    "unpublished channel provided",
+	url:      MustParseResolvedURL("~who/trusty/django-42"),
+	channels: []params.Channel{params.UnpublishedChannel},
 	initialEntity: &mongodoc.Entity{
 		URL: charm.MustParseURL("~who/trusty/django-42"),
 	},

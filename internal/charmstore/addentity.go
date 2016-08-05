@@ -574,6 +574,8 @@ func setEntityChannels(entity *mongodoc.Entity, chans []params.Channel) {
 // status, most stable first.
 var OrderedChannels = []params.Channel{
 	params.StableChannel,
+	params.CandidateChannel,
+	params.BetaChannel,
 	params.EdgeChannel,
 	params.UnpublishedChannel,
 }
@@ -641,19 +643,18 @@ func (s *Store) addBundle(b charm.Bundle, p addParams) error {
 func (s *Store) addEntity(entity *mongodoc.Entity) (err error) {
 	// Add the base entity to the database.
 	perms := []string{entity.User}
-	acls := mongodoc.ACL{
-		Read:  perms,
-		Write: perms,
+	channelACLs := make(map[params.Channel]mongodoc.ACL, len(OrderedChannels))
+	for _, ch := range OrderedChannels {
+		channelACLs[ch] = mongodoc.ACL{
+			Read:  perms,
+			Write: perms,
+		}
 	}
 	baseEntity := &mongodoc.BaseEntity{
-		URL:  entity.BaseURL,
-		User: entity.User,
-		Name: entity.Name,
-		ChannelACLs: map[params.Channel]mongodoc.ACL{
-			params.UnpublishedChannel: acls,
-			params.EdgeChannel:        acls,
-			params.StableChannel:      acls,
-		},
+		URL:         entity.BaseURL,
+		User:        entity.User,
+		Name:        entity.Name,
+		ChannelACLs: channelACLs,
 		Promulgated: entity.PromulgatedURL != nil,
 	}
 	err = s.DB.BaseEntities().Insert(baseEntity)
