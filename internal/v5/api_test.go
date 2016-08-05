@@ -802,9 +802,9 @@ var metaPublishedTests = []struct {
 	channels: []params.Channel{params.EdgeChannel, params.StableChannel},
 	expect: params.PublishedResponse{
 		Info: []params.PublishedInfo{{
-			Channel: params.EdgeChannel,
-		}, {
 			Channel: params.StableChannel,
+		}, {
+			Channel: params.EdgeChannel,
 		}},
 	},
 }, {
@@ -861,6 +861,21 @@ var metaPublishedTests = []struct {
 	expect: params.PublishedResponse{
 		Info: []params.PublishedInfo{{
 			Channel: params.StableChannel,
+			Current: true,
+		}},
+	},
+}, {
+	id: "~charmers/wordpress-8",
+	entity: storetesting.NewCharm(&charm.Meta{
+		Series: []string{"wily"},
+	}),
+	channels: []params.Channel{params.CandidateChannel, params.BetaChannel},
+	expect: params.PublishedResponse{
+		Info: []params.PublishedInfo{{
+			Channel: params.CandidateChannel,
+			Current: true,
+		}, {
+			Channel: params.BetaChannel,
 			Current: true,
 		}},
 	},
@@ -1005,6 +1020,14 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Read:  []string{"charmers"},
 			Write: []string{"charmers"},
 		},
+		params.BetaChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
+		params.CandidateChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
 		params.StableChannel: {
 			Read:  []string{"charmers"},
 			Write: []string{"charmers"},
@@ -1044,6 +1067,14 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Write: []string{"admin"},
 		},
 		params.EdgeChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
+		params.BetaChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
+		params.CandidateChannel: {
 			Read:  []string{"charmers"},
 			Write: []string{"charmers"},
 		},
@@ -1100,11 +1131,20 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Read:  []string{"bob", "charlie"},
 			Write: []string{"charmers"},
 		},
+		params.BetaChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
+		params.CandidateChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
 		params.StableChannel: {
 			Read:  []string{"charmers"},
 			Write: []string{"charmers"},
 		},
 	})
+
 	// Publish wordpress-1 to stable and check that the stable ACLs
 	// have changed.
 	err = s.store.Publish(newResolvedURL("~charmers/trusty/wordpress-1", 1), nil, params.StableChannel)
@@ -1158,6 +1198,14 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Read:  []string{"bob", "charlie"},
 			Write: []string{"charmers"},
 		},
+		params.BetaChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
+		params.CandidateChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
 		params.StableChannel: {
 			Read:  []string{"charmers"},
 			Write: []string{"doris"},
@@ -1180,6 +1228,14 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Read:  []string{"bob", "charlie"},
 			Write: []string{"charmers"},
 		},
+		params.BetaChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
+		params.CandidateChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
 		params.StableChannel: {
 			Read:  []string{"bob", params.Everyone},
 			Write: []string{"doris"},
@@ -1200,6 +1256,14 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 		},
 		params.EdgeChannel: {
 			Read:  []string{"bob", "charlie"},
+			Write: []string{"charmers"},
+		},
+		params.BetaChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
+		params.CandidateChannel: {
+			Read:  []string{"charmers"},
 			Write: []string{"charmers"},
 		},
 		params.StableChannel: {
@@ -1240,6 +1304,14 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Read:  []string{"bob", "charlie"},
 			Write: []string{"charmers"},
 		},
+		params.BetaChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
+		params.CandidateChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
 		params.StableChannel: {
 			Read:  []string{},
 			Write: []string{},
@@ -1258,6 +1330,14 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 		},
 		params.EdgeChannel: {
 			Read:  []string{"bob", "charlie"},
+			Write: []string{"charmers"},
+		},
+		params.BetaChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
+		params.CandidateChannel: {
+			Read:  []string{"charmers"},
 			Write: []string{"charmers"},
 		},
 		params.StableChannel: {
@@ -1280,6 +1360,14 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 		},
 		params.EdgeChannel: {
 			Read:  []string{"bob", "charlie"},
+			Write: []string{"charmers"},
+		},
+		params.BetaChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
+		params.CandidateChannel: {
+			Read:  []string{"charmers"},
 			Write: []string{"charmers"},
 		},
 		params.StableChannel: {
@@ -1348,6 +1436,14 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 		},
 		params.EdgeChannel: {
 			Read:  []string{"bob", "charlie"},
+			Write: []string{"charmers"},
+		},
+		params.BetaChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
+		params.CandidateChannel: {
+			Read:  []string{"charmers"},
 			Write: []string{"charmers"},
 		},
 		params.StableChannel: {

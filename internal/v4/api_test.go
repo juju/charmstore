@@ -668,6 +668,14 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Read:  []string{"charmers"},
 			Write: []string{"charmers"},
 		},
+		params.BetaChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
+		params.CandidateChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
 		params.StableChannel: {
 			Read:  []string{"charmers"},
 			Write: []string{"charmers"},
@@ -707,6 +715,14 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Write: []string{"admin"},
 		},
 		params.EdgeChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
+		params.BetaChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
+		params.CandidateChannel: {
 			Read:  []string{"charmers"},
 			Write: []string{"charmers"},
 		},
@@ -761,6 +777,14 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 		},
 		params.EdgeChannel: {
 			Read:  []string{"bob", "charlie"},
+			Write: []string{"charmers"},
+		},
+		params.BetaChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
+		params.CandidateChannel: {
+			Read:  []string{"charmers"},
 			Write: []string{"charmers"},
 		},
 		params.StableChannel: {
@@ -821,6 +845,14 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Read:  []string{"bob", "charlie"},
 			Write: []string{"charmers"},
 		},
+		params.BetaChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
+		params.CandidateChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
 		params.StableChannel: {
 			Read:  []string{"charmers"},
 			Write: []string{"doris"},
@@ -843,6 +875,14 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Read:  []string{"bob", "charlie"},
 			Write: []string{"charmers"},
 		},
+		params.BetaChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
+		params.CandidateChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
 		params.StableChannel: {
 			Read:  []string{"bob", params.Everyone},
 			Write: []string{"doris"},
@@ -863,6 +903,14 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 		},
 		params.EdgeChannel: {
 			Read:  []string{"bob", "charlie"},
+			Write: []string{"charmers"},
+		},
+		params.BetaChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
+		params.CandidateChannel: {
+			Read:  []string{"charmers"},
 			Write: []string{"charmers"},
 		},
 		params.StableChannel: {
@@ -903,6 +951,14 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Read:  []string{"bob", "charlie"},
 			Write: []string{"charmers"},
 		},
+		params.BetaChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
+		params.CandidateChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
 		params.StableChannel: {
 			Read:  []string{},
 			Write: []string{},
@@ -921,6 +977,14 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 		},
 		params.EdgeChannel: {
 			Read:  []string{"bob", "charlie"},
+			Write: []string{"charmers"},
+		},
+		params.BetaChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
+		params.CandidateChannel: {
+			Read:  []string{"charmers"},
 			Write: []string{"charmers"},
 		},
 		params.StableChannel: {
@@ -943,6 +1007,14 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 		},
 		params.EdgeChannel: {
 			Read:  []string{"bob", "charlie"},
+			Write: []string{"charmers"},
+		},
+		params.BetaChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
+		params.CandidateChannel: {
+			Read:  []string{"charmers"},
 			Write: []string{"charmers"},
 		},
 		params.StableChannel: {
@@ -1011,6 +1083,14 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 		},
 		params.EdgeChannel: {
 			Read:  []string{"bob", "charlie"},
+			Write: []string{"charmers"},
+		},
+		params.BetaChannel: {
+			Read:  []string{"charmers"},
+			Write: []string{"charmers"},
+		},
+		params.CandidateChannel: {
+			Read:  []string{"charmers"},
 			Write: []string{"charmers"},
 		},
 		params.StableChannel: {

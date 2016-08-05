@@ -1179,7 +1179,7 @@ func (h *ReqHandler) metaPublished(entity *mongodoc.Entity, id *router.ResolvedU
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	info := make([]params.PublishedInfo, 0, len(entity.Published))
+	results := make(map[params.Channel]params.PublishedInfo, len(entity.Published))
 	for channel, published := range entity.Published {
 		if !published {
 			continue
@@ -1191,10 +1191,17 @@ func (h *ReqHandler) metaPublished(entity *mongodoc.Entity, id *router.ResolvedU
 				break
 			}
 		}
-		info = append(info, params.PublishedInfo{
+		results[channel] = params.PublishedInfo{
 			Channel: channel,
 			Current: current,
-		})
+		}
+	}
+	// Reorder results by stability level.
+	info := make([]params.PublishedInfo, 0, len(results))
+	for _, channel := range charmstore.OrderedChannels {
+		if result, ok := results[channel]; ok {
+			info = append(info, result)
+		}
 	}
 	return &params.PublishedResponse{
 		Info: info,

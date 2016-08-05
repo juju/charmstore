@@ -25,6 +25,7 @@ const (
 	migrationEdgeEntities            mongodoc.MigrationName = "rename development to edge in entities"
 	migrationEdgeBaseEntities        mongodoc.MigrationName = "rename development to edge in base entities"
 	migrationPublishedEntities       mongodoc.MigrationName = "include published status in a single entity field"
+	migrationCandidateBetaChannels   mongodoc.MigrationName = "populate candidate and beta channel ACLs"
 )
 
 // migrations holds all the migration functions that are executed in the order
@@ -76,6 +77,9 @@ var migrations = []migration{{
 }, {
 	name:    migrationPublishedEntities,
 	migrate: migratePublishedEntities,
+}, {
+	name:    migrationCandidateBetaChannels,
+	migrate: migrateCandidateBetaChannels,
 }}
 
 // migration holds a migration function with its corresponding name.
@@ -219,6 +223,38 @@ func migratePublishedEntities(db StoreDatabase) error {
 	}
 	if err := iter.Err(); err != nil {
 		return errgo.Notef(err, "cannot iterate through entities")
+	}
+	return nil
+}
+
+// migrateCandidateBetaChannels populates base entity ACLs for the candidate
+// and beta channels.
+func migrateCandidateBetaChannels(db StoreDatabase) error {
+	baseEntities := db.BaseEntities()
+	iter := baseEntities.Find(bson.D{{
+		// Assume that, if a base entity does not have the "channelacls.beta"
+		// field, then the "channelacls.candidate" one is also missing and the
+		// document must be migrated.
+		"channelacls.beta", bson.D{{"$exists", false}},
+	}}).Select(map[string]int{"channelacls": 1}).Iter()
+
+	// For every resulting base entity populate "channelacls.beta" and
+	// "channelacls.candidate" with contents from "channelacls.unpublished".
+	var baseEntity mongodoc.BaseEntity
+	for iter.Next(&baseEntity) {
+		acls := baseEntity.ChannelACLs[params.UnpublishedChannel]
+		err := baseEntities.UpdateId(baseEntity.URL, bson.D{{
+			"$set", bson.D{
+				{"channelacls.candidate", acls},
+				{"channelacls.beta", acls},
+			},
+		}})
+		if err != nil {
+			return errgo.Notef(err, "cannot update base entity")
+		}
+	}
+	if err := iter.Err(); err != nil {
+		return errgo.Notef(err, "cannot iterate through base entities")
 	}
 	return nil
 }
