@@ -95,7 +95,7 @@ func (h *Handler) NewReqHandler(req *http.Request) (ReqHandler, error) {
 	// TODO Why is the v4 API accepting a channel parameter anyway? We
 	// should probably always use "stable".
 	for _, ch := range req.Form["channel"] {
-		if !charmstore.ValidChannels[params.Channel(ch)] {
+		if !params.ValidChannels[params.Channel(ch)] {
 			return ReqHandler{}, badRequestf(nil, "invalid channel %q specified in request", ch)
 		}
 	}

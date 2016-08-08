@@ -1045,7 +1045,7 @@ func (s *commonArchiveSuite) assertUpload(c *gc.C, p uploadParams) (id *charm.UR
 	for _, ch := range p.chans {
 		expectChans[ch] = true
 	}
-	for _, ch := range charmstore.OrderedChannels {
+	for _, ch := range params.OrderedChannels {
 		_, err := s.store.FindBestEntity(&p.id.URL, ch, nil)
 		if expectChans[ch] {
 			c.Assert(err, gc.IsNil)

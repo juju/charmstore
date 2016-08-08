@@ -564,30 +564,11 @@ func (s *Store) addCharm(c charm.Charm, p addParams) (err error) {
 func setEntityChannels(entity *mongodoc.Entity, chans []params.Channel) {
 	entity.Published = make(map[params.Channel]bool, len(chans))
 	for _, c := range chans {
-		if ValidChannels[c] && c != params.UnpublishedChannel {
+		if params.ValidChannels[c] && c != params.UnpublishedChannel {
 			entity.Published[c] = true
 		}
 	}
 }
-
-// OrderedChannels holds the list of valid channels in order of publishing
-// status, most stable first.
-var OrderedChannels = []params.Channel{
-	params.StableChannel,
-	params.CandidateChannel,
-	params.BetaChannel,
-	params.EdgeChannel,
-	params.UnpublishedChannel,
-}
-
-// ValidChannels holds the set of all allowed channels for an entity.
-var ValidChannels = func() map[params.Channel]bool {
-	channels := make(map[params.Channel]bool, len(OrderedChannels))
-	for _, ch := range OrderedChannels {
-		channels[ch] = true
-	}
-	return channels
-}()
 
 // addBundle adds a bundle to the entities collection with the given
 // parameters. If p.URL cannot be used as a name for the bundle then the
@@ -643,8 +624,8 @@ func (s *Store) addBundle(b charm.Bundle, p addParams) error {
 func (s *Store) addEntity(entity *mongodoc.Entity) (err error) {
 	// Add the base entity to the database.
 	perms := []string{entity.User}
-	channelACLs := make(map[params.Channel]mongodoc.ACL, len(OrderedChannels))
-	for _, ch := range OrderedChannels {
+	channelACLs := make(map[params.Channel]mongodoc.ACL, len(params.OrderedChannels))
+	for _, ch := range params.OrderedChannels {
 		channelACLs[ch] = mongodoc.ACL{
 			Read:  perms,
 			Write: perms,

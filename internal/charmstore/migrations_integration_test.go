@@ -688,7 +688,7 @@ func checkBaseEntityInvariants(c *gc.C, e *mongodoc.BaseEntity, store *Store) {
 			}
 			ce, err := store.FindEntity(MustParseResolvedURL(url.String()), nil)
 			c.Assert(err, gc.IsNil)
-			if !ValidChannels[ch] {
+			if !params.ValidChannels[ch] {
 				c.Fatalf("unknown channel %q found", ch)
 			}
 			c.Assert(ce.Published[ch], gc.Equals, true)

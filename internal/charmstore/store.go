@@ -514,7 +514,7 @@ func (s *Store) FindBestEntity(url *charm.URL, channel params.Channel, fields ma
 		// If a channel was specified make sure the entity is in that channel.
 		// This is crucial because if we don't do this, then the user could choose
 		// to use any chosen set of ACLs against any entity.
-		if ValidChannels[channel] && channel != params.UnpublishedChannel && !entity.Published[channel] {
+		if params.ValidChannels[channel] && channel != params.UnpublishedChannel && !entity.Published[channel] {
 			return nil, errgo.WithCausef(nil, params.ErrNotFound, "%s not found in %s channel", url, channel)
 		}
 		return entity, nil
@@ -758,8 +758,8 @@ func (s *Store) UpdateBaseEntity(url *router.ResolvedURL, update bson.D) error {
 var ErrPublishResourceMismatch = errgo.Newf("charm published with incorrect resources")
 
 // Publish assigns channels to the entity corresponding to the given URL.
-// An error is returned if no channels are provided. See ValidChannels in this
-// package for the list of supported channels. The unpublished channel cannot
+// An error is returned if no channels are provided. See params.ValidChannels
+// for the list of supported channels. The unpublished channel cannot
 // be provided.
 //
 // If the given resources do not match those expected or they're not
@@ -769,7 +769,7 @@ func (s *Store) Publish(url *router.ResolvedURL, resources map[string]int, chann
 	// Throw away any channels that we don't like.
 	actualChannels := make([]params.Channel, 0, len(channels))
 	for _, c := range channels {
-		if !ValidChannels[c] || c == params.UnpublishedChannel {
+		if !params.ValidChannels[c] || c == params.UnpublishedChannel {
 			continue
 		}
 		actualChannels = append(actualChannels, c)
