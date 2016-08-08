@@ -192,7 +192,7 @@ func (h *Handler) NewReqHandler(req *http.Request) (*ReqHandler, error) {
 	// most endpoints will only ever use the first one.
 	// PUT to an archive is the notable exception.
 	for _, ch := range req.Form["channel"] {
-		if !charmstore.ValidChannels[params.Channel(ch)] {
+		if !params.ValidChannels[params.Channel(ch)] {
 			return nil, badRequestf(nil, "invalid channel %q specified in request", ch)
 		}
 	}
@@ -1198,7 +1198,7 @@ func (h *ReqHandler) metaPublished(entity *mongodoc.Entity, id *router.ResolvedU
 	}
 	// Reorder results by stability level.
 	info := make([]params.PublishedInfo, 0, len(results))
-	for _, channel := range charmstore.OrderedChannels {
+	for _, channel := range params.OrderedChannels {
 		if result, ok := results[channel]; ok {
 			info = append(info, result)
 		}
@@ -1478,7 +1478,7 @@ func (h *ReqHandler) servePublish(id *router.ResolvedURL, w http.ResponseWriter,
 		if c == params.NoChannel {
 			return badRequestf(nil, "cannot publish to an empty channel")
 		}
-		if !charmstore.ValidChannels[c] {
+		if !params.ValidChannels[c] {
 			return badRequestf(nil, "unrecognized channel %q", c)
 		}
 		if c == params.UnpublishedChannel {

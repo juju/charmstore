@@ -548,7 +548,7 @@ func (h *ReqHandler) entityChannel(id *router.ResolvedURL) (params.Channel, erro
 		}
 		return params.NoChannel, errgo.Notef(err, "cannot retrieve entity %q for authorization", id)
 	}
-	for _, ch := range charmstore.OrderedChannels {
+	for _, ch := range params.OrderedChannels {
 		if entity.Published[ch] {
 			return ch, nil
 		}
