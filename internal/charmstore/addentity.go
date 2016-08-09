@@ -560,14 +560,12 @@ func (s *Store) addCharm(c charm.Charm, p addParams) (err error) {
 }
 
 // setEntityChannels associates the entity with the given channels, ignoring
-// unknown channels.
+// unknown channels and the unpublished channel.
 func setEntityChannels(entity *mongodoc.Entity, chans []params.Channel) {
+	entity.Published = make(map[params.Channel]bool, len(chans))
 	for _, c := range chans {
-		switch c {
-		case params.DevelopmentChannel:
-			entity.Development = true
-		case params.StableChannel:
-			entity.Stable = true
+		if params.ValidChannels[c] && c != params.UnpublishedChannel {
+			entity.Published[c] = true
 		}
 	}
 }
@@ -626,19 +624,18 @@ func (s *Store) addBundle(b charm.Bundle, p addParams) error {
 func (s *Store) addEntity(entity *mongodoc.Entity) (err error) {
 	// Add the base entity to the database.
 	perms := []string{entity.User}
-	acls := mongodoc.ACL{
-		Read:  perms,
-		Write: perms,
+	channelACLs := make(map[params.Channel]mongodoc.ACL, len(params.OrderedChannels))
+	for _, ch := range params.OrderedChannels {
+		channelACLs[ch] = mongodoc.ACL{
+			Read:  perms,
+			Write: perms,
+		}
 	}
 	baseEntity := &mongodoc.BaseEntity{
-		URL:  entity.BaseURL,
-		User: entity.User,
-		Name: entity.Name,
-		ChannelACLs: map[params.Channel]mongodoc.ACL{
-			params.UnpublishedChannel: acls,
-			params.DevelopmentChannel: acls,
-			params.StableChannel:      acls,
-		},
+		URL:         entity.BaseURL,
+		User:        entity.User,
+		Name:        entity.Name,
+		ChannelACLs: channelACLs,
 		Promulgated: entity.PromulgatedURL != nil,
 	}
 	err = s.DB.BaseEntities().Insert(baseEntity)

@@ -248,7 +248,7 @@ func (h *ReqHandler) servePutArchive(id *charm.URL, w http.ResponseWriter, req *
 	var chans []params.Channel
 	for _, c := range req.Form["channel"] {
 		c := params.Channel(c)
-		if c != params.DevelopmentChannel && c != params.StableChannel {
+		if !params.ValidChannels[c] || c == params.UnpublishedChannel {
 			return badRequestf(nil, "cannot put entity into channel %q", c)
 		}
 		chans = append(chans, c)

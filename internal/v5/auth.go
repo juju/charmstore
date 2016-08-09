@@ -420,11 +420,11 @@ func (h *ReqHandler) checkRequest(p authorizeParams) (authorization, error) {
 	return authorization{}, h.newDischargeRequiredError(newm, errgo.New("active lifetime expired; renew macaroon"), p.req, false)
 }
 
-// entityACLs calculates the ACLs for the specified entity. If the entity
-// has been published to the stable channel then the StableChannel ACLs will be
-// used; if the entity has been published to development, but not stable
-// then the DevelopmentChannel ACLs will be used; otherwise
-// the unpublished ACLs are used.
+// entityACLs calculates the ACLs for the specified entity. If the channel has
+// been specified via the "?channel=" query then the corresponding channel ACLs
+// are used. Otherwise, if the entity has been published to a channel then ACLs
+// for that channel are used, in this order: StableChannel, EdgeChannel. If the
+// entity was never published, the unpublished ACLs are used.
 func (h *ReqHandler) entityACLs(id *router.ResolvedURL) (mongodoc.ACL, error) {
 	ch, err := h.entityChannel(id)
 	if err != nil {
@@ -536,28 +536,24 @@ func (c isEntityChecker) Check(_, args string) error {
 // mentioned a channel, that channel is used; otherwise
 // a channel will be selected from the channels that the
 // entity has been published to: in order of preference,
-// stable, development and unpublished.
+// stable, edge and unpublished.
 func (h *ReqHandler) entityChannel(id *router.ResolvedURL) (params.Channel, error) {
 	if h.Store.Channel != params.NoChannel {
 		return h.Store.Channel, nil
 	}
-	entity, err := h.Cache.Entity(&id.URL, charmstore.FieldSelector("development", "stable"))
+	entity, err := h.Cache.Entity(&id.URL, charmstore.FieldSelector("published"))
 	if err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
 			return params.NoChannel, errgo.WithCausef(nil, params.ErrNotFound, "entity %q not found", id)
 		}
 		return params.NoChannel, errgo.Notef(err, "cannot retrieve entity %q for authorization", id)
 	}
-	var ch params.Channel
-	switch {
-	case entity.Stable:
-		ch = params.StableChannel
-	case entity.Development:
-		ch = params.DevelopmentChannel
-	default:
-		ch = params.UnpublishedChannel
+	for _, ch := range params.OrderedChannels {
+		if entity.Published[ch] {
+			return ch, nil
+		}
 	}
-	return ch, nil
+	return params.UnpublishedChannel, nil
 }
 
 // newMacaroon returns a new macaroon that allows only the given operations

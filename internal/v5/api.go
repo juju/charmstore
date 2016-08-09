@@ -154,8 +154,7 @@ var (
 		"series",
 		"promulgated-revision",
 		"promulgated-url",
-		"development",
-		"stable",
+		"published",
 	)
 	RequiredBaseEntityFields = charmstore.FieldSelector(
 		"user",
@@ -181,14 +180,6 @@ func (s *StoreWithChannel) FindBaseEntity(url *charm.URL, fields map[string]int)
 	return s.Store.FindBaseEntity(url, fields)
 }
 
-// ValidChannels holds the set of all allowed channels
-// that can be passed as a "?channel=" parameter.
-var ValidChannels = map[params.Channel]bool{
-	params.UnpublishedChannel: true,
-	params.DevelopmentChannel: true,
-	params.StableChannel:      true,
-}
-
 // NewReqHandler returns an instance of a *ReqHandler
 // suitable for handling the given HTTP request. After use, the ReqHandler.Close
 // method should be called to close it.
@@ -201,7 +192,7 @@ func (h *Handler) NewReqHandler(req *http.Request) (*ReqHandler, error) {
 	// most endpoints will only ever use the first one.
 	// PUT to an archive is the notable exception.
 	for _, ch := range req.Form["channel"] {
-		if !ValidChannels[params.Channel(ch)] {
+		if !params.ValidChannels[params.Channel(ch)] {
 			return nil, badRequestf(nil, "invalid channel %q specified in request", ch)
 		}
 	}
@@ -268,7 +259,7 @@ func RouterHandlers(h *ReqHandler) *router.Handlers {
 			"bundle-metadata":      h.EntityHandler(h.metaBundleMetadata, "bundledata"),
 			"bundles-containing":   h.EntityHandler(h.metaBundlesContaining),
 			"bundle-unit-count":    h.EntityHandler(h.metaBundleUnitCount, "bundleunitcount"),
-			"published":            h.EntityHandler(h.metaPublished, "development", "stable"),
+			"published":            h.EntityHandler(h.metaPublished, "published"),
 			"charm-actions":        h.EntityHandler(h.metaCharmActions, "charmactions"),
 			"charm-config":         h.EntityHandler(h.metaCharmConfig, "charmconfig"),
 			"charm-metadata":       h.EntityHandler(h.metaCharmMetadata, "charmmeta"),
@@ -848,7 +839,7 @@ func (h *ReqHandler) metaRevisionInfo(id *router.ResolvedURL, path string, flags
 		if err := h.AuthorizeEntityForOp(rurl, req, OpReadWithNoTerms); err != nil {
 			// We're not authorized to see the entity, so leave it out.
 			// Note that the only time this will happen is when
-			// the original URL is promulgated and has a development channel,
+			// the original URL is promulgated and has a edge channel,
 			// the charm has changed owners, and the old owner and
 			// the new one have different dev ACLs. It's easiest
 			// and most reliable just to check everything though.
@@ -1188,24 +1179,28 @@ func (h *ReqHandler) metaPublished(entity *mongodoc.Entity, id *router.ResolvedU
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	info := make([]params.PublishedInfo, 0, 2)
-	if entity.Development {
-		info = append(info, params.PublishedInfo{
-			Channel: params.DevelopmentChannel,
-		})
-	}
-	if entity.Stable {
-		info = append(info, params.PublishedInfo{
-			Channel: params.StableChannel,
-		})
-	}
-	for i, pinfo := range info {
-		// The entity is current for a channel if any series within
-		// a channel refers to the entity.
-		for _, url := range baseEntity.ChannelEntities[pinfo.Channel] {
+	results := make(map[params.Channel]params.PublishedInfo, len(entity.Published))
+	for channel, published := range entity.Published {
+		if !published {
+			continue
+		}
+		var current bool
+		for _, url := range baseEntity.ChannelEntities[channel] {
 			if *url == *entity.URL {
-				info[i].Current = true
+				current = true
+				break
 			}
+		}
+		results[channel] = params.PublishedInfo{
+			Channel: channel,
+			Current: current,
+		}
+	}
+	// Reorder results by stability level.
+	info := make([]params.PublishedInfo, 0, len(results))
+	for _, channel := range params.OrderedChannels {
+		if result, ok := results[channel]; ok {
+			info = append(info, result)
 		}
 	}
 	return &params.PublishedResponse{
@@ -1460,13 +1455,6 @@ func (h *ReqHandler) servePromulgate(id *router.ResolvedURL, w http.ResponseWrit
 	return nil
 }
 
-// validPublishChannels holds the set of channels that can
-// be the target of a publish request.
-var validPublishChannels = map[params.Channel]bool{
-	params.DevelopmentChannel: true,
-	params.StableChannel:      true,
-}
-
 // PUT id/publish
 // See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#put-idpublish
 func (h *ReqHandler) servePublish(id *router.ResolvedURL, w http.ResponseWriter, req *http.Request) error {
@@ -1487,8 +1475,14 @@ func (h *ReqHandler) servePublish(id *router.ResolvedURL, w http.ResponseWriter,
 		return badRequestf(nil, "no channels provided")
 	}
 	for _, c := range chans {
-		if !validPublishChannels[c] {
-			return badRequestf(nil, "cannot publish to %q", c)
+		if c == params.NoChannel {
+			return badRequestf(nil, "cannot publish to an empty channel")
+		}
+		if !params.ValidChannels[c] {
+			return badRequestf(nil, "unrecognized channel %q", c)
+		}
+		if c == params.UnpublishedChannel {
+			return badRequestf(nil, "cannot publish to the unpublished channel")
 		}
 	}
 

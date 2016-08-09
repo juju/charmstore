@@ -390,10 +390,10 @@ func (s *Store) ensureIndexes() error {
 		mgo.Index{Key: []string{"bundlecharms"}},
 	}, {
 		s.DB.Entities(),
-		mgo.Index{Key: []string{"name", "development", "-promulgated-revision", "-supportedseries"}},
+		mgo.Index{Key: []string{"name", "published", "-promulgated-revision", "-supportedseries"}},
 	}, {
 		s.DB.Entities(),
-		mgo.Index{Key: []string{"name", "development", "user", "-revision", "-supportedseries"}},
+		mgo.Index{Key: []string{"name", "published", "user", "-revision", "-supportedseries"}},
 	}, {
 		s.DB.BaseEntities(),
 		mgo.Index{Key: []string{"name"}},
@@ -496,8 +496,7 @@ func (s *Store) FindBestEntity(url *charm.URL, channel params.Channel, fields ma
 			"promulgated-revision": 1,
 			"series":               1,
 			"revision":             1,
-			"development":          1,
-			"stable":               1,
+			"published":            1,
 		}
 		for f := range fields {
 			nfields[f] = 1
@@ -515,15 +514,8 @@ func (s *Store) FindBestEntity(url *charm.URL, channel params.Channel, fields ma
 		// If a channel was specified make sure the entity is in that channel.
 		// This is crucial because if we don't do this, then the user could choose
 		// to use any chosen set of ACLs against any entity.
-		switch channel {
-		case params.StableChannel:
-			if !entity.Stable {
-				return nil, errgo.WithCausef(nil, params.ErrNotFound, "%s not found in stable channel", url)
-			}
-		case params.DevelopmentChannel:
-			if !entity.Development {
-				return nil, errgo.WithCausef(nil, params.ErrNotFound, "%s not found in development channel", url)
-			}
+		if params.ValidChannels[channel] && channel != params.UnpublishedChannel && !entity.Published[channel] {
+			return nil, errgo.WithCausef(nil, params.ErrNotFound, "%s not found in %s channel", url, channel)
 		}
 		return entity, nil
 	}
@@ -660,11 +652,9 @@ var seriesScore = map[string]int{
 
 var seriesBundleOrEmpty = bson.D{{"$or", []bson.D{{{"series", "bundle"}}, {{"series", ""}}}}}
 
-// EntitiesQuery creates a mgo.Query object that can be used to find
-// entities matching the given URL. If the given URL has no user then
-// the produced query will only match promulgated entities. If the given URL
-// channel is not "development" then the produced query will only match
-// published entities.
+// EntitiesQuery creates a mgo.Query object that can be used to find entities
+// matching the given URL. If the given URL has no user then the produced query
+// will only match promulgated entities.
 func (s *Store) EntitiesQuery(url *charm.URL) *mgo.Query {
 	entities := s.DB.Entities()
 	query := make(bson.D, 1, 5)
@@ -768,8 +758,9 @@ func (s *Store) UpdateBaseEntity(url *router.ResolvedURL, update bson.D) error {
 var ErrPublishResourceMismatch = errgo.Newf("charm published with incorrect resources")
 
 // Publish assigns channels to the entity corresponding to the given URL.
-// An error is returned if no channels are provided. For the time being,
-// the only supported channels are "development" and "stable".
+// An error is returned if no channels are provided. See params.ValidChannels
+// for the list of supported channels. The unpublished channel cannot
+// be provided.
 //
 // If the given resources do not match those expected or they're not
 // found, an error with a ErrPublichResourceMismatch cause will be returned.
@@ -778,12 +769,12 @@ func (s *Store) Publish(url *router.ResolvedURL, resources map[string]int, chann
 	// Throw away any channels that we don't like.
 	actualChannels := make([]params.Channel, 0, len(channels))
 	for _, c := range channels {
-		switch c {
-		case params.StableChannel:
+		if !params.ValidChannels[c] || c == params.UnpublishedChannel {
+			continue
+		}
+		actualChannels = append(actualChannels, c)
+		if c == params.StableChannel {
 			updateSearch = true
-			fallthrough
-		case params.DevelopmentChannel:
-			actualChannels = append(actualChannels, c)
 		}
 	}
 	channels = actualChannels
@@ -812,7 +803,7 @@ func (s *Store) Publish(url *router.ResolvedURL, resources map[string]int, chann
 	// Update the entity's published channels.
 	update := make(bson.D, 0, len(channels)*(len(series)+1)) // ...ish.
 	for _, c := range channels {
-		update = append(update, bson.DocElem{string(c), true})
+		update = append(update, bson.DocElem{"published." + string(c), true})
 	}
 	if err := s.UpdateEntity(url, bson.D{{"$set", update}}); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
@@ -826,7 +817,6 @@ func (s *Store) Publish(url *router.ResolvedURL, resources map[string]int, chann
 		}
 		update = append(update, bson.DocElem{fmt.Sprintf("channelresources.%s", c), resourceDocs})
 	}
-
 	if err := s.UpdateBaseEntity(url, bson.D{{"$set", update}}); err != nil {
 		return errgo.Mask(err)
 	}
@@ -1069,11 +1059,11 @@ func (s *Store) SetPromulgated(url *router.ResolvedURL, promulgate bool) error {
 }
 
 // SetPerms sets the ACL specified by which for the base entity with the
-// given id. The which parameter is in the form "[channel].operation",
-// where channel, if specified, is one of "development" or "stable" and
-// operation is one of "read" or "write". If which does not specify a
-// channel then the unpublished ACL is updated. This is only provided for
-// testing.
+// given id. The which parameter is in the form "channel.operation",
+// where channel is the string corresponding to one of the ValidChannels
+// and operation is one of "read" or "write". If which does not specify a
+// channel then the unpublished ACL is updated.
+// This is only provided for testing.
 func (s *Store) SetPerms(id *charm.URL, which string, acl ...string) error {
 	return s.DB.BaseEntities().UpdateId(mongodoc.BaseURL(id), bson.D{{"$set",
 		bson.D{{"channelacls." + which, acl}},
@@ -1398,7 +1388,7 @@ func (store *Store) ListQuery(sp SearchParams) (*ListQuery, error) {
 func (lq *ListQuery) Iter(fields map[string]int) *mgo.Iter {
 	qfields := FieldSelector(
 		"promulgated-url",
-		"development",
+		"published",
 		"name",
 		"user",
 		"series",
@@ -1416,7 +1406,7 @@ func (lq *ListQuery) Iter(fields map[string]int) *mgo.Iter {
 			"$baseurl",
 			"$series",
 			bson.D{{
-				"$cond", []string{"$development", "true", "false"},
+				"$cond", []string{"$published.edge", "true", "false"},
 			}},
 		},
 	}}})

@@ -533,7 +533,9 @@ func assertBaseEntity(c *gc.C, store *Store, url *charm.URL, promulgated bool) {
 	}
 	expectACLs := map[params.Channel]mongodoc.ACL{
 		params.StableChannel:      acls,
-		params.DevelopmentChannel: acls,
+		params.CandidateChannel:   acls,
+		params.BetaChannel:        acls,
+		params.EdgeChannel:        acls,
 		params.UnpublishedChannel: acls,
 	}
 	c.Assert(storetesting.NormalizeBaseEntity(baseEntity), jc.DeepEquals, storetesting.NormalizeBaseEntity(&mongodoc.BaseEntity{

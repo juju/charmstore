@@ -23,7 +23,7 @@ type migrationsIntegrationSuite struct {
 
 var _ = gc.Suite(&migrationsIntegrationSuite{})
 
-const earliestDeployedVersion = "4.4.3"
+const earliestDeployedVersion = "4.5.6"
 
 var dumpMigrationHistoryFlag = flag.Bool("dump-migration-history", false, "dump migration history to file")
 
@@ -235,6 +235,40 @@ var migrationHistory = []versionSpec{{
 		}
 		return nil
 	},
+}, {
+	// V5 API.
+	// Rename the development channel to "edge", in both entities and base
+	// entities.
+	// Deletes the "edge" and "stable" boolean fields in the entity document
+	// and replace them with a single "published" map.
+	// Populate base entity ACLs for the candidate and beta channels.
+	version: "4.5.6",
+	update: func(db *mgo.Database, csv *charmStoreVersion) error {
+		err := csv.Upload("v5", []uploadSpec{{
+			id:     "~charmers/trusty/different-acls-0",
+			entity: storetesting.NewCharm(nil),
+		}})
+		if err != nil {
+			return errgo.Mask(err)
+		}
+		url := charm.MustParseURL("~charmers/different-acls")
+		err = db.C("base_entities").UpdateId(url, bson.D{{
+			"$set", bson.D{
+				{"channelacls.unpublished", mongodoc.ACL{
+					Read:  []string{"everyone", "unpublished"},
+					Write: []string{"everyone", "charmers", "unpublished"},
+				}},
+				{"channelacls.development", mongodoc.ACL{
+					Read:  []string{"everyone", "edge"},
+					Write: []string{"everyone", "charmers", "edge"},
+				}},
+			},
+		}})
+		if err != nil {
+			return errgo.Notef(err, "cannot update ACLs for base entity %q", url)
+		}
+		return nil
+	},
 }}
 
 var migrationFromDumpEntityTests = []struct {
@@ -245,7 +279,7 @@ var migrationFromDumpEntityTests = []struct {
 	checkers: []entityChecker{
 		hasPromulgatedRevision(0),
 		hasCompatibilityBlob(false),
-		isDevelopment(true),
+		isEdge(true),
 		isStable(true),
 	},
 }, {
@@ -253,7 +287,7 @@ var migrationFromDumpEntityTests = []struct {
 	checkers: []entityChecker{
 		hasPromulgatedRevision(1),
 		hasCompatibilityBlob(false),
-		isDevelopment(true),
+		isEdge(true),
 		isStable(false),
 	},
 }, {
@@ -261,7 +295,7 @@ var migrationFromDumpEntityTests = []struct {
 	checkers: []entityChecker{
 		hasPromulgatedRevision(-1),
 		hasCompatibilityBlob(false),
-		isDevelopment(true),
+		isEdge(true),
 		isStable(true),
 	},
 }, {
@@ -269,7 +303,7 @@ var migrationFromDumpEntityTests = []struct {
 	checkers: []entityChecker{
 		hasPromulgatedRevision(0),
 		hasCompatibilityBlob(false),
-		isDevelopment(true),
+		isEdge(true),
 		isStable(true),
 	},
 }, {
@@ -277,7 +311,7 @@ var migrationFromDumpEntityTests = []struct {
 	checkers: []entityChecker{
 		hasPromulgatedRevision(-1),
 		hasCompatibilityBlob(false),
-		isDevelopment(true),
+		isEdge(true),
 		isStable(true),
 	},
 }, {
@@ -285,7 +319,7 @@ var migrationFromDumpEntityTests = []struct {
 	checkers: []entityChecker{
 		hasPromulgatedRevision(-1),
 		hasCompatibilityBlob(true),
-		isDevelopment(true),
+		isEdge(true),
 		isStable(true),
 	},
 }, {
@@ -293,7 +327,7 @@ var migrationFromDumpEntityTests = []struct {
 	checkers: []entityChecker{
 		hasPromulgatedRevision(-1),
 		hasCompatibilityBlob(true),
-		isDevelopment(true),
+		isEdge(true),
 		isStable(true),
 	},
 }, {
@@ -301,7 +335,7 @@ var migrationFromDumpEntityTests = []struct {
 	checkers: []entityChecker{
 		hasPromulgatedRevision(-1),
 		hasCompatibilityBlob(false),
-		isDevelopment(true),
+		isEdge(true),
 		isStable(true),
 	},
 }, {
@@ -309,7 +343,7 @@ var migrationFromDumpEntityTests = []struct {
 	checkers: []entityChecker{
 		hasPromulgatedRevision(-1),
 		hasCompatibilityBlob(false),
-		isDevelopment(true),
+		isEdge(true),
 		isStable(false),
 	},
 }, {
@@ -317,7 +351,7 @@ var migrationFromDumpEntityTests = []struct {
 	checkers: []entityChecker{
 		hasPromulgatedRevision(-1),
 		hasCompatibilityBlob(false),
-		isDevelopment(true),
+		isEdge(true),
 		isStable(false),
 	},
 }, {
@@ -325,7 +359,7 @@ var migrationFromDumpEntityTests = []struct {
 	checkers: []entityChecker{
 		hasPromulgatedRevision(-1),
 		hasCompatibilityBlob(false),
-		isDevelopment(true),
+		isEdge(true),
 		isStable(true),
 		hasMetrics(nil),
 	},
@@ -348,7 +382,15 @@ var migrationFromDumpBaseEntityTests = []struct {
 				Read:  []string{"charmers"},
 				Write: []string{"charmers"},
 			},
-			params.DevelopmentChannel: {
+			params.EdgeChannel: {
+				Read:  []string{"charmers"},
+				Write: []string{"charmers"},
+			},
+			params.BetaChannel: {
+				Read:  []string{"charmers"},
+				Write: []string{"charmers"},
+			},
+			params.CandidateChannel: {
 				Read:  []string{"charmers"},
 				Write: []string{"charmers"},
 			},
@@ -358,7 +400,7 @@ var migrationFromDumpBaseEntityTests = []struct {
 			},
 		}),
 		hasChannelEntities(map[params.Channel]map[string]*charm.URL{
-			params.DevelopmentChannel: {
+			params.EdgeChannel: {
 				"precise": charm.MustParseURL("~charmers/precise/promulgated-1"),
 			},
 			params.StableChannel: {
@@ -375,7 +417,15 @@ var migrationFromDumpBaseEntityTests = []struct {
 				Read:  []string{"bobgroup"},
 				Write: []string{"bob", "someoneelse"},
 			},
-			params.DevelopmentChannel: {
+			params.EdgeChannel: {
+				Read:  []string{"bobgroup"},
+				Write: []string{"bob", "someoneelse"},
+			},
+			params.BetaChannel: {
+				Read:  []string{"bobgroup"},
+				Write: []string{"bob", "someoneelse"},
+			},
+			params.CandidateChannel: {
 				Read:  []string{"bobgroup"},
 				Write: []string{"bob", "someoneelse"},
 			},
@@ -385,7 +435,7 @@ var migrationFromDumpBaseEntityTests = []struct {
 			},
 		}),
 		hasChannelEntities(map[params.Channel]map[string]*charm.URL{
-			params.DevelopmentChannel: {
+			params.EdgeChannel: {
 				"trusty": charm.MustParseURL("~bob/trusty/nonpromulgated-0"),
 			},
 			params.StableChannel: {
@@ -399,7 +449,7 @@ var migrationFromDumpBaseEntityTests = []struct {
 		isPromulgated(true),
 		hasAllACLs("charmers"),
 		hasChannelEntities(map[params.Channel]map[string]*charm.URL{
-			params.DevelopmentChannel: {
+			params.EdgeChannel: {
 				"bundle": charm.MustParseURL("~charmers/bundle/promulgatedbundle-0"),
 			},
 			params.StableChannel: {
@@ -413,7 +463,7 @@ var migrationFromDumpBaseEntityTests = []struct {
 		isPromulgated(false),
 		hasAllACLs("charmers"),
 		hasChannelEntities(map[params.Channel]map[string]*charm.URL{
-			params.DevelopmentChannel: {
+			params.EdgeChannel: {
 				"bundle": charm.MustParseURL("~charmers/bundle/nonpromulgatedbundle-0"),
 			},
 			params.StableChannel: {
@@ -427,7 +477,7 @@ var migrationFromDumpBaseEntityTests = []struct {
 		isPromulgated(false),
 		hasAllACLs("charmers"),
 		hasChannelEntities(map[params.Channel]map[string]*charm.URL{
-			params.DevelopmentChannel: {
+			params.EdgeChannel: {
 				"precise": charm.MustParseURL("~charmers/multiseries-1"),
 				"trusty":  charm.MustParseURL("~charmers/multiseries-1"),
 				"utopic":  charm.MustParseURL("~charmers/multiseries-0"),
@@ -447,13 +497,39 @@ var migrationFromDumpBaseEntityTests = []struct {
 		isPromulgated(false),
 		hasAllACLs("someone"),
 		hasChannelEntities(map[params.Channel]map[string]*charm.URL{
-			params.DevelopmentChannel: {
+			params.EdgeChannel: {
 				"precise": charm.MustParseURL("~someone/precise/southerncharm-3"),
 				"trusty":  charm.MustParseURL("~someone/trusty/southerncharm-6"),
 			},
 			params.StableChannel: {
 				"precise": charm.MustParseURL("~someone/precise/southerncharm-0"),
 				"trusty":  charm.MustParseURL("~someone/trusty/southerncharm-6"),
+			},
+		}),
+	},
+}, {
+	id: "cs:~charmers/different-acls",
+	checkers: []baseEntityChecker{
+		hasACLs(map[params.Channel]mongodoc.ACL{
+			params.UnpublishedChannel: {
+				Read:  []string{"everyone", "unpublished"},
+				Write: []string{"everyone", "charmers", "unpublished"},
+			},
+			params.EdgeChannel: {
+				Read:  []string{"everyone", "edge"},
+				Write: []string{"everyone", "charmers", "edge"},
+			},
+			params.BetaChannel: {
+				Read:  []string{"everyone", "unpublished"},
+				Write: []string{"everyone", "charmers", "unpublished"},
+			},
+			params.CandidateChannel: {
+				Read:  []string{"everyone", "unpublished"},
+				Write: []string{"everyone", "charmers", "unpublished"},
+			},
+			params.StableChannel: {
+				Read:  []string{"charmers"},
+				Write: []string{"charmers"},
 			},
 		}),
 	},
@@ -612,18 +688,13 @@ func checkBaseEntityInvariants(c *gc.C, e *mongodoc.BaseEntity, store *Store) {
 			}
 			ce, err := store.FindEntity(MustParseResolvedURL(url.String()), nil)
 			c.Assert(err, gc.IsNil)
-			switch ch {
-			case params.DevelopmentChannel:
-				c.Assert(ce.Development, gc.Equals, true)
-			case params.StableChannel:
-				c.Assert(ce.Stable, gc.Equals, true)
-			default:
+			if !params.ValidChannels[ch] {
 				c.Fatalf("unknown channel %q found", ch)
 			}
+			c.Assert(ce.Published[ch], gc.Equals, true)
 			if series != "bundle" && !stringInSlice(series, ce.SupportedSeries) {
 				c.Fatalf("series %q not found in supported series %q", series, ce.SupportedSeries)
 			}
-
 		}
 	}
 }
@@ -661,15 +732,15 @@ func hasCompatibilityBlob(hasBlob bool) entityChecker {
 	}
 }
 
-func isDevelopment(isDev bool) entityChecker {
+func isEdge(isDev bool) entityChecker {
 	return func(c *gc.C, entity *mongodoc.Entity) {
-		c.Assert(entity.Development, gc.Equals, isDev)
+		c.Assert(entity.Published[params.EdgeChannel], gc.Equals, isDev)
 	}
 }
 
 func isStable(isStable bool) entityChecker {
 	return func(c *gc.C, entity *mongodoc.Entity) {
-		c.Assert(entity.Stable, gc.Equals, isStable)
+		c.Assert(entity.Published[params.StableChannel], gc.Equals, isStable)
 	}
 }
 
@@ -700,7 +771,9 @@ func hasAllACLs(user string) baseEntityChecker {
 	}
 	return hasACLs(map[params.Channel]mongodoc.ACL{
 		params.UnpublishedChannel: userACL,
-		params.DevelopmentChannel: userACL,
+		params.EdgeChannel:        userACL,
+		params.BetaChannel:        userACL,
+		params.CandidateChannel:   userACL,
 		params.StableChannel:      userACL,
 	})
 }

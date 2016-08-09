@@ -483,9 +483,9 @@ func (s *ArchiveSuite) TestPostSingleSeriesCharmWhenMultiSeriesVersionExists(c *
 }
 
 func (s *ArchiveSuite) TestPutCharmWithChannel(c *gc.C) {
-	s.assertUploadCharm(c, "PUT", newResolvedURL("~charmers/precise/juju-gui-0", -1), "wordpress", []params.Channel{params.DevelopmentChannel})
+	s.assertUploadCharm(c, "PUT", newResolvedURL("~charmers/precise/juju-gui-0", -1), "wordpress", []params.Channel{params.EdgeChannel})
 	s.assertUploadCharm(c, "PUT", newResolvedURL("~charmers/precise/juju-gui-1", -1), "wordpress", []params.Channel{params.StableChannel})
-	s.assertUploadCharm(c, "PUT", newResolvedURL("~charmers/precise/juju-gui-2", -1), "wordpress", []params.Channel{params.StableChannel, params.DevelopmentChannel})
+	s.assertUploadCharm(c, "PUT", newResolvedURL("~charmers/precise/juju-gui-2", -1), "wordpress", []params.Channel{params.StableChannel, params.EdgeChannel})
 }
 
 func (s *ArchiveSuite) TestPutCharmWithInvalidChannel(c *gc.C) {
@@ -495,7 +495,7 @@ func (s *ArchiveSuite) TestPutCharmWithInvalidChannel(c *gc.C) {
 		charm.MustParseURL("~charmers/saucy/juju-gui-0"),
 		nil,
 		"wordpress",
-		[]params.Channel{params.DevelopmentChannel, "bad"},
+		[]params.Channel{params.EdgeChannel, "bad"},
 		http.StatusBadRequest,
 		params.Error{
 			Message: `invalid channel "bad" specified in request`,
@@ -1045,12 +1045,7 @@ func (s *commonArchiveSuite) assertUpload(c *gc.C, p uploadParams) (id *charm.UR
 	for _, ch := range p.chans {
 		expectChans[ch] = true
 	}
-
-	for _, ch := range []params.Channel{
-		params.UnpublishedChannel,
-		params.DevelopmentChannel,
-		params.StableChannel,
-	} {
+	for _, ch := range params.OrderedChannels {
 		_, err := s.store.FindBestEntity(&p.id.URL, ch, nil)
 		if expectChans[ch] {
 			c.Assert(err, gc.IsNil)
@@ -1067,8 +1062,13 @@ func (s *commonArchiveSuite) assertUpload(c *gc.C, p uploadParams) (id *charm.UR
 		c.Assert(entity.BlobHash256, gc.Equals, hash256Sum)
 	}
 	c.Assert(entity.PromulgatedURL, gc.DeepEquals, p.id.PromulgatedURL())
-	c.Assert(entity.Development, gc.Equals, expectChans[params.DevelopmentChannel])
-	c.Assert(entity.Stable, gc.Equals, expectChans[params.StableChannel])
+
+	delete(expectChans, params.UnpublishedChannel)
+	if len(expectChans) == 0 {
+		c.Assert(entity.Published, gc.IsNil)
+	} else {
+		c.Assert(entity.Published, gc.DeepEquals, expectChans)
+	}
 
 	// Test that the expected entry has been created
 	// in the blob store.

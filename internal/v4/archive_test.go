@@ -928,7 +928,7 @@ func (s *ArchiveSuite) assertUpload(c *gc.C, method string, url *router.Resolved
 	c.Assert(entity.PreV5BlobSize, gc.Not(gc.Equals), int64(0))
 
 	c.Assert(entity.PromulgatedURL, gc.DeepEquals, url.PromulgatedURL())
-	c.Assert(entity.Development, gc.Equals, false)
+	c.Assert(entity.Published, gc.IsNil)
 
 	return expectId, entity.PreV5BlobSize
 }

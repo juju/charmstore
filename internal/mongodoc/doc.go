@@ -136,16 +136,8 @@ type Entity struct {
 	// If the entity is not promulgated this should be set to -1.
 	PromulgatedRevision int `bson:"promulgated-revision"`
 
-	// TODO we could potentially use map[params.Channel] bool
-	// instead of having a separate field for each channel.
-
-	// Development holds whether the entity has been published in the
-	// "development" channel.
-	Development bool
-
-	// Stable holds whether the entity has been published in the
-	// "stable" channel.
-	Stable bool
+	// Published holds whether the entity has been published on a channel.
+	Published map[params.Channel]bool `json:",omitempty" bson:",omitempty"`
 }
 
 // PreferredURL returns the preferred way to refer to this entity. If
