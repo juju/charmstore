@@ -338,6 +338,7 @@ func (h *ReqHandler) ServeBlobFile(w http.ResponseWriter, req *http.Request, id 
 	if ctype != "" {
 		w.Header().Set("Content-Type", ctype)
 	}
+	w.Header().Set("Content-Disposition", "attachment")
 	w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
 	setArchiveCacheControl(w.Header(), h.isPublic(id))
 	w.WriteHeader(http.StatusOK)
