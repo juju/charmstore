@@ -1,0 +1,8 @@
+This source distribution contains a snapshot of the complete source
+dependencies needed to build the project at the released revision.
+
+In order to shove nested bazaar repository files into Launchpad, all the
+version control system repository directories have been packed into tarballs.
+
+To unpack them, run dist-scripts/unpack-vcs.sh with the appropriate GOPATH set.
+To repack them, run dist-scripts/pack-vcs.sh with the appropriate GOPATH set.
