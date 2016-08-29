@@ -4,6 +4,8 @@
 package charmstore // import "gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
 
 import (
+	"time"
+
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
@@ -90,6 +92,11 @@ type migration struct {
 
 // Migrate starts the migration process using the given database.
 func migrate(db StoreDatabase) error {
+	db = db.copy()
+	defer db.Close()
+	db.Session.SetSocketTimeout(10 * time.Minute)
+	// Set the socket timeout back to the default value of one minute.
+	defer db.Session.SetSocketTimeout(1 * time.Minute)
 	// Retrieve already executed migrations.
 	executed, err := getExecuted(db)
 	if err != nil {
