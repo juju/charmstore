@@ -64,6 +64,7 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	defer rh.Close()
+	rh.Router.Monitor.AppendLabel("/v4")
 	rh.ServeHTTP(w, req)
 }
 
@@ -204,7 +205,6 @@ func (h ReqHandler) Close() {
 	h.Store.Close()
 	h.Cache.Close()
 	h.Reset()
-	h.Monitor.ObserveMetric()
 	reqHandlerPool.Put(h)
 }
 
