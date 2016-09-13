@@ -34,7 +34,6 @@ import (
 	"gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/entitycache"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/monitoring"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
 )
 
@@ -90,9 +89,6 @@ type ReqHandler struct {
 
 	// cache holds the per-request entity cache.
 	Cache *entitycache.Cache
-
-	// Monitor times the request
-	Monitor monitoring.Request
 }
 
 const (
@@ -330,6 +326,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	defer rh.Close()
+	rh.Router.Monitor.Reset()
+	rh.Router.Monitor.AppendLabel("/v5")
 	rh.ServeHTTP(w, req)
 }
 
@@ -341,9 +339,7 @@ func (h *Handler) GroupsForUser(username string) ([]string, error) {
 
 // ServeHTTP implements http.Handler by calling h.Router.ServeHTTP.
 func (h *ReqHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	h.Monitor.Reset(req.URL)
 	h.Router.ServeHTTP(w, req)
-	h.Monitor.ObserveMetric()
 }
 
 // NewAPIHandler returns a new Handler as an http Handler.

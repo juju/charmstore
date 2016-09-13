@@ -1,4 +1,4 @@
-// Copyright 2014 Canonical Ltd.
+// Copyright 2014-2016 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
 // The router package implements an HTTP request router for charm store
@@ -22,6 +22,7 @@ import (
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 
+	"gopkg.in/juju/charmstore.v5-unstable/internal/monitoring"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/series"
 )
 
@@ -121,6 +122,9 @@ type Router struct {
 
 	handlers *Handlers
 	handler  http.Handler
+
+	// monitor holds a metric monitor to time a request.
+	Monitor monitoring.Request
 }
 
 // ResolvedURL represents a URL that has been resolved by resolveURL.
@@ -259,7 +263,11 @@ func New(
 	for path, handler := range r.handlers.Global {
 		path = "/" + path
 		prefix := strings.TrimSuffix(path, "/")
-		mux.Handle(path, http.StripPrefix(prefix, handler))
+		handler := handler
+		mux.Handle(path, http.StripPrefix(prefix, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			r.Monitor.AppendLabel(prefix)
+			handler.ServeHTTP(w, req)
+		})))
 	}
 	mux.Handle("/", HandleErrors(r.serveIds))
 	r.handler = mux
@@ -299,6 +307,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	r.handler.ServeHTTP(w, req)
+	r.Monitor.ObserveMetric()
 }
 
 // Handlers returns the set of handlers that the router was created with.
@@ -325,6 +334,7 @@ func (r *Router) serveIds(w http.ResponseWriter, req *http.Request) error {
 	}
 	handler := r.handlers.Id[key]
 	if handler != nil {
+		r.Monitor.AppendLabel("/:id/" + key + path)
 		req.URL.Path = path
 		err := handler(url, w, req)
 		// Note: preserve error cause from handlers.
@@ -415,12 +425,15 @@ func (r *Router) serveMetaGet(rurl *ResolvedURL, req *http.Request) (interface{}
 	if key == "" {
 		// GET id/meta
 		// https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmeta
+		r.Monitor.AppendLabel(":id/meta")
 		return r.metaNames(), nil
 	}
 	if key == "any" {
+		r.Monitor.AppendLabel("/:meta/" + key + path)
 		return r.serveMetaGetAny(rurl, req)
 	}
 	if handler := r.handlers.Meta[key]; handler != nil {
+		r.Monitor.AppendLabel("/:meta/" + key + path)
 		results, err := handler.HandleGet([]BulkIncludeHandler{handler}, rurl, []string{path}, req.Form, req)
 		if err != nil {
 			// Note: preserve error cause from handlers.
@@ -432,6 +445,7 @@ func (r *Router) serveMetaGet(rurl *ResolvedURL, req *http.Request) (interface{}
 		}
 		return results[0], nil
 	}
+	r.Monitor.AppendLabel("/:meta/" + key + path)
 	return nil, errgo.WithCausef(nil, params.ErrNotFound, "unknown metadata %q", strings.TrimPrefix(req.URL.Path, "/"))
 }
 
@@ -550,6 +564,7 @@ func (r *Router) metaNames() []string {
 
 // serveBulkMeta serves bulk metadata requests (requests to /meta/...).
 func (r *Router) serveBulkMeta(w http.ResponseWriter, req *http.Request) error {
+	r.Monitor.AppendLabel("/meta")
 	switch req.Method {
 	case "GET", "HEAD":
 		// A bare meta returns all endpoints.

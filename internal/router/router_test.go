@@ -47,6 +47,7 @@ var routerGetTests = []struct {
 	resolveURL                func(*charm.URL) (*ResolvedURL, error)
 	authorize                 func(*ResolvedURL, *http.Request) error
 	exists                    func(*ResolvedURL, *http.Request) (bool, error)
+	monitorLabel              string
 }{{
 	about: "global handler",
 	handlers: Handlers{
@@ -66,6 +67,7 @@ var routerGetTests = []struct {
 		Method: "GET",
 		Path:   "",
 	},
+	monitorLabel: "/foo",
 }, {
 	about: "global handler with sub-path and flags",
 	handlers: Handlers{
@@ -89,6 +91,7 @@ var routerGetTests = []struct {
 			"b": {"two"},
 		},
 	},
+	monitorLabel: "/foo/bar",
 }, {
 	about:        "invalid form",
 	urlStr:       "/foo?a=%",
@@ -109,6 +112,7 @@ var routerGetTests = []struct {
 		Method:   "GET",
 		CharmURL: "cs:precise/wordpress-34",
 	},
+	monitorLabel: "/:id/foo",
 }, {
 	about: "development id handler",
 	handlers: Handlers{
@@ -148,6 +152,7 @@ var routerGetTests = []struct {
 		Method:   "GET",
 		CharmURL: "cs:win81/visualstudio-2012",
 	},
+	monitorLabel: "/:id/foo",
 }, {
 	about: "wily id handler",
 	handlers: Handlers{
@@ -161,6 +166,7 @@ var routerGetTests = []struct {
 		Method:   "GET",
 		CharmURL: "cs:wily/wordpress-34",
 	},
+	monitorLabel: "/:id/foo",
 }, {
 	about: "id handler with no series in id",
 	handlers: Handlers{
@@ -174,6 +180,7 @@ var routerGetTests = []struct {
 		Method:   "GET",
 		CharmURL: "cs:wordpress-34",
 	},
+	monitorLabel: "/:id/foo",
 }, {
 	about: "id handler with no revision in id",
 	handlers: Handlers{
@@ -187,6 +194,7 @@ var routerGetTests = []struct {
 		Method:   "GET",
 		CharmURL: "cs:precise/wordpress",
 	},
+	monitorLabel: "/:id/foo",
 }, {
 	about: "id handler with channel and name only",
 	handlers: Handlers{
@@ -214,6 +222,7 @@ var routerGetTests = []struct {
 		CharmURL: "cs:precise/wordpress-34",
 		Path:     "/blah/arble",
 	},
+	monitorLabel: "/:id/foo//blah/arble",
 }, {
 	about: "id handler with allowed extra path but none given",
 	handlers: Handlers{
@@ -253,6 +262,7 @@ var routerGetTests = []struct {
 		Method:   "GET",
 		CharmURL: "cs:~joe/precise/wordpress-34",
 	},
+	monitorLabel: "/:id/foo",
 }, {
 	about: "wily handler with user",
 	handlers: Handlers{
@@ -266,6 +276,7 @@ var routerGetTests = []struct {
 		Method:   "GET",
 		CharmURL: "cs:~joe/wily/wordpress-34",
 	},
+	monitorLabel: "/:id/foo",
 }, {
 	about: "id handler with user and extra path",
 	handlers: Handlers{
@@ -280,6 +291,7 @@ var routerGetTests = []struct {
 		CharmURL: "cs:~joe/precise/wordpress-34",
 		Path:     "/blah/arble",
 	},
+	monitorLabel: "/:id/foo//blah/arble",
 }, {
 	about: "development id handler with user and extra path",
 	handlers: Handlers{
@@ -318,6 +330,7 @@ var routerGetTests = []struct {
 	expectBody: params.Error{
 		Message: "errorIdHandler error",
 	},
+	monitorLabel: "/:id/foo//blah/arble",
 }, {
 	about: "id handler that returns a not-found error",
 	handlers: Handlers{
@@ -333,6 +346,7 @@ var routerGetTests = []struct {
 		Message: "not found",
 		Code:    params.ErrNotFound,
 	},
+	monitorLabel: "/:id/foo",
 }, {
 	about: "id handler that returns some other kind of coded error",
 	handlers: Handlers{
@@ -348,6 +362,7 @@ var routerGetTests = []struct {
 		Message: "a message",
 		Code:    "foo",
 	},
+	monitorLabel: "/:id/foo",
 }, {
 	about: "id with unspecified series and revision, not resolved",
 	handlers: Handlers{
@@ -362,6 +377,7 @@ var routerGetTests = []struct {
 		Method:   "GET",
 		CharmURL: "cs:~joe/wordpress",
 	},
+	monitorLabel: "/:id/foo",
 }, {
 	about: "id with error on resolving",
 	handlers: Handlers{
@@ -403,6 +419,7 @@ var routerGetTests = []struct {
 	urlStr:       "/precise/wordpress-42/meta",
 	expectStatus: http.StatusOK,
 	expectBody:   []string{"bar", "baz", "foo"},
+	monitorLabel: ":id/meta",
 }, {
 	about: "meta list at root",
 	handlers: Handlers{
@@ -417,6 +434,7 @@ var routerGetTests = []struct {
 	urlStr:       "/meta",
 	expectStatus: http.StatusOK,
 	expectBody:   []string{"bar", "baz", "foo"},
+	monitorLabel: "/meta",
 }, {
 	about: "meta list at root with trailing /",
 	handlers: Handlers{
@@ -431,6 +449,7 @@ var routerGetTests = []struct {
 	urlStr:       "/meta/",
 	expectStatus: http.StatusOK,
 	expectBody:   []string{"bar", "baz", "foo"},
+	monitorLabel: "/meta",
 }, {
 	about: "meta handler",
 	handlers: Handlers{
@@ -444,6 +463,7 @@ var routerGetTests = []struct {
 	expectBody: &metaHandlerTestResp{
 		CharmURL: "cs:precise/wordpress-42",
 	},
+	monitorLabel: "/:meta/foo",
 }, {
 	about: "meta handler with additional elements",
 	handlers: Handlers{
@@ -458,6 +478,7 @@ var routerGetTests = []struct {
 		CharmURL: "cs:precise/wordpress-42",
 		Path:     "/bar/baz",
 	},
+	monitorLabel: "/:meta/foo//bar/baz",
 }, {
 	about: "meta handler with params",
 	handlers: Handlers{
@@ -475,6 +496,7 @@ var routerGetTests = []struct {
 			"two": {"b"},
 		},
 	},
+	monitorLabel: "/:meta/foo",
 }, {
 	about:  "meta handler that's not found",
 	urlStr: "/precise/wordpress-42/meta/foo",
@@ -484,6 +506,7 @@ var routerGetTests = []struct {
 		Code:    params.ErrNotFound,
 		Message: `unknown metadata "foo"`,
 	},
+	monitorLabel: "/:meta/foo",
 }, {
 	about:  "meta sub-handler that's not found",
 	urlStr: "/precise/wordpress-42/meta/foo/bar",
@@ -493,6 +516,7 @@ var routerGetTests = []struct {
 		Code:    params.ErrNotFound,
 		Message: `unknown metadata "foo/bar"`,
 	},
+	monitorLabel: "/:meta/foo//bar",
 }, {
 	about: "meta handler with nil data",
 	handlers: Handlers{
@@ -507,6 +531,7 @@ var routerGetTests = []struct {
 		Code:    params.ErrMetadataNotFound,
 		Message: "metadata not found",
 	},
+	monitorLabel: "/:meta/foo",
 }, {
 	about: "meta handler with typed nil data",
 	handlers: Handlers{
@@ -521,6 +546,7 @@ var routerGetTests = []struct {
 		Code:    params.ErrMetadataNotFound,
 		Message: "metadata not found",
 	},
+	monitorLabel: "/:meta/foo",
 }, {
 	about:  "meta handler with field selector",
 	urlStr: "/precise/wordpress-42/meta/foo",
@@ -540,6 +566,7 @@ var routerGetTests = []struct {
 		},
 		Id: newResolvedURL("cs:~charmers/precise/wordpress-42", 42),
 	},
+	monitorLabel: "/:meta/foo",
 }, {
 	about:  "meta handler returning error with code",
 	urlStr: "/precise/wordpress-42/meta/foo",
@@ -554,6 +581,7 @@ var routerGetTests = []struct {
 		Code:    "arble",
 		Message: "a message",
 	},
+	monitorLabel: "/:meta/foo",
 }, {
 	about:  "unauthorized meta handler",
 	urlStr: "/precise/wordpress-42/meta/foo",
@@ -576,6 +604,7 @@ var routerGetTests = []struct {
 	expectBody: params.MetaAnyResponse{
 		Id: charm.MustParseURL("cs:precise/wordpress-42"),
 	},
+	monitorLabel: "/:meta/any",
 }, {
 	about:        "meta/any, no includes, id does not exist",
 	urlStr:       "/precise/wordpress/meta/any",
@@ -627,6 +656,7 @@ var routerGetTests = []struct {
 			},
 		},
 	},
+	monitorLabel: "/:meta/any",
 }, {
 	about:  "meta/any, includes with additional path elements",
 	urlStr: "/precise/wordpress-42/meta/any?include=item1/foo&include=item2/bar&include=item1",
@@ -671,6 +701,7 @@ var routerGetTests = []struct {
 			},
 		},
 	},
+	monitorLabel: "/:meta/any",
 }, {
 	about:  "meta/any, nil metadata omitted",
 	urlStr: "/precise/wordpress-42/meta/any?include=ok&include=nil",
@@ -691,6 +722,7 @@ var routerGetTests = []struct {
 			},
 		},
 	},
+	monitorLabel: "/:meta/any",
 }, {
 	about:  "meta/any, handler returns error with cause",
 	urlStr: "/precise/wordpress-42/meta/any?include=error",
@@ -705,6 +737,7 @@ var routerGetTests = []struct {
 		Code:    "foo",
 		Message: "a message",
 	},
+	monitorLabel: "/:meta/any",
 }, {
 	about:  "bulk meta handler, single id",
 	urlStr: "/meta/foo?id=precise/wordpress-42",
@@ -720,6 +753,7 @@ var routerGetTests = []struct {
 			CharmURL: "cs:precise/wordpress-42",
 		},
 	},
+	monitorLabel: "/meta/:meta/foo",
 }, {
 	about:  "bulk meta handler, single id with invalid channel",
 	urlStr: "/meta/foo?id=~user/bad-wolf/wily/wordpress-42",
@@ -734,6 +768,7 @@ var routerGetTests = []struct {
 		Code:    params.ErrBadRequest,
 		Message: `bad request: charm or bundle URL has invalid form: "~user/bad-wolf/wily/wordpress-42"`,
 	},
+	monitorLabel: "/meta",
 }, {
 	about:  "bulk meta handler, several ids",
 	urlStr: "/meta/foo?id=precise/wordpress-42&id=utopic/foo-32&id=django",
@@ -755,6 +790,7 @@ var routerGetTests = []struct {
 			CharmURL: "cs:precise/django-0",
 		},
 	},
+	monitorLabel: "/meta/:meta/foo/:meta/foo/:meta/foo",
 }, {
 	about:  "bulk meta/any handler, several ids",
 	urlStr: "/meta/any?id=precise/wordpress-42&id=utopic/foo-32&id=django-47&include=foo&include=bar/something",
@@ -804,6 +840,7 @@ var routerGetTests = []struct {
 			},
 		},
 	},
+	monitorLabel: "/meta/:meta/any/:meta/any/:meta/any",
 }, {
 	about:  "bulk meta/any handler, several ids, invalid channel",
 	urlStr: "/meta/any?id=precise/wordpress-42&id=staging/trusty/django&include=foo&include=bar/something",
@@ -819,6 +856,7 @@ var routerGetTests = []struct {
 		Code:    params.ErrBadRequest,
 		Message: `bad request: charm or bundle URL has invalid form: "staging/trusty/django"`,
 	},
+	monitorLabel: "/meta",
 }, {
 	about:  "bulk meta/any handler, discharge required",
 	urlStr: "/meta/any?id=precise/wordpress-42&include=foo",
@@ -833,6 +871,7 @@ var routerGetTests = []struct {
 	expectBody: params.Error{
 		Message: "discharge required",
 	},
+	monitorLabel: "/meta",
 }, {
 	about:  "bulk meta/any handler, discharge required, ignore authorization",
 	urlStr: "/meta/any?id=precise/wordpress-42&include=foo&ignore-auth=1",
@@ -845,6 +884,7 @@ var routerGetTests = []struct {
 	expectWillIncludeMetadata: []string{"foo"},
 	expectStatus:              http.StatusOK,
 	expectBody:                map[string]params.MetaAnyResponse{},
+	monitorLabel:              "/meta",
 }, {
 	about:  "bulk meta/any handler, some unauthorized, ignore authorization",
 	urlStr: "/meta/any?id=precise/wordpress-42&id=utopic/foo-32&include=foo&ignore-auth=1",
@@ -866,6 +906,7 @@ var routerGetTests = []struct {
 			},
 		},
 	},
+	monitorLabel: "/meta/:meta/any",
 }, {
 	about:  "bulk meta/any handler, unauthorized",
 	urlStr: "/meta/any?id=precise/wordpress-42&include=foo",
@@ -880,6 +921,7 @@ var routerGetTests = []struct {
 	expectBody: params.Error{
 		Message: "bad wolf",
 	},
+	monitorLabel: "/meta",
 }, {
 	about:  "bulk meta/any handler, unauthorized, ignore authorization",
 	urlStr: "/meta/any?id=precise/wordpress-42&include=foo&ignore-auth=1",
@@ -892,6 +934,7 @@ var routerGetTests = []struct {
 	expectWillIncludeMetadata: []string{"foo"},
 	expectStatus:              http.StatusOK,
 	expectBody:                map[string]params.MetaAnyResponse{},
+	monitorLabel:              "/meta",
 }, {
 	about:        "bulk meta/any handler, invalid ignore-auth flag",
 	urlStr:       "/meta/any?id=precise/wordpress-42&include=foo&ignore-auth=meh",
@@ -900,6 +943,7 @@ var routerGetTests = []struct {
 		Code:    params.ErrBadRequest,
 		Message: `bad request: unexpected bool value "meh" (must be "0" or "1")`,
 	},
+	monitorLabel: "/meta",
 }, {
 	about:  "bulk meta handler with unresolved id",
 	urlStr: "/meta/foo/bar?id=wordpress",
@@ -917,6 +961,7 @@ var routerGetTests = []struct {
 			Path:     "/bar",
 		},
 	},
+	monitorLabel: "/meta/:meta/foo//bar",
 }, {
 	about:  "bulk meta handler with extra flags",
 	urlStr: "/meta/foo/bar?id=wordpress&arble=bletch&z=w&z=p",
@@ -938,6 +983,7 @@ var routerGetTests = []struct {
 			},
 		},
 	},
+	monitorLabel: "/meta/:meta/foo//bar",
 }, {
 	about:  "bulk meta handler with no ids",
 	urlStr: "/meta/foo/bar",
@@ -951,6 +997,7 @@ var routerGetTests = []struct {
 		Code:    params.ErrBadRequest,
 		Message: "no ids specified in meta request",
 	},
+	monitorLabel: "/meta",
 }, {
 	about:  "bulk meta handler with unresolvable id",
 	urlStr: "/meta/foo?id=unresolved&id=~foo/precise/wordpress-23",
@@ -972,6 +1019,7 @@ var routerGetTests = []struct {
 			CharmURL: "cs:precise/wordpress-99",
 		},
 	},
+	monitorLabel: "/meta/:meta/foo",
 }, {
 	about:  "bulk meta handler with id resolution error",
 	urlStr: "/meta/foo?id=resolveerror&id=precise/wordpress-23",
@@ -991,6 +1039,7 @@ var routerGetTests = []struct {
 	expectBody: params.Error{
 		Message: "an error",
 	},
+	monitorLabel: "/meta",
 }, {
 	about:  "bulk meta handler with some nil data",
 	urlStr: "/meta/foo?id=bundle/something-24&id=precise/wordpress-23",
@@ -1006,6 +1055,7 @@ var routerGetTests = []struct {
 	expectBody: map[string]string{
 		"bundle/something-24": "bundlefoo",
 	},
+	monitorLabel: "/meta/:meta/foo/:meta/foo",
 }, {
 	about:  "bulk meta handler with entity not found",
 	urlStr: "/meta/foo?id=bundle/something-24&id=precise/wordpress-23",
@@ -1024,6 +1074,7 @@ var routerGetTests = []struct {
 	expectBody: map[string]string{
 		"bundle/something-24": "something",
 	},
+	monitorLabel: "/meta/:meta/foo/:meta/foo",
 }, {
 	about:        "meta request with invalid entity reference",
 	urlStr:       "/robots.txt/meta/any",
@@ -1033,6 +1084,7 @@ var routerGetTests = []struct {
 		Code:    params.ErrNotFound,
 		Message: `not found: URL has invalid charm or bundle name: "robots.txt"`,
 	},
+	monitorLabel: "",
 }, {
 	about:                     "bulk meta handler, invalid id",
 	urlStr:                    "/meta/foo?id=robots.txt",
@@ -1043,6 +1095,7 @@ var routerGetTests = []struct {
 		Code:    params.ErrBadRequest,
 		Message: `bad request: URL has invalid charm or bundle name: "robots.txt"`,
 	},
+	monitorLabel: "/meta",
 }}
 
 // resolveTo returns a URL resolver that resolves
@@ -1123,6 +1176,7 @@ func (s *RouterSuite) TestRouterGet(c *gc.C) {
 		})
 		c.Assert(queryCount, gc.Equals, test.expectQueryCount)
 		c.Assert(includedMetadata, jc.DeepEquals, test.expectWillIncludeMetadata)
+		c.Assert(router.Monitor.Label(), gc.Equals, test.monitorLabel)
 	}
 }
 
