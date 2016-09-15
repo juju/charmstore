@@ -893,8 +893,5 @@ func parseURL(s string) (*charm.URL, error) {
 	if err != nil {
 		return nil, err
 	}
-	if u.Channel != "" {
-		return nil, errgo.Newf("charmstore ids must not contain a channel")
-	}
 	return u, nil
 }
