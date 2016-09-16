@@ -183,9 +183,7 @@ func (h *ReqHandler) servePostArchive(id *charm.URL, w http.ResponseWriter, req 
 			PromulgatedId: oldURL.PromulgatedURL(),
 		})
 	}
-	rid := &router.ResolvedURL{
-		URL: *id.WithChannel(""),
-	}
+	rid := &router.ResolvedURL{URL: *id}
 	// Choose the next revision number for the upload.
 	if oldURL == nil {
 		rid.URL.Revision = 0
@@ -254,7 +252,7 @@ func (h *ReqHandler) servePutArchive(id *charm.URL, w http.ResponseWriter, req *
 		chans = append(chans, c)
 	}
 	rid := &router.ResolvedURL{
-		URL:                 *id.WithChannel(""),
+		URL:                 *id,
 		PromulgatedRevision: -1,
 	}
 	// Get the PromulgatedURL from the request parameters. When ingesting

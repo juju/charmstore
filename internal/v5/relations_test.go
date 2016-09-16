@@ -700,7 +700,7 @@ func mustParseResolvedURL(urlStr string) *router.ResolvedURL {
 		panic(fmt.Sprintf("resolved URL %q does not contain user", urlStr))
 	}
 	return &router.ResolvedURL{
-		URL:                 *url.WithChannel(""),
+		URL:                 *url,
 		PromulgatedRevision: promRev,
 	}
 }
