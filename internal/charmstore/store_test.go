@@ -925,7 +925,7 @@ func MustParseResolvedURL(urlStr string) *router.ResolvedURL {
 		panic("resolved URL with no revision")
 	}
 	return &router.ResolvedURL{
-		URL:                 *url.WithChannel(""),
+		URL:                 *url,
 		PromulgatedRevision: promRev,
 	}
 }
