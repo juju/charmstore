@@ -24,7 +24,7 @@ import (
 
 const UsernameAttr = "username"
 
-// authorization conatains authorization information extracted from an HTTP request.
+// authorization contains authorization information extracted from an HTTP request.
 // The zero value for a authorization contains no privileges.
 type authorization struct {
 	Admin    bool
