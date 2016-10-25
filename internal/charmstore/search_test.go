@@ -143,7 +143,7 @@ var searchEntities = map[string]searchEntity{
 	},
 	// Note: "squid-forwardproxy" shares a trigram "dpr" with "wordpress".
 	"squid-forwardproxy": {
-		entity:    newEntity("cs:~charmers/wily/squid-forwardproxy-3", 3),
+		entity:    newEntity("cs:~charmers/yakkety/squid-forwardproxy-3", 3),
 		charmMeta: &charm.Meta{},
 		acl:       []string{params.Everyone},
 		downloads: 2,
@@ -279,7 +279,7 @@ func (s *StoreSearchSuite) TestExportMultiSeriesCharmsCreateExpandedVersions(c *
 		[]string{"charmers"},
 		0,
 	)
-	charmArchive = storetesting.NewCharm(storetesting.MetaWithSupportedSeries(nil, "trusty", "xenial", "utopic", "vivid", "wily"))
+	charmArchive = storetesting.NewCharm(storetesting.MetaWithSupportedSeries(nil, "trusty", "xenial", "utopic", "vivid", "wily", "yakkety"))
 	url = router.MustNewResolvedURL("cs:~charmers/juju-gui-25", -1)
 	addCharmForSearch(
 		c,
@@ -844,17 +844,17 @@ func (s *StoreSearchSuite) TestSorting(c *gc.C) {
 			searchEntities["wordpress-simple"].entity,
 			searchEntities["wordpress"].entity,
 			searchEntities["cloud-controller-worker-v2"].entity,
-			searchEntities["squid-forwardproxy"].entity,
 			searchEntities["mysql"].entity,
 			searchEntities["varnish"].entity,
+			searchEntities["squid-forwardproxy"].entity,
 		},
 	}, {
 		about:     "series descending",
 		sortQuery: "-series,name",
 		results: Entities{
+			searchEntities["squid-forwardproxy"].entity,
 			searchEntities["mysql"].entity,
 			searchEntities["varnish"].entity,
-			searchEntities["squid-forwardproxy"].entity,
 			searchEntities["cloud-controller-worker-v2"].entity,
 			searchEntities["wordpress"].entity,
 			searchEntities["wordpress-simple"].entity,
@@ -1071,7 +1071,7 @@ func (s *StoreSearchSuite) TestUpdateConflict(c *gc.C) {
 }
 
 func (s *StoreSearchSuite) TestMultiSeriesCharmFiltersSeriesCorrectly(c *gc.C) {
-	charmArchive := storetesting.NewCharm(storetesting.MetaWithSupportedSeries(nil, "trusty", "xenial", "utopic", "vivid", "wily"))
+	charmArchive := storetesting.NewCharm(storetesting.MetaWithSupportedSeries(nil, "trusty", "xenial", "utopic", "vivid", "wily", "yakkety"))
 	url := router.MustNewResolvedURL("cs:~charmers/juju-gui-25", -1)
 	addCharmForSearch(
 		c,
@@ -1112,7 +1112,7 @@ func (s *StoreSearchSuite) TestMultiSeriesCharmFiltersSeriesCorrectly(c *gc.C) {
 }
 
 func (s *StoreSearchSuite) TestMultiSeriesCharmSortsSeriesCorrectly(c *gc.C) {
-	charmArchive := storetesting.NewCharm(storetesting.MetaWithSupportedSeries(nil, "trusty", "xenial", "utopic", "vivid", "wily"))
+	charmArchive := storetesting.NewCharm(storetesting.MetaWithSupportedSeries(nil, "trusty", "xenial", "utopic", "vivid", "wily", "yakkety"))
 	url := router.MustNewResolvedURL("cs:~charmers/juju-gui-25", -1)
 	addCharmForSearch(
 		c,
@@ -1128,10 +1128,10 @@ func (s *StoreSearchSuite) TestMultiSeriesCharmSortsSeriesCorrectly(c *gc.C) {
 	res, err := s.store.Search(sp)
 	c.Assert(err, gc.IsNil)
 	c.Assert(Entities(res.Results), jc.DeepEquals, Entities{
-		newEntity("cs:~charmers/juju-gui-25", -1, "trusty", "xenial", "utopic", "vivid", "wily"),
+		newEntity("cs:~charmers/yakkety/squid-forwardproxy-3", 3),
+		newEntity("cs:~charmers/juju-gui-25", -1, "trusty", "xenial", "utopic", "vivid", "wily", "yakkety"),
 		newEntity("cs:~foo/xenial/varnish-1", -1),
 		newEntity("cs:~openstack-charmers/xenial/mysql-7", 7),
-		newEntity("cs:~charmers/wily/squid-forwardproxy-3", 3),
 		searchEntities["cloud-controller-worker-v2"].entity,
 		newEntity("cs:~charmers/precise/wordpress-23", 23),
 		newEntity("cs:~charmers/bundle/wordpress-simple-4", 4),
