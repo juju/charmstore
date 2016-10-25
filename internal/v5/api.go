@@ -7,6 +7,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -246,7 +247,7 @@ func RouterHandlers(h *ReqHandler) *router.Handlers {
 			"publish":     resolveId(h.servePublish),
 			"promulgate":  resolveId(h.servePromulgate),
 			"readme":      resolveId(authId(h.serveReadMe), "contents", "blobname"),
-			"resource/":   resolveId(authId(h.serveResources), "charmmeta"),
+			"resource/":   reqBodyReadHandler(resolveId(authId(h.serveResources), "charmmeta")),
 		},
 		Meta: map[string]router.BulkIncludeHandler{
 			"archive-size":         h.EntityHandler(h.metaArchiveSize, "size"),
@@ -1577,6 +1578,20 @@ func (h *ReqHandler) ResolvedIdHandler(f ResolvedIdHandler, cacheFields ...strin
 			return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 		}
 		return f(rid, w, req)
+	}
+}
+
+// reqBodyReadHandler returns an id handler that reads the request body
+// before returning a response.
+func reqBodyReadHandler(f router.IdHandler) router.IdHandler {
+	return func(id *charm.URL, w http.ResponseWriter, req *http.Request) error {
+		r := f(id, w, req)
+		count, err := io.Copy(ioutil.Discard, req.Body)
+		if err != nil {
+			logger.Errorf("error discarding request body %s", err)
+		}
+		logger.Debugf("discarded %d bytes from request body", count)
+		return r
 	}
 }
 
