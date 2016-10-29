@@ -4,6 +4,7 @@
 package v5 // import "gopkg.in/juju/charmstore.v5-unstable/internal/v5"
 
 import (
+	"bufio"
 	"encoding/hex"
 	"net/http"
 	"net/url"
@@ -104,6 +105,31 @@ func (h *ReqHandler) serveUploadResource(id *router.ResolvedURL, w http.Response
 			}
 		}
 	}
+
+	if req.Header.Get("Expect") == "100-continue" {
+		logger.Debugf("continuing... *** 100-continue ***")
+		hj, ok := w.(http.Hijacker)
+		if !ok {
+			logger.Debugf("writer is not an http.Hijacker %#v", w)
+			return errgo.WithCausef(nil, params.ErrForbidden, "webserver doesn't support hijacking")
+		}
+		conn, bufrw, err := hj.Hijack()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return errgo.Mask(err)
+		}
+		// Don't forget to close the connection:
+		defer conn.Close()
+		bufrw.WriteString("HTTP/1.1 100 Continue\r\n\r\n")
+		bufrw.Flush()
+		// The session has been hijacked, so writing must be completed
+		// using the hijacked writer.
+		// By wrapping that hijacked writer in something which implements
+		// ResponseWriter interface, the httprequest.WriteJSON can still
+		// be used to write a response.
+		w = &dumb200ResponseWriter{ReadWriter: bufrw, ResponseWriter: w}
+	}
+
 	rdoc, err := h.Store.UploadResource(id, name, req.Body, hash, req.ContentLength)
 	if err != nil {
 		return errgo.Mask(err)
@@ -111,6 +137,40 @@ func (h *ReqHandler) serveUploadResource(id *router.ResolvedURL, w http.Response
 	return httprequest.WriteJSON(w, http.StatusOK, &params.ResourceUploadResponse{
 		Revision: rdoc.Revision,
 	})
+}
+
+// dumb200ResponseWriter is a simple implementation of http.ResponseWriter.
+// It should never be used unless needed with a connection which has been hijacked.
+// It should only be used with a handler which calls Write only once.
+type dumb200ResponseWriter struct {
+	*bufio.ReadWriter
+	http.ResponseWriter
+	wroteHeader bool
+}
+
+// Write writes the data to the connection as part of an HTTP reply.
+func (w *dumb200ResponseWriter) Write(data []byte) (int, error) {
+	if !w.wroteHeader {
+		w.ReadWriter.WriteString("HTTP/1.1 200 OK\r\n")
+		w.ResponseWriter.Header().Write(w.ReadWriter)
+		w.ReadWriter.Write([]byte("\r\n"))
+	}
+	n, err := w.ReadWriter.Write(data)
+	// There is a bug here for the general use case. This is NOT intended to be
+	// used in the general case.
+	w.ReadWriter.Write([]byte("\r\n"))
+	w.ReadWriter.Flush()
+	return n, err
+}
+
+// WriteHeader is a no-op. Write does its work.
+func (w *dumb200ResponseWriter) WriteHeader(code int) {
+}
+
+// Header returns the header map that will be sent by
+// WriteHeader.
+func (w *dumb200ResponseWriter) Header() http.Header {
+	return w.ResponseWriter.Header()
 }
 
 // GET id/meta/resource
