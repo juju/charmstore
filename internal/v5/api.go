@@ -1586,11 +1586,16 @@ func (h *ReqHandler) ResolvedIdHandler(f ResolvedIdHandler, cacheFields ...strin
 func reqBodyReadHandler(f router.IdHandler) router.IdHandler {
 	return func(id *charm.URL, w http.ResponseWriter, req *http.Request) error {
 		r := f(id, w, req)
-		count, err := io.Copy(ioutil.Discard, req.Body)
-		if err != nil {
-			logger.Errorf("error discarding request body %s", err)
+		// Do not flush the body if client requested 100-continue and there was an error.
+		if r == nil && req.Header.Get("Expect") == "100-continue" {
+			count, err := io.Copy(ioutil.Discard, req.Body)
+			if err != nil {
+				logger.Errorf("error discarding request body %s", err)
+			}
+			logger.Debugf("discarded %d bytes from request body", count)
+		} else {
+			logger.Debugf("skipping request body read because request failed and client requested 100-continue")
 		}
-		logger.Debugf("discarded %d bytes from request body", count)
 		return r
 	}
 }

@@ -104,6 +104,25 @@ func (h *ReqHandler) serveUploadResource(id *router.ResolvedURL, w http.Response
 			}
 		}
 	}
+
+	if req.Header.Get("Expect") == "100-continue" {
+		logger.Debugf("continuing... *** 100-continue ***")
+		hj, ok := w.(http.Hijacker)
+		if !ok {
+			http.Error(w, "webserver doesn't support hijacking", http.StatusInternalServerError)
+			return errgo.Mask(err)
+		}
+		conn, bufrw, err := hj.Hijack()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return errgo.Mask(err)
+		}
+		// Don't forget to close the connection:
+		defer conn.Close()
+		bufrw.WriteString("HTTP/1.1 100 Continue\r\n\r\n")
+		bufrw.Flush()
+	}
+
 	rdoc, err := h.Store.UploadResource(id, name, req.Body, hash, req.ContentLength)
 	if err != nil {
 		return errgo.Mask(err)
