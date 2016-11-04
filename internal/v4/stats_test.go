@@ -1,7 +1,7 @@
 // Copyright 2012 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package v4_test // import "gopkg.in/juju/charmstore.v5-unstable/internal/v4"
+package v4_test
 
 import (
 	"encoding/json"
@@ -17,7 +17,7 @@ import (
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/v4"
+	"gopkg.in/juju/charmstore.v5-unstable/internal/v5"
 )
 
 type StatsSuite struct {
@@ -634,7 +634,7 @@ func (s *StatsSuite) TestStatsCounterBy(c *gc.C) {
 func (s *StatsSuite) TestStatsEnabled(c *gc.C) {
 	statsEnabled := func(url string) bool {
 		req, _ := http.NewRequest("GET", url, nil)
-		return v4.StatsEnabled(req)
+		return v5.StatsEnabled(req)
 	}
 	c.Assert(statsEnabled("http://foo.com"), gc.Equals, true)
 	c.Assert(statsEnabled("http://foo.com?stats=1"), gc.Equals, true)

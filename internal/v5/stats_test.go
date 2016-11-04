@@ -1,7 +1,7 @@
 // Copyright 2012 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package v5_test // import "gopkg.in/juju/charmstore.v5-unstable/internal/v5"
+package v5_test
 
 import (
 	"encoding/json"
@@ -305,15 +305,11 @@ func (s *StatsSuite) TestServerStatsUpdateNotPartOfStatsUpdateGroup(c *gc.C) {
 func (s *StatsSuite) TestServerStatsUpdatePartOfStatsUpdateGroup(c *gc.C) {
 	s.addPublicCharm(c, storetesting.Charms.CharmDir("wordpress"), newResolvedURL("~charmers/precise/wordpress-23", 23))
 
-	s.discharge = dischargeForUser("statsupdate")
-	s.idM.groups = map[string][]string{
-		"statsupdate": {"statsupdate@cs"},
-	}
-
+	s.idmServer.AddUser("statsupdate", "statsupdate@cs")
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler: s.srv,
 		URL:     storeURL("stats/update"),
-		Do:      bakeryDo(nil),
+		Do:      s.bakeryDoAsUser("statsupdate"),
 		Method:  "PUT",
 		JSONBody: params.StatsUpdateRequest{
 			Entries: []params.StatsUpdateEntry{{

@@ -1,7 +1,7 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package v4_test // import "gopkg.in/juju/charmstore.v5-unstable/internal/v4"
+package v4_test
 
 import (
 	"bytes"
@@ -20,7 +20,7 @@ import (
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/v4"
+	"gopkg.in/juju/charmstore.v5-unstable/internal/v5"
 )
 
 var serveDiagramErrorsTests = []struct {
@@ -308,7 +308,7 @@ func (s *APISuite) TestServeDefaultIcon(c *gc.C) {
 		URL:     storeURL(url.URL.Path() + "/icon.svg"),
 	})
 	c.Assert(rec.Code, gc.Equals, http.StatusOK)
-	c.Assert(rec.Body.String(), gc.Equals, v4.DefaultIcon)
+	c.Assert(rec.Body.String(), gc.Equals, v5.DefaultIcon)
 	c.Assert(rec.Header().Get("Content-Type"), gc.Equals, "image/svg+xml")
 	assertCacheControl(c, rec.Header(), true)
 }
@@ -333,7 +333,7 @@ func (s *APISuite) TestServeDefaultIconForBadXML(c *gc.C) {
 			URL:     storeURL(url.URL.Path() + "/icon.svg"),
 		})
 		c.Assert(rec.Code, gc.Equals, http.StatusOK)
-		c.Assert(rec.Body.String(), gc.Equals, v4.DefaultIcon)
+		c.Assert(rec.Body.String(), gc.Equals, v5.DefaultIcon)
 		c.Assert(rec.Header().Get("Content-Type"), gc.Equals, "image/svg+xml")
 		assertCacheControl(c, rec.Header(), true)
 	}

@@ -1,7 +1,7 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package v5_test // import "gopkg.in/juju/charmstore.v5-unstable/internal/v5"
+package v5_test
 
 import (
 	"bytes"
@@ -430,14 +430,15 @@ func (s *logSuite) TestPostLogsMultipleEntries(c *gc.C) {
 	})
 
 	// Ensure the log messages has been added to the database.
+	// TODO avoid reordering logs by adding a sequence number.
 	var docs []mongodoc.Log
-	err = s.store.DB.Logs().Find(nil).Sort("id").All(&docs)
+	err = s.store.DB.Logs().Find(nil).Sort("level").All(&docs)
 	c.Assert(err, gc.IsNil)
 	c.Assert(docs, gc.HasLen, 2)
-	c.Assert(string(docs[0].Data), gc.Equals, string(infoData))
-	c.Assert(docs[0].Level, gc.Equals, mongodoc.InfoLevel)
-	c.Assert(string(docs[1].Data), gc.Equals, string(warningData))
-	c.Assert(docs[1].Level, gc.Equals, mongodoc.WarningLevel)
+	c.Check(string(docs[0].Data), gc.Equals, string(infoData))
+	c.Check(docs[0].Level, gc.Equals, mongodoc.InfoLevel)
+	c.Check(string(docs[1].Data), gc.Equals, string(warningData))
+	c.Check(docs[1].Level, gc.Equals, mongodoc.WarningLevel)
 }
 
 var postLogsErrorsTests = []struct {
@@ -500,7 +501,7 @@ func (s *logSuite) TestPostLogsErrors(c *gc.C) {
 }
 
 func (s *logSuite) TestGetLogsUnauthorizedError(c *gc.C) {
-	s.AssertEndpointAuth(c, httptesting.JSONCallParams{
+	s.AssertAuthOnAdminEndpoint(c, httptesting.JSONCallParams{
 		URL:          storeURL("log"),
 		ExpectStatus: http.StatusOK,
 		ExpectBody:   []params.LogResponse{},

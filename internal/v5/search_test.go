@@ -1,7 +1,7 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package v5_test // import "gopkg.in/juju/charmstore.v5-unstable/internal/v5"
+package v5_test
 
 import (
 	"encoding/json"
@@ -33,7 +33,8 @@ var exportTestCharms = map[string]*router.ResolvedURL{
 	"wordpress": newResolvedURL("cs:~charmers/precise/wordpress-23", 23),
 	"mysql":     newResolvedURL("cs:~openstack-charmers/trusty/mysql-7", 7),
 	"varnish":   newResolvedURL("cs:~foo/trusty/varnish-1", -1),
-	"riak":      newResolvedURL("cs:~charmers/trusty/riak-67", 67),
+	// Note: the riak charm is set up without read-everyone permissions.
+	"riak": newResolvedURL("cs:~charmers/trusty/riak-67", 67),
 }
 
 var exportTestBundles = map[string]*router.ResolvedURL{
@@ -592,7 +593,7 @@ func (s *SearchSuite) TestSearchIncludeError(c *gc.C) {
 	// It will be automatically removed later because IsolatedMgoESSuite
 	// uses LoggingSuite.
 	var tw loggo.TestWriter
-	err = loggo.RegisterWriter("test-log", &tw, loggo.DEBUG)
+	err = loggo.RegisterWriter("test-log", &tw)
 	c.Assert(err, gc.IsNil)
 
 	rec = httptesting.DoRequest(c, httptesting.DoRequestParams{
@@ -754,7 +755,7 @@ func (s *SearchSuite) TestSearchWithUserMacaroon(c *gc.C) {
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.srv,
 		URL:     storeURL("search"),
-		Do:      s.bakeryDoAsUser(c, "test-user"),
+		Do:      bakeryDo(s.login("test-user")),
 	})
 	c.Assert(rec.Code, gc.Equals, http.StatusOK)
 	expected := []*router.ResolvedURL{
@@ -781,7 +782,7 @@ func (s *SearchSuite) TestSearchDoesNotCreateExtraMacaroons(c *gc.C) {
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.srv,
 		URL:     storeURL("search"),
-		Do:      s.bakeryDoAsUser(c, "noone"),
+		Do:      s.bakeryDoAsUser("noone"),
 	})
 	c.Assert(rec.Code, gc.Equals, http.StatusOK)
 	n, err = s.store.DB.Macaroons().Find(nil).Count()
@@ -790,13 +791,11 @@ func (s *SearchSuite) TestSearchDoesNotCreateExtraMacaroons(c *gc.C) {
 }
 
 func (s *SearchSuite) TestSearchWithUserInGroups(c *gc.C) {
-	s.idM.groups = map[string][]string{
-		"bob": {"test-user", "test-user2"},
-	}
+	s.idmServer.AddUser("bob", "test-user", "test-user2")
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.srv,
 		URL:     storeURL("search"),
-		Do:      s.bakeryDoAsUser(c, "bob"),
+		Do:      bakeryDo(s.login("bob")),
 	})
 	c.Assert(rec.Code, gc.Equals, http.StatusOK)
 	expected := []*router.ResolvedURL{
@@ -815,7 +814,7 @@ func (s *SearchSuite) TestSearchWithUserInGroups(c *gc.C) {
 func (s *SearchSuite) TestSearchWithBadAdminCredentialsAndACookie(c *gc.C) {
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler:  s.srv,
-		Do:       s.bakeryDoAsUser(c, "test-user"),
+		Do:       s.bakeryDoAsUser("test-user"),
 		URL:      storeURL("search"),
 		Username: testUsername,
 		Password: "bad-password",
@@ -834,12 +833,17 @@ func (s *SearchSuite) TestSearchWithBadAdminCredentialsAndACookie(c *gc.C) {
 }
 
 func assertResultSet(c *gc.C, sr params.SearchResponse, expected []*router.ResolvedURL) {
-	sort.Sort(searchResultById(sr.Results))
-	sort.Sort(resolvedURLByPreferredURL(expected))
-	c.Assert(sr.Results, gc.HasLen, len(expected), gc.Commentf("expected %#v", expected))
-	for i := range expected {
-		c.Assert(sr.Results[i].Id.String(), gc.Equals, expected[i].PreferredURL().String(), gc.Commentf("element %d"))
+	results := make([]string, len(sr.Results))
+	for i, r := range sr.Results {
+		results[i] = r.Id.String()
 	}
+	expect := make([]string, len(expected))
+	for i, e := range expected {
+		expect[i] = e.PreferredURL().String()
+	}
+	sort.Strings(results)
+	sort.Strings(expect)
+	c.Assert(results, jc.DeepEquals, expect)
 }
 
 type searchResultById []params.EntityResult

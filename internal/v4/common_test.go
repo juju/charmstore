@@ -1,25 +1,26 @@
-package v4_test // import "gopkg.in/juju/charmstore.v5-unstable/internal/v4"
+package v4_test
 
 import (
 	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
-	"net/http/httptest"
+	"net/url"
 	"time"
 
+	"github.com/juju/idmclient"
+	"github.com/juju/idmclient/idmtest"
 	"github.com/juju/loggo"
 	jujutesting "github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
 	"github.com/julienschmidt/httprouter"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakerytest"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	macaroon "gopkg.in/macaroon.v2-unstable"
 	"gopkg.in/mgo.v2"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
@@ -70,18 +71,9 @@ type commonSuite struct {
 	// esSuite is set only when enableES is set to true.
 	esSuite *storetesting.ElasticSearchSuite
 
-	// discharge holds the function that will be used
-	// to check third party caveats by the mock
-	// discharger. This will be ignored if enableIdentity was
-	// not true before commonSuite.SetUpTest is invoked.
-	//
-	// It may be set by tests to influence the behavior of the
-	// discharger.
-	discharge func(cav, arg string) ([]checkers.Caveat, error)
-
-	discharger *bakerytest.Discharger
-	idM        *idM
-	idMServer  *httptest.Server
+	// idmServer holds the fake IDM server instance. It
+	// is only non-nil when enableIdentity is true.
+	idmServer *idmtest.Server
 
 	// The following fields may be set before
 	// SetUpSuite is invoked on commonSuite
@@ -120,8 +112,7 @@ func (s *commonSuite) SetUpTest(c *gc.C) {
 		s.esSuite.SetUpTest(c)
 	}
 	if s.enableIdentity {
-		s.idM = newIdM()
-		s.idMServer = httptest.NewServer(s.idM)
+		s.idmServer = idmtest.NewServer()
 	}
 	s.startServer(c)
 }
@@ -134,9 +125,8 @@ func (s *commonSuite) TearDownTest(c *gc.C) {
 	if s.esSuite != nil {
 		s.esSuite.TearDownTest(c)
 	}
-	if s.discharger != nil {
-		s.discharger.Close()
-		s.idMServer.Close()
+	if s.idmServer != nil {
+		s.idmServer.Close()
 	}
 	s.IsolatedMgoSuite.TearDownTest(c)
 }
@@ -153,20 +143,15 @@ func (s *commonSuite) startServer(c *gc.C) {
 		AgentUsername:    "notused",
 		AgentKey:         new(bakery.KeyPair),
 	}
-	keyring := bakery.NewPublicKeyRing()
+	keyring := httpbakery.NewPublicKeyRing(nil, nil)
+	keyring.AllowInsecure()
 	if s.enableIdentity {
-		s.discharge = func(_, _ string) ([]checkers.Caveat, error) {
-			return nil, errgo.New("no discharge")
-		}
-		discharger := bakerytest.NewDischarger(nil, func(_ *http.Request, cond string, arg string) ([]checkers.Caveat, error) {
-			return s.discharge(cond, arg)
-		})
-		config.IdentityLocation = discharger.Location()
-		config.IdentityAPIURL = s.idMServer.URL
-		pk, err := httpbakery.PublicKeyForLocation(http.DefaultClient, discharger.Location())
-		c.Assert(err, gc.IsNil)
-		err = keyring.AddPublicKeyForLocation(discharger.Location(), true, pk)
-		c.Assert(err, gc.IsNil)
+		s.idmServer = idmtest.NewServer()
+		config.AgentUsername = "charmstore-agent"
+		s.idmServer.AddUser(config.AgentUsername)
+		config.AgentKey = s.idmServer.UserPublicKey(config.AgentUsername)
+		config.IdentityLocation = s.idmServer.URL.String()
+		c.Logf("added public key for location %v", config.IdentityLocation)
 	}
 	config.PublicKeyLocator = keyring
 	var si *charmstore.SearchIndex
@@ -262,6 +247,38 @@ func (s *commonSuite) handler(c *gc.C) v4.ReqHandler {
 
 func storeURL(path string) string {
 	return "/v4/" + path
+}
+
+func (s *commonSuite) bakeryDoAsUser(user string) func(*http.Request) (*http.Response, error) {
+	return bakeryDo(s.idmServer.Client(user))
+}
+
+// login returns a bakery client that holds a macaroon that
+// declares the given authenticated user.
+// The login macaroon will be attenuated by the given first
+// party caveat conditions.
+func (s *commonSuite) login(user string, conditions ...string) *httpbakery.Client {
+	var caveats []checkers.Caveat
+	for _, cond := range conditions {
+		caveats = append(caveats, checkers.Caveat{
+			Condition: cond,
+		})
+	}
+	caveats = append(caveats, idmclient.UserDeclaration(user))
+	m, err := s.store.Bakery.NewMacaroon(caveats)
+	if err != nil {
+		panic(err)
+	}
+	client := httpbakery.NewClient()
+	u, err := url.Parse("http://127.0.0.1")
+	if err != nil {
+		panic(err)
+	}
+	err = httpbakery.SetCookie(client.Jar, u, macaroon.Slice{m})
+	if err != nil {
+		panic(err)
+	}
+	return client
 }
 
 // addRequiredCharms adds any charms required by the given
@@ -375,28 +392,24 @@ func (s *commonSuite) assertPutIsUnauthorized(c *gc.C, url string, val interface
 
 // doAsUser calls the given function, discharging any authorization
 // request as the given user name.
+// If user is empty, no discharge will be allowed.
 func (s *commonSuite) doAsUser(user string, f func()) {
-	old := s.discharge
-	s.discharge = dischargeForUser(user)
-	defer func() {
-		s.discharge = old
-	}()
+	s.idmServer.SetDefaultUser(user)
+	defer s.idmServer.SetDefaultUser("")
 	f()
 }
 
-func bakeryDo(client *http.Client) func(*http.Request) (*http.Response, error) {
+func bakeryDo(client *httpbakery.Client) func(*http.Request) (*http.Response, error) {
 	if client == nil {
-		client = httpbakery.NewHTTPClient()
+		client = httpbakery.NewClient()
 	}
-	bclient := httpbakery.NewClient()
-	bclient.Client = client
 	return func(req *http.Request) (*http.Response, error) {
-		if req.Body != nil {
-			body := req.Body.(io.ReadSeeker)
-			req.Body = nil
-			return bclient.DoWithBody(req, body)
+		if req.Body == nil {
+			return client.Do(req)
 		}
-		return bclient.Do(req)
+		body := req.Body.(io.ReadSeeker)
+		req.Body = nil
+		return client.DoWithBody(req, body)
 	}
 }
 

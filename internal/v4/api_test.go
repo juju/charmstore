@@ -1,7 +1,7 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package v4_test // import "gopkg.in/juju/charmstore.v5-unstable/internal/v4"
+package v4_test
 
 import (
 	"archive/zip"
@@ -12,10 +12,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"reflect"
-	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	jc "github.com/juju/testing/checkers"
@@ -25,7 +23,6 @@ import (
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/macaroon.v2-unstable"
 	"gopkg.in/mgo.v2/bson"
@@ -643,8 +640,6 @@ func (s *APISuite) TestMetaEndpointsSingle(c *gc.C) {
 }
 
 func (s *APISuite) TestMetaPerm(c *gc.C) {
-	s.discharge = dischargeForUser("charmers")
-
 	for _, u := range []*router.ResolvedURL{
 		newResolvedURL("~charmers/precise/wordpress-23", 23),
 		newResolvedURL("~charmers/precise/wordpress-24", 24),
@@ -743,7 +738,6 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 	})
 
 	s.doAsUser("charmers", func() {
-		s.discharge = dischargeForUser("charmers")
 		s.assertPut(c, "precise/wordpress-23/meta/perm/read", []string{"bob", "charlie"})
 		s.assertGetIsUnauthorized(c, "~charmers/precise/wordpress/meta/perm/read?channel=edge", `unauthorized: access denied for user "charmers"`)
 	})
@@ -2744,7 +2738,7 @@ var urlChannelResolvingTests = []struct {
 }}
 
 func (s *APISuite) TestURLChannelResolving(c *gc.C) {
-	s.discharge = dischargeForUser("charmers")
+	s.idmServer.SetDefaultUser("charmers")
 	for _, add := range urlChannelResolvingEntities {
 		err := s.store.AddCharmWithArchive(add.id, storetesting.NewCharm(nil))
 		c.Assert(err, gc.IsNil)
@@ -2890,15 +2884,6 @@ func mustMarshalJSON(val interface{}) string {
 }
 
 func (s *APISuite) TestMacaroon(c *gc.C) {
-	var checkedCaveats []string
-	var mu sync.Mutex
-	var dischargeError error
-	s.discharge = func(cond string, arg string) ([]checkers.Caveat, error) {
-		mu.Lock()
-		defer mu.Unlock()
-		checkedCaveats = append(checkedCaveats, cond+" "+arg)
-		return []checkers.Caveat{checkers.DeclaredCaveat("username", "who")}, dischargeError
-	}
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.srv,
 		URL:     storeURL("macaroon"),
@@ -2909,13 +2894,11 @@ func (s *APISuite) TestMacaroon(c *gc.C) {
 	err := json.Unmarshal(rec.Body.Bytes(), &m)
 	c.Assert(err, gc.IsNil)
 	c.Assert(m.Location(), gc.Equals, "charmstore")
+
+	s.idmServer.SetDefaultUser("who")
 	client := httpbakery.NewClient()
 	ms, err := client.DischargeAll(&m)
 	c.Assert(err, gc.IsNil)
-	sort.Strings(checkedCaveats)
-	c.Assert(checkedCaveats, jc.DeepEquals, []string{
-		"is-authenticated-user ",
-	})
 	macaroonCookie, err := httpbakery.NewCookie(ms)
 	c.Assert(err, gc.IsNil)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -2954,10 +2937,8 @@ func (s *APISuite) TestWhoAmIFailWithNoMacaroon(c *gc.C) {
 }
 
 func (s *APISuite) TestWhoAmIReturnsNameAndGroups(c *gc.C) {
-	s.discharge = dischargeForUser("who")
-	s.idM.groups = map[string][]string{
-		"who": {"foo", "bar"},
-	}
+	s.idmServer.AddUser("who", "foo", "bar")
+	s.idmServer.SetDefaultUser("who")
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:      s.srv,
 		URL:          storeURL("whoami"),
@@ -2971,14 +2952,17 @@ func (s *APISuite) TestWhoAmIReturnsNameAndGroups(c *gc.C) {
 }
 
 var promulgateTests = []struct {
-	about              string
-	entities           []*mongodoc.Entity
-	baseEntities       []*mongodoc.BaseEntity
-	id                 string
-	useHTTPDo          bool
-	method             string
-	caveats            []checkers.Caveat
-	groups             map[string][]string
+	about        string
+	entities     []*mongodoc.Entity
+	baseEntities []*mongodoc.BaseEntity
+	id           string
+	method       string
+	// asUser holds the user to authenticate as. If it's empty,
+	// the regular HTTP client will be used.
+	asUser string
+	// groups holds the groups the authenticated user will
+	// be considered a part of.
+	groups             []string
 	body               io.Reader
 	username           string
 	password           string
@@ -2987,7 +2971,7 @@ var promulgateTests = []struct {
 	expectEntities     []*mongodoc.Entity
 	expectBaseEntities []*mongodoc.BaseEntity
 	expectPromulgate   bool
-	expectUser         string
+	expectAuditUser    string
 }{{
 	about: "unpromulgate base entity",
 	entities: []*mongodoc.Entity{
@@ -3007,7 +2991,7 @@ var promulgateTests = []struct {
 	expectBaseEntities: []*mongodoc.BaseEntity{
 		storetesting.NewBaseEntity("~charmers/wordpress").Build(),
 	},
-	expectUser: "admin",
+	expectAuditUser: "admin",
 }, {
 	about: "promulgate base entity",
 	entities: []*mongodoc.Entity{
@@ -3026,11 +3010,11 @@ var promulgateTests = []struct {
 	},
 	expectBaseEntities: []*mongodoc.BaseEntity{
 		storetesting.NewBaseEntity("~charmers/wordpress").WithACLs(params.StableChannel, mongodoc.ACL{
-			Write: []string{v4.PromulgatorsGroup},
+			Write: []string{v5.PromulgatorsGroup},
 		}).WithPromulgated(true).Build(),
 	},
 	expectPromulgate: true,
-	expectUser:       "admin",
+	expectAuditUser:  "admin",
 }, {
 	about: "unpromulgate base entity not found",
 	entities: []*mongodoc.Entity{
@@ -3132,11 +3116,9 @@ var promulgateTests = []struct {
 	baseEntities: []*mongodoc.BaseEntity{
 		storetesting.NewBaseEntity("~charmers/wordpress").WithPromulgated(true).Build(),
 	},
-	id:   "~charmers/wordpress",
-	body: storetesting.JSONReader(params.PromulgateRequest{Promulgated: false}),
-	caveats: []checkers.Caveat{
-		checkers.DeclaredCaveat(v4.UsernameAttr, v4.PromulgatorsGroup),
-	},
+	id:           "~charmers/wordpress",
+	body:         storetesting.JSONReader(params.PromulgateRequest{Promulgated: false}),
+	asUser:       v5.PromulgatorsGroup,
 	expectStatus: http.StatusOK,
 	expectEntities: []*mongodoc.Entity{
 		storetesting.NewEntity("~charmers/trusty/wordpress-0").WithPromulgatedURL("trusty/wordpress-0").Build(),
@@ -3144,7 +3126,7 @@ var promulgateTests = []struct {
 	expectBaseEntities: []*mongodoc.BaseEntity{
 		storetesting.NewBaseEntity("~charmers/wordpress").Build(),
 	},
-	expectUser: v4.PromulgatorsGroup,
+	expectAuditUser: v5.PromulgatorsGroup,
 }, {
 	about: "promulgate base entity with macaroon",
 	entities: []*mongodoc.Entity{
@@ -3153,22 +3135,20 @@ var promulgateTests = []struct {
 	baseEntities: []*mongodoc.BaseEntity{
 		storetesting.NewBaseEntity("~charmers/wordpress").Build(),
 	},
-	id:   "~charmers/wordpress",
-	body: storetesting.JSONReader(params.PromulgateRequest{Promulgated: true}),
-	caveats: []checkers.Caveat{
-		checkers.DeclaredCaveat(v4.UsernameAttr, v4.PromulgatorsGroup),
-	},
+	id:           "~charmers/wordpress",
+	body:         storetesting.JSONReader(params.PromulgateRequest{Promulgated: true}),
+	asUser:       v5.PromulgatorsGroup,
 	expectStatus: http.StatusOK,
 	expectEntities: []*mongodoc.Entity{
 		storetesting.NewEntity("~charmers/trusty/wordpress-0").WithPromulgatedURL("trusty/wordpress-0").Build(),
 	},
 	expectBaseEntities: []*mongodoc.BaseEntity{
 		storetesting.NewBaseEntity("~charmers/wordpress").WithACLs(params.StableChannel, mongodoc.ACL{
-			Write: []string{v4.PromulgatorsGroup},
+			Write: []string{v5.PromulgatorsGroup},
 		}).WithPromulgated(true).Build(),
 	},
 	expectPromulgate: true,
-	expectUser:       v4.PromulgatorsGroup,
+	expectAuditUser:  v5.PromulgatorsGroup,
 }, {
 	about: "promulgate base entity with group macaroon",
 	entities: []*mongodoc.Entity{
@@ -3177,25 +3157,21 @@ var promulgateTests = []struct {
 	baseEntities: []*mongodoc.BaseEntity{
 		storetesting.NewBaseEntity("~charmers/wordpress").Build(),
 	},
-	id:   "~charmers/wordpress",
-	body: storetesting.JSONReader(params.PromulgateRequest{Promulgated: true}),
-	caveats: []checkers.Caveat{
-		checkers.DeclaredCaveat(v4.UsernameAttr, "bob"),
-	},
-	groups: map[string][]string{
-		"bob": {v4.PromulgatorsGroup, "yellow"},
-	},
+	id:           "~charmers/wordpress",
+	body:         storetesting.JSONReader(params.PromulgateRequest{Promulgated: true}),
+	asUser:       "bob",
+	groups:       []string{v5.PromulgatorsGroup, "yellow"},
 	expectStatus: http.StatusOK,
 	expectEntities: []*mongodoc.Entity{
 		storetesting.NewEntity("~charmers/trusty/wordpress-0").WithPromulgatedURL("trusty/wordpress-0").Build(),
 	},
 	expectBaseEntities: []*mongodoc.BaseEntity{
 		storetesting.NewBaseEntity("~charmers/wordpress").WithACLs(params.StableChannel, mongodoc.ACL{
-			Write: []string{v4.PromulgatorsGroup},
+			Write: []string{v5.PromulgatorsGroup},
 		}).WithPromulgated(true).Build(),
 	},
 	expectPromulgate: true,
-	expectUser:       "bob",
+	expectAuditUser:  "bob",
 }, {
 	about: "no authorisation",
 	entities: []*mongodoc.Entity{
@@ -3204,7 +3180,6 @@ var promulgateTests = []struct {
 	baseEntities: []*mongodoc.BaseEntity{
 		storetesting.NewBaseEntity("~charmers/wordpress").WithPromulgated(true).Build(),
 	},
-	useHTTPDo:    true,
 	id:           "~charmers/wordpress",
 	body:         storetesting.JSONReader(params.PromulgateRequest{Promulgated: false}),
 	expectStatus: http.StatusProxyAuthRequired,
@@ -3223,14 +3198,10 @@ var promulgateTests = []struct {
 	baseEntities: []*mongodoc.BaseEntity{
 		storetesting.NewBaseEntity("~charmers/wordpress").Build(),
 	},
-	id:   "~charmers/wordpress",
-	body: storetesting.JSONReader(params.PromulgateRequest{Promulgated: true}),
-	caveats: []checkers.Caveat{
-		checkers.DeclaredCaveat(v4.UsernameAttr, "bob"),
-	},
-	groups: map[string][]string{
-		"bob": {"yellow"},
-	},
+	id:           "~charmers/wordpress",
+	body:         storetesting.JSONReader(params.PromulgateRequest{Promulgated: true}),
+	asUser:       "bob",
+	groups:       []string{"yellow"},
 	expectStatus: http.StatusUnauthorized,
 	expectBody: params.Error{
 		Message: `unauthorized: access denied for user "bob"`,
@@ -3263,11 +3234,6 @@ func (s *APISuite) TestPromulgate(c *gc.C) {
 			test.method = "PUT"
 		}
 
-		client := httpbakery.NewHTTPClient()
-		s.discharge = func(_, _ string) ([]checkers.Caveat, error) {
-			return test.caveats, nil
-		}
-		s.idM.groups = test.groups
 		p := httptesting.JSONCallParams{
 			Handler: s.srv,
 			// TODO avoid using channel=unpublished here
@@ -3280,8 +3246,10 @@ func (s *APISuite) TestPromulgate(c *gc.C) {
 			ExpectStatus: test.expectStatus,
 			ExpectBody:   test.expectBody,
 		}
-		if !test.useHTTPDo {
-			p.Do = bakeryDo(client)
+		if test.asUser != "" {
+			s.idmServer.RemoveUser(test.asUser)
+			s.idmServer.AddUser(test.asUser, test.groups...)
+			p.Do = bakeryDo(s.idmServer.Client(test.asUser))
 		}
 		httptesting.AssertJSONCall(c, p)
 		n, err := s.store.DB.Entities().Count()

@@ -1,7 +1,7 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package v4_test // import "gopkg.in/juju/charmstore.v5-unstable/internal/v4"
+package v4_test
 
 import (
 	"archive/zip"
@@ -34,7 +34,7 @@ import (
 	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/storetesting/stats"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/v4"
+	"gopkg.in/juju/charmstore.v5-unstable/internal/v5"
 )
 
 type ArchiveSuite struct {
@@ -410,7 +410,7 @@ loop:
 }
 
 func (s *ArchiveSuite) TestPostCharm(c *gc.C) {
-	s.discharge = dischargeForUser("charmers")
+	s.idmServer.SetDefaultUser("charmers")
 
 	// A charm that did not exist before should get revision 0.
 	s.assertUploadCharm(c, "POST", newResolvedURL("~charmers/precise/wordpress-0", -1), "wordpress")
@@ -1025,7 +1025,7 @@ func (s *ArchiveSuite) TestArchiveFileErrors(c *gc.C) {
 	id, _ := s.addPublicCharmFromRepo(c, "mysql", newResolvedURL("cs:~charmers/utopic/mysql-0", 0))
 	err := s.store.SetPerms(&id.URL, "stable.read", "no-one")
 	c.Assert(err, gc.IsNil)
-	s.discharge = dischargeForUser("bob")
+	s.idmServer.SetDefaultUser("bob")
 	for i, test := range archiveFileErrorsTests {
 		c.Logf("test %d: %s", i, test.about)
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -1426,7 +1426,7 @@ func hashOf(r io.Reader) (hashSum string, size int64) {
 // whether the id in the request represents a public charm or bundle.
 func assertCacheControl(c *gc.C, h http.Header, isPublic bool) {
 	if isPublic {
-		seconds := v4.ArchiveCachePublicMaxAge / time.Second
+		seconds := v5.ArchiveCachePublicMaxAge / time.Second
 		c.Assert(h.Get("Cache-Control"), gc.Equals, fmt.Sprintf("public, max-age=%d", seconds))
 	} else {
 		c.Assert(h.Get("Cache-Control"), gc.Equals, "no-cache, must-revalidate")

@@ -1,22 +1,22 @@
-package v5_test // import "gopkg.in/juju/charmstore.v5-unstable/internal/v5"
+package v5_test
 
 import (
 	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
-	"net/http/httptest"
+	"net/url"
 	"strings"
 	"time"
 
+	"github.com/juju/idmclient"
+	"github.com/juju/idmclient/idmtest"
 	"github.com/juju/loggo"
 	jujutesting "github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
-	"github.com/julienschmidt/httprouter"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakerytest"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
@@ -70,18 +70,9 @@ type commonSuite struct {
 	// esSuite is set only when enableES is set to true.
 	esSuite *storetesting.ElasticSearchSuite
 
-	// discharge holds the function that will be used
-	// to check third party caveats by the mock
-	// discharger. This will be ignored if enableIdentity was
-	// not true before commonSuite.SetUpTest is invoked.
-	//
-	// It may be set by tests to influence the behavior of the
-	// discharger.
-	discharge func(cav, arg string) ([]checkers.Caveat, error)
-
-	discharger *bakerytest.Discharger
-	idM        *idM
-	idMServer  *httptest.Server
+	// idmServer holds the fake IDM server instance. It
+	// is only non-nil when enableIdentity is true.
+	idmServer *idmtest.Server
 
 	dischargeTerms  func(cav, arg string) ([]checkers.Caveat, error)
 	termsDischarger *bakerytest.Discharger
@@ -124,8 +115,7 @@ func (s *commonSuite) SetUpTest(c *gc.C) {
 		s.esSuite.SetUpTest(c)
 	}
 	if s.enableIdentity {
-		s.idM = newIdM()
-		s.idMServer = httptest.NewServer(s.idM)
+		s.idmServer = idmtest.NewServer()
 	}
 	s.startServer(c)
 }
@@ -138,9 +128,8 @@ func (s *commonSuite) TearDownTest(c *gc.C) {
 	if s.esSuite != nil {
 		s.esSuite.TearDownTest(c)
 	}
-	if s.discharger != nil {
-		s.discharger.Close()
-		s.idMServer.Close()
+	if s.idmServer != nil {
+		s.idmServer.Close()
 	}
 	if s.termsDischarger != nil {
 		s.termsDischarger.Close()
@@ -157,22 +146,16 @@ func (s *commonSuite) startServer(c *gc.C) {
 		AuthPassword:     testPassword,
 		StatsCacheMaxAge: time.Nanosecond,
 		MaxMgoSessions:   s.maxMgoSessions,
-		AgentUsername:    "notused",
-		AgentKey:         new(bakery.KeyPair),
 	}
-	keyring := bakery.NewPublicKeyRing()
+	keyring := httpbakery.NewPublicKeyRing(nil, nil)
+	keyring.AllowInsecure()
 	if s.enableIdentity {
-		s.discharge = noDischarge
-		discharger := bakerytest.NewDischarger(nil, func(_ *http.Request, cond string, arg string) ([]checkers.Caveat, error) {
-			return s.discharge(cond, arg)
-		})
-		config.IdentityLocation = discharger.Location()
-		config.IdentityAPIURL = s.idMServer.URL
-		pk, err := httpbakery.PublicKeyForLocation(http.DefaultClient, discharger.Location())
-		c.Assert(err, gc.IsNil)
-		err = keyring.AddPublicKeyForLocation(discharger.Location(), true, pk)
-		c.Assert(err, gc.IsNil)
-		c.Logf("added public key for location %v", discharger.Location())
+		s.idmServer = idmtest.NewServer()
+		config.AgentUsername = "charmstore-agent"
+		s.idmServer.AddUser(config.AgentUsername)
+		config.AgentKey = s.idmServer.UserPublicKey(config.AgentUsername)
+		config.IdentityLocation = s.idmServer.URL.String()
+		c.Logf("added public key for location %v", config.IdentityLocation)
 	}
 	if s.enableTerms {
 		s.dischargeTerms = noDischarge
@@ -180,10 +163,6 @@ func (s *commonSuite) startServer(c *gc.C) {
 			return s.dischargeTerms(cond, arg)
 		})
 		config.TermsLocation = termsDischarger.Location()
-		pk, err := httpbakery.PublicKeyForLocation(http.DefaultClient, termsDischarger.Location())
-		c.Assert(err, gc.IsNil)
-		err = keyring.AddPublicKeyForLocation(termsDischarger.Location(), true, pk)
-		c.Assert(err, gc.IsNil)
 	}
 	config.PublicKeyLocator = keyring
 	var si *charmstore.SearchIndex
@@ -306,23 +285,36 @@ func storeURL(path string) string {
 	return "/v5/" + path
 }
 
-func (s *commonSuite) bakeryDoAsUser(c *gc.C, user string) func(*http.Request) (*http.Response, error) {
-	bclient := httpbakery.NewClient()
-	m, err := s.store.Bakery.NewMacaroon([]checkers.Caveat{
-		checkers.DeclaredCaveat("username", user),
-	})
-	c.Assert(err, gc.IsNil)
-	macaroonCookie, err := httpbakery.NewCookie(macaroon.Slice{m})
-	c.Assert(err, gc.IsNil)
-	return func(req *http.Request) (*http.Response, error) {
-		req.AddCookie(macaroonCookie)
-		if req.Body == nil {
-			return bclient.Do(req)
-		}
-		body := req.Body.(io.ReadSeeker)
-		req.Body = nil
-		return bclient.DoWithBody(req, body)
+func (s *commonSuite) bakeryDoAsUser(user string) func(*http.Request) (*http.Response, error) {
+	return bakeryDo(s.idmServer.Client(user))
+}
+
+// login returns a bakery client that holds a macaroon that
+// declares the given authenticated user.
+// The login macaroon will be attenuated by the given first
+// party caveat conditions.
+func (s *commonSuite) login(user string, conditions ...string) *httpbakery.Client {
+	var caveats []checkers.Caveat
+	for _, cond := range conditions {
+		caveats = append(caveats, checkers.Caveat{
+			Condition: cond,
+		})
 	}
+	caveats = append(caveats, idmclient.UserDeclaration(user))
+	m, err := s.store.Bakery.NewMacaroon(caveats)
+	if err != nil {
+		panic(err)
+	}
+	client := httpbakery.NewClient()
+	u, err := url.Parse("http://127.0.0.1")
+	if err != nil {
+		panic(err)
+	}
+	err = httpbakery.SetCookie(client.Jar, u, macaroon.Slice{m})
+	if err != nil {
+		panic(err)
+	}
+	return client
 }
 
 // addRequiredCharms adds any charms required by the given
@@ -438,15 +430,8 @@ func (s *commonSuite) assertPutIsUnauthorized(c *gc.C, url string, val interface
 // request as the given user name.
 // If user is empty, no discharge will be allowed.
 func (s *commonSuite) doAsUser(user string, f func()) {
-	old := s.discharge
-	if user != "" {
-		s.discharge = dischargeForUser(user)
-	} else {
-		s.discharge = noDischarge
-	}
-	defer func() {
-		s.discharge = old
-	}()
+	s.idmServer.SetDefaultUser(user)
+	defer s.idmServer.SetDefaultUser("")
 	f()
 }
 
@@ -458,73 +443,16 @@ func (s *commonSuite) uploadResource(c *gc.C, id *router.ResolvedURL, name strin
 	c.Assert(err, gc.IsNil)
 }
 
-func bakeryDo(client *http.Client) func(*http.Request) (*http.Response, error) {
+func bakeryDo(client *httpbakery.Client) func(*http.Request) (*http.Response, error) {
 	if client == nil {
-		client = httpbakery.NewHTTPClient()
+		client = httpbakery.NewClient()
 	}
-	bclient := httpbakery.NewClient()
-	bclient.Client = client
 	return func(req *http.Request) (*http.Response, error) {
 		if req.Body == nil {
-			return bclient.Do(req)
+			return client.Do(req)
 		}
 		body := req.Body.(io.ReadSeeker)
 		req.Body = nil
-		return bclient.DoWithBody(req, body)
-	}
-}
-
-type idM struct {
-	// groups may be set to determine the mapping
-	// from user to groups for that user.
-	groups map[string][]string
-
-	// body may be set to cause serveGroups to return
-	// an arbitrary HTTP response body.
-	body string
-
-	// contentType is the contentType to use when body is not ""
-	contentType string
-
-	// status may be set to indicate the HTTP status code
-	// when body is not nil.
-	status int
-
-	router *httprouter.Router
-}
-
-func newIdM() *idM {
-	idM := &idM{
-		groups: make(map[string][]string),
-		router: httprouter.New(),
-	}
-	idM.router.GET("/v1/u/:user/groups", idM.serveGroups)
-	idM.router.GET("/v1/u/:user/idpgroups", idM.serveGroups)
-	return idM
-}
-
-func (idM *idM) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	idM.router.ServeHTTP(w, req)
-}
-
-func (idM *idM) serveGroups(w http.ResponseWriter, req *http.Request, p httprouter.Params) {
-	if idM.body != "" {
-		if idM.contentType != "" {
-			w.Header().Set("Content-Type", idM.contentType)
-		}
-		if idM.status != 0 {
-			w.WriteHeader(idM.status)
-		}
-		w.Write([]byte(idM.body))
-		return
-	}
-	u := p.ByName("user")
-	if u == "" {
-		panic("no user")
-	}
-	w.Header().Set("Content-Type", "application/json")
-	enc := json.NewEncoder(w)
-	if err := enc.Encode(idM.groups[u]); err != nil {
-		panic(err)
+		return client.DoWithBody(req, body)
 	}
 }

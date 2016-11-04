@@ -110,6 +110,8 @@ func NewServer(db *mgo.Database, si *SearchIndex, config ServerParams, versions 
 	config.IdentityAPIURL = strings.TrimSuffix(config.IdentityAPIURL, "/")
 	if config.IdentityLocation == "" && config.IdentityAPIURL != "" {
 		config.IdentityLocation = config.IdentityAPIURL
+	} else if config.IdentityLocation != "" && config.IdentityAPIURL == "" {
+		config.IdentityAPIURL = config.IdentityLocation
 	}
 	logger.Infof("identity discharge location: %s", config.IdentityLocation)
 	logger.Infof("identity API location: %s", config.IdentityAPIURL)
