@@ -43,10 +43,14 @@ type ReqHandler struct {
 	*v5.ReqHandler
 }
 
-func New(pool *charmstore.Pool, config charmstore.ServerParams, rootPath string) Handler {
-	return Handler{
-		Handler: v5.New(pool, config, rootPath),
+func New(pool *charmstore.Pool, config charmstore.ServerParams, rootPath string) (Handler, error) {
+	h, err := v5.New(pool, config, rootPath)
+	if err != nil {
+		return Handler{}, errgo.Mask(err)
 	}
+	return Handler{
+		Handler: h,
+	}, nil
 }
 
 func (h Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -60,8 +64,12 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	rh.ServeHTTP(w, req)
 }
 
-func NewAPIHandler(pool *charmstore.Pool, config charmstore.ServerParams, rootPath string) charmstore.HTTPCloseHandler {
-	return New(pool, config, rootPath)
+func NewAPIHandler(pool *charmstore.Pool, config charmstore.ServerParams, rootPath string) (charmstore.HTTPCloseHandler, error) {
+	h, err := New(pool, config, rootPath)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return h, nil
 }
 
 // The v4 resolvedURL function also requires SupportedSeries.

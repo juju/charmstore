@@ -40,7 +40,7 @@ type versionResponse struct {
 func (s *ServerSuite) TestNewServerWithVersions(c *gc.C) {
 	db := s.Session.DB("foo")
 	serveVersion := func(vers string) NewAPIHandlerFunc {
-		return func(p *Pool, config ServerParams, _ string) HTTPCloseHandler {
+		return func(p *Pool, config ServerParams, _ string) (HTTPCloseHandler, error) {
 			return nopCloseHandler{
 				router.HandleJSON(func(_ http.Header, req *http.Request) (interface{}, error) {
 					return versionResponse{
@@ -48,7 +48,7 @@ func (s *ServerSuite) TestNewServerWithVersions(c *gc.C) {
 						Path:    req.URL.Path,
 					}, nil
 				}),
-			}
+			}, nil
 		}
 	}
 
@@ -99,12 +99,12 @@ func (s *ServerSuite) TestNewServerWithConfig(c *gc.C) {
 		AuthPassword:     "test-password",
 		IdentityLocation: "http://0.1.2.3/",
 	}
-	serveConfig := func(p *Pool, config ServerParams, _ string) HTTPCloseHandler {
+	serveConfig := func(p *Pool, config ServerParams, _ string) (HTTPCloseHandler, error) {
 		return nopCloseHandler{
 			router.HandleJSON(func(_ http.Header, req *http.Request) (interface{}, error) {
 				return config, nil
 			}),
-		}
+		}, nil
 	}
 	h, err := NewServer(s.Session.DB("foo"), nil, params, map[string]NewAPIHandlerFunc{
 		"version1": serveConfig,
@@ -136,12 +136,12 @@ func (s *ServerSuite) TestNewServerWithElasticSearch(c *gc.C) {
 		AuthPassword:   "test-password",
 		IdentityAPIURL: "http://0.1.2.3",
 	}
-	serveConfig := func(p *Pool, config ServerParams, _ string) HTTPCloseHandler {
+	serveConfig := func(p *Pool, config ServerParams, _ string) (HTTPCloseHandler, error) {
 		return nopCloseHandler{
 			router.HandleJSON(func(_ http.Header, req *http.Request) (interface{}, error) {
 				return config, nil
 			}),
-		}
+		}, nil
 	}
 	h, err := NewServer(s.Session.DB("foo"), &SearchIndex{s.ES, s.TestIndex}, params,
 		map[string]NewAPIHandlerFunc{

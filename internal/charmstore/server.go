@@ -24,7 +24,7 @@ import (
 // NewAPIHandlerFunc is a function that returns a new API handler that uses
 // the given Store. The absPath parameter holds the root path of the
 // API handler.
-type NewAPIHandlerFunc func(pool *Pool, p ServerParams, absPath string) HTTPCloseHandler
+type NewAPIHandlerFunc func(pool *Pool, p ServerParams, absPath string) (HTTPCloseHandler, error)
 
 // HTTPCloseHandler represents a HTTP handler that
 // must be closed after use.
@@ -152,7 +152,10 @@ func NewServer(db *mgo.Database, si *SearchIndex, config ServerParams, versions 
 	handle(srv.mux, "/metrics", prometheus.Handler())
 	for vers, newAPI := range versions {
 		root := "/" + vers
-		h := newAPI(pool, config, root)
+		h, err := newAPI(pool, config, root)
+		if err != nil {
+			return nil, errgo.Notef(err, "cannot initialize handler for version %v", vers)
+		}
 		handle(srv.mux, root, h)
 		srv.handlers = append(srv.handlers, h)
 	}
