@@ -22,9 +22,9 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
-	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
-	"gopkg.in/macaroon.v1"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon.v2-unstable"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
@@ -955,7 +955,7 @@ func (s *authSuite) TestDelegatableMacaroon(c *gc.C) {
 	caveats := m.Caveats()
 	foundExpiry := false
 	for _, cav := range caveats {
-		cond, arg, err := checkers.ParseCaveat(cav.Id)
+		cond, arg, err := checkers.ParseCaveat(string(cav.Id))
 		c.Assert(err, gc.IsNil)
 		switch cond {
 		case checkers.CondTimeBefore:
@@ -1231,15 +1231,15 @@ func (s *authSuite) TestDelegatableMacaroonCannotBeUsedForWriting(c *gc.C) {
 }
 
 func (s *authSuite) TestRenewMacaroon(c *gc.C) {
-	m, err := macaroon.New([]byte("key"), "id", "somewhere")
+	m, err := macaroon.New([]byte("key"), []byte("id"), "somewhere")
 	c.Assert(err, gc.IsNil)
 	m.AddFirstPartyCaveat("active-time-before xxx")
 	m.AddFirstPartyCaveat("hello")
-	m.AddThirdPartyCaveat([]byte("otherkey"), "x", "location")
+	m.AddThirdPartyCaveat([]byte("otherkey"), []byte("x"), "location")
 	m.AddFirstPartyCaveat("goodbye")
 	m.AddFirstPartyCaveat("active-time-before yyy")
 
-	newm, err := macaroon.New([]byte("otherkey"), "id2", "somewhere")
+	newm, err := macaroon.New([]byte("otherkey"), []byte("id2"), "somewhere")
 	c.Assert(err, gc.IsNil)
 
 	expectTime := "2016-04-22T16:30:00Z"
@@ -1254,11 +1254,11 @@ func (s *authSuite) TestRenewMacaroon(c *gc.C) {
 	// from the original, omitting the third party caveats
 	// and with a new active-time-before caveat.
 	c.Assert(newm.Caveats(), jc.DeepEquals, []macaroon.Caveat{{
-		Id: "hello",
+		Id: []byte("hello"),
 	}, {
-		Id: "goodbye",
+		Id: []byte("goodbye"),
 	}, {
-		Id: "active-time-before " + expectTime,
+		Id: []byte("active-time-before " + expectTime),
 	}})
 }
 

@@ -3280,7 +3280,7 @@ func (s *StoreSuite) TestCopyCopiesSessions(c *gc.C) {
 	r.Close()
 
 	// Also check the macaroon storage as that also has its own session reference.
-	m, err := store1.Bakery.NewMacaroon("", nil, nil)
+	m, err := store1.Bakery.NewMacaroon(nil)
 	c.Assert(err, gc.IsNil)
 	c.Assert(m, gc.NotNil)
 }

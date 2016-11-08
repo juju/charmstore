@@ -21,9 +21,9 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
-	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
-	"gopkg.in/macaroon.v1"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon.v2-unstable"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/v4"
@@ -984,7 +984,7 @@ func (s *authSuite) TestDelegatableMacaroon(c *gc.C) {
 	caveats := m.Caveats()
 	foundExpiry := false
 	for _, cav := range caveats {
-		cond, arg, err := checkers.ParseCaveat(cav.Id)
+		cond, arg, err := checkers.ParseCaveat(string(cav.Id))
 		c.Assert(err, gc.IsNil)
 		switch cond {
 		case checkers.CondTimeBefore:

@@ -16,11 +16,11 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
-	"gopkg.in/macaroon-bakery.v1/bakery"
-	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v1/bakerytest"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
-	"gopkg.in/macaroon.v1"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakerytest"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon.v2-unstable"
 	"gopkg.in/mgo.v2"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
@@ -308,7 +308,7 @@ func storeURL(path string) string {
 
 func (s *commonSuite) bakeryDoAsUser(c *gc.C, user string) func(*http.Request) (*http.Response, error) {
 	bclient := httpbakery.NewClient()
-	m, err := s.store.Bakery.NewMacaroon("", nil, []checkers.Caveat{
+	m, err := s.store.Bakery.NewMacaroon([]checkers.Caveat{
 		checkers.DeclaredCaveat("username", user),
 	})
 	c.Assert(err, gc.IsNil)

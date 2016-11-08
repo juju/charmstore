@@ -22,10 +22,11 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
-	"gopkg.in/macaroon-bakery.v1/bakery"
-	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v1/bakery/mgostorage"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgostorage"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon.v2-unstable"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
@@ -37,6 +38,16 @@ import (
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
 )
+
+// SetAuthCookie holds the parameters used to make a set-auth-cookie request
+// to the charm store.
+// It duplicates the type in charmrepo.v2-unstable/csclient/params
+// because we don't want to make that use macaroon.v2-unstable yet.
+// TODO use charmrepo.v2-unstable/csclient/params for SetAuthCookie.
+type SetAuthCookie struct {
+	// Macaroons holds a slice of macaroons.
+	Macaroons macaroon.Slice
+}
 
 var logger = loggo.GetLogger("charmstore.internal.v5")
 
@@ -114,10 +125,13 @@ func New(pool *charmstore.Pool, config charmstore.ServerParams, rootPath string)
 	var permChecker permChecker
 	if config.IdentityAPIURL != "" && config.AgentUsername != "" && config.AgentKey != nil {
 		logger.Infof("group membership enabled at %s; agent %s", config.IdentityAPIURL, config.AgentUsername)
-		identityClient := idmclient.New(idmclient.NewParams{
+		identityClient, err := idmclient.New(idmclient.NewParams{
 			BaseURL: config.IdentityAPIURL,
 			Client:  agent.NewClient(config.AgentUsername, config.AgentKey),
 		})
+		if err != nil {
+			panic(err)
+		}
 		gc := idmclient.NewGroupCache(identityClient, PermCacheExpiry)
 		groupCache = gc
 		permChecker = idmclient.NewPermCheckerWithCache(gc)
@@ -1308,7 +1322,7 @@ func (h *ReqHandler) serveDelegatableMacaroon(_ http.Header, req *http.Request) 
 
 		// Note that we don't use a root key store with a short term
 		// expiry, as we don't want to create a new root key every minute.
-		m, err := h.Store.Bakery.NewMacaroon("", nil, []checkers.Caveat{
+		m, err := h.Store.Bakery.NewMacaroon([]checkers.Caveat{
 			checkers.DeclaredCaveat(UsernameAttr, auth.Username),
 			checkers.TimeBeforeCaveat(time.Now().Add(DelegatableMacaroonExpiry)),
 			checkers.AllowCaveat(authnCheckableOps...),
@@ -1363,7 +1377,7 @@ func (h *ReqHandler) serveDelegatableMacaroon(_ http.Header, req *http.Request) 
 	activeExpireTime := time.Now().Add(DelegatableMacaroonExpiry)
 
 	// TODO propagate expiry time from macaroons in request.
-	m, err := longTermBakery.NewMacaroon("", nil, []checkers.Caveat{
+	m, err := longTermBakery.NewMacaroon([]checkers.Caveat{
 		checkers.DeclaredCaveat(UsernameAttr, auth.Username),
 		isEntityCaveat(ids),
 		activeTimeBeforeCaveat(activeExpireTime),
@@ -1524,7 +1538,7 @@ func (h *ReqHandler) serveSetAuthCookie(w http.ResponseWriter, req *http.Request
 	if req.Method != "PUT" {
 		return errgo.WithCausef(nil, params.ErrMethodNotAllowed, "%s not allowed", req.Method)
 	}
-	var p params.SetAuthCookie
+	var p SetAuthCookie
 	decoder := json.NewDecoder(req.Body)
 	if err := decoder.Decode(&p); err != nil {
 		return errgo.Notef(err, "cannot unmarshal macaroons")
