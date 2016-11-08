@@ -110,7 +110,7 @@ const (
 // and group membership information will be cached for.
 var PermCacheExpiry = time.Minute
 
-func New(pool *charmstore.Pool, config charmstore.ServerParams, rootPath string) *Handler {
+func New(pool *charmstore.Pool, config charmstore.ServerParams, rootPath string) (*Handler, error) {
 	bclient := httpbakery.NewClient()
 	bclient.Key = config.AgentKey
 	h := &Handler{
@@ -121,17 +121,17 @@ func New(pool *charmstore.Pool, config charmstore.ServerParams, rootPath string)
 		locator:     config.PublicKeyLocator,
 	}
 	if config.IdentityAPIURL != "" {
-		var err error
-		h.idmClient, err = idmclient.New(idmclient.NewParams{
+		idmClient, err := idmclient.New(idmclient.NewParams{
 			Client:        bclient,
 			BaseURL:       config.IdentityAPIURL,
 			AgentUsername: config.AgentUsername,
 		})
 		if err != nil {
-			panic(err)
+			return nil, errgo.Notef(err, "cannot initialize identity client")
 		}
+		h.idmClient = idmClient
 	}
-	return h
+	return h, nil
 }
 
 // Close closes the Handler.
@@ -336,8 +336,12 @@ func (h *ReqHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 // NewAPIHandler returns a new Handler as an http Handler.
 // It is defined for the convenience of callers that require a
 // charmstore.NewAPIHandlerFunc.
-func NewAPIHandler(pool *charmstore.Pool, config charmstore.ServerParams, rootPath string) charmstore.HTTPCloseHandler {
-	return New(pool, config, rootPath)
+func NewAPIHandler(pool *charmstore.Pool, config charmstore.ServerParams, rootPath string) (charmstore.HTTPCloseHandler, error) {
+	h, err := New(pool, config, rootPath)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return h, nil
 }
 
 // Close closes the ReqHandler. This should always be called when the

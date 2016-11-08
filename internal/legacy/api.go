@@ -103,10 +103,14 @@ var reqHandlerPool = mempool.Pool{
 	},
 }
 
-func NewAPIHandler(pool *charmstore.Pool, config charmstore.ServerParams, rootPath string) charmstore.HTTPCloseHandler {
-	return &Handler{
-		v4: v4.New(pool, config, rootPath),
+func NewAPIHandler(pool *charmstore.Pool, config charmstore.ServerParams, rootPath string) (charmstore.HTTPCloseHandler, error) {
+	h, err := v4.New(pool, config, rootPath)
+	if err != nil {
+		return nil, errgo.Mask(err)
 	}
+	return &Handler{
+		v4: h,
+	}, nil
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
