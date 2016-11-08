@@ -1,7 +1,7 @@
 // Copyright 2016 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package v5_test // import "gopkg.in/juju/charmstore.v5-unstable/internal/v5"
+package v5_test
 
 import (
 	"crypto/sha512"
@@ -56,7 +56,7 @@ func (s *ResourceSuite) TestPost(c *gc.C) {
 			// revision 0.
 			Revision: 1,
 		},
-		Do: s.bakeryDoAsUser(c, "charmers"),
+		Do: s.bakeryDoAsUser("charmers"),
 	})
 
 	// Check that the resource has really been uploaded.
@@ -87,7 +87,7 @@ func (s *ResourceSuite) TestGet(c *gc.C) {
 			Code:    params.ErrNotFound,
 			Message: `cs:~charmers/precise/wordpress-0 has no "someResource" resource`,
 		},
-		Do: s.bakeryDoAsUser(c, "charmers"),
+		Do: s.bakeryDoAsUser("charmers"),
 	})
 
 	content := "some content"
@@ -100,7 +100,7 @@ func (s *ResourceSuite) TestGet(c *gc.C) {
 		Handler: s.srv,
 		Method:  "GET",
 		URL:     storeURL(id.URL.Path() + "/resource/someResource/1"),
-		Do:      s.bakeryDoAsUser(c, "charmers"),
+		Do:      s.bakeryDoAsUser("charmers"),
 	})
 	c.Assert(resp.Body.String(), gc.Equals, content+"1")
 	c.Assert(resp.Header().Get(params.ContentHashHeader), gc.Equals, hashOfString(content+"1"))
@@ -139,7 +139,7 @@ func (s *ResourceSuite) TestInvalidMethod(c *gc.C) {
 			Code:    params.ErrMethodNotAllowed,
 			Message: `PUT not allowed`,
 		},
-		Do: s.bakeryDoAsUser(c, "charmers"),
+		Do: s.bakeryDoAsUser("charmers"),
 	})
 }
 
@@ -155,7 +155,7 @@ func (s *ResourceSuite) TestCannotUploadToBundle(c *gc.C) {
 			Code:    params.ErrForbidden,
 			Message: `cannot upload a resource to a bundle`,
 		},
-		Do: s.bakeryDoAsUser(c, "charmers"),
+		Do: s.bakeryDoAsUser("charmers"),
 	})
 }
 
@@ -171,7 +171,7 @@ func (s *ResourceSuite) TestUploadInvalidResourceName(c *gc.C) {
 			Code:    params.ErrBadRequest,
 			Message: `invalid resource name`,
 		},
-		Do: s.bakeryDoAsUser(c, "charmers"),
+		Do: s.bakeryDoAsUser("charmers"),
 	})
 }
 
@@ -187,7 +187,7 @@ func (s *ResourceSuite) TestUploadNoHash(c *gc.C) {
 			Code:    params.ErrBadRequest,
 			Message: `hash parameter not specified`,
 		},
-		Do: s.bakeryDoAsUser(c, "charmers"),
+		Do: s.bakeryDoAsUser("charmers"),
 	})
 }
 
@@ -209,7 +209,7 @@ func (s *ResourceSuite) TestUploadNoContentLength(c *gc.C) {
 			Code:    params.ErrBadRequest,
 			Message: `Content-Length not specified`,
 		},
-		Do: s.bakeryDoAsUser(c, "charmers"),
+		Do: s.bakeryDoAsUser("charmers"),
 	})
 }
 
@@ -226,7 +226,7 @@ func (s *ResourceSuite) TestUploadResourceNotDeclaredInCharm(c *gc.C) {
 			Code:    params.ErrForbidden,
 			Message: `resource "someResource" not found in charm metadata`,
 		},
-		Do: s.bakeryDoAsUser(c, "charmers"),
+		Do: s.bakeryDoAsUser("charmers"),
 	})
 }
 
@@ -251,7 +251,7 @@ func (s *ResourceSuite) TestUploadResourceFilenameExtensionMismatch(c *gc.C) {
 			Code:    params.ErrForbidden,
 			Message: `filename extension mismatch (got ".dat" want ".zip")`,
 		},
-		Do: s.bakeryDoAsUser(c, "charmers"),
+		Do: s.bakeryDoAsUser("charmers"),
 	})
 }
 
@@ -276,7 +276,7 @@ func (s *ResourceSuite) TestUploadResourceFilenameWithNoExtension(c *gc.C) {
 			Code:    params.ErrForbidden,
 			Message: `filename extension mismatch (got "" want ".zip")`,
 		},
-		Do: s.bakeryDoAsUser(c, "charmers"),
+		Do: s.bakeryDoAsUser("charmers"),
 	})
 }
 
@@ -305,7 +305,7 @@ func (s *ResourceSuite) TestUploadResourcePathWithNoExtension(c *gc.C) {
 			// revision 0.
 			Revision: 1,
 		},
-		Do: s.bakeryDoAsUser(c, "charmers"),
+		Do: s.bakeryDoAsUser("charmers"),
 	})
 }
 
@@ -385,14 +385,14 @@ func (s *ResourceSuite) TestDownloadPrivateCharmResource(c *gc.C) {
 			Code:    params.ErrUnauthorized,
 			Message: `unauthorized: access denied for user "bob"`,
 		},
-		Do: s.bakeryDoAsUser(c, "bob"),
+		Do: s.bakeryDoAsUser("bob"),
 	})
 
 	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.srv,
 		Method:  "GET",
 		URL:     storeURL(id.URL.Path() + "/resource/someResource/0"),
-		Do:      s.bakeryDoAsUser(c, "charmers"),
+		Do:      s.bakeryDoAsUser("charmers"),
 	})
 	c.Assert(resp.Body.String(), gc.Equals, content)
 	c.Assert(resp.Header().Get(params.ContentHashHeader), gc.Equals, hashOfString(content))
@@ -533,7 +533,7 @@ func (s *ResourceSuite) TestMetaResourcesSingleResourceNotUploaded(c *gc.C) {
 			Description: "someResource description",
 			Revision:    -1,
 		},
-		Do: s.bakeryDoAsUser(c, "charmers"),
+		Do: s.bakeryDoAsUser("charmers"),
 	})
 }
 
@@ -554,7 +554,7 @@ func (s *ResourceSuite) TestMetaResourcesSingleResourceWithRevision(c *gc.C) {
 			Fingerprint: rawHash(hashOfString("someResource content")),
 			Size:        int64(len("someResource content")),
 		},
-		Do: s.bakeryDoAsUser(c, "charmers"),
+		Do: s.bakeryDoAsUser("charmers"),
 	})
 }
 
@@ -571,7 +571,7 @@ func (s *ResourceSuite) TestMetaResourcesSingleResourceWithRevisionNotFound(c *g
 			Code:    params.ErrMetadataNotFound,
 			Message: string(params.ErrMetadataNotFound),
 		},
-		Do: s.bakeryDoAsUser(c, "charmers"),
+		Do: s.bakeryDoAsUser("charmers"),
 	})
 }
 
@@ -594,7 +594,7 @@ func (s *ResourceSuite) TestMetaResourcesSingleResourceWithRevisionNotInCharm(c 
 			Fingerprint: rawHash(hashOfString("a new version")),
 			Size:        int64(len("a new version")),
 		},
-		Do: s.bakeryDoAsUser(c, "charmers"),
+		Do: s.bakeryDoAsUser("charmers"),
 	})
 }
 
@@ -615,6 +615,6 @@ func (s *ResourceSuite) TestMetaResourcesSingleResourceWithNameNotInCharm(c *gc.
 			Code:    params.ErrMetadataNotFound,
 			Message: string(params.ErrMetadataNotFound),
 		},
-		Do: s.bakeryDoAsUser(c, "charmers"),
+		Do: s.bakeryDoAsUser("charmers"),
 	})
 }

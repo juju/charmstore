@@ -31,7 +31,6 @@ import (
 	"gopkg.in/mgo.v2/bson"
 
 	"gopkg.in/juju/charmstore.v5-unstable/audit"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/agent"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/cache"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/entitycache"
@@ -65,11 +64,10 @@ type Handler struct {
 	// with.
 	Pool *charmstore.Pool
 
-	config      charmstore.ServerParams
-	locator     bakery.PublicKeyLocator
-	groupCache  groupCache
-	permChecker permChecker
-	rootPath    string
+	config    charmstore.ServerParams
+	locator   bakery.PublicKeyLocator
+	idmClient *idmclient.Client
+	rootPath  string
 
 	// searchCache is a cache of search results keyed on the query
 	// parameters of the search. It should only be used for searches
@@ -97,7 +95,7 @@ type ReqHandler struct {
 
 	// auth holds the results of any authorization that
 	// has been done on this request.
-	auth authorization
+	auth Authorization
 
 	// cache holds the per-request entity cache.
 	Cache *entitycache.Cache
@@ -112,42 +110,26 @@ const (
 // and group membership information will be cached for.
 var PermCacheExpiry = time.Minute
 
-type permChecker interface {
-	Allow(username string, acl []string) (bool, error)
-}
-
-type groupCache interface {
-	Groups(username string) ([]string, error)
-}
-
 func New(pool *charmstore.Pool, config charmstore.ServerParams, rootPath string) *Handler {
-	var groupCache groupCache
-	var permChecker permChecker
-	if config.IdentityAPIURL != "" && config.AgentUsername != "" && config.AgentKey != nil {
-		logger.Infof("group membership enabled at %s; agent %s", config.IdentityAPIURL, config.AgentUsername)
-		identityClient, err := idmclient.New(idmclient.NewParams{
-			BaseURL: config.IdentityAPIURL,
-			Client:  agent.NewClient(config.AgentUsername, config.AgentKey),
-		})
-		if err != nil {
-			panic(err)
-		}
-		gc := idmclient.NewGroupCache(identityClient, PermCacheExpiry)
-		groupCache = gc
-		permChecker = idmclient.NewPermCheckerWithCache(gc)
-	} else {
-		logger.Infof("group membership not enabled (no identity-api-url or agent-username)")
-		groupCache = noGroupCache{}
-		permChecker = noGroupsPermChecker{}
-	}
+	bclient := httpbakery.NewClient()
+	bclient.Key = config.AgentKey
 	h := &Handler{
 		Pool:        pool,
 		config:      config,
 		rootPath:    rootPath,
 		searchCache: cache.New(config.SearchCacheMaxAge),
 		locator:     config.PublicKeyLocator,
-		groupCache:  groupCache,
-		permChecker: permChecker,
+	}
+	if config.IdentityAPIURL != "" {
+		var err error
+		h.idmClient, err = idmclient.New(idmclient.NewParams{
+			Client:        bclient,
+			BaseURL:       config.IdentityAPIURL,
+			AgentUsername: config.AgentUsername,
+		})
+		if err != nil {
+			panic(err)
+		}
 	}
 	return h
 }
@@ -346,12 +328,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	rh.ServeHTTP(w, req)
 }
 
-// GroupsForUser returns all the groups that the given user
-// is a member of.
-func (h *Handler) GroupsForUser(username string) ([]string, error) {
-	return h.groupCache.Groups(username)
-}
-
 // ServeHTTP implements http.Handler by calling h.Router.ServeHTTP.
 func (h *ReqHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	h.Router.ServeHTTP(w, req)
@@ -379,7 +355,7 @@ func (h *ReqHandler) Reset() {
 	h.Store = nil
 	h.Handler = nil
 	h.Cache = nil
-	h.auth = authorization{}
+	h.auth = Authorization{}
 }
 
 // ResolveURL implements router.Context.ResolveURL.
@@ -1315,7 +1291,7 @@ func (h *ReqHandler) serveDelegatableMacaroon(_ http.Header, req *http.Request) 
 		if err != nil {
 			return nil, errgo.Mask(err, errgo.Any)
 		}
-		if auth.Username == "" {
+		if auth.User == nil {
 			return nil, errgo.WithCausef(nil, params.ErrForbidden, "delegatable macaroon is not obtainable using admin credentials")
 		}
 		// TODO propagate expiry time from macaroons in request.
@@ -1323,7 +1299,7 @@ func (h *ReqHandler) serveDelegatableMacaroon(_ http.Header, req *http.Request) 
 		// Note that we don't use a root key store with a short term
 		// expiry, as we don't want to create a new root key every minute.
 		m, err := h.Store.Bakery.NewMacaroon([]checkers.Caveat{
-			checkers.DeclaredCaveat(UsernameAttr, auth.Username),
+			idmclient.UserDeclaration(auth.Username),
 			checkers.TimeBeforeCaveat(time.Now().Add(DelegatableMacaroonExpiry)),
 			checkers.AllowCaveat(authnCheckableOps...),
 		})
@@ -1361,7 +1337,7 @@ func (h *ReqHandler) serveDelegatableMacaroon(_ http.Header, req *http.Request) 
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
-	if auth.Username == "" {
+	if auth.User == nil {
 		if !auth.Admin {
 			return nil, errgo.WithCausef(nil, params.ErrForbidden, "delegatable macaroon cannot be obtained for public entities")
 		}
@@ -1378,7 +1354,7 @@ func (h *ReqHandler) serveDelegatableMacaroon(_ http.Header, req *http.Request) 
 
 	// TODO propagate expiry time from macaroons in request.
 	m, err := longTermBakery.NewMacaroon([]checkers.Caveat{
-		checkers.DeclaredCaveat(UsernameAttr, auth.Username),
+		idmclient.UserDeclaration(auth.Username),
 		isEntityCaveat(ids),
 		activeTimeBeforeCaveat(activeExpireTime),
 	})
@@ -1398,7 +1374,7 @@ func (h *ReqHandler) serveWhoAmI(_ http.Header, req *http.Request) (interface{},
 	if auth.Admin {
 		return nil, errgo.WithCausef(nil, params.ErrForbidden, "admin credentials used")
 	}
-	groups, err := h.Handler.GroupsForUser(auth.Username)
+	groups, err := auth.User.Groups()
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
@@ -1614,7 +1590,7 @@ var testAddAuditCallback func(e audit.Entry)
 // addAudit delegates an audit entry to the store to record an audit log after
 // it has set correctly the user doing the action.
 func (h *ReqHandler) addAudit(e audit.Entry) {
-	if h.auth.Username == "" && !h.auth.Admin {
+	if h.auth.User == nil && !h.auth.Admin {
 		panic("No auth set in ReqHandler")
 	}
 	e.User = h.auth.Username

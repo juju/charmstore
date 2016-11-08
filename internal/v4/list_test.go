@@ -1,7 +1,7 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package v4_test // import "gopkg.in/juju/charmstore.v5-unstable/internal/v4"
+package v4_test
 
 import (
 	"bytes"
@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/juju/idmclient"
 	"github.com/juju/loggo"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
@@ -288,7 +289,7 @@ func (s *ListSuite) TestListIncludeError(c *gc.C) {
 	// It will be automatically removed later because IsolatedMgoESSuite
 	// uses LoggingSuite.
 	var tw loggo.TestWriter
-	err = loggo.RegisterWriter("test-log", &tw, loggo.DEBUG)
+	err = loggo.RegisterWriter("test-log", &tw)
 	c.Assert(err, gc.IsNil)
 
 	rec = httptesting.DoRequest(c, httptesting.DoRequestParams{
@@ -477,16 +478,10 @@ func (s *ListSuite) TestListWithAdminCredentials(c *gc.C) {
 }
 
 func (s *ListSuite) TestListWithUserMacaroon(c *gc.C) {
-	m, err := s.store.Bakery.NewMacaroon([]checkers.Caveat{
-		checkers.DeclaredCaveat("username", "test-user"),
-	})
-	c.Assert(err, gc.IsNil)
-	macaroonCookie, err := httpbakery.NewCookie(macaroon.Slice{m})
-	c.Assert(err, gc.IsNil)
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.srv,
 		URL:     storeURL("list"),
-		Cookies: []*http.Cookie{macaroonCookie},
+		Do:      bakeryDo(s.login("test-user")),
 	})
 	c.Assert(rec.Code, gc.Equals, http.StatusOK)
 	expected := []*router.ResolvedURL{
@@ -497,14 +492,14 @@ func (s *ListSuite) TestListWithUserMacaroon(c *gc.C) {
 		exportTestBundles["wordpress-simple"],
 	}
 	var sr params.ListResponse
-	err = json.Unmarshal(rec.Body.Bytes(), &sr)
+	err := json.Unmarshal(rec.Body.Bytes(), &sr)
 	c.Assert(err, gc.IsNil)
 	assertListResultSet(c, sr, expected)
 }
 
 func (s *ListSuite) TestSearchWithBadAdminCredentialsAndACookie(c *gc.C) {
 	m, err := s.store.Bakery.NewMacaroon([]checkers.Caveat{
-		checkers.DeclaredCaveat("username", "test-user"),
+		idmclient.UserDeclaration("test-user"),
 	})
 	c.Assert(err, gc.IsNil)
 	macaroonCookie, err := httpbakery.NewCookie(macaroon.Slice{m})

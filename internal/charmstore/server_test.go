@@ -15,9 +15,9 @@ import (
 )
 
 var serverParams = ServerParams{
-	AuthUsername:   "test-user",
-	AuthPassword:   "test-password",
-	IdentityAPIURL: "http://0.1.2.3",
+	AuthUsername:     "test-user",
+	AuthPassword:     "test-password",
+	IdentityLocation: "http://0.1.2.3",
 }
 
 type ServerSuite struct {
@@ -95,9 +95,9 @@ func (s *ServerSuite) TestNewServerWithVersions(c *gc.C) {
 func (s *ServerSuite) TestNewServerWithConfig(c *gc.C) {
 
 	params := ServerParams{
-		AuthUsername:   "test-user",
-		AuthPassword:   "test-password",
-		IdentityAPIURL: "http://0.1.2.3/",
+		AuthUsername:     "test-user",
+		AuthPassword:     "test-password",
+		IdentityLocation: "http://0.1.2.3/",
 	}
 	serveConfig := func(p *Pool, config ServerParams, _ string) HTTPCloseHandler {
 		return nopCloseHandler{

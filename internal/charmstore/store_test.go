@@ -1159,8 +1159,19 @@ func (s *StoreSuite) TestCollections(c *gc.C) {
 		}
 
 	}
+	otherCollections := map[string]bool{
+		"managedStoredResources": true,
+		"entitystore.chunks":     true,
+		"storedResources":        true,
+		"txns":                   true,
+		"txns.log":               true,
+		"txns.stash":             true,
+	}
 	// Check that all created collections are mentioned in Collections.
 	for _, name := range names {
+		if strings.HasPrefix(name, "system.") || otherCollections[name] {
+			continue
+		}
 		if name == "system.indexes" || name == "managedStoredResources" || name == "entitystore.files" {
 			continue
 		}

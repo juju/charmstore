@@ -26,14 +26,6 @@ import (
 
 var logger = loggo.GetLogger("charmstore.internal.v4")
 
-const (
-	PromulgatorsGroup         = v5.PromulgatorsGroup
-	UsernameAttr              = v5.UsernameAttr
-	DelegatableMacaroonExpiry = v5.DelegatableMacaroonExpiry
-	DefaultIcon               = v5.DefaultIcon
-	ArchiveCachePublicMaxAge  = v5.ArchiveCachePublicMaxAge
-)
-
 // reqHandlerPool holds a cache of ReqHandlers to save
 // on allocation time. When a handler is done with,
 // it is put back into the pool.
@@ -206,12 +198,6 @@ func (h ReqHandler) Close() {
 	h.Cache.Close()
 	h.Reset()
 	reqHandlerPool.Put(h)
-}
-
-// StatsEnabled reports whether statistics should be gathered for
-// the given HTTP request.
-func StatsEnabled(req *http.Request) bool {
-	return v5.StatsEnabled(req)
 }
 
 // GET id/meta/bundle-metadata

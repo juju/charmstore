@@ -27,7 +27,7 @@ func (h ReqHandler) serveSearch(_ http.Header, req *http.Request) (interface{}, 
 	sp.Admin = auth.Admin
 	if auth.Username != "" {
 		sp.Groups = append(sp.Groups, auth.Username)
-		groups, err := h.Handler.GroupsForUser(auth.Username)
+		groups, err := auth.User.Groups()
 		if err != nil {
 			logger.Infof("cannot get groups for user %q, assuming no groups: %v", auth.Username, err)
 		}

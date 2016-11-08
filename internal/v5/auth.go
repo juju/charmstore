@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/juju/idmclient"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
@@ -22,12 +23,11 @@ import (
 	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
 )
 
-const UsernameAttr = "username"
-
-// authorization conatains authorization information extracted from an HTTP request.
+// Authorization contains authorization information extracted from an HTTP request.
 // The zero value for a authorization contains no privileges.
-type authorization struct {
+type Authorization struct {
 	Admin    bool
+	User     *idmclient.User
 	Username string
 }
 
@@ -90,7 +90,7 @@ func (h *ReqHandler) AuthorizeEntity(id *router.ResolvedURL, req *http.Request) 
 
 // Authenticate is a convenience method that calls authorize to check
 // that that the given request is authenticated for some user.
-func (h *ReqHandler) Authenticate(req *http.Request) (authorization, error) {
+func (h *ReqHandler) Authenticate(req *http.Request) (Authorization, error) {
 	return h.authorize(authorizeParams{
 		req: req,
 		acls: []mongodoc.ACL{{
@@ -175,9 +175,9 @@ type authorizeParams struct {
 // error is returned holding the macaroon.
 //
 // This method also sets h.auth to the returned authorization info.
-func (h *ReqHandler) authorize(p authorizeParams) (authorization, error) {
+func (h *ReqHandler) authorize(p authorizeParams) (Authorization, error) {
 	if len(p.ops) == 0 {
-		return authorization{}, errgo.Newf("no operation to be authorized")
+		return Authorization{}, errgo.Newf("no operation to be authorized")
 	}
 	// TODO this is logging statement is actually quite costly
 	// when we're dealing with requests that need to authorize
@@ -195,45 +195,45 @@ func (h *ReqHandler) authorize(p authorizeParams) (authorization, error) {
 	set := newACLSet(len(p.entityIds) + 1)
 	if !p.ignoreEntityACLs {
 		if err := h.addEntitiesACLs(set, p.entityIds); err != nil {
-			return authorization{}, errgo.Mask(err)
+			return Authorization{}, errgo.Mask(err)
 		}
 	}
 	for _, acl := range p.acls {
 		set.add(acl)
 	}
 	if len(set.acls) == 0 {
-		return authorization{}, errgo.Newf("no ACLs or entities specified in authorization request")
+		return Authorization{}, errgo.Newf("no ACLs or entities specified in authorization request")
 	}
 
 	newOps, requiredTerms, newAuthnRequired, err := h.verifyOps(p.ops, p.entityIds)
 	if err != nil {
-		return authorization{}, errgo.Mask(err)
+		return Authorization{}, errgo.Mask(err)
 	}
 	p.ops = newOps
 	p.authnRequired = p.authnRequired || newAuthnRequired
 
 	if len(requiredTerms) > 0 && h.Handler.config.TermsLocation == "" {
-		return authorization{}, errgo.WithCausef(nil, params.ErrUnauthorized, "charmstore not configured to serve charms with terms and conditions")
+		return Authorization{}, errgo.WithCausef(nil, params.ErrUnauthorized, "charmstore not configured to serve charms with terms and conditions")
 	}
 
 	if !p.authnRequired && set.readPublic {
 		// No need to authenticate if the ACL is open to everyone and we're
 		// just trying to read something that won't require terms to be agreed to.
 		// TODO return Username: "everyone" here?
-		return authorization{}, nil
+		return Authorization{}, nil
 	}
 	auth, verr := h.checkRequest(p)
 	if verr == nil {
 		// The request is OK. Now check that the user associated with
 		// the verified macaroons is part of the ACL.
-		if err := set.check(auth, p.ops, h.Handler.permChecker.Allow); err != nil {
-			return authorization{}, errgo.WithCausef(err, params.ErrUnauthorized, "")
+		if err := set.check(auth, p.ops); err != nil {
+			return Authorization{}, errgo.WithCausef(err, params.ErrUnauthorized, "")
 		}
 		h.auth = auth
 		return auth, nil
 	}
 	if _, ok := errgo.Cause(verr).(*bakery.VerificationError); !ok {
-		return authorization{}, errgo.Mask(verr, errgo.Is(params.ErrUnauthorized), isDischargeRequiredError)
+		return Authorization{}, errgo.Mask(verr, errgo.Is(params.ErrUnauthorized), isDischargeRequiredError)
 	}
 
 	// Macaroon verification failed: mint a new macaroon.
@@ -247,9 +247,9 @@ func (h *ReqHandler) authorize(p authorizeParams) (authorization, error) {
 	}
 	m, err := h.newMacaroon(grantOps, p.entityIds, requiredTerms, shortTerm)
 	if err != nil {
-		return authorization{}, errgo.Notef(err, "cannot mint macaroon")
+		return Authorization{}, errgo.Notef(err, "cannot mint macaroon")
 	}
-	return authorization{}, h.newDischargeRequiredError(m, verr, p.req, shortTerm)
+	return Authorization{}, h.newDischargeRequiredError(m, verr, p.req, shortTerm)
 }
 
 // verifyOps verifies that all the given operations on the given entity ids
@@ -354,17 +354,17 @@ var errActiveTimeExpired = errgo.New("active time expired")
 // If no suitable credentials are found, or an error occurs, then a zero
 // valued authorization is returned. It also checks any first party
 // caveats. It does not check ACLs.
-func (h *ReqHandler) checkRequest(p authorizeParams) (authorization, error) {
+func (h *ReqHandler) checkRequest(p authorizeParams) (Authorization, error) {
 	user, passwd, err := parseCredentials(p.req)
 	if err == nil {
 		if user != h.Handler.config.AuthUsername || passwd != h.Handler.config.AuthPassword {
-			return authorization{}, errgo.WithCausef(nil, params.ErrUnauthorized, "invalid user name or password")
+			return Authorization{}, errgo.WithCausef(nil, params.ErrUnauthorized, "invalid user name or password")
 		}
-		return authorization{Admin: true}, nil
+		return Authorization{Admin: true}, nil
 	}
 	bk := h.Store.Bakery
 	if errgo.Cause(err) != errNoCreds || bk == nil || h.Handler.config.IdentityLocation == "" {
-		return authorization{}, errgo.WithCausef(err, params.ErrUnauthorized, "authentication failed")
+		return Authorization{}, errgo.WithCausef(err, params.ErrUnauthorized, "authentication failed")
 	}
 	// active holds whether we're checking with active status.
 	// It's used by the active-time-before caveat checker.
@@ -389,35 +389,44 @@ func (h *ReqHandler) checkRequest(p authorizeParams) (authorization, error) {
 
 	attrMap, _, err := httpbakery.CheckRequestM(bk, p.req, nil, reqCheckers)
 	if err == nil {
-		// TODO check username is non-empty?
-		return authorization{
+		ident, err := h.Handler.idmClient.DeclaredIdentity(attrMap)
+		if err != nil {
+			return Authorization{}, errgo.Notef(err, "cannot infer identity")
+		}
+		user := ident.(*idmclient.User)
+		username, err := user.Username()
+		if err != nil {
+			return Authorization{}, errgo.Notef(err, "cannot get user name for identity")
+		}
+		return Authorization{
 			Admin:    false,
-			Username: attrMap[UsernameAttr],
+			User:     user,
+			Username: username,
 		}, nil
 	}
 	verr, ok := errgo.Cause(err).(*bakery.VerificationError)
 	if !ok || errgo.Cause(verr.Reason) != errActiveTimeExpired {
-		return authorization{}, errgo.Mask(err, errgo.Any)
+		return Authorization{}, errgo.Mask(err, errgo.Any)
 	}
 	// Set active to false and see if the macaroon can be used to self-renew.
 	active = false
 	_, ms, err := httpbakery.CheckRequestM(bk, p.req, nil, reqCheckers)
 	if err != nil {
-		return authorization{}, errgo.Mask(err, errgo.Any)
+		return Authorization{}, errgo.Mask(err, errgo.Any)
 	}
 	// The active time period of the macaroon has expired, but it's
 	// otherwise still valid. Mint another macaroon with a later expiration
 	// date but all other first party caveats the same.
 	newm, err := h.Store.Bakery.NewMacaroon(nil)
 	if err != nil {
-		return authorization{}, errgo.Notef(err, "cannot make renewed macaroon")
+		return Authorization{}, errgo.Notef(err, "cannot make renewed macaroon")
 	}
 	activeExpireTime := timeNow().Add(DelegatableMacaroonExpiry)
 	err = renewMacaroon(newm, ms, activeExpireTime)
 	if err != nil {
-		return authorization{}, errgo.Notef(err, "cannot renew macaroon")
+		return Authorization{}, errgo.Notef(err, "cannot renew macaroon")
 	}
-	return authorization{}, h.newDischargeRequiredError(newm, errgo.New("active lifetime expired; renew macaroon"), p.req, false)
+	return Authorization{}, h.newDischargeRequiredError(newm, errgo.New("active lifetime expired; renew macaroon"), p.req, false)
 }
 
 // entityACLs calculates the ACLs for the specified entity. If the channel has
@@ -573,15 +582,22 @@ func (h *ReqHandler) newMacaroon(
 		expiry = shortTermMacaroonExpiry
 	}
 
+	idmCaveats := h.Handler.idmClient.IdentityCaveats()
+	if h.Handler.config.IdentityLocation != h.Handler.config.IdentityAPIURL {
+		// The identity discharge location differs from the URL we're using to talk
+		// to its API, so change change any third party caveats
+		// to refer to that.
+		// TODO remove the distinction between IdentityAPIURL and IdentityLocation.
+		for i := range idmCaveats {
+			c := &idmCaveats[i]
+			if c.Location != "" {
+				c.Location = h.Handler.config.IdentityLocation
+			}
+		}
+	}
 	caveats := make([]checkers.Caveat, 0, 5)
+	caveats = append(caveats, idmCaveats...)
 	caveats = append(caveats,
-		checkers.NeedDeclaredCaveat(
-			checkers.Caveat{
-				Location:  h.Handler.config.IdentityLocation,
-				Condition: "is-authenticated-user",
-			},
-			UsernameAttr,
-		),
 		checkers.AllowCaveat(allowedOps...),
 		checkers.TimeBeforeCaveat(timeNow().Add(expiry)),
 	)
@@ -667,24 +683,17 @@ func (s *aclSet) add(acl mongodoc.ACL) {
 // is allowed to perform all the given operations with respect
 // to all the ACLs in the set. It uses the allow function to check
 // individual ACL membership.
-func (s *aclSet) check(auth authorization, ops []string, allow func(user string, acl []string) (bool, error)) error {
+func (s *aclSet) check(auth Authorization, ops []string) error {
 	if auth.Admin {
 		return nil
 	}
-	if auth.Username == "" {
-		return errgo.New("no username declared")
-	}
-	if len(s.acls) == 0 {
-		return errgo.New("no ACLs found to check")
+	if auth.User == nil {
+		return errgo.New("no authenticated identity")
 	}
 	logger.Infof("check username %q; ops %q; acls: %#v", auth.Username, ops, s.acls)
 	for _, acl := range s.acls {
 		for _, op := range ops {
-			// TODO could be slightly more efficient here
-			// because we'll do unnecessary calls to allow when
-			// several of the operations use the same set
-			// of ACLs.
-			ok, err := allow(auth.Username, aclForOp(acl, op))
+			ok, err := auth.User.Allow(aclForOp(acl, op))
 			if err != nil {
 				return errgo.Mask(err)
 			}

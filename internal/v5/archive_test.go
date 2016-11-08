@@ -1,7 +1,7 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package v5_test // import "gopkg.in/juju/charmstore.v5-unstable/internal/v5"
+package v5_test
 
 import (
 	"archive/zip"
@@ -407,7 +407,7 @@ loop:
 }
 
 func (s *ArchiveSuite) TestPostCharm(c *gc.C) {
-	s.discharge = dischargeForUser("charmers")
+	s.idmServer.SetDefaultUser("charmers")
 
 	// A charm that did not exist before should get revision 0.
 	s.assertUploadCharm(c, "POST", newResolvedURL("~charmers/precise/wordpress-0", -1), "wordpress", nil)
@@ -1174,7 +1174,7 @@ func (s *ArchiveSuite) TestArchiveFileErrors(c *gc.C) {
 	id, _ := s.addPublicCharmFromRepo(c, "mysql", newResolvedURL("cs:~charmers/utopic/mysql-0", 0))
 	err := s.store.SetPerms(&id.URL, "stable.read", "no-one")
 	c.Assert(err, gc.IsNil)
-	s.discharge = dischargeForUser("bob")
+	s.idmServer.SetDefaultUser("bob")
 	for i, test := range archiveFileErrorsTests {
 		c.Logf("test %d: %s", i, test.about)
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -1686,7 +1686,7 @@ func (s *ArchiveSuiteWithTerms) SetUpSuite(c *gc.C) {
 
 func (s *ArchiveSuiteWithTerms) SetUpTest(c *gc.C) {
 	s.commonSuite.SetUpTest(c)
-	s.discharge = dischargeForUser("bob")
+	s.idmServer.SetDefaultUser("bob")
 }
 
 func (s *ArchiveSuiteWithTerms) TestGetUserHasAgreedToTermsAndConditions(c *gc.C) {
@@ -1704,7 +1704,7 @@ func (s *ArchiveSuiteWithTerms) TestGetUserHasAgreedToTermsAndConditions(c *gc.C
 		return nil, nil
 	}
 
-	client := httpbakery.NewHTTPClient()
+	client := httpbakery.NewClient()
 
 	ch := storetesting.NewCharm(&charm.Meta{
 		Terms: []string{"terms-1/1", "terms-2/5"},
@@ -1755,7 +1755,7 @@ func (s *ArchiveSuiteWithTerms) TestGetArchiveWithBlankMacaroon(c *gc.C) {
 
 	archiveUrl := storeURL("~charmers/precise/terms-0/archive")
 
-	client := httpbakery.NewHTTPClient()
+	client := httpbakery.NewClient()
 	var gotBody json.RawMessage
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:      s.srv,
@@ -1793,7 +1793,6 @@ func (s *ArchiveSuiteWithTerms) TestGetUserHasNotAgreedToTerms(c *gc.C) {
 	s.dischargeTerms = func(_, _ string) ([]checkers.Caveat, error) {
 		return nil, errgo.New("user has not agreed to specified terms and conditions")
 	}
-	client := httpbakery.NewHTTPClient()
 
 	s.addPublicCharm(c, storetesting.NewCharm(&charm.Meta{
 		Terms: []string{"terms-1/1", "terms-2/5"},
@@ -1803,7 +1802,7 @@ func (s *ArchiveSuiteWithTerms) TestGetUserHasNotAgreedToTerms(c *gc.C) {
 	httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler:     s.srv,
 		URL:         archiveUrl,
-		Do:          bakeryDo(client),
+		Do:          bakeryDo(nil),
 		ExpectError: ".*third party refused discharge: cannot discharge: user has not agreed to specified terms and conditions",
 	})
 }
