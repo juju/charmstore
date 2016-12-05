@@ -1453,7 +1453,7 @@ func (s *ArchiveSearchSuite) TestGetSearchUpdate(c *gc.C) {
 		c.Skip("MongoDB JavaScript not available")
 	}
 
-	for i, id := range []string{"~charmers/wily/mysql-42", "~who/wily/mysql-42"} {
+	for i, id := range []string{"~charmers/yakkety/mysql-42", "~who/yakkety/mysql-42"} {
 		c.Logf("test %d: %s", i, id)
 		url := newResolvedURL(id, -1)
 
