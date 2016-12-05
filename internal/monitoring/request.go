@@ -26,7 +26,11 @@ func (r *Request) AppendLabel(label string) {
 
 // ObserveMetric observes this metric.
 func (r *Request) ObserveMetric() {
-	requestDuration.WithLabelValues(r.label).Observe(float64(time.Since(r.startTime)) / float64(time.Second))
+	// TODO reenable this when the problem with inappropriate use of
+	// AppendLabel has been fixed.
+	// For example, we're seeing a path of /v4/meta/:meta/any/v4/:meta/any/v4/:meta/any/v4/:meta/any/v4/:meta/any/v4/:meta/any
+	// for some requests.
+	// requestDuration.WithLabelValues(r.label).Observe(float64(time.Since(r.startTime)) / float64(time.Second))
 }
 
 // Label returns unexported label for testing.
