@@ -60,7 +60,8 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	defer rh.Close()
-	rh.Router.Monitor.AppendLabel("/v4")
+	rh.Router.Monitor.Reset(req.Method, "v4")
+	defer rh.Router.Monitor.Done()
 	rh.ServeHTTP(w, req)
 }
 

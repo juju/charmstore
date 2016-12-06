@@ -121,6 +121,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	defer rh.close()
+	rh.v4.Router.Monitor.Reset(req.Method, "legacy")
+	defer rh.v4.Router.Monitor.Done()
 	rh.mux.ServeHTTP(w, req)
 }
 
@@ -183,6 +185,7 @@ func charmStatsKey(url *charm.URL, kind string) []string {
 var errNotFound = fmt.Errorf("entry not found")
 
 func (h *reqHandler) serveCharmInfo(_ http.Header, req *http.Request) (interface{}, error) {
+	h.v4.Router.Monitor.SetKind("charm-info")
 	response := make(map[string]*charmrepo.InfoResponse)
 	for _, url := range req.Form["charms"] {
 		c := &charmrepo.InfoResponse{}
@@ -238,6 +241,7 @@ func (h *reqHandler) serveCharmInfo(_ http.Header, req *http.Request) (interface
 // "charms" query. In this implementation, the only supported event is
 // "published", required by the "juju publish" command.
 func (h *reqHandler) serveCharmEvent(_ http.Header, req *http.Request) (interface{}, error) {
+	h.v4.Router.Monitor.SetKind("charm-event")
 	response := make(map[string]*charmrepo.EventResponse)
 	for _, url := range req.Form["charms"] {
 		c := &charmrepo.EventResponse{}
