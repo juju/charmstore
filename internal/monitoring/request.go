@@ -6,28 +6,58 @@ import (
 	"time"
 )
 
-// Request represents a monitoring request.
+// Request represents a monitoring request. To record a request, either
+// create a new request with NewRequest or call Reset on an existing
+// Request; then call Done when the request has completed.
 type Request struct {
 	startTime time.Time
-	label     string
+	root      string
+	method    string
+	kind      string
 }
 
-// Reset the monitor start time to now and the label to blank.
-func (r *Request) Reset() {
+var knownMethods = map[string]bool{
+	"DELETE":  true,
+	"GET":     true,
+	"HEAD":    true,
+	"OPTIONS": true,
+	"POST":    true,
+	"PUT":     true,
+}
+
+// NewRequest returns a new monitoring request
+// for monitoring a request within the given root.
+// When the request is done, Done should be called.
+func NewRequest(method, root string) *Request {
+	var req Request
+	req.Reset(method, root)
+	return &req
+}
+
+// Reset resets r to indicate that a new request has started. The
+// parameter holds the API root (for example the API version).
+func (r *Request) Reset(method, root string) {
 	r.startTime = time.Now()
-	r.label = ""
+	r.kind = ""
+	if !knownMethods[method] {
+		method = "UNKNOWN"
+	}
+	r.method = method
+	r.root = root
 }
 
-// AppendLabel appends the given label value to the label of the monitor.
-// This supports piecing together parameterized routes as labels.
-func (r *Request) AppendLabel(label string) {
-	r.label += label
+// SetKind sets the kind of the request. This is
+// an arbitrary string to classify different kinds of request.
+func (r *Request) SetKind(kind string) {
+	r.kind = kind
 }
 
-// ObserveMetric observes this metric.
-func (r *Request) ObserveMetric() {
-	requestDuration.WithLabelValues(r.label).Observe(float64(time.Since(r.startTime)) / float64(time.Second))
+// Done records that the request is complete, and records any metrics for the request since the last call to Reset.
+func (r *Request) Done() {
+	requestDuration.WithLabelValues(r.method, r.root, r.kind).Observe(float64(time.Since(r.startTime)) / float64(time.Second))
 }
 
-// Label returns unexported label for testing.
-func (r *Request) Label() string { return r.label }
+// Kind returns the kind that has been set. This is useful for testing.
+func (r *Request) Kind() string {
+	return r.kind
+}

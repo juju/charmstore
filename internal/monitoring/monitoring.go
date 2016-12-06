@@ -12,7 +12,7 @@ var (
 		Subsystem: "handler",
 		Name:      "request_duration",
 		Help:      "The duration of a web request in seconds.",
-	}, []string{"path_pattern"})
+	}, []string{"method", "root", "kind"})
 	uploadProcessingDuration = prometheus.NewSummary(prometheus.SummaryOpts{
 		Namespace: "charmstore",
 		Subsystem: "archive",

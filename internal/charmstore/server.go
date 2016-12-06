@@ -18,6 +18,7 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/natefinch/lumberjack.v2"
 
+	"gopkg.in/juju/charmstore.v5-unstable/internal/monitoring"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
 )
 
@@ -149,7 +150,7 @@ func NewServer(db *mgo.Database, si *SearchIndex, config ServerParams, versions 
 	}
 	// Version independent API.
 	handle(srv.mux, "/debug", newServiceDebugHandler(pool, config, srv.mux))
-	handle(srv.mux, "/metrics", prometheus.Handler())
+	handle(srv.mux, "/metrics", prometheusHandler())
 	for vers, newAPI := range versions {
 		root := "/" + vers
 		h, err := newAPI(pool, config, root)
@@ -161,6 +162,17 @@ func NewServer(db *mgo.Database, si *SearchIndex, config ServerParams, versions 
 	}
 
 	return srv, nil
+}
+
+func prometheusHandler() http.Handler {
+	h := prometheus.Handler()
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		// Use prometheus to monitor its own requests...
+		monReq := monitoring.NewRequest(req.Method, "prometheus")
+		defer monReq.Done()
+		monReq.SetKind("metrics")
+		h.ServeHTTP(w, req)
+	})
 }
 
 type Server struct {

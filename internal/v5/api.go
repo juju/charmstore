@@ -323,8 +323,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	defer rh.Close()
-	rh.Router.Monitor.Reset()
-	rh.Router.Monitor.AppendLabel("/v5")
+	rh.Router.Monitor.Reset(req.Method, "v5")
+	defer rh.Router.Monitor.Done()
 	rh.ServeHTTP(w, req)
 }
 

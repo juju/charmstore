@@ -19,6 +19,7 @@ import (
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 	"gopkg.in/mgo.v2"
 
+	"gopkg.in/juju/charmstore.v5-unstable/internal/monitoring"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
 	appver "gopkg.in/juju/charmstore.v5-unstable/version"
 )
@@ -216,7 +217,22 @@ func newServiceDebugHandler(p *Pool, c ServerParams, hnd http.Handler) http.Hand
 		"elasticsearch": checkES(p.es),
 	}))
 	mux.Handle("/fullcheck", authorized(c, debugFullCheck(hnd)))
-	return mux
+	return handler{mux}
+}
+
+type handler struct {
+	mux *router.ServeMux
+}
+
+func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	monReq := monitoring.NewRequest(r.Method, "debug")
+	defer monReq.Done()
+	if _, path := h.mux.Handler(r); path != "" {
+		monReq.SetKind(path)
+	} else {
+		monReq.SetKind("unknown")
+	}
+	h.mux.ServeHTTP(w, r)
 }
 
 func authorized(c ServerParams, h http.Handler) http.Handler {

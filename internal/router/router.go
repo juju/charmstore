@@ -265,7 +265,7 @@ func New(
 		prefix := strings.TrimSuffix(path, "/")
 		handler := handler
 		mux.Handle(path, http.StripPrefix(prefix, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			r.Monitor.AppendLabel(prefix)
+			r.Monitor.SetKind(path[1:])
 			handler.ServeHTTP(w, req)
 		})))
 	}
@@ -307,7 +307,6 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	r.handler.ServeHTTP(w, req)
-	r.Monitor.ObserveMetric()
 }
 
 // Handlers returns the set of handlers that the router was created with.
@@ -334,7 +333,7 @@ func (r *Router) serveIds(w http.ResponseWriter, req *http.Request) error {
 	}
 	handler := r.handlers.Id[key]
 	if handler != nil {
-		r.Monitor.AppendLabel("/:id/" + key + path)
+		r.Monitor.SetKind(key)
 		req.URL.Path = path
 		err := handler(url, w, req)
 		// Note: preserve error cause from handlers.
@@ -421,19 +420,17 @@ func (r *Router) serveMetaGet(rurl *ResolvedURL, req *http.Request) (interface{}
 	if err := r.Context.AuthorizeEntity(rurl, req); err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
+	r.Monitor.SetKind("meta")
 	key, path := handlerKey(req.URL.Path)
 	if key == "" {
 		// GET id/meta
 		// https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmeta
-		r.Monitor.AppendLabel(":id/meta")
 		return r.metaNames(), nil
 	}
 	if key == "any" {
-		r.Monitor.AppendLabel("/:meta/" + key + path)
 		return r.serveMetaGetAny(rurl, req)
 	}
 	if handler := r.handlers.Meta[key]; handler != nil {
-		r.Monitor.AppendLabel("/:meta/" + key + path)
 		results, err := handler.HandleGet([]BulkIncludeHandler{handler}, rurl, []string{path}, req.Form, req)
 		if err != nil {
 			// Note: preserve error cause from handlers.
@@ -445,7 +442,6 @@ func (r *Router) serveMetaGet(rurl *ResolvedURL, req *http.Request) (interface{}
 		}
 		return results[0], nil
 	}
-	r.Monitor.AppendLabel("/:meta/" + key + path)
 	return nil, errgo.WithCausef(nil, params.ErrNotFound, "unknown metadata %q", strings.TrimPrefix(req.URL.Path, "/"))
 }
 
@@ -487,6 +483,7 @@ func (r *Router) serveMetaPut(id *ResolvedURL, req *http.Request) error {
 	if err := r.Context.AuthorizeEntity(id, req); err != nil {
 		return errgo.Mask(err, errgo.Any)
 	}
+	r.Monitor.SetKind("meta")
 	var body json.RawMessage
 	if err := unmarshalJSONBody(req, &body); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrBadRequest))
@@ -564,7 +561,7 @@ func (r *Router) metaNames() []string {
 
 // serveBulkMeta serves bulk metadata requests (requests to /meta/...).
 func (r *Router) serveBulkMeta(w http.ResponseWriter, req *http.Request) error {
-	r.Monitor.AppendLabel("/meta")
+	r.Monitor.SetKind("meta")
 	switch req.Method {
 	case "GET", "HEAD":
 		// A bare meta returns all endpoints.
