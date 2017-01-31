@@ -1,4 +1,4 @@
-// Copyright 2014 Canonical Ltd.
+// Copyright 2014-2016 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
 package blobstore // import "gopkg.in/juju/charmstore.v5-unstable/internal/blobstore"
@@ -76,22 +76,65 @@ func NewContentChallengeResponse(chal *ContentChallenge, r io.ReadSeeker) (*Cont
 	}, nil
 }
 
+// Store stores data blobs in the configured store.
+type Store struct {
+	store
+}
+
 // Store stores data blobs in mongodb, de-duplicating by
 // blob hash.
-type Store struct {
+type store interface {
+	Put(r io.Reader, name string, size int64, hash string, proof *ContentChallengeResponse) (*ContentChallenge, error)
+	PutUnchallenged(r io.Reader, name string, size int64, hash string) error
+	Open(name string) (ReadSeekCloser, int64, error)
+	Remove(name string) error
+}
+
+// gridStore stores data blobs in mongodb gridfs, de-duplicating by
+// blob hash.
+type gridStore struct {
 	mstore blobstore.ManagedStorage
+	db     *mgo.Database
+	prefix string
 }
 
 // New returns a new blob store that writes to the given database,
 // prefixing its collections with the given prefix.
+// This is the legacy function. Prefer using NewGridFSFromProviderConfig
 func New(db *mgo.Database, prefix string) *Store {
 	rs := blobstore.NewGridFS(db.Name, prefix, db.Session)
 	return &Store{
-		mstore: blobstore.NewManagedStorage(db, rs),
+		&gridStore{
+			mstore: blobstore.NewManagedStorage(db, rs),
+			db:     db,
+			prefix: prefix,
+		},
 	}
 }
 
-func (s *Store) challengeResponse(resp *ContentChallengeResponse) error {
+// NewBlobstoreFromProviderConfig returns a new blob stor that writes to mongodb
+// as defined in the given ProviderConfig
+func NewBlobstoreFromProviderConfig(pc *ProviderConfig) *Store {
+	if pc.MongoAddr == "" {
+		logger.Errorf("gridfs config with empty mongo_addr")
+	}
+	session, err := mgo.Dial(pc.MongoAddr)
+	if err != nil {
+		panic(errgo.Notef(err, "cannot dial mongo at %q", pc.MongoAddr))
+	}
+	dbName := pc.MongoDBName
+	if pc.MongoDBName == "" {
+		dbName = "juju"
+		logger.Debugf("gridfs mongo_dbname was empty, defaulting to juju")
+	}
+	db := session.DB(dbName)
+	if pc.BucketName == "" {
+		logger.Debugf("gridfs bucket_name was empty, mgo will default to fs")
+	}
+	return New(db, pc.BucketName)
+}
+
+func (s *gridStore) challengeResponse(resp *ContentChallengeResponse) error {
 	id, err := strconv.ParseInt(resp.RequestId, 10, 64)
 	if err != nil {
 		return errgo.Newf("invalid request id %q", id)
@@ -106,7 +149,7 @@ func (s *Store) challengeResponse(resp *ContentChallengeResponse) error {
 // satisfied by a client to prove that they have access to the content.
 // If the proof has already been acquired, it should be passed in as the
 // proof argument.
-func (s *Store) Put(r io.Reader, name string, size int64, hash string, proof *ContentChallengeResponse) (*ContentChallenge, error) {
+func (s *gridStore) Put(r io.Reader, name string, size int64, hash string, proof *ContentChallengeResponse) (*ContentChallenge, error) {
 	if proof != nil {
 		err := s.challengeResponse(proof)
 		if err == nil {
@@ -140,12 +183,12 @@ func (s *Store) Put(r io.Reader, name string, size int64, hash string, proof *Co
 // storage, with the provided name. The content should have the given
 // size and hash. In this case a challenge is never returned and a proof
 // is not required.
-func (s *Store) PutUnchallenged(r io.Reader, name string, size int64, hash string) error {
+func (s *gridStore) PutUnchallenged(r io.Reader, name string, size int64, hash string) error {
 	return s.mstore.PutForEnvironmentAndCheckHash("", name, r, size, hash)
 }
 
 // Open opens the entry with the given name.
-func (s *Store) Open(name string) (ReadSeekCloser, int64, error) {
+func (s *gridStore) Open(name string) (ReadSeekCloser, int64, error) {
 	r, length, err := s.mstore.GetForEnvironment("", name)
 	if err != nil {
 		return nil, 0, errgo.Mask(err)
@@ -154,6 +197,6 @@ func (s *Store) Open(name string) (ReadSeekCloser, int64, error) {
 }
 
 // Remove the given name from the Store.
-func (s *Store) Remove(name string) error {
+func (s *gridStore) Remove(name string) error {
 	return s.mstore.RemoveForEnvironment("", name)
 }

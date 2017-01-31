@@ -23,3 +23,30 @@ identity-location: https://api.jujucharms.com/identity/v1/discharger
 # Uncomment to test with a terms service running locally
 #terms-location: localhost:8085
 access-log: /var/log/charmstore/access.log
+provider-config:
+    - type: jujublobstore
+      mongo_addr: localhost:27017
+      mongo_dbname: juju
+      bucket_name: entitystore
+      mode: read-write
+# An example config using s3 and ceph:
+#    - type: s3
+#      bucket_name: charmstoretestbucket
+#      disable_ssl: true
+#      endpoint: http://10.0.5.117
+#      key: O5W6PMIQZ83ODYCGVIGJ
+#      secret: 6aqf5vyRONOvGFJkvH65xW7ttxZIKNZx0c2cPMTA
+#      mode: read-write
+# An example config using localfs. bucket_name is a relative or absolute directory name.
+#    - type: localfs
+#      bucket_name: localstore
+#      mode: read-write
+# An example config using s3 and a fake s3 server.
+    #    - type: s3
+    #  bucket_name: charmstoretestbucket
+    #  disable_ssl: true
+    #  endpoint: "192.168.15.197:8000"
+    #  key: accessKey1
+    #  region: us-east-1
+    #  s3_force_path_style: true
+    #  secret: verySecretKey1

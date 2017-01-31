@@ -218,13 +218,24 @@ func (p *Pool) requestStoreNB(always bool) (*Store, error) {
 	db := p.db.copy()
 	store := &Store{
 		DB:        db,
-		BlobStore: blobstore.New(db.Database, "entitystore"),
+		BlobStore: p.newBlobstore(db.Database),
 		ES:        p.es,
 		stats:     &p.stats,
 		pool:      p,
 	}
 	store.Bakery = store.BakeryWithPolicy(p.config.RootKeyPolicy)
 	return store, nil
+}
+
+// newBlobstore creates a new blobstore based on config and the given StoreDatabase.
+func (p *Pool) newBlobstore(db *mgo.Database) *blobstore.Store {
+	// If no BlobStoreProviders are in the config, use the legacy config of
+	// same mongo as entity database and entitystore as the gridfs prefix.
+	if 0 == len(p.config.BlobStorageProviders) {
+		logger.Debugf("using default gridfs blobstore with prefix entitystore - no provider-config")
+		return blobstore.New(db, "entitystore")
+	}
+	return blobstore.NewMultiStore(p.config.BlobStorageProviders)
 }
 
 // BakeryWithPolicy returns a copy of the Store's Bakery with a macaroon
@@ -257,7 +268,7 @@ type Store struct {
 func (s *Store) Copy() *Store {
 	s1 := *s
 	s1.DB = s.DB.clone()
-	s1.BlobStore = blobstore.New(s1.DB.Database, "entitystore")
+	s1.BlobStore = s.pool.newBlobstore(s1.DB.Database)
 	s1.Bakery = s1.BakeryWithPolicy(s.pool.config.RootKeyPolicy)
 
 	s.pool.mu.Lock()

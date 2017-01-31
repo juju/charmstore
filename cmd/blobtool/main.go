@@ -1,31 +1,29 @@
-// Copyright 2012, 2013, 2014 Canonical Ltd.
+// Copyright 2016 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package main // import "gopkg.in/juju/charmstore.v5-unstable/cmd/charmd"
+package main // import "gopkg.in/juju/charmstore.v5-unstable/cmd/blobtool"
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 
-	"github.com/gorilla/handlers"
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/natefinch/lumberjack.v2"
 
-	"gopkg.in/juju/charmstore.v5-unstable"
 	"gopkg.in/juju/charmstore.v5-unstable/config"
-	"gopkg.in/juju/charmstore.v5-unstable/elasticsearch"
+	"gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
+	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
 )
 
 var (
-	logger        = loggo.GetLogger("charmd")
-	loggingConfig = flag.String("logging-config", "", "specify log levels for modules e.g. <root>=TRACE")
+	logger        = loggo.GetLogger("blobtool")
+	loggingConfig = flag.String("logging-config", "", "specify log levels for modules e.g. TRACE or '<root>=DEBUG;mgo=WARN'")
+	filter        = flag.String("filter", "", `json filter string to use as mongodb query. e.g. '{"user":"evarlast"}' or '{"size":{"$lt": 10000000}}'`)
 )
 
 func main() {
@@ -44,13 +42,13 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	if err := serve(flag.Arg(0)); err != nil {
+	if err := run(flag.Arg(0)); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
 }
 
-func serve(confPath string) error {
+func run(confPath string) error {
 	logger.Infof("reading configuration")
 	conf, err := config.Read(confPath)
 	if err != nil {
@@ -69,26 +67,11 @@ func serve(confPath string) error {
 	}
 	db := session.DB(dbName)
 
-	var es *elasticsearch.Database
-	if conf.ESAddr != "" {
-		es = &elasticsearch.Database{
-			Addr: conf.ESAddr,
-		}
+	if conf.BlobStorageProviders == nil {
+		return errgo.New("a provider-config section must be in the input config file")
 	}
 
-	keyring := bakery.NewPublicKeyRing()
-	err = addPublicKey(keyring, conf.IdentityLocation, conf.IdentityPublicKey)
-	if err != nil {
-		return errgo.Mask(err)
-	}
-	if conf.TermsLocation != "" {
-		err = addPublicKey(keyring, conf.TermsLocation, conf.TermsPublicKey)
-		if err != nil {
-			return errgo.Mask(err)
-		}
-	}
-
-	logger.Infof("setting up the API server")
+	logger.Infof("instantiating the store")
 	cfg := charmstore.ServerParams{
 		AuthUsername:            conf.AuthUsername,
 		AuthPassword:            conf.AuthPassword,
@@ -101,7 +84,6 @@ func serve(confPath string) error {
 		MaxMgoSessions:          conf.MaxMgoSessions,
 		HTTPRequestWaitDuration: conf.RequestTimeout.Duration,
 		SearchCacheMaxAge:       conf.SearchCacheMaxAge.Duration,
-		PublicKeyLocator:        keyring,
 		BlobStorageProviders:    conf.BlobStorageProviders,
 	}
 
@@ -113,33 +95,54 @@ func serve(confPath string) error {
 		}
 	}
 
-	server, err := charmstore.NewServer(db, es, "cs", cfg, charmstore.Legacy, charmstore.V4, charmstore.V5)
+	pool, err := charmstore.NewPool(db, nil, nil, cfg)
 	if err != nil {
-		return errgo.Notef(err, "cannot create new server at %q", conf.APIAddr)
+		return errgo.Notef(err, "cannot create a new store")
 	}
-	handler := server.(http.Handler)
-	if conf.AccessLog != "" {
-		accesslog := &lumberjack.Logger{
-			Filename:   conf.AccessLog,
-			MaxSize:    500, // megabytes
-			MaxBackups: 3,
-			MaxAge:     28, //days
-		}
-		handler = handlers.CombinedLoggingHandler(accesslog, handler)
+	store := pool.Store()
+	defer store.Close()
+
+	logger.Infof("updating entities")
+	if err := action(store); err != nil {
+		return errgo.Notef(err, "cannot update entities")
 	}
-	logger.Infof("starting the API server")
-	return http.ListenAndServe(conf.APIAddr, handler)
+
+	logger.Infof("done")
+	return nil
 }
 
-func addPublicKey(ring *bakery.PublicKeyRing, loc string, key *bakery.PublicKey) error {
-	if key != nil {
-		return ring.AddPublicKeyForLocation(loc, false, key)
-	}
-	pubKey, err := httpbakery.PublicKeyForLocation(http.DefaultClient, loc)
+func action(store *charmstore.Store) error {
+	entities := store.DB.Entities()
+	var filterMap map[string]interface{}
+	err := json.Unmarshal([]byte(*filter), &filterMap)
 	if err != nil {
-		return errgo.Mask(err)
+		return errgo.Notef(err, "could not json unmarshal filter: %s", filter)
 	}
-	return ring.AddPublicKeyForLocation(loc, false, pubKey)
+	iter := entities.Find(filterMap).Iter()
+	defer iter.Close()
+
+	successCounter := 0
+	failCounter := 0
+	var entity mongodoc.Entity
+	for iter.Next(&entity) {
+		logger.Debugf("processing %s", entity.URL)
+		blob, err := store.OpenBlob(charmstore.EntityResolvedURL(&entity))
+		if err != nil {
+			logger.Warningf("cannot open archive data for %s: %s", entity.URL, err)
+			failCounter++
+			continue
+		}
+		defer blob.Close()
+		logger.Debugf("copying %s %s", entity.URL, entity.BlobName)
+		store.BlobStore.Put(blob, entity.BlobName, blob.Size, blob.Hash, nil)
+		successCounter++
+		if successCounter%100 == 0 {
+			logger.Infof("%d entities written", successCounter)
+		}
+	}
+	logger.Infof("%d entities written. %d failed to read.", successCounter, failCounter)
+
+	return nil
 }
 
 var mgoLogger = loggo.GetLogger("mgo")

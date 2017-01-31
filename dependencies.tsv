@@ -34,6 +34,7 @@ github.com/prometheus/procfs	git	abf152e5f3e97f2fafac028d2cc06c1feb87ffa5	2016-0
 github.com/rogpeppe/fastuuid	git	6724a57986aff9bff1a1770e9347036def7c89f6	2015-01-06T09:32:20Z
 golang.org/x/crypto	git	aedad9a179ec1ea11b7064c57cbc6dc30d7724ec	2015-08-30T18:06:42Z
 golang.org/x/net	git	ea47fc708ee3e20177f3ca3716217c4ab75942cb	2015-08-29T23:03:18Z
+gopkg.in/amz.v3	git	18899065239e006cc73b0e66800c98c2ce4eee50	2016-10-06T07:29:34Z
 gopkg.in/check.v1	git	4f90aeace3a26ad7021961c297b22c42160c7b25	2016-01-05T16:49:36Z
 gopkg.in/errgo.v1	git	66cb46252b94c1f3d65646f54ee8043ab38d766c	2015-10-07T15:31:57Z
 gopkg.in/juju/charm.v6-unstable	git	e62786fbece4c6a74945d0d1d19140a69018c07d	2016-09-16T08:55:15Z
