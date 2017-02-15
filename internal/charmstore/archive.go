@@ -58,7 +58,7 @@ func (s *Store) openBlob(id *router.ResolvedURL, preV5 bool) (*Blob, error) {
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	r, size, err := s.BlobStore.Open(entity.BlobName)
+	r, size, err := s.BlobStore.Open(entity.BlobName, nil)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot open archive data for %s", id)
 	}
@@ -67,7 +67,7 @@ func (s *Store) openBlob(id *router.ResolvedURL, preV5 bool) (*Blob, error) {
 	if entity.PreV5BlobHash != entity.BlobHash && preV5 {
 		// The v5 blob is different so we open the blob suffix that
 		// contains the metadata hack.
-		r2, size2, err := s.BlobStore.Open(preV5CompatibilityBlobName(entity.BlobName))
+		r2, size2, err := s.BlobStore.Open(preV5CompatibilityBlobName(entity.BlobName), nil)
 		if err != nil {
 			r.Close()
 			return nil, errgo.Notef(err, "cannot find pre-v5 hack blob")
@@ -163,7 +163,7 @@ func (s *Store) OpenCachedBlobFile(
 	if ok && !zipf.IsValid() {
 		return nil, errgo.WithCausef(nil, params.ErrNotFound, "")
 	}
-	blob, size, err := s.BlobStore.Open(entity.BlobName)
+	blob, size, err := s.BlobStore.Open(entity.BlobName, nil)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot open archive blob")
 	}

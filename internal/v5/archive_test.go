@@ -1072,7 +1072,7 @@ func (s *commonArchiveSuite) assertUpload(c *gc.C, p uploadParams) (id *charm.UR
 
 	// Test that the expected entry has been created
 	// in the blob store.
-	r, _, err := s.store.BlobStore.Open(entity.BlobName)
+	r, _, err := s.store.BlobStore.Open(entity.BlobName, nil)
 	c.Assert(err, gc.IsNil)
 	r.Close()
 

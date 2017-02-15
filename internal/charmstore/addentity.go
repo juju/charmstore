@@ -134,13 +134,13 @@ func (s *Store) UploadEntity(url *router.ResolvedURL, blob io.Reader, blobHash s
 	}
 	m_upload := monitoring.NewUploadProcessingDuration()
 	defer m_upload.ObserveMetric()
-	r, _, err := s.BlobStore.Open(blobName)
+	r, _, err := s.BlobStore.Open(blobName, nil)
 	if err != nil {
 		return errgo.Notef(err, "cannot open newly created blob")
 	}
 	defer r.Close()
 	if err := s.addEntityFromReader(url, r, blobName, blobHash, blobHash256, size, chans); err != nil {
-		if err1 := s.BlobStore.Remove(blobName); err1 != nil {
+		if err1 := s.BlobStore.Remove(blobName, nil); err1 != nil {
 			logger.Errorf("cannot remove blob %s after error: %v", blobName, err1)
 		}
 		return errgo.Mask(err,
@@ -164,7 +164,7 @@ func (s *Store) putArchive(blob io.Reader, blobSize int64, hash string) (blobNam
 
 	// Upload the actual blob, and make sure that it is removed
 	// if we fail later.
-	err = s.BlobStore.PutUnchallenged(blob, name, blobSize, hash)
+	err = s.BlobStore.Put(blob, name, blobSize, hash)
 	if err != nil {
 		// TODO return error with ErrInvalidEntity cause when
 		// there's a hash or size mismatch.
@@ -207,7 +207,7 @@ func (s *Store) addEntityFromReader(id *router.ResolvedURL, r io.ReadSeeker, blo
 		if err != nil && addedCompat {
 			// We added a compatibility blob so we need to remove it.
 			compatBlobName := preV5CompatibilityBlobName(p.blobName)
-			if err1 := s.BlobStore.Remove(compatBlobName); err1 != nil {
+			if err1 := s.BlobStore.Remove(compatBlobName, nil); err1 != nil {
 				logger.Errorf("cannot remove blob %s after error: %v", compatBlobName, err1)
 			}
 		}
@@ -234,7 +234,7 @@ func (s *Store) addEntityFromReader(id *router.ResolvedURL, r io.ReadSeeker, blo
 	if err != nil && len(ch.Meta().Series) > 0 {
 		// We added a compatibility blob so we need to remove it.
 		compatBlobName := preV5CompatibilityBlobName(p.blobName)
-		if err1 := s.BlobStore.Remove(compatBlobName); err1 != nil {
+		if err1 := s.BlobStore.Remove(compatBlobName, nil); err1 != nil {
 			logger.Errorf("cannot remove blob %s after error: %v", compatBlobName, err1)
 		}
 	}
@@ -339,7 +339,7 @@ func applicationsToServices(r io.Reader) ([]byte, error) {
 func addCompatibilityHackBlob(blobStore *blobstore.Store, r io.ReadSeeker, blobName string, blobSize int64, appendData []byte) (*compatibilityHackBlobInfo, error) {
 	sha384sum := sha512.Sum384(appendData)
 
-	if err := blobStore.PutUnchallenged(
+	if err := blobStore.Put(
 		bytes.NewReader(appendData),
 		blobName,
 		int64(len(appendData)),
