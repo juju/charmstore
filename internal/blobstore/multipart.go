@@ -61,7 +61,7 @@ func (s *Store) NewUpload(expires time.Time) (uploadId string, err error) {
 	// only be 45 bytes and secure enough that we could
 	// probably dispense with ownership checking.
 	uploadId = fmt.Sprintf("%x", bson.NewObjectId())
-	if err := s.uploadC().Insert(uploadDoc{
+	if err := s.uploadc.Insert(uploadDoc{
 		Id:      uploadId,
 		Expires: expires,
 	}); err != nil {
@@ -84,13 +84,9 @@ func (s *Store) PutPart(uploadId string, part int, r io.Reader, size int64, hash
 	if part >= maxParts {
 		return errgo.Newf("part number %d too big (maximum %d)", part, maxParts-1)
 	}
-	uploadc := s.uploadC()
-	var udoc uploadDoc
-	if err := uploadc.FindId(uploadId).One(&udoc); err != nil {
-		if err == mgo.ErrNotFound {
-			return errgo.WithCausef(nil, ErrNotFound, "upload id %q not found", uploadId)
-		}
-		return errgo.Notef(err, "cannot get upload id %q", uploadId)
+	udoc, err := s.getUpload(uploadId)
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(ErrNotFound))
 	}
 	if err := checkPartSizes(udoc.Parts, part, size); err != nil {
 		return errgo.Mask(err)
@@ -112,7 +108,7 @@ func (s *Store) PutPart(uploadId string, part int, r io.Reader, size int64, hash
 		// No part record. Make one, not marked as complete
 		// before we put the part so that DeleteExpiredParts
 		// knows to delete the part.
-		if err := initializePart(uploadc, uploadId, part, hash, size); err != nil {
+		if err := s.initializePart(uploadId, part, hash, size); err != nil {
 			return errgo.Mask(err)
 		}
 	}
@@ -127,7 +123,7 @@ func (s *Store) PutPart(uploadId string, part int, r io.Reader, size int64, hash
 	// complete. Note: we update the entire part rather than just
 	// setting $partElem.complete=true because of a bug in MongoDB
 	// 2.4 which fails in that case.
-	err := uploadc.UpdateId(uploadId, bson.D{{
+	err = s.uploadc.UpdateId(uploadId, bson.D{{
 		"$set", bson.D{{
 			partElem,
 			uploadPart{
@@ -176,9 +172,9 @@ func uploadPartName(uploadId string, part int) string {
 }
 
 // initializePart creates the initial record for a part.
-func initializePart(uploadc *mgo.Collection, uploadId string, part int, hash string, size int64) error {
+func (s *Store) initializePart(uploadId string, part int, hash string, size int64) error {
 	partElem := fmt.Sprintf("parts.%d", part)
-	err := uploadc.Update(bson.D{
+	err := s.uploadc.Update(bson.D{
 		{"_id", uploadId},
 		{"$or", []bson.D{{{
 			partElem, bson.D{{"$exists", false}},
@@ -233,6 +229,17 @@ func (s *Store) DeleteUpload(uploadId string) error {
 	return errgo.New("not implemented yet")
 }
 
+func (s *Store) getUpload(uploadId string) (*uploadDoc, error) {
+	var udoc uploadDoc
+	if err := s.uploadc.FindId(uploadId).One(&udoc); err != nil {
+		if err == mgo.ErrNotFound {
+			return nil, errgo.WithCausef(nil, ErrNotFound, "upload id %q not found", uploadId)
+		}
+		return nil, errgo.Notef(err, "cannot get upload id %q", uploadId)
+	}
+	return &udoc, nil
+}
+
 // MultipartIndex holds the index of all the parts of a multipart blob.
 // It should be stored in an external document along with the
 // blob name so that the blob can be downloaded.
@@ -243,8 +250,4 @@ type MultipartIndex struct {
 // Part represents one part of a multipart blob.
 type Part struct {
 	Hash string
-}
-
-func (s *Store) uploadC() *mgo.Collection {
-	return s.db.C(s.prefix + ".upload")
 }

@@ -27,9 +27,8 @@ func NewHash() hash.Hash {
 // Store stores data blobs in mongodb, de-duplicating by
 // blob hash.
 type Store struct {
-	db     *mgo.Database
-	prefix string
-	mstore blobstore.ManagedStorage
+	uploadc *mgo.Collection
+	mstore  blobstore.ManagedStorage
 }
 
 // New returns a new blob store that writes to the given database,
@@ -37,9 +36,8 @@ type Store struct {
 func New(db *mgo.Database, prefix string) *Store {
 	rs := blobstore.NewGridFS(db.Name, prefix, db.Session)
 	return &Store{
-		db:     db,
-		prefix: prefix,
-		mstore: blobstore.NewManagedStorage(db, rs),
+		uploadc: db.C(prefix + ".upload"),
+		mstore:  blobstore.NewManagedStorage(db, rs),
 	}
 }
 
