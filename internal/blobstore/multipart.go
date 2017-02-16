@@ -6,6 +6,7 @@ package blobstore
 import (
 	"fmt"
 	"io"
+	"log"
 	"time"
 
 	"gopkg.in/errgo.v1"
@@ -16,21 +17,32 @@ import (
 var (
 	maxParts          = 400
 	minPartSize int64 = 5 * 1024 * 1024
+	maxPartSize int64 = 1<<32 - 1
 )
+
+// MultipartIndex holds the index of all the parts of a multipart blob.
+// It should be stored in an external document along with the
+// blob name so that the blob can be downloaded.
+type MultipartIndex struct {
+	Sizes []uint32
+}
+
+// Part represents one part of a multipart blob.
+type Part struct {
+	Hash string
+}
 
 var ErrNotFound = errgo.New("blob not found")
 
 // uploadDoc describes the record that's held
 // for a pending multipart upload.
 type uploadDoc struct {
-	// Id holds the upload id. The blob for each
-	// part in the underlying blobstore will be named
-	// $id/$partnumber.
+	// Id holds the upload id. The blob for each part in the
+	// underlying blobstore will be named $id/$partnumber.
 	Id string `bson:"_id"`
 
-	// Hash holds the SHA384 hash of all the
-	// concatenated parts. It is empty until
-	// after FinishUpload is called.
+	// Hash holds the SHA384 hash of all the concatenated parts. It
+	// is empty until after FinishUpload is called.
 	Hash string `bson:"hash,omitempty"`
 
 	// Expires holds the expiry time of the upload.
@@ -84,6 +96,12 @@ func (s *Store) PutPart(uploadId string, part int, r io.Reader, size int64, hash
 	if part >= maxParts {
 		return errgo.Newf("part number %d too big (maximum %d)", part, maxParts-1)
 	}
+	if size <= 0 {
+		return errgo.Newf("non-positive part %d size %d", part, size)
+	}
+	if size >= maxPartSize {
+		return errgo.Newf("part %d too big (maximum %d)", part, maxPartSize)
+	}
 	udoc, err := s.getUpload(uploadId)
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(ErrNotFound))
@@ -105,6 +123,9 @@ func (s *Store) PutPart(uploadId string, part int, r io.Reader, size int64, hash
 		// Someone else made the part record, but it's not complete
 		// perhaps because a previous part upload failed.
 	} else {
+		if udoc.Hash != "" {
+			return errgo.Newf("cannot upload new part because upload is already complete")
+		}
 		// No part record. Make one, not marked as complete
 		// before we put the part so that DeleteExpiredParts
 		// knows to delete the part.
@@ -143,8 +164,11 @@ func (s *Store) PutPart(uploadId string, part int, r io.Reader, size int64, hash
 // As the last part is allowed to be small, we can
 // only check previously uploaded parts unless we're
 // uploading an out-of-order part.
+//
+// The part argument holds the part being uploaded,
+// or -1 if no part is currently being uploaded.
 func checkPartSizes(parts []*uploadPart, part int, size int64) error {
-	if part < len(parts)-1 && size < minPartSize {
+	if part >= 0 && part < len(parts)-1 && size < minPartSize {
 		return errgo.Newf("part too small (need at least %d bytes, got %d)", minPartSize, size)
 	}
 	for i, p := range parts {
@@ -174,12 +198,16 @@ func uploadPartName(uploadId string, part int) string {
 // initializePart creates the initial record for a part.
 func (s *Store) initializePart(uploadId string, part int, hash string, size int64) error {
 	partElem := fmt.Sprintf("parts.%d", part)
+	// Update the document if it's not been marked
+	// as complete (it has no hash) and the part entry hasn't been
+	// created yet.
 	err := s.uploadc.Update(bson.D{
 		{"_id", uploadId},
+		{"hash", bson.D{{"$exists", false}}},
 		{"$or", []bson.D{{{
 			partElem, bson.D{{"$exists", false}},
 		}}, {{
-			partElem, bson.D{{"$eq", nil}},
+			partElem, nil,
 		}}}},
 	},
 		bson.D{{
@@ -190,7 +218,7 @@ func (s *Store) initializePart(uploadId string, part int, hash string, size int6
 		}},
 	)
 	if err == nil || err != mgo.ErrNotFound {
-		return nil
+		return errgo.Mask(err)
 	}
 	return errgo.New("cannot update initial part record - concurrent upload of the same part?")
 }
@@ -205,11 +233,93 @@ func (s *Store) initializePart(uploadId string, part int, hash string, size int6
 // deleted explicitly by calling DeleteUpload after the index data is
 // stored.
 func (s *Store) FinishUpload(uploadId string, parts []Part) (idx *MultipartIndex, hash string, err error) {
-	// TODO read metadata
-	// if parts don't match uploaded parts, return error.
-	// read all parts in sequence to hash them.
-	// return index derived from metadata and calculated hash.
-	return nil, "", errgo.New("not implemented yet")
+	udoc, err := s.getUpload(uploadId)
+	if err != nil {
+		return nil, "", errgo.Mask(err, errgo.Is(ErrNotFound))
+	}
+	if len(parts) != len(udoc.Parts) {
+		return nil, "", errgo.Newf("part count mismatch (got %d but %d uploaded)", len(parts), len(udoc.Parts))
+	}
+	log.Printf("udoc.Parts: %#v", udoc.Parts)
+	for i, p := range parts {
+		pu := udoc.Parts[i]
+		if pu == nil || !pu.Complete {
+			return nil, "", errgo.Newf("part %d not uploaded yet", i)
+		}
+		if p.Hash != pu.Hash {
+			return nil, "", errgo.Newf("hash mismatch on part %d (got %q want %q)", i, p.Hash, pu.Hash)
+		}
+	}
+	// Even though some part size checking is done
+	// when the parts are being uploaded, we still need
+	// to check here in case several parts were uploaded
+	// concurrently and one or more was too small.
+	if err := checkPartSizes(udoc.Parts, -1, 0); err != nil {
+		return nil, "", errgo.Mask(err)
+	}
+	// Calculate the hash of the entire thing, which marks
+	// it as a completed upload.
+	hash, err = s.setUploadHash(uploadId, udoc)
+	if err != nil {
+		return nil, "", errgo.Mask(err)
+	}
+	idx = &MultipartIndex{
+		Sizes: make([]uint32, len(parts)),
+	}
+	for i := range udoc.Parts {
+		idx.Sizes[i] = uint32(udoc.Parts[i].Size)
+	}
+	return idx, hash, nil
+}
+
+// setUploadHash calculates the hash of an complete multipart
+// upload and sets it on the upload document which marks
+// is as complete. It returns the hash.
+// Precondition: all the parts have previously been checked for
+// validity.
+func (s *Store) setUploadHash(uploadId string, udoc *uploadDoc) (string, error) {
+	if udoc.Hash != "" {
+		return udoc.Hash, nil
+	}
+	var hash string
+	if len(udoc.Parts) == 1 {
+		// If there's only one part, we already know the hash
+		// of the whole thing.
+		hash = udoc.Parts[0].Hash
+	} else {
+		h := NewHash()
+		for i := range udoc.Parts {
+			if err := s.copyBlob(h, uploadPartName(uploadId, i)); err != nil {
+				return "", errgo.Mask(err)
+			}
+		}
+		hash = fmt.Sprintf("%x", h.Sum(nil))
+	}
+	// Note: setting the hash field marks the upload as complete.
+	err := s.uploadc.UpdateId(uploadId, bson.D{{
+		"$set", bson.D{{"hash", hash}},
+	}})
+	if err == mgo.ErrNotFound {
+		return "", errgo.Newf("upload expired or removed")
+	}
+	if err != nil {
+		return "", errgo.Notef(err, "could not update hash")
+	}
+	return hash, nil
+}
+
+// copyBlob copies the contents of blob with the given name
+/// to the given Writer.
+func (s *Store) copyBlob(w io.Writer, name string) error {
+	rc, _, err := s.Open(name, nil)
+	if err != nil {
+		return errgo.Notef(err, "cannot open blob %q", name)
+	}
+	defer rc.Close()
+	if _, err := io.Copy(w, rc); err != nil {
+		return errgo.Notef(err, "cannot read blob %q", name)
+	}
+	return nil
 }
 
 // DeleteExpiredUploads deletes any multipart entries
@@ -238,16 +348,4 @@ func (s *Store) getUpload(uploadId string) (*uploadDoc, error) {
 		return nil, errgo.Notef(err, "cannot get upload id %q", uploadId)
 	}
 	return &udoc, nil
-}
-
-// MultipartIndex holds the index of all the parts of a multipart blob.
-// It should be stored in an external document along with the
-// blob name so that the blob can be downloaded.
-type MultipartIndex struct {
-	Sizes []uint32
-}
-
-// Part represents one part of a multipart blob.
-type Part struct {
-	Hash string
 }

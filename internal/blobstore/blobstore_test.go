@@ -108,8 +108,7 @@ func (s *BlobStoreSuite) TestNewParts(c *gc.C) {
 
 	// Verify that the new record looks like we expect.
 	var udoc blobstore.UploadDoc
-	db := s.Session.DB("db")
-	err = db.C("blobstore.upload").FindId(id).One(&udoc)
+	err = s.Session.DB("db").C("blobstore.upload").FindId(id).One(&udoc)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(udoc, jc.DeepEquals, blobstore.UploadDoc{
 		Id:      id,
@@ -130,6 +129,20 @@ func (s *BlobStoreSuite) TestPutPartNumberTooBig(c *gc.C) {
 	id := s.newUpload(c)
 	err := s.store.PutPart(id, 100, nil, 0, "")
 	c.Assert(err, gc.ErrorMatches, `part number 100 too big \(maximum 99\)`)
+}
+
+func (s *BlobStoreSuite) TestPutPartSizeNonPositive(c *gc.C) {
+	id := s.newUpload(c)
+	err := s.store.PutPart(id, 0, strings.NewReader(""), 0, hashOf(""))
+	c.Assert(err, gc.ErrorMatches, `non-positive part 0 size 0`)
+}
+
+func (s *BlobStoreSuite) TestPutPartSizeTooBig(c *gc.C) {
+	s.PatchValue(blobstore.MaxPartSize, int64(5))
+
+	id := s.newUpload(c)
+	err := s.store.PutPart(id, 0, strings.NewReader(""), 20, hashOf(""))
+	c.Assert(err, gc.ErrorMatches, `part 0 too big \(maximum 5\)`)
 }
 
 func (s *BlobStoreSuite) TestPutPartSingle(c *gc.C) {
@@ -282,10 +295,253 @@ func (s *BlobStoreSuite) TestPutPartConcurrent(c *gc.C) {
 }
 
 func (s *BlobStoreSuite) TestPutPartNotFound(c *gc.C) {
-
-	err := s.store.PutPart("unknownblob", 0, strings.NewReader(""), 0, hashOf(""))
+	err := s.store.PutPart("unknownblob", 0, strings.NewReader("x"), 1, hashOf(""))
 	c.Assert(err, gc.ErrorMatches, `upload id "unknownblob" not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, blobstore.ErrNotFound)
+}
+
+func (s *BlobStoreSuite) TestFinishUploadMismatchedPartCount(c *gc.C) {
+	s.PatchValue(blobstore.MinPartSize, int64(10))
+	id := s.newUpload(c)
+
+	content0 := "123456789 123456789 "
+	err := s.store.PutPart(id, 0, strings.NewReader(content0), int64(len(content0)), hashOf(content0))
+	c.Assert(err, gc.Equals, nil)
+
+	content1 := "abcdefghijklmnopqrstuvwxyz"
+	err = s.store.PutPart(id, 1, strings.NewReader(content1), int64(len(content1)), hashOf(content1))
+	c.Assert(err, gc.Equals, nil)
+
+	idx, hash, err := s.store.FinishUpload(id, []blobstore.Part{{
+		Hash: hashOf(content0),
+	}})
+	c.Assert(err, gc.ErrorMatches, `part count mismatch \(got 1 but 2 uploaded\)`)
+	c.Assert(idx, gc.IsNil)
+	c.Assert(hash, gc.Equals, "")
+}
+
+func (s *BlobStoreSuite) TestFinishUploadMismatchedPartHash(c *gc.C) {
+	s.PatchValue(blobstore.MinPartSize, int64(10))
+	id := s.newUpload(c)
+
+	content0 := "123456789 123456789 "
+	err := s.store.PutPart(id, 0, strings.NewReader(content0), int64(len(content0)), hashOf(content0))
+	c.Assert(err, gc.Equals, nil)
+
+	content1 := "abcdefghijklmnopqrstuvwxyz"
+	err = s.store.PutPart(id, 1, strings.NewReader(content1), int64(len(content1)), hashOf(content1))
+	c.Assert(err, gc.Equals, nil)
+
+	idx, hash, err := s.store.FinishUpload(id, []blobstore.Part{{
+		Hash: hashOf(content0),
+	}, {
+		Hash: "badhash",
+	}})
+	c.Assert(err, gc.ErrorMatches, `hash mismatch on part 1 \(got "badhash" want ".+"\)`)
+	c.Assert(idx, gc.IsNil)
+	c.Assert(hash, gc.Equals, "")
+}
+
+func (s *BlobStoreSuite) TestFinishUploadPartNotUploaded(c *gc.C) {
+	s.PatchValue(blobstore.MinPartSize, int64(10))
+	id := s.newUpload(c)
+
+	content1 := "123456789 123456789 "
+	err := s.store.PutPart(id, 1, strings.NewReader(content1), int64(len(content1)), hashOf(content1))
+	c.Assert(err, gc.Equals, nil)
+
+	idx, hash, err := s.store.FinishUpload(id, []blobstore.Part{{
+		Hash: hashOf(content1),
+	}, {
+		Hash: hashOf(content1),
+	}})
+	c.Assert(err, gc.ErrorMatches, `part 0 not uploaded yet`)
+	c.Assert(idx, gc.IsNil)
+	c.Assert(hash, gc.Equals, "")
+}
+
+func (s *BlobStoreSuite) TestFinishUploadPartIncomplete(c *gc.C) {
+	s.PatchValue(blobstore.MinPartSize, int64(10))
+	id := s.newUpload(c)
+
+	content0 := "123456789 123456789 "
+	err := s.store.PutPart(id, 0, strings.NewReader(""), int64(len(content0)), hashOf(content0))
+	c.Assert(err, gc.ErrorMatches, `cannot upload part ".+/0": hash mismatch`)
+
+	idx, hash, err := s.store.FinishUpload(id, []blobstore.Part{{
+		Hash: hashOf(content0),
+	}})
+	c.Assert(err, gc.ErrorMatches, `part 0 not uploaded yet`)
+	c.Assert(idx, gc.IsNil)
+	c.Assert(hash, gc.Equals, "")
+}
+
+func (s *BlobStoreSuite) TestFinishUploadCheckSizes(c *gc.C) {
+	s.PatchValue(blobstore.MinPartSize, int64(50))
+	id := s.newUpload(c)
+	content := "123456789 123456789 "
+	// Upload two small parts concurrently.
+	done := make(chan error)
+	for i := 0; i < 2; i++ {
+		i := i
+		go func() {
+			err := s.store.PutPart(id, i, strings.NewReader(content), int64(len(content)), hashOf(content))
+			done <- err
+		}()
+	}
+	allOK := true
+	for i := 0; i < 2; i++ {
+		if err := <-done; err != nil {
+			c.Assert(err, gc.ErrorMatches, ".*too small.*")
+			allOK = allOK && err == nil
+		}
+	}
+	if !allOK {
+		// Although it's likely that both parts will succeed
+		// because they both fetch the upload doc at the same
+		// time, there's a possibility that one goroutine will
+		// fetch and initialize its update doc before the other
+		// one retrieves it, so we skip the test in that case
+		c.Skip("concurrent uploads were not very concurrent, so test skipped")
+	}
+	idx, hash, err := s.store.FinishUpload(id, []blobstore.Part{{
+		Hash: hashOf(content),
+	}, {
+		Hash: hashOf(content),
+	}})
+	c.Assert(err, gc.ErrorMatches, `part 0 was too small \(need at least 50 bytes, got 20\)`)
+	c.Assert(idx, gc.IsNil)
+	c.Assert(hash, gc.Equals, "")
+}
+
+func (s *BlobStoreSuite) TestFinishUploadSuccess(c *gc.C) {
+	s.PatchValue(blobstore.MinPartSize, int64(10))
+	id := s.newUpload(c)
+
+	content0 := "123456789 123456789 "
+	err := s.store.PutPart(id, 0, strings.NewReader(content0), int64(len(content0)), hashOf(content0))
+	c.Assert(err, gc.Equals, nil)
+
+	content1 := "abcdefghijklmnopqrstuvwxyz"
+	err = s.store.PutPart(id, 1, strings.NewReader(content1), int64(len(content1)), hashOf(content1))
+	c.Assert(err, gc.Equals, nil)
+
+	idx, hash, err := s.store.FinishUpload(id, []blobstore.Part{{
+		Hash: hashOf(content0),
+	}, {
+		Hash: hashOf(content1),
+	}})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(hash, gc.Equals, hashOf(content0+content1))
+	c.Assert(idx, jc.DeepEquals, &blobstore.MultipartIndex{
+		Sizes: []uint32{
+			uint32(len(content0)),
+			uint32(len(content1)),
+		},
+	})
+}
+
+func (s *BlobStoreSuite) TestFinishUploadSuccessOnePart(c *gc.C) {
+	s.PatchValue(blobstore.MinPartSize, int64(10))
+	id := s.newUpload(c)
+
+	content0 := "123456789 123456789 "
+	err := s.store.PutPart(id, 0, strings.NewReader(content0), int64(len(content0)), hashOf(content0))
+	c.Assert(err, gc.Equals, nil)
+
+	idx, hash, err := s.store.FinishUpload(id, []blobstore.Part{{
+		Hash: hashOf(content0),
+	}})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(hash, gc.Equals, hashOf(content0))
+	c.Assert(idx, jc.DeepEquals, &blobstore.MultipartIndex{
+		Sizes: []uint32{
+			uint32(len(content0)),
+		},
+	})
+}
+
+func (s *BlobStoreSuite) TestFinishUploadNotFound(c *gc.C) {
+	_, _, err := s.store.FinishUpload("not-an-id", nil)
+	c.Assert(err, gc.ErrorMatches, `upload id "not-an-id" not found`)
+	c.Assert(errgo.Cause(err), gc.Equals, blobstore.ErrNotFound)
+}
+
+func (s *BlobStoreSuite) TestFinishUploadAgain(c *gc.C) {
+	s.PatchValue(blobstore.MinPartSize, int64(10))
+	id := s.newUpload(c)
+
+	content0 := "123456789 123456789 "
+	err := s.store.PutPart(id, 0, strings.NewReader(content0), int64(len(content0)), hashOf(content0))
+	c.Assert(err, gc.Equals, nil)
+
+	idx, hash, err := s.store.FinishUpload(id, []blobstore.Part{{
+		Hash: hashOf(content0),
+	}})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(hash, gc.Equals, hashOf(content0))
+	c.Assert(idx, jc.DeepEquals, &blobstore.MultipartIndex{
+		Sizes: []uint32{
+			uint32(len(content0)),
+		},
+	})
+
+	// We should get exactly the same thing if we call
+	// FinishUpload again.
+	idx, hash, err = s.store.FinishUpload(id, []blobstore.Part{{
+		Hash: hashOf(content0),
+	}})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(hash, gc.Equals, hashOf(content0))
+	c.Assert(idx, jc.DeepEquals, &blobstore.MultipartIndex{
+		Sizes: []uint32{
+			uint32(len(content0)),
+		},
+	})
+}
+
+func (s *BlobStoreSuite) TestFinishUploadRemovedWhenCalculatingHash(c *gc.C) {
+	s.PatchValue(blobstore.MinPartSize, int64(10))
+	id := s.newUpload(c)
+
+	// We need at least two parts so that FinishUpload
+	// actually needs to stream the parts again, so
+	// upload a small first part and then a large second
+	// part that's big enough that there's a strong probability
+	// that we'll be able to remove the upload entry before
+	// FinishUpload has finished calculating the hash.
+	content0 := "123456789 123456789 "
+	err := s.store.PutPart(id, 0, strings.NewReader(content0), int64(len(content0)), hashOf(content0))
+	c.Assert(err, gc.Equals, nil)
+
+	const size1 = 2 * 1024 * 1024
+	hash1 := hashOfReader(c, newDataSource(1, size1))
+	err = s.store.PutPart(id, 1, newDataSource(1, size1), int64(size1), hash1)
+	c.Assert(err, gc.Equals, nil)
+
+	done := make(chan error)
+	go func() {
+		_, _, err := s.store.FinishUpload(id, []blobstore.Part{{
+			Hash: hashOf(content0),
+		}, {
+			Hash: hash1,
+		}})
+		done <- err
+	}()
+	// TODO use DeleteUpload instead of going directly to the collection.
+	time.Sleep(20 * time.Millisecond)
+	err = s.Session.DB("db").C("blobstore.upload").RemoveId(id)
+	c.Assert(err, gc.Equals, nil)
+
+	err = <-done
+	if err == nil {
+		// We didn't delete it fast enough, so skip the test.
+		c.Skip("FinishUpload finished before we could interfere with it")
+	}
+	if errgo.Cause(err) == blobstore.ErrNotFound {
+		c.Skip("FinishUpload started too late, after we removed its doc")
+	}
+	c.Assert(err, gc.ErrorMatches, `upload expired or removed`)
 }
 
 // newUpload returns the id of a new upload instance.
