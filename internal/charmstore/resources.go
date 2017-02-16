@@ -164,7 +164,7 @@ func (s *Store) UploadResource(id *router.ResolvedURL, name string, blob io.Read
 		UploadTime: time.Now().UTC(),
 	})
 	if err != nil {
-		if err := s.BlobStore.Remove(blobName); err != nil {
+		if err := s.BlobStore.Remove(blobName, nil); err != nil {
 			logger.Errorf("cannot remove blob %s after error: %v", blobName, err)
 		}
 		return nil, errgo.Mask(err)
@@ -255,7 +255,7 @@ func charmHasResource(meta *charm.Meta, name string) bool {
 
 // OpenResourceBlob returns the blob associated with the given resource.
 func (s *Store) OpenResourceBlob(res *mongodoc.Resource) (*Blob, error) {
-	r, size, err := s.BlobStore.Open(res.BlobName)
+	r, size, err := s.BlobStore.Open(res.BlobName, nil)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot open archive data for %s resource %q", res.BaseURL, fmt.Sprintf("%s/%d", res.Name, res.Revision))
 	}

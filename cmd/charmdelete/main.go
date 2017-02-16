@@ -121,13 +121,13 @@ func run(confPath string) error {
 }
 
 func deleteEntity(entity *mongodoc.Entity, store *charmstore.Store) {
-	err := store.BlobStore.Remove(entity.BlobName)
+	err := store.BlobStore.Remove(entity.BlobName, nil)
 	if err != nil {
 		logger.Errorf("could not remove blob for charm %s %s", entity.URL, err)
 	} else if *verbose {
 		fmt.Printf("deleted blob %s\n", entity.BlobName)
 	}
-	err = store.BlobStore.Remove(entity.BlobName + ".pre-v5-suffix")
+	err = store.BlobStore.Remove(entity.BlobName+".pre-v5-suffix", nil)
 	if err != nil {
 		logger.Errorf("could not remove .pre-v5-suffix blob for charm %s %s", entity.URL, err)
 	} else if *verbose {
@@ -136,7 +136,7 @@ func deleteEntity(entity *mongodoc.Entity, store *charmstore.Store) {
 
 	if entity.CharmMeta != nil && entity.CharmMeta.Resources != nil {
 		for _, r := range entity.CharmMeta.Resources {
-			err = store.BlobStore.Remove(r.Name)
+			err = store.BlobStore.Remove(r.Name, nil)
 			if err != nil {
 				logger.Errorf("could not remove %s resource blob for charm %s %s", r.Name, entity.URL, err)
 			} else if *verbose {

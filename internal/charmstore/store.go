@@ -1130,12 +1130,12 @@ func (s *Store) DeleteEntity(id *router.ResolvedURL) error {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	// Remove the reference to the archive from the blob store.
-	if err := s.BlobStore.Remove(entity.BlobName); err != nil {
+	if err := s.BlobStore.Remove(entity.BlobName, nil); err != nil {
 		return errgo.Notef(err, "cannot remove blob %s", entity.BlobName)
 	}
 	if entity.BlobHash != entity.PreV5BlobHash {
 		name := preV5CompatibilityBlobName(entity.BlobName)
-		if err := s.BlobStore.Remove(name); err != nil {
+		if err := s.BlobStore.Remove(name, nil); err != nil {
 			return errgo.Notef(err, "cannot remove compatibility blob %s", name)
 		}
 	}

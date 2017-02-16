@@ -94,7 +94,7 @@ func update(store *charmstore.Store) error {
 	counter := 0
 	for iter.Next(&entity) {
 		// Retrieve the archive contents.
-		r, _, err := store.BlobStore.Open(entity.BlobName)
+		r, _, err := store.BlobStore.Open(entity.BlobName, nil)
 		if err != nil {
 			return errgo.Notef(err, "cannot open archive data for %s", entity.URL)
 		}

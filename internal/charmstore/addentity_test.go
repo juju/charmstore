@@ -397,7 +397,7 @@ func (s *AddEntitySuite) checkAddCharm(c *gc.C, ch charm.Charm, url *router.Reso
 	}))
 
 	// The charm archive has been properly added to the blob store.
-	r, obtainedSize, err := store.BlobStore.Open(doc.BlobName)
+	r, obtainedSize, err := store.BlobStore.Open(doc.BlobName, nil)
 	c.Assert(err, gc.IsNil)
 	defer r.Close()
 	c.Assert(obtainedSize, gc.Equals, size)
@@ -460,7 +460,7 @@ func (s *AddEntitySuite) checkAddBundle(c *gc.C, bundle charm.Bundle, url *route
 	}))
 
 	// The bundle archive has been properly added to the blob store.
-	r, obtainedSize, err := store.BlobStore.Open(doc.BlobName)
+	r, obtainedSize, err := store.BlobStore.Open(doc.BlobName, nil)
 	c.Assert(err, gc.IsNil)
 	defer r.Close()
 	c.Assert(obtainedSize, gc.Equals, size)

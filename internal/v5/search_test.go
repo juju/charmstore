@@ -583,7 +583,7 @@ func (s *SearchSuite) TestSearchIncludeError(c *gc.C) {
 	entity, err := s.store.FindEntity(newResolvedURL("~charmers/precise/wordpress-23", 23), nil)
 
 	c.Assert(err, gc.IsNil)
-	err = s.store.BlobStore.Remove(entity.BlobName)
+	err = s.store.BlobStore.Remove(entity.BlobName, nil)
 	c.Assert(err, gc.IsNil)
 
 	// Now search again - we should get one result less

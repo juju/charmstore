@@ -279,7 +279,7 @@ func (s *ListSuite) TestListIncludeError(c *gc.C) {
 	// work, but only return a single result.
 	entity, err := s.store.FindEntity(newResolvedURL("~charmers/precise/wordpress-23", 23), nil)
 	c.Assert(err, gc.IsNil)
-	err = s.store.BlobStore.Remove(entity.BlobName)
+	err = s.store.BlobStore.Remove(entity.BlobName, nil)
 	c.Assert(err, gc.IsNil)
 
 	// Now list again - we should get one result less

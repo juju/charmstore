@@ -33,8 +33,13 @@ type Resource struct {
 	Size int64 `bson:"size"`
 
 	// BlobName holds the name that the resource blob is given in the
-	// blob store.
+	// blob store, or the name prefix for multipart blobs.
 	BlobName string
+
+	// TODO add this:
+	// BlobMultipart stores the multipart index when the blob
+	// is composed of several parts.
+	// BlobMultipart *blobstore.MultipartIndex
 
 	// UploadTime is the is the time the resource file was stored in
 	// the blob store.

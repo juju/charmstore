@@ -3540,7 +3540,7 @@ func zipGetter(get func(*zip.Reader) interface{}) metaEndpointExpectedValueGette
 		if err != nil {
 			return nil, errgo.Mask(err)
 		}
-		blob, size, err := store.BlobStore.Open(doc.BlobName)
+		blob, size, err := store.BlobStore.Open(doc.BlobName, nil)
 		if err != nil {
 			return nil, errgo.Mask(err)
 		}

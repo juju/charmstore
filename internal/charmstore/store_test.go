@@ -3286,7 +3286,7 @@ func (s *StoreSuite) TestCopyCopiesSessions(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	// Also check the blob store, as it has its own session reference.
-	r, _, err := store1.BlobStore.Open(entity.BlobName)
+	r, _, err := store1.BlobStore.Open(entity.BlobName, nil)
 	c.Assert(err, gc.IsNil)
 	r.Close()
 

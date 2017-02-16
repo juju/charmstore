@@ -664,7 +664,7 @@ func bundleCount(x *int) interface{} {
 // GET id/meta/manifest
 // https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetamanifest
 func (h *ReqHandler) metaManifest(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
-	r, size, err := h.Store.BlobStore.Open(entity.BlobName)
+	r, size, err := h.Store.BlobStore.Open(entity.BlobName, nil)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot open archive data for %s", id)
 	}
