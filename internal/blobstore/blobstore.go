@@ -55,23 +55,17 @@ func (s *Store) Put(r io.Reader, name string, size int64, hash string) error {
 // Open opens the entry with the given name. It returns an error
 // with an ErrNotFound cause if the entry does not exist.
 func (s *Store) Open(name string, index *MultipartIndex) (ReadSeekCloser, int64, error) {
-	if index == nil {
-		r, length, err := s.mstore.GetForEnvironment("", name)
-		if err != nil {
-			if errors.IsNotFound(err) {
-				return nil, 0, errgo.WithCausef(err, ErrNotFound, "")
-			}
-			return nil, 0, errgo.Mask(err)
-		}
-		return r.(ReadSeekCloser), length, nil
+	if index != nil {
+		return newMultiReader(s, name, index)
 	}
-	return nil, 0, errgo.New("open of multipart blob not yet implemented")
-	// TODO
-	//	return &multipartReader{
-	//		store: s,
-	//		name: name,
-	//		index: index,
-	//	}
+	r, length, err := s.mstore.GetForEnvironment("", name)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil, 0, errgo.WithCausef(err, ErrNotFound, "")
+		}
+		return nil, 0, errgo.Mask(err)
+	}
+	return r.(ReadSeekCloser), length, nil
 }
 
 // Remove the given name from the Store.

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/iotest"
 	"time"
 
 	jujutesting "github.com/juju/testing"
@@ -46,7 +47,7 @@ func (s *BlobStoreSuite) TestPutTwice(c *gc.C) {
 	err = s.store.Put(strings.NewReader(content), "x", int64(len(content)), hashOf(content))
 	c.Assert(err, gc.IsNil)
 
-	s.assertBlobContent(c, "x", content)
+	s.assertBlobContent(c, "x", nil, content)
 }
 
 func (s *BlobStoreSuite) TestPut(c *gc.C) {
@@ -54,7 +55,7 @@ func (s *BlobStoreSuite) TestPut(c *gc.C) {
 	err := s.store.Put(strings.NewReader(content), "x", int64(len(content)), hashOf(content))
 	c.Assert(err, gc.IsNil)
 
-	s.assertBlobContent(c, "x", content)
+	s.assertBlobContent(c, "x", nil, content)
 
 	err = s.store.Put(strings.NewReader(content), "x", int64(len(content)), hashOf(content))
 	c.Assert(err, gc.IsNil)
@@ -71,7 +72,7 @@ func (s *BlobStoreSuite) TestRemove(c *gc.C) {
 	err := s.store.Put(strings.NewReader(content), "x", int64(len(content)), hashOf(content))
 	c.Assert(err, gc.IsNil)
 
-	s.assertBlobContent(c, "x", content)
+	s.assertBlobContent(c, "x", nil, content)
 
 	err = s.store.Remove("x", nil)
 	c.Assert(err, gc.IsNil)
@@ -574,7 +575,7 @@ func (s *BlobStoreSuite) TestRemoveFinishedUploadDoesNotRemoveParts(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	s.assertUploadDoesNotExist(c, id)
-	s.assertBlobContent(c, id+"/0", content)
+	s.assertBlobContent(c, id+"/0", nil, content)
 }
 
 func (s *BlobStoreSuite) TestRemoveExpires(c *gc.C) {
@@ -600,9 +601,138 @@ func (s *BlobStoreSuite) TestRemoveExpires(c *gc.C) {
 		} else {
 			_, _, err = s.store.FinishUpload(id, []blobstore.Part{{Hash: hashOf(content)}})
 			c.Assert(err, gc.Equals, nil)
-			s.assertBlobContent(c, id+"/0", content)
+			s.assertBlobContent(c, id+"/0", nil, content)
 		}
 	}
+}
+
+func (s *BlobStoreSuite) TestOpenEmptyMultipart(c *gc.C) {
+	id, idx := s.putMultipart(c)
+	s.assertBlobContent(c, id, idx, "")
+}
+
+func (s *BlobStoreSuite) TestMultipartReadAll(c *gc.C) {
+	s.PatchValue(blobstore.MinPartSize, int64(10))
+	part0 := "123456789 12345"
+	part1 := "abcdefghijklmnopqrstuvwxyz"
+	part2 := "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	id, idx := s.putMultipart(c, part0, part1, part2)
+	s.assertBlobContent(c, id, idx, part0+part1+part2)
+}
+
+func (s *BlobStoreSuite) TestMultipartSmallReads(c *gc.C) {
+	s.PatchValue(blobstore.MinPartSize, int64(10))
+	part0 := "123456789 12345"
+	part1 := "abcdefghijklmnopqrstuvwxyz"
+	part2 := "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	id, idx := s.putMultipart(c, part0, part1, part2)
+	r, _, err := s.store.Open(id, idx)
+	defer r.Close()
+	c.Assert(err, gc.Equals, nil)
+	data, err := ioutil.ReadAll(iotest.OneByteReader(r))
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(string(data), gc.Equals, part0+part1+part2)
+}
+
+func (s *BlobStoreSuite) TestMultipartSinglePart(c *gc.C) {
+	s.PatchValue(blobstore.MinPartSize, int64(10))
+	part0 := "123456789 12345"
+	id, idx := s.putMultipart(c, part0)
+	s.assertBlobContent(c, id, idx, part0)
+}
+
+func (s *BlobStoreSuite) TestMultipartCloseWithoutReading(c *gc.C) {
+	s.PatchValue(blobstore.MinPartSize, int64(10))
+	part0 := "123456789 12345"
+	part1 := "abcdefghijklmnopqrstuvwxyz"
+	id, idx := s.putMultipart(c, part0, part1)
+	r, _, err := s.store.Open(id, idx)
+	c.Assert(err, gc.Equals, nil)
+	err = r.Close()
+	c.Assert(err, gc.Equals, nil)
+}
+
+var multipartSeekTests = []struct {
+	offset    int64
+	whence    int
+	expectPos int64
+	expect    string
+}{{
+	offset:    0,
+	whence:    0,
+	expectPos: 0,
+	expect:    "123456789 ",
+}, {
+	offset:    200,
+	whence:    0,
+	expectPos: 200,
+	expect:    "",
+}, {
+	offset:    7,
+	whence:    0,
+	expectPos: 7,
+	expect:    "89 12345",
+}, {
+	offset:    -3,
+	whence:    0,
+	expectPos: 0,
+	expect:    "123456789 ",
+}, {
+	offset:    3,
+	whence:    2,
+	expectPos: 15 + 26 + 26 - 3,
+	expect:    "XYZ",
+}, {
+	// Note: dependent on previous test.
+	offset:    -10,
+	whence:    1,
+	expectPos: 15 + 26 + 26 - 10,
+	expect:    "QRSTUVWXYZ",
+}}
+
+func (s *BlobStoreSuite) TestMultipartSeek(c *gc.C) {
+	s.PatchValue(blobstore.MinPartSize, int64(10))
+	part0 := "123456789 12345"
+	part1 := "abcdefghijklmnopqrstuvwxyz"
+	part2 := "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	id, idx := s.putMultipart(c, part0, part1, part2)
+	r, _, err := s.store.Open(id, idx)
+	defer r.Close()
+	c.Assert(err, gc.Equals, nil)
+
+	for i, test := range multipartSeekTests {
+		c.Logf("test %d: offset %d whence %d", i, test.offset, test.whence)
+		p, err := r.Seek(test.offset, test.whence)
+		c.Assert(err, gc.Equals, nil)
+		c.Assert(p, gc.Equals, test.expectPos)
+		buf := make([]byte, 10)
+		n, err := r.Read(buf)
+		if test.expect == "" {
+			c.Assert(err, gc.Equals, io.EOF)
+			c.Assert(n, gc.Equals, 0)
+		} else {
+			c.Assert(err, gc.Equals, nil)
+			c.Assert(string(buf[0:n]), gc.Equals, test.expect)
+		}
+	}
+}
+
+func (s *BlobStoreSuite) putMultipart(c *gc.C, contents ...string) (string, *blobstore.MultipartIndex) {
+	id, err := s.store.NewUpload(time.Now().Add(time.Minute))
+	c.Assert(err, gc.Equals, nil)
+
+	parts := make([]blobstore.Part, len(contents))
+	for i, content := range contents {
+		hash := hashOf(content)
+		err = s.store.PutPart(id, i, strings.NewReader(content), int64(len(content)), hash)
+		c.Assert(err, gc.Equals, nil)
+		parts[i].Hash = hash
+	}
+	idx, _, err := s.store.FinishUpload(id, parts)
+	c.Assert(err, gc.Equals, nil)
+	err = s.store.RemoveUpload(id)
+	c.Assert(err, gc.Equals, nil)
+	return id, idx
 }
 
 func (s *BlobStoreSuite) assertUploadDoesNotExist(c *gc.C, id string) {
@@ -615,8 +745,9 @@ func (s *BlobStoreSuite) assertBlobDoesNotExist(c *gc.C, name string) {
 	c.Assert(errgo.Cause(err), gc.Equals, blobstore.ErrNotFound)
 }
 
-func (s *BlobStoreSuite) assertBlobContent(c *gc.C, name, content string) {
-	r, size, err := s.store.Open(name, nil)
+func (s *BlobStoreSuite) assertBlobContent(c *gc.C, name string, idx *blobstore.MultipartIndex, content string) {
+	r, size, err := s.store.Open(name, idx)
+	c.Assert(err, gc.IsNil)
 	defer r.Close()
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(size, gc.Equals, int64(len(content)))
