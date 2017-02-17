@@ -100,7 +100,7 @@ func (s *commonSuite) testMacaroonAuth(c *gc.C, p httptesting.JSONCallParams) {
 	p.Username, p.Password = "", ""
 	p.ExpectStatus = http.StatusUnauthorized
 	p.ExpectBody = params.Error{
-		Message: `unauthorized: access denied for user "bob"`,
+		Message: `access denied for user "bob"`,
 		Code:    params.ErrUnauthorized,
 	}
 	p.Do = bakeryDo(client)
@@ -234,7 +234,7 @@ var readAuthorizationTests = []struct {
 	expectStatus: http.StatusUnauthorized,
 	expectBody: params.Error{
 		Code:    params.ErrUnauthorized,
-		Message: `unauthorized: access denied for user "picard"`,
+		Message: `access denied for user "picard"`,
 	},
 }, {
 	about:               "access denied for user",
@@ -243,7 +243,7 @@ var readAuthorizationTests = []struct {
 	expectStatus:        http.StatusUnauthorized,
 	expectBody: params.Error{
 		Code:    params.ErrUnauthorized,
-		Message: `unauthorized: access denied for user "kirk"`,
+		Message: `access denied for user "kirk"`,
 	},
 }, {
 	about:               "everyone is authorized (user is member of groups)",
@@ -272,7 +272,7 @@ var readAuthorizationTests = []struct {
 	expectStatus: http.StatusUnauthorized,
 	expectBody: params.Error{
 		Code:    params.ErrUnauthorized,
-		Message: `unauthorized: access denied for user "picard"`,
+		Message: `access denied for user "picard"`,
 	},
 }, {
 	about:               "access denied for group",
@@ -282,7 +282,7 @@ var readAuthorizationTests = []struct {
 	expectStatus:        http.StatusUnauthorized,
 	expectBody: params.Error{
 		Code:    params.ErrUnauthorized,
-		Message: `unauthorized: access denied for user "kirk"`,
+		Message: `access denied for user "kirk"`,
 	},
 }, {
 	about:               "access provided through edge channel",
@@ -300,7 +300,7 @@ var readAuthorizationTests = []struct {
 	expectStatus:        http.StatusUnauthorized,
 	expectBody: params.Error{
 		Code:    params.ErrUnauthorized,
-		Message: `unauthorized: access denied for user "kirk"`,
+		Message: `access denied for user "kirk"`,
 	},
 }, {
 	about:               "access provided through stable channel",
@@ -321,7 +321,7 @@ var readAuthorizationTests = []struct {
 	expectStatus:        http.StatusUnauthorized,
 	expectBody: params.Error{
 		Code:    params.ErrUnauthorized,
-		Message: `unauthorized: access denied for user "kirk"`,
+		Message: `access denied for user "kirk"`,
 	},
 }, {
 	about:               "access provided through edge channel, but charm on stable channel",
@@ -337,7 +337,7 @@ var readAuthorizationTests = []struct {
 	expectStatus: http.StatusUnauthorized,
 	expectBody: params.Error{
 		Code:    params.ErrUnauthorized,
-		Message: `unauthorized: access denied for user "kirk"`,
+		Message: `access denied for user "kirk"`,
 	},
 }, {
 	about:               "access provided through unpublished ACL, but charm on stable channel",
@@ -352,7 +352,7 @@ var readAuthorizationTests = []struct {
 	expectStatus: http.StatusUnauthorized,
 	expectBody: params.Error{
 		Code:    params.ErrUnauthorized,
-		Message: `unauthorized: access denied for user "kirk"`,
+		Message: `access denied for user "kirk"`,
 	},
 }, {
 	about:               "access provided through unpublished ACL, but charm on edge channel",
@@ -366,7 +366,7 @@ var readAuthorizationTests = []struct {
 	expectStatus: http.StatusUnauthorized,
 	expectBody: params.Error{
 		Code:    params.ErrUnauthorized,
-		Message: `unauthorized: access denied for user "kirk"`,
+		Message: `access denied for user "kirk"`,
 	},
 }}
 
@@ -470,7 +470,7 @@ var writeAuthorizationTests = []struct {
 	expectStatus: http.StatusUnauthorized,
 	expectBody: params.Error{
 		Code:    params.ErrUnauthorized,
-		Message: `unauthorized: access denied for user "who"`,
+		Message: `access denied for user "who"`,
 	},
 }, {
 	about:                "specific user unauthorized",
@@ -479,7 +479,7 @@ var writeAuthorizationTests = []struct {
 	expectStatus:         http.StatusUnauthorized,
 	expectBody: params.Error{
 		Code:    params.ErrUnauthorized,
-		Message: `unauthorized: access denied for user "kirk"`,
+		Message: `access denied for user "kirk"`,
 	},
 }, {
 	about:                "access granted for group",
@@ -498,7 +498,7 @@ var writeAuthorizationTests = []struct {
 	expectStatus: http.StatusUnauthorized,
 	expectBody: params.Error{
 		Code:    params.ErrUnauthorized,
-		Message: `unauthorized: access denied for user "picard"`,
+		Message: `access denied for user "picard"`,
 	},
 }, {
 	about:                "access denied for group",
@@ -508,7 +508,7 @@ var writeAuthorizationTests = []struct {
 	expectStatus:         http.StatusUnauthorized,
 	expectBody: params.Error{
 		Code:    params.ErrUnauthorized,
-		Message: `unauthorized: access denied for user "kirk"`,
+		Message: `access denied for user "kirk"`,
 	},
 }, {
 	about:                "access provided through edge channel",
@@ -526,7 +526,7 @@ var writeAuthorizationTests = []struct {
 	expectStatus:         http.StatusUnauthorized,
 	expectBody: params.Error{
 		Code:    params.ErrUnauthorized,
-		Message: `unauthorized: access denied for user "kirk"`,
+		Message: `access denied for user "kirk"`,
 	},
 }, {
 	about:                "access provided through stable channel",
@@ -547,7 +547,7 @@ var writeAuthorizationTests = []struct {
 	expectStatus:         http.StatusUnauthorized,
 	expectBody: params.Error{
 		Code:    params.ErrUnauthorized,
-		Message: `unauthorized: access denied for user "kirk"`,
+		Message: `access denied for user "kirk"`,
 	},
 }, {
 	about:                "access provided through edge channel, but charm on stable channel",
@@ -563,7 +563,7 @@ var writeAuthorizationTests = []struct {
 	expectStatus: http.StatusUnauthorized,
 	expectBody: params.Error{
 		Code:    params.ErrUnauthorized,
-		Message: `unauthorized: access denied for user "kirk"`,
+		Message: `access denied for user "kirk"`,
 	},
 }, {
 	about:                "access provided through unpublished ACL, but charm on stable channel",
@@ -578,7 +578,7 @@ var writeAuthorizationTests = []struct {
 	expectStatus: http.StatusUnauthorized,
 	expectBody: params.Error{
 		Code:    params.ErrUnauthorized,
-		Message: `unauthorized: access denied for user "kirk"`,
+		Message: `access denied for user "kirk"`,
 	},
 }, {
 	about:                "access provided through unpublished ACL, but charm on edge channel",
@@ -592,7 +592,7 @@ var writeAuthorizationTests = []struct {
 	expectStatus: http.StatusUnauthorized,
 	expectBody: params.Error{
 		Code:    params.ErrUnauthorized,
-		Message: `unauthorized: access denied for user "kirk"`,
+		Message: `access denied for user "kirk"`,
 	},
 }}
 
@@ -705,7 +705,7 @@ var uploadEntityAuthorizationTests = []struct {
 	expectStatus: http.StatusUnauthorized,
 	expectBody: params.Error{
 		Code:    params.ErrUnauthorized,
-		Message: `unauthorized: access denied for user "sisko"`,
+		Message: `access denied for user "sisko"`,
 	},
 }, {
 	about:        "unauthorized: user does not match",
@@ -714,7 +714,7 @@ var uploadEntityAuthorizationTests = []struct {
 	expectStatus: http.StatusUnauthorized,
 	expectBody: params.Error{
 		Code:    params.ErrUnauthorized,
-		Message: `unauthorized: access denied for user "kirk"`,
+		Message: `access denied for user "kirk"`,
 	},
 }, {
 	about:        "unauthorized: group does not match",
@@ -724,7 +724,7 @@ var uploadEntityAuthorizationTests = []struct {
 	expectStatus: http.StatusUnauthorized,
 	expectBody: params.Error{
 		Code:    params.ErrUnauthorized,
-		Message: `unauthorized: access denied for user "kirk"`,
+		Message: `access denied for user "kirk"`,
 	},
 }, {
 	about:        "unauthorized: specific group and promulgated entity",
@@ -735,7 +735,7 @@ var uploadEntityAuthorizationTests = []struct {
 	expectStatus: http.StatusUnauthorized,
 	expectBody: params.Error{
 		Code:    params.ErrUnauthorized,
-		Message: `unauthorized: access denied for user "janeway"`,
+		Message: `access denied for user "janeway"`,
 	},
 }, {
 	about:        "unauthorized: published entity no published permissions",
@@ -745,7 +745,7 @@ var uploadEntityAuthorizationTests = []struct {
 	expectStatus: http.StatusUnauthorized,
 	expectBody: params.Error{
 		Code:    params.ErrUnauthorized,
-		Message: `unauthorized: access denied for user "picard"`,
+		Message: `access denied for user "picard"`,
 	},
 }}
 

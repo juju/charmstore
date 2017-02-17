@@ -766,7 +766,7 @@ var routerGetTests = []struct {
 	expectStatus:              http.StatusBadRequest,
 	expectBody: params.Error{
 		Code:    params.ErrBadRequest,
-		Message: `bad request: charm or bundle URL has invalid form: "~user/bad-wolf/wily/wordpress-42"`,
+		Message: `charm or bundle URL has invalid form: "~user/bad-wolf/wily/wordpress-42"`,
 	},
 	monitorKind: "meta",
 }, {
@@ -854,7 +854,7 @@ var routerGetTests = []struct {
 	expectStatus:              http.StatusBadRequest,
 	expectBody: params.Error{
 		Code:    params.ErrBadRequest,
-		Message: `bad request: charm or bundle URL has invalid form: "staging/trusty/django"`,
+		Message: `charm or bundle URL has invalid form: "staging/trusty/django"`,
 	},
 	monitorKind: "meta",
 }, {
@@ -941,7 +941,7 @@ var routerGetTests = []struct {
 	expectStatus: http.StatusBadRequest,
 	expectBody: params.Error{
 		Code:    params.ErrBadRequest,
-		Message: `bad request: unexpected bool value "meh" (must be "0" or "1")`,
+		Message: `unexpected bool value "meh" (must be "0" or "1")`,
 	},
 	monitorKind: "meta",
 }, {
@@ -1082,7 +1082,7 @@ var routerGetTests = []struct {
 	expectStatus: http.StatusNotFound,
 	expectBody: params.Error{
 		Code:    params.ErrNotFound,
-		Message: `not found: URL has invalid charm or bundle name: "robots.txt"`,
+		Message: `URL has invalid charm or bundle name: "robots.txt"`,
 	},
 	monitorKind: "",
 }, {
@@ -1093,7 +1093,7 @@ var routerGetTests = []struct {
 	expectStatus:              http.StatusBadRequest,
 	expectBody: params.Error{
 		Code:    params.ErrBadRequest,
-		Message: `bad request: URL has invalid charm or bundle name: "robots.txt"`,
+		Message: `URL has invalid charm or bundle name: "robots.txt"`,
 	},
 	monitorKind: "meta",
 }}

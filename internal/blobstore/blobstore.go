@@ -9,9 +9,13 @@ import (
 	"io"
 
 	"github.com/juju/blobstore"
+	"github.com/juju/errors"
+	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2"
 )
+
+var logger = loggo.GetLogger("charmstore.internal.blobstore")
 
 type ReadSeekCloser interface {
 	io.Reader
@@ -48,11 +52,15 @@ func (s *Store) Put(r io.Reader, name string, size int64, hash string) error {
 	return s.mstore.PutForEnvironmentAndCheckHash("", name, r, size, hash)
 }
 
-// Open opens the entry with the given name.
+// Open opens the entry with the given name. It returns an error
+// with an ErrNotFound cause if the entry does not exist.
 func (s *Store) Open(name string, index *MultipartIndex) (ReadSeekCloser, int64, error) {
 	if index == nil {
 		r, length, err := s.mstore.GetForEnvironment("", name)
 		if err != nil {
+			if errors.IsNotFound(err) {
+				return nil, 0, errgo.WithCausef(err, ErrNotFound, "")
+			}
 			return nil, 0, errgo.Mask(err)
 		}
 		return r.(ReadSeekCloser), length, nil
@@ -68,5 +76,9 @@ func (s *Store) Open(name string, index *MultipartIndex) (ReadSeekCloser, int64,
 
 // Remove the given name from the Store.
 func (s *Store) Remove(name string, index *MultipartIndex) error {
-	return s.mstore.RemoveForEnvironment("", name)
+	err := s.mstore.RemoveForEnvironment("", name)
+	if errors.IsNotFound(err) {
+		return errgo.WithCausef(err, ErrNotFound, "")
+	}
+	return errgo.Mask(err)
 }
