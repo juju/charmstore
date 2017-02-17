@@ -330,7 +330,7 @@ func (s *ResourceSuite) TestDownloadBadResourceRevision(c *gc.C) {
 		ExpectStatus: http.StatusNotFound,
 		ExpectBody: params.Error{
 			Code:    params.ErrNotFound,
-			Message: `not found: malformed revision number`,
+			Message: `malformed revision number`,
 		},
 	})
 }
@@ -383,7 +383,7 @@ func (s *ResourceSuite) TestDownloadPrivateCharmResource(c *gc.C) {
 		ExpectStatus: http.StatusUnauthorized,
 		ExpectBody: params.Error{
 			Code:    params.ErrUnauthorized,
-			Message: `unauthorized: access denied for user "bob"`,
+			Message: `access denied for user "bob"`,
 		},
 		Do: s.bakeryDoAsUser("bob"),
 	})

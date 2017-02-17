@@ -1165,7 +1165,7 @@ var archiveFileErrorsTests = []struct {
 	about:         "no permissions",
 	path:          "~charmers/utopic/mysql-0/archive/metadata.yaml",
 	expectStatus:  http.StatusUnauthorized,
-	expectMessage: `unauthorized: access denied for user "bob"`,
+	expectMessage: `access denied for user "bob"`,
 	expectCode:    params.ErrUnauthorized,
 }}
 

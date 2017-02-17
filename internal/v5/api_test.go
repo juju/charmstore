@@ -1039,7 +1039,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 		s.assertPut(c, "precise/wordpress-23/meta/perm/read", []string{"bob"})
 		s.assertPut(c, "precise/wordpress-23/meta/perm/write", []string{"admin"})
 		// charmers no longer has permission.
-		s.assertGetIsUnauthorized(c, "precise/wordpress-23/meta/perm", `unauthorized: access denied for user "charmers"`)
+		s.assertGetIsUnauthorized(c, "precise/wordpress-23/meta/perm", `access denied for user "charmers"`)
 	})
 
 	// The permissions are only for bob now, so act as bob.
@@ -1088,12 +1088,12 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 
 	s.doAsUser("bob", func() {
 		// Check that we aren't allowed to put to the newly published entity as bob.
-		s.assertPutIsUnauthorized(c, "~charmers/precise/wordpress/meta/perm/read?channel=edge", []string{}, `unauthorized: access denied for user "bob"`)
+		s.assertPutIsUnauthorized(c, "~charmers/precise/wordpress/meta/perm/read?channel=edge", []string{}, `access denied for user "bob"`)
 	})
 
 	s.doAsUser("charmers", func() {
 		s.assertPut(c, "precise/wordpress-23/meta/perm/read", []string{"bob", "charlie"})
-		s.assertGetIsUnauthorized(c, "~charmers/precise/wordpress/meta/perm/read?channel=edge", `unauthorized: access denied for user "charmers"`)
+		s.assertGetIsUnauthorized(c, "~charmers/precise/wordpress/meta/perm/read?channel=edge", `access denied for user "charmers"`)
 	})
 
 	s.doAsUser("bob", func() {
@@ -1279,15 +1279,15 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			ExpectStatus: http.StatusUnauthorized,
 			ExpectBody: params.Error{
 				Code:    params.ErrUnauthorized,
-				Message: `unauthorized: access denied for user "doris"`,
+				Message: `access denied for user "doris"`,
 			},
 		})
 	})
 	// Now no-one except admin can do anything with trusty/wordpress-1.
 	for _, user := range []string{"charmers", "bob", "charlie", "doris", "admin"} {
 		s.doAsUser(user, func() {
-			s.assertGetIsUnauthorized(c, "wordpress/meta/perm", fmt.Sprintf("unauthorized: access denied for user %q", user))
-			s.assertPutIsUnauthorized(c, "wordpress/meta/perm", []string{}, fmt.Sprintf("unauthorized: access denied for user %q", user))
+			s.assertGetIsUnauthorized(c, "wordpress/meta/perm", fmt.Sprintf("access denied for user %q", user))
+			s.assertPutIsUnauthorized(c, "wordpress/meta/perm", []string{}, fmt.Sprintf("access denied for user %q", user))
 		})
 	}
 
@@ -3084,7 +3084,7 @@ var publishErrorsTests = []struct {
 	}),
 	expectStatus: http.StatusBadRequest,
 	expectBody: params.Error{
-		Message: `bad request: charm published with incorrect resources: charm does not have resource "unknown"`,
+		Message: `charm does not have resource "unknown"`,
 		Code:    params.ErrBadRequest,
 	},
 }}
@@ -3236,7 +3236,7 @@ func (s *APISuite) TestPublishAuthorization(c *gc.C) {
 				ExpectStatus: http.StatusUnauthorized,
 				ExpectBody: params.Error{
 					Code:    params.ErrUnauthorized,
-					Message: `unauthorized: access denied for user "bob"`,
+					Message: `access denied for user "bob"`,
 				},
 			})
 			continue
@@ -3601,7 +3601,7 @@ func (s *APISuite) TestMacaroon(c *gc.C) {
 		ExpectStatus: http.StatusUnauthorized,
 		ExpectBody: params.Error{
 			Code:    params.ErrUnauthorized,
-			Message: `unauthorized: access denied for user "who"`,
+			Message: `access denied for user "who"`,
 		},
 	})
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -3792,7 +3792,7 @@ var promulgateTests = []struct {
 	expectStatus: http.StatusBadRequest,
 	expectBody: params.Error{
 		Code:    params.ErrBadRequest,
-		Message: "bad request: invalid character ' ' in literal true (expecting 'e')",
+		Message: "invalid character ' ' in literal true (expecting 'e')",
 	},
 	expectEntities: []*mongodoc.Entity{
 		storetesting.NewEntity("~charmers/trusty/wordpress-0").WithPromulgatedURL("trusty/wordpress-0").Build(),
@@ -3896,7 +3896,7 @@ var promulgateTests = []struct {
 	groups:       []string{"yellow"},
 	expectStatus: http.StatusUnauthorized,
 	expectBody: params.Error{
-		Message: `unauthorized: access denied for user "bob"`,
+		Message: `access denied for user "bob"`,
 		Code:    params.ErrUnauthorized,
 	},
 	expectEntities: []*mongodoc.Entity{
@@ -4026,7 +4026,7 @@ func (s *APISuite) TestTooManyConcurrentRequests(c *gc.C) {
 		URL:          storeURL("debug/status"),
 		ExpectStatus: http.StatusServiceUnavailable,
 		ExpectBody: params.Error{
-			Message: "service unavailable: too many mongo sessions in use",
+			Message: "too many mongo sessions in use",
 			Code:    params.ErrServiceUnavailable,
 		},
 	})

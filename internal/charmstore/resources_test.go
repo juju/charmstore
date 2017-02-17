@@ -387,7 +387,7 @@ func (s *resourceSuite) TestPublishWithResourceNotInMetadata(c *gc.C) {
 	err = store.Publish(id, map[string]int{
 		"resource1": 0,
 	}, params.StableChannel)
-	c.Assert(err, gc.ErrorMatches, `charm published with incorrect resources: charm does not have resource "resource1"`)
+	c.Assert(err, gc.ErrorMatches, `charm does not have resource "resource1"`)
 	c.Assert(errgo.Cause(err), gc.Equals, ErrPublishResourceMismatch)
 }
 
@@ -403,7 +403,7 @@ func (s *resourceSuite) TestPublishWithResourceNotFound(c *gc.C) {
 	err = store.Publish(id, map[string]int{
 		"resource1": 0,
 	}, params.StableChannel)
-	c.Assert(err, gc.ErrorMatches, `charm published with incorrect resources: cs:~charmers/precise/wordpress-3 resource "resource1/0" not found`)
+	c.Assert(err, gc.ErrorMatches, `cs:~charmers/precise/wordpress-3 resource "resource1/0" not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, ErrPublishResourceMismatch)
 }
 
@@ -421,7 +421,7 @@ func (s *resourceSuite) TestPublishWithoutAllRequiredResources(c *gc.C) {
 	err = store.Publish(id, map[string]int{
 		"resource2": 0,
 	}, params.StableChannel)
-	c.Assert(err, gc.ErrorMatches, `charm published with incorrect resources: resources are missing from publish request: resource1, resource3`)
+	c.Assert(err, gc.ErrorMatches, `resources are missing from publish request: resource1, resource3`)
 	c.Assert(errgo.Cause(err), gc.Equals, ErrPublishResourceMismatch)
 }
 

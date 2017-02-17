@@ -46,14 +46,7 @@ func (s *BlobStoreSuite) TestPutTwice(c *gc.C) {
 	err = s.store.Put(strings.NewReader(content), "x", int64(len(content)), hashOf(content))
 	c.Assert(err, gc.IsNil)
 
-	rc, length, err := s.store.Open("x", nil)
-	c.Assert(err, gc.IsNil)
-	defer rc.Close()
-	c.Assert(length, gc.Equals, int64(len(content)))
-
-	data, err := ioutil.ReadAll(rc)
-	c.Assert(err, gc.IsNil)
-	c.Assert(string(data), gc.Equals, content)
+	s.assertBlobContent(c, "x", content)
 }
 
 func (s *BlobStoreSuite) TestPut(c *gc.C) {
@@ -61,14 +54,7 @@ func (s *BlobStoreSuite) TestPut(c *gc.C) {
 	err := s.store.Put(strings.NewReader(content), "x", int64(len(content)), hashOf(content))
 	c.Assert(err, gc.IsNil)
 
-	rc, length, err := s.store.Open("x", nil)
-	c.Assert(err, gc.IsNil)
-	defer rc.Close()
-	c.Assert(length, gc.Equals, int64(len(content)))
-
-	data, err := ioutil.ReadAll(rc)
-	c.Assert(err, gc.IsNil)
-	c.Assert(string(data), gc.Equals, content)
+	s.assertBlobContent(c, "x", content)
 
 	err = s.store.Put(strings.NewReader(content), "x", int64(len(content)), hashOf(content))
 	c.Assert(err, gc.IsNil)
@@ -85,19 +71,18 @@ func (s *BlobStoreSuite) TestRemove(c *gc.C) {
 	err := s.store.Put(strings.NewReader(content), "x", int64(len(content)), hashOf(content))
 	c.Assert(err, gc.IsNil)
 
-	rc, length, err := s.store.Open("x", nil)
-	c.Assert(err, gc.IsNil)
-	defer rc.Close()
-	c.Assert(length, gc.Equals, int64(len(content)))
-	data, err := ioutil.ReadAll(rc)
-	c.Assert(err, gc.IsNil)
-	c.Assert(string(data), gc.Equals, content)
+	s.assertBlobContent(c, "x", content)
 
 	err = s.store.Remove("x", nil)
 	c.Assert(err, gc.IsNil)
 
-	rc, length, err = s.store.Open("x", nil)
-	c.Assert(err, gc.ErrorMatches, `resource at path "[^"]+" not found`)
+	s.assertBlobDoesNotExist(c, "x")
+}
+
+func (s *BlobStoreSuite) TestRemoveNonExistent(c *gc.C) {
+	err := s.store.Remove("x", nil)
+	c.Check(err, gc.ErrorMatches, `resource at path "global/x" not found`)
+	c.Check(errgo.Cause(err), gc.Equals, blobstore.ErrNotFound)
 }
 
 func (s *BlobStoreSuite) TestNewParts(c *gc.C) {
@@ -528,9 +513,8 @@ func (s *BlobStoreSuite) TestFinishUploadRemovedWhenCalculatingHash(c *gc.C) {
 		}})
 		done <- err
 	}()
-	// TODO use DeleteUpload instead of going directly to the collection.
-	time.Sleep(20 * time.Millisecond)
-	err = s.Session.DB("db").C("blobstore.upload").RemoveId(id)
+	time.Sleep(100 * time.Millisecond)
+	err = s.store.RemoveUpload(id)
 	c.Assert(err, gc.Equals, nil)
 
 	err = <-done
@@ -539,9 +523,106 @@ func (s *BlobStoreSuite) TestFinishUploadRemovedWhenCalculatingHash(c *gc.C) {
 		c.Skip("FinishUpload finished before we could interfere with it")
 	}
 	if errgo.Cause(err) == blobstore.ErrNotFound {
-		c.Skip("FinishUpload started too late, after we removed its doc")
+		c.Skip(fmt.Sprintf("FinishUpload started too late, after we removed its doc (cause %#v)", errgo.Cause(err)))
+	} else {
+		c.Logf("cause %#v", errgo.Cause(err))
 	}
 	c.Assert(err, gc.ErrorMatches, `upload expired or removed`)
+}
+
+func (s *BlobStoreSuite) TestRemoveUploadSuccessWithNoPart(c *gc.C) {
+	s.PatchValue(blobstore.MinPartSize, int64(10))
+	expires := time.Now().Add(time.Minute).UTC().Truncate(time.Millisecond)
+	id, err := s.store.NewUpload(expires)
+	c.Assert(err, gc.Equals, nil)
+	err = s.store.RemoveUpload(id)
+	c.Assert(err, gc.Equals, nil)
+	s.assertUploadDoesNotExist(c, id)
+}
+
+func (s *BlobStoreSuite) TestRemoveUploadOnNonExistingUpload(c *gc.C) {
+	err := s.store.RemoveUpload("something")
+	c.Assert(err, gc.Equals, nil)
+}
+
+func (s *BlobStoreSuite) TestRemoveUploadSuccessWithParts(c *gc.C) {
+	s.PatchValue(blobstore.MinPartSize, int64(10))
+	expires := time.Now().Add(time.Minute).UTC().Truncate(time.Millisecond)
+	id, err := s.store.NewUpload(expires)
+	c.Assert(err, gc.Equals, nil)
+	content := "123456789 12345"
+	err = s.store.PutPart(id, 0, strings.NewReader(content), int64(len(content)), hashOf(content))
+	c.Assert(err, gc.Equals, nil)
+	err = s.store.RemoveUpload(id)
+	c.Assert(err, gc.Equals, nil)
+	s.assertUploadDoesNotExist(c, id)
+	s.assertBlobDoesNotExist(c, id+"/0")
+}
+
+func (s *BlobStoreSuite) TestRemoveFinishedUploadDoesNotRemoveParts(c *gc.C) {
+	s.PatchValue(blobstore.MinPartSize, int64(10))
+
+	id, err := s.store.NewUpload(time.Now().Add(time.Minute))
+	c.Assert(err, gc.Equals, nil)
+	content := "123456789 12345"
+	err = s.store.PutPart(id, 0, strings.NewReader(content), int64(len(content)), hashOf(content))
+	c.Assert(err, gc.Equals, nil)
+	_, _, err = s.store.FinishUpload(id, []blobstore.Part{{Hash: hashOf(content)}})
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.store.RemoveUpload(id)
+	c.Assert(err, gc.Equals, nil)
+
+	s.assertUploadDoesNotExist(c, id)
+	s.assertBlobContent(c, id+"/0", content)
+}
+
+func (s *BlobStoreSuite) TestRemoveExpires(c *gc.C) {
+	s.PatchValue(blobstore.MinPartSize, int64(10))
+
+	expireTimes := []time.Duration{-time.Minute, -time.Second, time.Minute, time.Hour}
+	ids := make([]string, len(expireTimes))
+	content := "123456789 12345"
+	for i, dt := range expireTimes {
+		id, err := s.store.NewUpload(time.Now().Add(dt))
+		c.Assert(err, gc.Equals, nil)
+		err = s.store.PutPart(id, 0, strings.NewReader(content), int64(len(content)), hashOf(content))
+		c.Assert(err, gc.Equals, nil)
+		ids[i] = id
+	}
+
+	err := s.store.RemoveExpiredUploads()
+	c.Assert(err, gc.Equals, nil)
+	for i, id := range ids {
+		if expireTimes[i] < 0 {
+			s.assertUploadDoesNotExist(c, id)
+			s.assertBlobDoesNotExist(c, id+"/0")
+		} else {
+			_, _, err = s.store.FinishUpload(id, []blobstore.Part{{Hash: hashOf(content)}})
+			c.Assert(err, gc.Equals, nil)
+			s.assertBlobContent(c, id+"/0", content)
+		}
+	}
+}
+
+func (s *BlobStoreSuite) assertUploadDoesNotExist(c *gc.C, id string) {
+	_, _, err := s.store.FinishUpload(id, nil)
+	c.Assert(errgo.Cause(err), gc.Equals, blobstore.ErrNotFound)
+}
+
+func (s *BlobStoreSuite) assertBlobDoesNotExist(c *gc.C, name string) {
+	_, _, err := s.store.Open(name, nil)
+	c.Assert(errgo.Cause(err), gc.Equals, blobstore.ErrNotFound)
+}
+
+func (s *BlobStoreSuite) assertBlobContent(c *gc.C, name, content string) {
+	r, size, err := s.store.Open(name, nil)
+	defer r.Close()
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(size, gc.Equals, int64(len(content)))
+	data, err := ioutil.ReadAll(r)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(string(data), gc.Equals, content)
 }
 
 // newUpload returns the id of a new upload instance.

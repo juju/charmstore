@@ -6,7 +6,6 @@ package blobstore
 import (
 	"fmt"
 	"io"
-	"log"
 	"time"
 
 	"gopkg.in/errgo.v1"
@@ -66,7 +65,7 @@ type uploadPart struct {
 // NewUpload created a new multipart entry to track a multipart upload.
 // It returns an uploadId that can be used to refer to it. After
 // creating the upload, each part must be uploaded individually, and
-// then the whole completed by calling FinishUpload and DeleteUpload.
+// then the whole completed by calling FinishUpload and RemoveUpload.
 func (s *Store) NewUpload(expires time.Time) (uploadId string, err error) {
 	// TODO this makes an upload id that's 78 bytes.
 	// A base64-encoded 256 bit random number would
@@ -127,7 +126,7 @@ func (s *Store) PutPart(uploadId string, part int, r io.Reader, size int64, hash
 			return errgo.Newf("cannot upload new part because upload is already complete")
 		}
 		// No part record. Make one, not marked as complete
-		// before we put the part so that DeleteExpiredParts
+		// before we put the part so that RemoveExpiredParts
 		// knows to delete the part.
 		if err := s.initializePart(uploadId, part, hash, size); err != nil {
 			return errgo.Mask(err)
@@ -230,7 +229,7 @@ func (s *Store) initializePart(uploadId string, part int, hash string, size int6
 // The part numbers used will be from 0 to len(parts)-1.
 //
 // This does not delete the multipart metadata, which should still be
-// deleted explicitly by calling DeleteUpload after the index data is
+// deleted explicitly by calling RemoveUpload after the index data is
 // stored.
 func (s *Store) FinishUpload(uploadId string, parts []Part) (idx *MultipartIndex, hash string, err error) {
 	udoc, err := s.getUpload(uploadId)
@@ -240,7 +239,6 @@ func (s *Store) FinishUpload(uploadId string, parts []Part) (idx *MultipartIndex
 	if len(parts) != len(udoc.Parts) {
 		return nil, "", errgo.Newf("part count mismatch (got %d but %d uploaded)", len(parts), len(udoc.Parts))
 	}
-	log.Printf("udoc.Parts: %#v", udoc.Parts)
 	for i, p := range parts {
 		pu := udoc.Parts[i]
 		if pu == nil || !pu.Complete {
@@ -261,6 +259,9 @@ func (s *Store) FinishUpload(uploadId string, parts []Part) (idx *MultipartIndex
 	// it as a completed upload.
 	hash, err = s.setUploadHash(uploadId, udoc)
 	if err != nil {
+		if errgo.Cause(err) == ErrNotFound {
+			return nil, "", errgo.New("upload expired or removed")
+		}
 		return nil, "", errgo.Mask(err)
 	}
 	idx = &MultipartIndex{
@@ -290,7 +291,7 @@ func (s *Store) setUploadHash(uploadId string, udoc *uploadDoc) (string, error) 
 		h := NewHash()
 		for i := range udoc.Parts {
 			if err := s.copyBlob(h, uploadPartName(uploadId, i)); err != nil {
-				return "", errgo.Mask(err)
+				return "", errgo.Mask(err, errgo.Is(ErrNotFound))
 			}
 		}
 		hash = fmt.Sprintf("%x", h.Sum(nil))
@@ -300,7 +301,7 @@ func (s *Store) setUploadHash(uploadId string, udoc *uploadDoc) (string, error) 
 		"$set", bson.D{{"hash", hash}},
 	}})
 	if err == mgo.ErrNotFound {
-		return "", errgo.Newf("upload expired or removed")
+		return "", ErrNotFound
 	}
 	if err != nil {
 		return "", errgo.Notef(err, "could not update hash")
@@ -313,30 +314,100 @@ func (s *Store) setUploadHash(uploadId string, udoc *uploadDoc) (string, error) 
 func (s *Store) copyBlob(w io.Writer, name string) error {
 	rc, _, err := s.Open(name, nil)
 	if err != nil {
-		return errgo.Notef(err, "cannot open blob %q", name)
+		return errgo.NoteMask(err, fmt.Sprintf("cannot open blob %q", name), errgo.Is(ErrNotFound))
 	}
 	defer rc.Close()
 	if _, err := io.Copy(w, rc); err != nil {
-		return errgo.Notef(err, "cannot read blob %q", name)
+		if errgo.Cause(err) == mgo.ErrNotFound {
+			return errgo.WithCausef(err, ErrNotFound, "error reading blob %q", name)
+		}
+		return errgo.Notef(err, "error reading blob %q", name)
 	}
 	return nil
 }
 
-// DeleteExpiredUploads deletes any multipart entries
+// RemoveExpiredUploads deletes any multipart entries
 // that have passed their expiry date.
-func (s *Store) DeleteExpiredUploads() error {
-	return errgo.New("not implemented yet")
+func (s *Store) RemoveExpiredUploads() error {
+	it := s.uploadc.Find(bson.D{
+		{"expires", bson.D{{"$lt", time.Now()}}},
+	}).Iter()
+	defer it.Close()
+	var udoc uploadDoc
+	for it.Next(&udoc) {
+		err := s.removeUpload(&udoc)
+		if err != nil {
+			return errgo.Mask(err)
+		}
+	}
+	if err := it.Err(); err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
 }
 
-// DeleteUpload deletes all the parts associated with the
+// RemoveUpload deletes all the parts associated with the
 // given upload id. It is a no-op if called twice on the
 // same upload id.
-func (s *Store) DeleteUpload(uploadId string) error {
-	// TODO
-	// read multipart metadata
-	// delete all parts referenced in that
-	// delete multipart metadata
-	return errgo.New("not implemented yet")
+func (s *Store) RemoveUpload(uploadId string) error {
+	udoc, err := s.getUpload(uploadId)
+	if err != nil {
+		if errgo.Cause(err) == ErrNotFound {
+			return nil
+		}
+		return errgo.Mask(err)
+	}
+	return s.removeUpload(udoc)
+}
+
+func (s *Store) removeUpload(udoc *uploadDoc) error {
+	removedDoc := false
+	removeParts := udoc.Hash == ""
+	if removeParts {
+		// It's possible that FinishUpload has been called
+		// at the same time as RemoveUpload, so only
+		// remove the upload document if that hasn't
+		// happened.
+		err := s.uploadc.Remove(bson.D{
+			{"_id", udoc.Id},
+			{"hash", bson.D{{"$exists", false}}},
+		})
+		switch err {
+		case nil:
+			removedDoc = true
+		case mgo.ErrNotFound:
+			// Someone called FinishUpload concurrently.
+			removeParts = false
+		default:
+			return errgo.Mask(err)
+		}
+	}
+	if !removedDoc {
+		if err := s.uploadc.RemoveId(udoc.Id); err != nil && err != mgo.ErrNotFound {
+			return errgo.Mask(err)
+		}
+	}
+	if !removeParts {
+		return nil
+	}
+	var removeErr error
+	for i := range udoc.Parts {
+		name := uploadPartName(udoc.Id, i)
+		err := s.Remove(name, nil)
+		if err == nil || errgo.Cause(err) == ErrNotFound {
+			// The blob *shouldn't* have been removed, but it's
+			// probably best not to treat it as an error if it has.
+			continue
+		}
+		if removeErr == nil {
+			removeErr = err
+		}
+		logger.Errorf("cannot remove blob %q, leaving as garbage: %v", name, err)
+	}
+	if removeErr != nil {
+		return errgo.Notef(removeErr, "failed to remove some data, see log for details")
+	}
+	return nil
 }
 
 func (s *Store) getUpload(uploadId string) (*uploadDoc, error) {
