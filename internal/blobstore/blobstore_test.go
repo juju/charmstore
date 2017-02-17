@@ -652,6 +652,36 @@ func (s *BlobStoreSuite) TestMultipartCloseWithoutReading(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 }
 
+func (s *BlobStoreSuite) TestUploadInfo(c *gc.C) {
+	s.PatchValue(blobstore.MinPartSize, int64(10))
+	part0 := "123456789 12345"
+	part1 := "abcdefghijklmnopqrstuvwxyz"
+	part2 := "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	id, _ := s.putMultipartNoRemove(c, part0, part1, part2)
+	info, err := s.store.UploadInfo(id)
+	c.Assert(err, gc.IsNil)
+	if want := time.Now().Add(50 * time.Second); !info.Expires.After(want) {
+		c.Errorf("unexpected expiry time %v, want at least %v", info.Expires, want)
+	}
+	info.Expires = time.Time{}
+	c.Assert(info, jc.DeepEquals, blobstore.UploadInfo{
+		Parts: []*blobstore.PartInfo{{
+			Hash:     hashOf(part0),
+			Size:     int64(len(part0)),
+			Complete: true,
+		}, {
+			Hash:     hashOf(part1),
+			Size:     int64(len(part1)),
+			Complete: true,
+		}, {
+			Hash:     hashOf(part2),
+			Size:     int64(len(part2)),
+			Complete: true,
+		}},
+		Hash: hashOf(part0 + part1 + part2),
+	})
+}
+
 var multipartSeekTests = []struct {
 	offset    int64
 	whence    int
@@ -718,6 +748,13 @@ func (s *BlobStoreSuite) TestMultipartSeek(c *gc.C) {
 }
 
 func (s *BlobStoreSuite) putMultipart(c *gc.C, contents ...string) (string, *blobstore.MultipartIndex) {
+	id, idx := s.putMultipartNoRemove(c, contents...)
+	err := s.store.RemoveUpload(id)
+	c.Assert(err, gc.Equals, nil)
+	return id, idx
+}
+
+func (s *BlobStoreSuite) putMultipartNoRemove(c *gc.C, contents ...string) (string, *blobstore.MultipartIndex) {
 	id, err := s.store.NewUpload(time.Now().Add(time.Minute))
 	c.Assert(err, gc.Equals, nil)
 
@@ -729,8 +766,6 @@ func (s *BlobStoreSuite) putMultipart(c *gc.C, contents ...string) (string, *blo
 		parts[i].Hash = hash
 	}
 	idx, _, err := s.store.FinishUpload(id, parts)
-	c.Assert(err, gc.Equals, nil)
-	err = s.store.RemoveUpload(id)
 	c.Assert(err, gc.Equals, nil)
 	return id, idx
 }
