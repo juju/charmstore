@@ -48,11 +48,15 @@ type uploadDoc struct {
 	Expires time.Time
 
 	// Parts holds all the currently uploaded parts.
-	Parts []*uploadPart
+	Parts []*PartInfo
 }
 
-// uploadPart represents one part of an on-going upload.
-type uploadPart struct {
+// Note that the PartInfo type is also used as a document
+// inside MongoDB - do not change without due care
+// and attention.
+
+// PartInfo holds information about one part of a multipart upload.
+type PartInfo struct {
 	// Hash holds the SHA384 hash of the part.
 	Hash string
 	// Size holds the size of the part.
@@ -60,6 +64,23 @@ type uploadPart struct {
 	// Complete holds whether the part has been
 	// successfully uploaded.
 	Complete bool
+}
+
+// UploadInfo holds information on a given upload.
+type UploadInfo struct {
+	// Parts holds all the known parts of the upload.
+	// Parts that haven't been uploaded yet will have nil
+	// elements. Parts that are in progress or have been
+	// aborted will have false Complete fields.
+	Parts []*PartInfo
+
+	// Expires holds when the upload will expire.
+	Expires time.Time
+
+	// Hash holds the hash of the entire upload.
+	// This will be empty until the upload has
+	// been completed with FinishUpload.
+	Hash string `bson:"hash,omitempty"`
 }
 
 // NewUpload created a new multipart entry to track a multipart upload.
@@ -146,7 +167,7 @@ func (s *Store) PutPart(uploadId string, part int, r io.Reader, size int64, hash
 	err = s.uploadc.UpdateId(uploadId, bson.D{{
 		"$set", bson.D{{
 			partElem,
-			uploadPart{
+			PartInfo{
 				Hash:     hash,
 				Size:     size,
 				Complete: true,
@@ -166,7 +187,7 @@ func (s *Store) PutPart(uploadId string, part int, r io.Reader, size int64, hash
 //
 // The part argument holds the part being uploaded,
 // or -1 if no part is currently being uploaded.
-func checkPartSizes(parts []*uploadPart, part int, size int64) error {
+func checkPartSizes(parts []*PartInfo, part int, size int64) error {
 	if part >= 0 && part < len(parts)-1 && size < minPartSize {
 		return errgo.Newf("part too small (need at least %d bytes, got %d)", minPartSize, size)
 	}
@@ -178,14 +199,18 @@ func checkPartSizes(parts []*uploadPart, part int, size int64) error {
 	return nil
 }
 
-// ListUpload returns all the parts associated with the given
-// upload id. It returns ErrNotFound if the upload has been
-// deleted or finished.
-func (s *Store) ListUpload(uploadId string) ([]Part, error) {
-	return nil, errgo.New(" not implemented yet")
-	// TODO
-	// read multipart metadata
-	// return parts from that, omitting parts that are currently in progress
+// UploadInfo returns information on a given upload. It returns
+// ErrNotFound if the upload has been deleted.
+func (s *Store) UploadInfo(uploadId string) (UploadInfo, error) {
+	udoc, err := s.getUpload(uploadId)
+	if err != nil {
+		return UploadInfo{}, errgo.Mask(err, errgo.Is(ErrNotFound))
+	}
+	return UploadInfo{
+		Parts:   udoc.Parts,
+		Expires: udoc.Expires,
+		Hash:    udoc.Hash,
+	}, nil
 }
 
 // uploadPartName returns the blob name of the part with the given
@@ -210,7 +235,7 @@ func (s *Store) initializePart(uploadId string, part int, hash string, size int6
 		}}}},
 	},
 		bson.D{{
-			"$set", bson.D{{partElem, uploadPart{
+			"$set", bson.D{{partElem, PartInfo{
 				Hash: hash,
 				Size: size,
 			}}},
