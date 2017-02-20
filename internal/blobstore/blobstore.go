@@ -31,8 +31,11 @@ func NewHash() hash.Hash {
 // Store stores data blobs in mongodb, de-duplicating by
 // blob hash.
 type Store struct {
-	uploadc *mgo.Collection
-	mstore  blobstore.ManagedStorage
+	uploadc     *mgo.Collection
+	mstore      blobstore.ManagedStorage
+	minPartSize int64
+	maxParts    int
+	maxPartSize int64
 }
 
 // New returns a new blob store that writes to the given database,
@@ -40,8 +43,11 @@ type Store struct {
 func New(db *mgo.Database, prefix string) *Store {
 	rs := blobstore.NewGridFS(db.Name, prefix, db.Session)
 	return &Store{
-		uploadc: db.C(prefix + ".upload"),
-		mstore:  blobstore.NewManagedStorage(db, rs),
+		uploadc:     db.C(prefix + ".upload"),
+		mstore:      blobstore.NewManagedStorage(db, rs),
+		minPartSize: defaultMinPartSize,
+		maxParts:    defaultMaxParts,
+		maxPartSize: defaultMaxPartSize,
 	}
 }
 

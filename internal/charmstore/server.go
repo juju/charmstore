@@ -90,6 +90,19 @@ type ServerParams struct {
 	// RootKeyPolicy holds the default policy used when creating
 	// macaroon root keys.
 	RootKeyPolicy mgostorage.Policy
+
+	// MinUploadPartSize holds the minimum size of
+	// an upload part. If it's zero, a default value will be used.
+	MinUploadPartSize int64 `json:"min-upload-part-size"`
+
+	// MaxUploadPartSize holds the maximum size of
+	// an upload part. If it's zero, a default value will be used.
+	MaxUploadPartSize int64 `json:"max-upload-part-size"`
+
+	// MaxUploadParts holds the maximum number of upload
+	// parts that can be uploaded in a single upload.
+	// If it's zero, a default value will be used.
+	MaxUploadParts int `json:"max-upload-parts"`
 }
 
 const defaultRootKeyExpiryDuration = 24 * time.Hour

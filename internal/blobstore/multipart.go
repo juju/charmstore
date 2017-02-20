@@ -13,10 +13,10 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-var (
-	maxParts          = 400
-	minPartSize int64 = 5 * 1024 * 1024
-	maxPartSize int64 = 1<<32 - 1
+const (
+	defaultMinPartSize = 5 * 1024 * 1024
+	defaultMaxParts    = 400
+	defaultMaxPartSize = 1<<32 - 1
 )
 
 // MultipartIndex holds the index of all the parts of a multipart blob.
@@ -83,6 +83,26 @@ type UploadInfo struct {
 	Hash string `bson:"hash,omitempty"`
 }
 
+// SetMinPartSize sets the minimum size of upload part
+// that is allowed to be uploaded to the store.
+// The default value is 5MB.
+func (s *Store) SetMinPartSize(size int64) {
+	s.minPartSize = size
+}
+
+// SetMaxPartSize sets the maximum size of upload part
+// that is allowed to be uploaded to the store.
+// The default value is 4GB.
+func (s *Store) SetMaxPartSize(size int64) {
+	s.maxPartSize = size
+}
+
+// SetMaxParts sets the maximum number of parts that
+// are allowed in a multipart upload. The default is 400.
+func (s *Store) SetMaxParts(n int) {
+	s.maxParts = n
+}
+
 // NewUpload created a new multipart entry to track a multipart upload.
 // It returns an uploadId that can be used to refer to it. After
 // creating the upload, each part must be uploaded individually, and
@@ -113,20 +133,20 @@ func (s *Store) PutPart(uploadId string, part int, r io.Reader, size int64, hash
 	if part < 0 {
 		return errgo.Newf("negative part number")
 	}
-	if part >= maxParts {
-		return errgo.Newf("part number %d too big (maximum %d)", part, maxParts-1)
+	if part >= s.maxParts {
+		return errgo.Newf("part number %d too big (maximum %d)", part, s.maxParts-1)
 	}
 	if size <= 0 {
 		return errgo.Newf("non-positive part %d size %d", part, size)
 	}
-	if size >= maxPartSize {
-		return errgo.Newf("part %d too big (maximum %d)", part, maxPartSize)
+	if size >= s.maxPartSize {
+		return errgo.Newf("part %d too big (maximum %d)", part, s.maxPartSize)
 	}
 	udoc, err := s.getUpload(uploadId)
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(ErrNotFound))
 	}
-	if err := checkPartSizes(udoc.Parts, part, size); err != nil {
+	if err := s.checkPartSizes(udoc.Parts, part, size); err != nil {
 		return errgo.Mask(err)
 	}
 	partElem := fmt.Sprintf("parts.%d", part)
@@ -187,13 +207,18 @@ func (s *Store) PutPart(uploadId string, part int, r io.Reader, size int64, hash
 //
 // The part argument holds the part being uploaded,
 // or -1 if no part is currently being uploaded.
-func checkPartSizes(parts []*PartInfo, part int, size int64) error {
-	if part >= 0 && part < len(parts)-1 && size < minPartSize {
-		return errgo.Newf("part too small (need at least %d bytes, got %d)", minPartSize, size)
+func (s *Store) checkPartSizes(parts []*PartInfo, part int, size int64) error {
+	if part == -1 {
+		// There's no current part, so pretend the last part
+		// is being uploaded so that we don't complain about
+		// it being too small.
+		part = len(parts) - 1
+	} else if part < len(parts)-1 && size < s.minPartSize {
+		return errgo.Newf("part too small (need at least %d bytes, got %d)", s.minPartSize, size)
 	}
 	for i, p := range parts {
-		if i != part && p != nil && p.Size < minPartSize {
-			return errgo.Newf("part %d was too small (need at least %d bytes, got %d)", i, minPartSize, p.Size)
+		if i != part && p != nil && p.Size < s.minPartSize {
+			return errgo.Newf("part %d was too small (need at least %d bytes, got %d)", i, s.minPartSize, p.Size)
 		}
 	}
 	return nil
@@ -277,7 +302,7 @@ func (s *Store) FinishUpload(uploadId string, parts []Part) (idx *MultipartIndex
 	// when the parts are being uploaded, we still need
 	// to check here in case several parts were uploaded
 	// concurrently and one or more was too small.
-	if err := checkPartSizes(udoc.Parts, -1, 0); err != nil {
+	if err := s.checkPartSizes(udoc.Parts, -1, 0); err != nil {
 		return nil, "", errgo.Mask(err)
 	}
 	// Calculate the hash of the entire thing, which marks

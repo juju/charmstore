@@ -41,6 +41,9 @@ type Config struct {
 	SearchCacheMaxAge DurationString  `yaml:"search-cache-max-age,omitempty"`
 	Database          string          `yaml:"database,omitempty"`
 	AccessLog         string          `yaml:"access-log"`
+	MinUploadPartSize int64           `json:"min-upload-part-size"`
+	MaxUploadPartSize int64           `json:"max-upload-part-size"`
+	MaxUploadParts    int             `json:"max-upload-parts"`
 }
 
 func (c *Config) validate() error {

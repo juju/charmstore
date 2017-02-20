@@ -186,6 +186,20 @@ func (p *Pool) RequestStore() (*Store, error) {
 	}
 }
 
+func (p *Pool) newBlobStore(db StoreDatabase) *blobstore.Store {
+	bs := blobstore.New(db.Database, "entitystore")
+	if p.config.MinUploadPartSize != 0 {
+		bs.SetMinPartSize(p.config.MinUploadPartSize)
+	}
+	if p.config.MaxUploadPartSize != 0 {
+		bs.SetMaxPartSize(p.config.MaxUploadPartSize)
+	}
+	if p.config.MaxUploadParts != 0 {
+		bs.SetMaxParts(p.config.MaxUploadParts)
+	}
+	return bs
+}
+
 // Store returns a Store that can be used to access the database.
 //
 // It must be closed (with the Close method) after use.
@@ -218,7 +232,7 @@ func (p *Pool) requestStoreNB(always bool) (*Store, error) {
 	db := p.db.copy()
 	store := &Store{
 		DB:        db,
-		BlobStore: blobstore.New(db.Database, "entitystore"),
+		BlobStore: p.newBlobStore(db),
 		ES:        p.es,
 		stats:     &p.stats,
 		pool:      p,
@@ -257,7 +271,7 @@ type Store struct {
 func (s *Store) Copy() *Store {
 	s1 := *s
 	s1.DB = s.DB.clone()
-	s1.BlobStore = blobstore.New(s1.DB.Database, "entitystore")
+	s1.BlobStore = s.pool.newBlobStore(s1.DB)
 	s1.Bakery = s1.BakeryWithPolicy(s.pool.config.RootKeyPolicy)
 
 	s.pool.mu.Lock()
