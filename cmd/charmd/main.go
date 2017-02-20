@@ -38,12 +38,6 @@ func main() {
 	if flag.NArg() != 1 {
 		flag.Usage()
 	}
-	if *loggingConfig != "" {
-		if err := loggo.ConfigureLoggers(*loggingConfig); err != nil {
-			fmt.Fprintf(os.Stderr, "cannot configure loggers: %v", err)
-			os.Exit(1)
-		}
-	}
 	if err := serve(flag.Arg(0)); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
@@ -51,12 +45,20 @@ func main() {
 }
 
 func serve(confPath string) error {
-	logger.Infof("reading configuration")
 	conf, err := config.Read(confPath)
 	if err != nil {
 		return errgo.Notef(err, "cannot read config file %q", confPath)
 	}
-
+	level := *loggingConfig
+	if level == "" {
+		level = conf.LoggingLevel
+		if level == "" {
+			level = "INFO"
+		}
+	}
+	if err := loggo.ConfigureLoggers(level); err != nil {
+		return errgo.Notef(err, "cannot configure loggers")
+	}
 	logger.Infof("connecting to mongo")
 	session, err := mgo.Dial(conf.MongoURL)
 	if err != nil {

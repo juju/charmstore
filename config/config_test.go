@@ -50,6 +50,7 @@ stats-cache-max-age: 1h
 search-cache-max-age: 15m
 request-timeout: 500ms
 max-mgo-sessions: 10
+logging-level: DEBUG
 `
 
 func (s *ConfigSuite) readConfig(c *gc.C, content string) (*config.Config, error) {
@@ -95,6 +96,7 @@ func (s *ConfigSuite) TestRead(c *gc.C) {
 		RequestTimeout:    config.DurationString{500 * time.Millisecond},
 		MaxMgoSessions:    10,
 		SearchCacheMaxAge: config.DurationString{15 * time.Minute},
+		LoggingLevel:      "DEBUG",
 	})
 }
 

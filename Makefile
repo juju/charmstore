@@ -85,7 +85,7 @@ simplify:
 
 # Run the charmd server.
 server: install
-	charmd -logging-config '<root>=DEBUG;mgo=INFO;bakery=INFO;httpbakery=INFO' cmd/charmd/config.yaml
+	charmd cmd/charmd/config.yaml
 
 # Update the project Go dependencies to the required revision.
 deps: $(GOPATH)/bin/godeps
