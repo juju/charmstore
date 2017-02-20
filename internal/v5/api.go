@@ -233,6 +233,8 @@ func RouterHandlers(h *ReqHandler) *router.Handlers {
 			"macaroon":             router.HandleJSON(h.serveMacaroon),
 			"delegatable-macaroon": router.HandleJSON(h.serveDelegatableMacaroon),
 			"whoami":               router.HandleJSON(h.serveWhoAmI),
+			"upload":               router.HandleErrors(h.serveUploadId),
+			"upload/":              router.HandleErrors(h.serveUploadPart),
 		},
 		Id: map[string]router.IdHandler{
 			"archive":     h.serveArchive,

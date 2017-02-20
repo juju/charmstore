@@ -32,6 +32,7 @@ type Part struct {
 }
 
 var ErrNotFound = errgo.New("blob not found")
+var ErrBadParams = errgo.New("bad parameters")
 
 // uploadDoc describes the record that's held
 // for a pending multipart upload.
@@ -129,18 +130,19 @@ func (s *Store) NewUpload(expires time.Time) (uploadId string, err error) {
 //
 // If the upload id was not found (for example, because it's expired),
 // PutPart returns an error with an ErrNotFound cause.
+// If one of the parameters is badly formed, it returns an error with an ErrBadParams cause.
 func (s *Store) PutPart(uploadId string, part int, r io.Reader, size int64, hash string) error {
 	if part < 0 {
-		return errgo.Newf("negative part number")
+		return errgo.WithCausef(nil, ErrBadParams, "negative part number")
 	}
 	if part >= s.maxParts {
-		return errgo.Newf("part number %d too big (maximum %d)", part, s.maxParts-1)
+		return errgo.WithCausef(nil, ErrBadParams, "part number %d too big (maximum %d)", part, s.maxParts-1)
 	}
 	if size <= 0 {
-		return errgo.Newf("non-positive part %d size %d", part, size)
+		return errgo.WithCausef(nil, ErrBadParams, "non-positive part %d size %d", part, size)
 	}
 	if size >= s.maxPartSize {
-		return errgo.Newf("part %d too big (maximum %d)", part, s.maxPartSize)
+		return errgo.WithCausef(nil, ErrBadParams, "part %d too big (maximum %d)", part, s.maxPartSize)
 	}
 	udoc, err := s.getUpload(uploadId)
 	if err != nil {
