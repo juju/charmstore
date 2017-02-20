@@ -77,10 +77,11 @@ func (h *ReqHandler) serveUploadResource(id *router.ResolvedURL, w http.Response
 		return badRequestf(nil, "invalid resource name")
 	}
 	hash := req.Form.Get("hash")
-	if hash == "" {
+	uploadId := req.Form.Get("upload-id")
+	if hash == "" && uploadId == "" {
 		return badRequestf(nil, "hash parameter not specified")
 	}
-	if req.ContentLength == -1 {
+	if uploadId == "" && req.ContentLength == -1 {
 		return badRequestf(nil, "Content-Length not specified")
 	}
 	e, err := h.Cache.Entity(&id.URL, charmstore.FieldSelector("charmmeta"))
@@ -104,7 +105,12 @@ func (h *ReqHandler) serveUploadResource(id *router.ResolvedURL, w http.Response
 			}
 		}
 	}
-	rdoc, err := h.Store.UploadResource(id, name, req.Body, hash, req.ContentLength)
+	var rdoc *mongodoc.Resource
+	if uploadId != "" {
+		rdoc, err = h.Store.AddResourceWithUploadId(id, name, uploadId)
+	} else {
+		rdoc, err = h.Store.UploadResource(id, name, req.Body, hash, req.ContentLength)
+	}
 	if err != nil {
 		return errgo.Mask(err)
 	}

@@ -213,7 +213,6 @@ func (s *APISuite) TestPutUploadParts(c *gc.C) {
 	part1 := newDataSource(1, 5*1024*1024)
 	hash1, size1 := hashOf(part1)
 	part1.Seek(0, 0)
-	c.Logf("Size from hashOf %v", size1)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:       s.srv,
 		Method:        "PUT",

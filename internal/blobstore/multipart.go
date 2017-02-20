@@ -11,6 +11,8 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+
+	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
 )
 
 const (
@@ -18,13 +20,6 @@ const (
 	defaultMaxParts    = 400
 	defaultMaxPartSize = 1<<32 - 1
 )
-
-// MultipartIndex holds the index of all the parts of a multipart blob.
-// It should be stored in an external document along with the
-// blob name so that the blob can be downloaded.
-type MultipartIndex struct {
-	Sizes []uint32
-}
 
 // Part represents one part of a multipart blob.
 type Part struct {
@@ -102,6 +97,23 @@ func (s *Store) SetMaxPartSize(size int64) {
 // are allowed in a multipart upload. The default is 400.
 func (s *Store) SetMaxParts(n int) {
 	s.maxParts = n
+}
+
+// Index returns a multipart index suitable for opening
+// the multipart blob with the given info.
+// It returns false if the info does not represent a completed
+// upload.
+func (info *UploadInfo) Index() (*mongodoc.MultipartIndex, bool) {
+	if info.Hash == "" {
+		return nil, false
+	}
+	idx := &mongodoc.MultipartIndex{
+		Sizes: make([]uint32, len(info.Parts)),
+	}
+	for i, p := range info.Parts {
+		idx.Sizes[i] = uint32(p.Size)
+	}
+	return idx, true
 }
 
 // NewUpload created a new multipart entry to track a multipart upload.
@@ -283,7 +295,7 @@ func (s *Store) initializePart(uploadId string, part int, hash string, size int6
 // This does not delete the multipart metadata, which should still be
 // deleted explicitly by calling RemoveUpload after the index data is
 // stored.
-func (s *Store) FinishUpload(uploadId string, parts []Part) (idx *MultipartIndex, hash string, err error) {
+func (s *Store) FinishUpload(uploadId string, parts []Part) (idx *mongodoc.MultipartIndex, hash string, err error) {
 	udoc, err := s.getUpload(uploadId)
 	if err != nil {
 		return nil, "", errgo.Mask(err, errgo.Is(ErrNotFound))
@@ -316,7 +328,7 @@ func (s *Store) FinishUpload(uploadId string, parts []Part) (idx *MultipartIndex
 		}
 		return nil, "", errgo.Mask(err)
 	}
-	idx = &MultipartIndex{
+	idx = &mongodoc.MultipartIndex{
 		Sizes: make([]uint32, len(parts)),
 	}
 	for i := range udoc.Parts {
@@ -412,6 +424,17 @@ func (s *Store) RemoveUpload(uploadId string) error {
 	return s.removeUpload(udoc)
 }
 
+// removeUpload removes the upload document. It removes the parts
+// associated with it if the upload is not yet completed.
+//
+// TODO this has a few problems:
+//
+// - if there's a completed resource that's not actually added as a
+// resource, its parts will stick around forever.
+//
+// - if the same upload is used for two resources and then the charm for
+// one is deleted, then there's no way of knowing that the resources are
+// shared.
 func (s *Store) removeUpload(udoc *uploadDoc) error {
 	removedDoc := false
 	removeParts := udoc.Hash == ""

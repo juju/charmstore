@@ -5,7 +5,9 @@ package v5_test
 
 import (
 	"crypto/sha512"
+	"encoding/json"
 	"fmt"
+	"gopkg.in/errgo.v1"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -17,6 +19,7 @@ import (
 	"gopkg.in/juju/charm.v6-unstable/resource"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 
+	"gopkg.in/juju/charmstore.v5-unstable/internal/blobstore"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
 )
 
@@ -69,6 +72,94 @@ func (s *ResourceSuite) TestPost(c *gc.C) {
 	data, err := ioutil.ReadAll(blob)
 	c.Assert(err, gc.IsNil)
 	c.Assert(string(data), gc.Equals, content)
+}
+
+func (s *ResourceSuite) TestMultipartPost(c *gc.C) {
+	// Create the upload.
+	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
+		Handler: s.srv,
+		Do:      bakeryDo(s.idmServer.Client("bob")),
+		Method:  "POST",
+		URL:     storeURL("upload"),
+	})
+	var uploadIdResp params.UploadIdResponse
+	err := json.Unmarshal(resp.Body.Bytes(), &uploadIdResp)
+	c.Assert(err, gc.Equals, nil)
+	uploadId := uploadIdResp.UploadId
+
+	// Upload each part in turn.
+	contents := []string{
+		"12345689 123456789 ",
+		"abcdefghijklmnopqrstuvwxyz",
+	}
+	allContents := strings.Join(contents, "")
+
+	for i, content := range contents {
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler: s.srv,
+			Method:  "PUT",
+			Do:      bakeryDo(s.idmServer.Client("bob")),
+			URL:     storeURL(fmt.Sprintf("upload/%s/%d?hash=%s", uploadId, i, hashOfString(content))),
+			Body:    strings.NewReader(content),
+		})
+	}
+
+	// Finalize the upload.
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		Method:  "PUT",
+		Do:      bakeryDo(s.idmServer.Client("bob")),
+		URL:     storeURL("upload/" + uploadId),
+		JSONBody: params.Parts{
+			Parts: []params.Part{{
+				Hash: hashOfString(contents[0]),
+			}, {
+				Hash: hashOfString(contents[1]),
+			}},
+		},
+		ExpectBody: &params.FinishUploadResponse{
+			Hash: hashOfString(allContents),
+		},
+	})
+
+	id := newResolvedURL("~charmers/precise/wordpress-0", -1)
+	s.addPublicCharm(c, storetesting.NewCharm(&charm.Meta{
+		Resources: map[string]resource.Meta{
+			"someResource": {
+				Name: "someResource",
+				Type: resource.TypeFile,
+				Path: "1.zip",
+			},
+		},
+	}), id)
+
+	// Create the resource.
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		Method:  "POST",
+		URL:     storeURL(fmt.Sprintf("%s/resource/someResource?upload-id=%s", id.URL.Path(), uploadId)),
+		ExpectBody: params.ResourceUploadResponse{
+			// Note: revision 1 because addPublicCharm has already uploaded
+			// revision 0.
+			Revision: 1,
+		},
+		Do: s.bakeryDoAsUser("charmers"),
+	})
+
+	// Check that the resource has really been uploaded.
+	r, err := s.store.ResolveResource(id, "someResource", 1, "")
+	c.Assert(err, gc.IsNil)
+
+	blob, err := s.store.OpenResourceBlob(r)
+	c.Assert(err, gc.IsNil)
+	defer blob.Close()
+	data, err := ioutil.ReadAll(blob)
+	c.Assert(err, gc.IsNil)
+	c.Assert(string(data), gc.Equals, allContents)
+
+	// Check that the upload info has been removed.
+	_, err = s.store.BlobStore.UploadInfo(uploadId)
+	c.Assert(errgo.Cause(err), gc.Equals, blobstore.ErrNotFound, gc.Commentf("error: %v", err))
 }
 
 func (s *ResourceSuite) TestGet(c *gc.C) {

@@ -17,6 +17,7 @@ import (
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 	"gopkg.in/mgo.v2"
 
+	"gopkg.in/juju/charmstore.v5-unstable/internal/blobstore"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
@@ -230,6 +231,52 @@ func (s *resourceSuite) TestUploadResource(c *gc.C) {
 	res, err = store.UploadResource(id, "someResource", strings.NewReader(blob), hashOfString(blob), int64(len(blob)))
 	c.Assert(err, jc.ErrorIsNil)
 	checkResourceDocs(c, store, id, []string{"someResource/1"}, []*mongodoc.Resource{res})
+}
+
+func (s *resourceSuite) TestAddResourceWithUploadId(c *gc.C) {
+	store := s.newStore(c, false)
+	defer store.Close()
+
+	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
+	meta := storetesting.MetaWithResources(nil, "someResource")
+	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
+	c.Assert(err, jc.ErrorIsNil)
+
+	contents := []string{
+		"123456789 123456789 ",
+		"abcdefghijklmnopqrstuvwyz",
+	}
+	uid := putMultipart(c, store.BlobStore, contents...)
+
+	res, err := store.AddResourceWithUploadId(id, "someResource", uid)
+	c.Assert(err, jc.ErrorIsNil)
+
+	checkResourceDocs(c, store, id, []string{"someResource/0"}, []*mongodoc.Resource{res})
+	allContents := strings.Join(contents, "")
+	blob, err := store.OpenResourceBlob(res)
+	c.Assert(err, jc.ErrorIsNil)
+	defer blob.Close()
+	c.Assert(blob.Size, gc.Equals, int64(len(allContents)))
+	c.Assert(blob.Hash, gc.Equals, hashOfString(allContents))
+	data, err := ioutil.ReadAll(blob)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(string(data), gc.Equals, allContents)
+}
+
+func putMultipart(c *gc.C, bs *blobstore.Store, contents ...string) string {
+	id, err := bs.NewUpload(time.Now().Add(time.Minute))
+	c.Assert(err, gc.Equals, nil)
+
+	parts := make([]blobstore.Part, len(contents))
+	for i, content := range contents {
+		hash := hashOfString(content)
+		err = bs.PutPart(id, i, strings.NewReader(content), int64(len(content)), hash)
+		c.Assert(err, gc.Equals, nil)
+		parts[i].Hash = hash
+	}
+	_, _, err = bs.FinishUpload(id, parts)
+	c.Assert(err, gc.Equals, nil)
+	return id
 }
 
 var uploadResourceErrorTests = []struct {

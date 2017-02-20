@@ -36,14 +36,18 @@ type Resource struct {
 	// blob store, or the name prefix for multipart blobs.
 	BlobName string
 
-	// TODO add this:
-	// BlobMultipart stores the multipart index when the blob
+	// BlobIndex stores the multipart index when the blob
 	// is composed of several parts.
-	// BlobMultipart *blobstore.MultipartIndex
+	BlobIndex *MultipartIndex `bson:",omitempty"`
 
 	// UploadTime is the is the time the resource file was stored in
 	// the blob store.
 	UploadTime time.Time
+}
+
+// MultipartIndex holds the index of all the parts of a multipart blob.
+type MultipartIndex struct {
+	Sizes []uint32
 }
 
 // Validate ensures that the doc is valid.
