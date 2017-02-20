@@ -142,10 +142,11 @@ func (s *commonSuite) startServer(c *gc.C) {
 	// Disable group caching.
 	s.PatchValue(&v5.PermCacheExpiry, time.Duration(0))
 	config := charmstore.ServerParams{
-		AuthUsername:     testUsername,
-		AuthPassword:     testPassword,
-		StatsCacheMaxAge: time.Nanosecond,
-		MaxMgoSessions:   s.maxMgoSessions,
+		AuthUsername:      testUsername,
+		AuthPassword:      testPassword,
+		StatsCacheMaxAge:  time.Nanosecond,
+		MaxMgoSessions:    s.maxMgoSessions,
+		MinUploadPartSize: 10,
 	}
 	keyring := httpbakery.NewPublicKeyRing(nil, nil)
 	keyring.AllowInsecure()

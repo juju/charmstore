@@ -12,12 +12,12 @@ import (
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 
 	"gopkg.in/juju/charmstore.v5-unstable/config"
 	"gopkg.in/juju/charmstore.v5-unstable/elasticsearch"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
-	"gopkg.in/mgo.v2/bson"
 )
 
 var logger = loggo.GetLogger("charmdelete")
