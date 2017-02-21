@@ -79,26 +79,6 @@ type UploadInfo struct {
 	Hash string `bson:"hash,omitempty"`
 }
 
-// SetMinPartSize sets the minimum size of upload part
-// that is allowed to be uploaded to the store.
-// The default value is 5MB.
-func (s *Store) SetMinPartSize(size int64) {
-	s.minPartSize = size
-}
-
-// SetMaxPartSize sets the maximum size of upload part
-// that is allowed to be uploaded to the store.
-// The default value is 4GB.
-func (s *Store) SetMaxPartSize(size int64) {
-	s.maxPartSize = size
-}
-
-// SetMaxParts sets the maximum number of parts that
-// are allowed in a multipart upload. The default is 400.
-func (s *Store) SetMaxParts(n int) {
-	s.maxParts = n
-}
-
 // Index returns a multipart index suitable for opening
 // the multipart blob with the given info.
 // It returns false if the info does not represent a completed
@@ -147,14 +127,14 @@ func (s *Store) PutPart(uploadId string, part int, r io.Reader, size int64, hash
 	if part < 0 {
 		return errgo.WithCausef(nil, ErrBadParams, "negative part number")
 	}
-	if part >= s.maxParts {
-		return errgo.WithCausef(nil, ErrBadParams, "part number %d too big (maximum %d)", part, s.maxParts-1)
+	if part >= s.MaxParts {
+		return errgo.WithCausef(nil, ErrBadParams, "part number %d too big (maximum %d)", part, s.MaxParts-1)
 	}
 	if size <= 0 {
 		return errgo.WithCausef(nil, ErrBadParams, "non-positive part %d size %d", part, size)
 	}
-	if size >= s.maxPartSize {
-		return errgo.WithCausef(nil, ErrBadParams, "part %d too big (maximum %d)", part, s.maxPartSize)
+	if size >= s.MaxPartSize {
+		return errgo.WithCausef(nil, ErrBadParams, "part %d too big (maximum %d)", part, s.MaxPartSize)
 	}
 	udoc, err := s.getUpload(uploadId)
 	if err != nil {
@@ -227,12 +207,12 @@ func (s *Store) checkPartSizes(parts []*PartInfo, part int, size int64) error {
 		// is being uploaded so that we don't complain about
 		// it being too small.
 		part = len(parts) - 1
-	} else if part < len(parts)-1 && size < s.minPartSize {
-		return errgo.Newf("part too small (need at least %d bytes, got %d)", s.minPartSize, size)
+	} else if part < len(parts)-1 && size < s.MinPartSize {
+		return errgo.Newf("part too small (need at least %d bytes, got %d)", s.MinPartSize, size)
 	}
 	for i, p := range parts {
-		if i != part && p != nil && p.Size < s.minPartSize {
-			return errgo.Newf("part %d was too small (need at least %d bytes, got %d)", i, s.minPartSize, p.Size)
+		if i != part && p != nil && p.Size < s.MinPartSize {
+			return errgo.Newf("part %d was too small (need at least %d bytes, got %d)", i, s.MinPartSize, p.Size)
 		}
 	}
 	return nil

@@ -33,11 +33,22 @@ func NewHash() hash.Hash {
 // Store stores data blobs in mongodb, de-duplicating by
 // blob hash.
 type Store struct {
-	uploadc     *mgo.Collection
-	mstore      blobstore.ManagedStorage
-	minPartSize int64
-	maxParts    int
-	maxPartSize int64
+	uploadc *mgo.Collection
+	mstore  blobstore.ManagedStorage
+
+	// The following fields are given default values by
+	// New but may be changed away from the defaults
+	// if desired.
+
+	// MinPartSize holds the minimum size of a multipart upload part.
+	MinPartSize int64
+
+	// MaxPartSize holds the maximum size of a multipart upload part.
+	MaxPartSize int64
+
+	// MaxParts holds the maximum number of parts that there
+	// can be in a multipart upload.
+	MaxParts int
 }
 
 // New returns a new blob store that writes to the given database,
@@ -47,9 +58,9 @@ func New(db *mgo.Database, prefix string) *Store {
 	return &Store{
 		uploadc:     db.C(prefix + ".upload"),
 		mstore:      blobstore.NewManagedStorage(db, rs),
-		minPartSize: defaultMinPartSize,
-		maxParts:    defaultMaxParts,
-		maxPartSize: defaultMaxPartSize,
+		MinPartSize: defaultMinPartSize,
+		MaxParts:    defaultMaxParts,
+		MaxPartSize: defaultMaxPartSize,
 	}
 }
 

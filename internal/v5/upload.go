@@ -43,12 +43,18 @@ func (h *ReqHandler) serveUploadId(w http.ResponseWriter, req *http.Request) err
 			}
 			expires = exp
 		}
-		uploadId, err := h.Store.BlobStore.NewUpload(time.Now().Add(expires))
+		expireTime := time.Now().Add(expires)
+		uploadId, err := h.Store.BlobStore.NewUpload(expireTime)
 		if err != nil {
 			return errgo.Mask(err)
 		}
-		return httprequest.WriteJSON(w, http.StatusOK, &params.UploadIdResponse{
+		return httprequest.WriteJSON(w, http.StatusOK, &params.NewUploadResponse{
 			UploadId: uploadId,
+			// Match mongo's behaviour so we return an accurate time.
+			Expires:     expireTime.Truncate(time.Millisecond),
+			MinPartSize: h.Store.BlobStore.MinPartSize,
+			MaxPartSize: h.Store.BlobStore.MaxPartSize,
+			MaxParts:    h.Store.BlobStore.MaxParts,
 		})
 	default:
 		return errgo.WithCausef(nil, params.ErrMethodNotAllowed, "%s not allowed", req.Method)
