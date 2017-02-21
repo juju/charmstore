@@ -111,7 +111,7 @@ func (s *BlobStoreSuite) TestPutPartNegativePart(c *gc.C) {
 }
 
 func (s *BlobStoreSuite) TestPutPartNumberTooBig(c *gc.C) {
-	s.store.SetMaxParts(100)
+	s.store.MaxParts = 100
 
 	id := s.newUpload(c)
 	err := s.store.PutPart(id, 100, nil, 0, "")
@@ -125,7 +125,7 @@ func (s *BlobStoreSuite) TestPutPartSizeNonPositive(c *gc.C) {
 }
 
 func (s *BlobStoreSuite) TestPutPartSizeTooBig(c *gc.C) {
-	s.store.SetMaxPartSize(5)
+	s.store.MaxPartSize = 5
 
 	id := s.newUpload(c)
 	err := s.store.PutPart(id, 0, strings.NewReader(""), 20, hashOf(""))
@@ -189,7 +189,7 @@ func (s *BlobStoreSuite) TestPutPartAgainWithSameHash(c *gc.C) {
 }
 
 func (s *BlobStoreSuite) TestPutPartOutOfOrder(c *gc.C) {
-	s.store.SetMinPartSize(10)
+	s.store.MinPartSize = 10
 	id := s.newUpload(c)
 
 	content1 := "123456789 123456789 "
@@ -212,7 +212,7 @@ func (s *BlobStoreSuite) TestPutPartOutOfOrder(c *gc.C) {
 }
 
 func (s *BlobStoreSuite) TestPutPartTooSmall(c *gc.C) {
-	s.store.SetMinPartSize(100)
+	s.store.MinPartSize = 100
 	id := s.newUpload(c)
 
 	content0 := "abcdefghijklmnopqrstuvwxyz"
@@ -225,7 +225,7 @@ func (s *BlobStoreSuite) TestPutPartTooSmall(c *gc.C) {
 }
 
 func (s *BlobStoreSuite) TestPutPartTooSmallOutOfOrder(c *gc.C) {
-	s.store.SetMinPartSize(100)
+	s.store.MinPartSize = 100
 	id := s.newUpload(c)
 
 	content1 := "abcdefghijklmnopqrstuvwxyz"
@@ -238,7 +238,7 @@ func (s *BlobStoreSuite) TestPutPartTooSmallOutOfOrder(c *gc.C) {
 }
 
 func (s *BlobStoreSuite) TestPutPartSmallAtEnd(c *gc.C) {
-	s.store.SetMinPartSize(10)
+	s.store.MinPartSize = 10
 	id := s.newUpload(c)
 
 	content0 := "1234"
@@ -288,7 +288,7 @@ func (s *BlobStoreSuite) TestPutPartNotFound(c *gc.C) {
 }
 
 func (s *BlobStoreSuite) TestFinishUploadMismatchedPartCount(c *gc.C) {
-	s.store.SetMinPartSize(10)
+	s.store.MinPartSize = 10
 	id := s.newUpload(c)
 
 	content0 := "123456789 123456789 "
@@ -308,7 +308,7 @@ func (s *BlobStoreSuite) TestFinishUploadMismatchedPartCount(c *gc.C) {
 }
 
 func (s *BlobStoreSuite) TestFinishUploadMismatchedPartHash(c *gc.C) {
-	s.store.SetMinPartSize(10)
+	s.store.MinPartSize = 10
 	id := s.newUpload(c)
 
 	content0 := "123456789 123456789 "
@@ -330,7 +330,7 @@ func (s *BlobStoreSuite) TestFinishUploadMismatchedPartHash(c *gc.C) {
 }
 
 func (s *BlobStoreSuite) TestFinishUploadPartNotUploaded(c *gc.C) {
-	s.store.SetMinPartSize(10)
+	s.store.MinPartSize = 10
 	id := s.newUpload(c)
 
 	content1 := "123456789 123456789 "
@@ -348,7 +348,7 @@ func (s *BlobStoreSuite) TestFinishUploadPartNotUploaded(c *gc.C) {
 }
 
 func (s *BlobStoreSuite) TestFinishUploadPartIncomplete(c *gc.C) {
-	s.store.SetMinPartSize(10)
+	s.store.MinPartSize = 10
 	id := s.newUpload(c)
 
 	content0 := "123456789 123456789 "
@@ -364,7 +364,7 @@ func (s *BlobStoreSuite) TestFinishUploadPartIncomplete(c *gc.C) {
 }
 
 func (s *BlobStoreSuite) TestFinishUploadCheckSizes(c *gc.C) {
-	s.store.SetMinPartSize(50)
+	s.store.MinPartSize = 50
 	id := s.newUpload(c)
 	content := "123456789 123456789 "
 	// Upload two small parts concurrently.
@@ -402,7 +402,7 @@ func (s *BlobStoreSuite) TestFinishUploadCheckSizes(c *gc.C) {
 }
 
 func (s *BlobStoreSuite) TestFinishUploadSuccess(c *gc.C) {
-	s.store.SetMinPartSize(10)
+	s.store.MinPartSize = 10
 	id := s.newUpload(c)
 
 	content0 := "123456789 123456789 "
@@ -454,7 +454,7 @@ func (s *BlobStoreSuite) TestFinishUploadNotFound(c *gc.C) {
 }
 
 func (s *BlobStoreSuite) TestFinishUploadAgain(c *gc.C) {
-	s.store.SetMinPartSize(10)
+	s.store.MinPartSize = 10
 	id := s.newUpload(c)
 
 	content0 := "123456789 123456789 "
@@ -487,7 +487,7 @@ func (s *BlobStoreSuite) TestFinishUploadAgain(c *gc.C) {
 }
 
 func (s *BlobStoreSuite) TestFinishUploadRemovedWhenCalculatingHash(c *gc.C) {
-	s.store.SetMinPartSize(10)
+	s.store.MinPartSize = 10
 	id := s.newUpload(c)
 
 	// We need at least two parts so that FinishUpload
@@ -532,7 +532,7 @@ func (s *BlobStoreSuite) TestFinishUploadRemovedWhenCalculatingHash(c *gc.C) {
 }
 
 func (s *BlobStoreSuite) TestRemoveUploadSuccessWithNoPart(c *gc.C) {
-	s.store.SetMinPartSize(10)
+	s.store.MinPartSize = 10
 	expires := time.Now().Add(time.Minute).UTC().Truncate(time.Millisecond)
 	id, err := s.store.NewUpload(expires)
 	c.Assert(err, gc.Equals, nil)
@@ -547,7 +547,7 @@ func (s *BlobStoreSuite) TestRemoveUploadOnNonExistingUpload(c *gc.C) {
 }
 
 func (s *BlobStoreSuite) TestRemoveUploadSuccessWithParts(c *gc.C) {
-	s.store.SetMinPartSize(10)
+	s.store.MinPartSize = 10
 	expires := time.Now().Add(time.Minute).UTC().Truncate(time.Millisecond)
 	id, err := s.store.NewUpload(expires)
 	c.Assert(err, gc.Equals, nil)
@@ -561,7 +561,7 @@ func (s *BlobStoreSuite) TestRemoveUploadSuccessWithParts(c *gc.C) {
 }
 
 func (s *BlobStoreSuite) TestRemoveFinishedUploadDoesNotRemoveParts(c *gc.C) {
-	s.store.SetMinPartSize(10)
+	s.store.MinPartSize = 10
 
 	id, err := s.store.NewUpload(time.Now().Add(time.Minute))
 	c.Assert(err, gc.Equals, nil)
@@ -579,7 +579,7 @@ func (s *BlobStoreSuite) TestRemoveFinishedUploadDoesNotRemoveParts(c *gc.C) {
 }
 
 func (s *BlobStoreSuite) TestRemoveExpires(c *gc.C) {
-	s.store.SetMinPartSize(10)
+	s.store.MinPartSize = 10
 
 	expireTimes := []time.Duration{-time.Minute, -time.Second, time.Minute, time.Hour}
 	ids := make([]string, len(expireTimes))
@@ -612,7 +612,7 @@ func (s *BlobStoreSuite) TestOpenEmptyMultipart(c *gc.C) {
 }
 
 func (s *BlobStoreSuite) TestMultipartReadAll(c *gc.C) {
-	s.store.SetMinPartSize(10)
+	s.store.MinPartSize = 10
 	part0 := "123456789 12345"
 	part1 := "abcdefghijklmnopqrstuvwxyz"
 	part2 := "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -621,7 +621,7 @@ func (s *BlobStoreSuite) TestMultipartReadAll(c *gc.C) {
 }
 
 func (s *BlobStoreSuite) TestMultipartSmallReads(c *gc.C) {
-	s.store.SetMinPartSize(10)
+	s.store.MinPartSize = 10
 	part0 := "123456789 12345"
 	part1 := "abcdefghijklmnopqrstuvwxyz"
 	part2 := "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -635,14 +635,14 @@ func (s *BlobStoreSuite) TestMultipartSmallReads(c *gc.C) {
 }
 
 func (s *BlobStoreSuite) TestMultipartSinglePart(c *gc.C) {
-	s.store.SetMinPartSize(10)
+	s.store.MinPartSize = 10
 	part0 := "123456789 12345"
 	id, idx := s.putMultipart(c, part0)
 	s.assertBlobContent(c, id, idx, part0)
 }
 
 func (s *BlobStoreSuite) TestMultipartCloseWithoutReading(c *gc.C) {
-	s.store.SetMinPartSize(10)
+	s.store.MinPartSize = 10
 	part0 := "123456789 12345"
 	part1 := "abcdefghijklmnopqrstuvwxyz"
 	id, idx := s.putMultipart(c, part0, part1)
@@ -653,7 +653,7 @@ func (s *BlobStoreSuite) TestMultipartCloseWithoutReading(c *gc.C) {
 }
 
 func (s *BlobStoreSuite) TestUploadInfo(c *gc.C) {
-	s.store.SetMinPartSize(10)
+	s.store.MinPartSize = 10
 	part0 := "123456789 12345"
 	part1 := "abcdefghijklmnopqrstuvwxyz"
 	part2 := "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -727,7 +727,7 @@ var multipartSeekTests = []struct {
 }}
 
 func (s *BlobStoreSuite) TestMultipartSeek(c *gc.C) {
-	s.store.SetMinPartSize(10)
+	s.store.MinPartSize = 10
 	part0 := "123456789 12345"
 	part1 := "abcdefghijklmnopqrstuvwxyz"
 	part2 := "ABCDEFGHIJKLMNOPQRSTUVWXYZ"

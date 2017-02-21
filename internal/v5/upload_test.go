@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
@@ -37,19 +38,33 @@ func (s *APISuite) TestPostUpload(c *gc.C) {
 		Do:      bakeryDo(s.idmServer.Client("bob")),
 		URL:     storeURL("upload?expires=2m"),
 	})
-	var uploadIdResp params.UploadIdResponse
-	err := json.Unmarshal(resp.Body.Bytes(), &uploadIdResp)
+	var uploadResp params.NewUploadResponse
+	err := json.Unmarshal(resp.Body.Bytes(), &uploadResp)
 	c.Assert(err, gc.Equals, nil)
-	info, err := s.store.BlobStore.UploadInfo(uploadIdResp.UploadId)
+
+	uploadId := uploadResp.UploadId
+	c.Assert(uploadId, gc.Not(gc.Equals), "")
+
+	expires := uploadResp.Expires
+	if got, want := expires, now.Add(2*time.Minute).Truncate(time.Millisecond); got.Before(want) {
+		c.Errorf("expires too early, got %v, want %v", got, want)
+	}
+	if got, want := expires, now.Add(2*time.Minute+5*time.Second); got.After(want) {
+		c.Errorf("expires too late, got %v, want %v", got, want)
+	}
+	c.Assert(uploadResp, jc.DeepEquals, params.NewUploadResponse{
+		UploadId:    uploadId,
+		Expires:     expires,
+		MinPartSize: s.store.BlobStore.MinPartSize,
+		MaxPartSize: s.store.BlobStore.MaxPartSize,
+		MaxParts:    s.store.BlobStore.MaxParts,
+	})
+
+	info, err := s.store.BlobStore.UploadInfo(uploadId)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(len(info.Parts), gc.Equals, 0)
 	c.Assert(info.Hash, gc.Equals, "")
-	if want := now.Add(2 * time.Minute).Truncate(time.Millisecond); info.Expires.Before(want) {
-		c.Errorf("expires too early, got %v, want %v", info.Expires, want)
-	}
-	if want := now.Add(2*time.Minute + 5*time.Second); info.Expires.After(want) {
-		c.Errorf("expires too late, got %v, want %v", info.Expires, want)
-	}
+	c.Assert(info.Expires.UTC(), gc.Equals, expires.UTC())
 }
 
 func (s *APISuite) TestPostUploadMaxExpiry(c *gc.C) {
@@ -60,10 +75,10 @@ func (s *APISuite) TestPostUploadMaxExpiry(c *gc.C) {
 		Do:      bakeryDo(s.idmServer.Client("bob")),
 		URL:     storeURL("upload?expires=27h"),
 	})
-	var uploadIdResp params.UploadIdResponse
-	err := json.Unmarshal(resp.Body.Bytes(), &uploadIdResp)
+	var uploadResp params.NewUploadResponse
+	err := json.Unmarshal(resp.Body.Bytes(), &uploadResp)
 	c.Assert(err, gc.Equals, nil)
-	info, err := s.store.BlobStore.UploadInfo(uploadIdResp.UploadId)
+	info, err := s.store.BlobStore.UploadInfo(uploadResp.UploadId)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(len(info.Parts), gc.Equals, 0)
 	c.Assert(info.Hash, gc.Equals, "")
@@ -97,10 +112,10 @@ func (s *APISuite) TestPostUploadNoExpiry(c *gc.C) {
 		Method:  "POST",
 		URL:     storeURL("upload"),
 	})
-	var uploadIdResp params.UploadIdResponse
-	err := json.Unmarshal(resp.Body.Bytes(), &uploadIdResp)
+	var uploadResp params.NewUploadResponse
+	err := json.Unmarshal(resp.Body.Bytes(), &uploadResp)
 	c.Assert(err, gc.Equals, nil)
-	info, err := s.store.BlobStore.UploadInfo(uploadIdResp.UploadId)
+	info, err := s.store.BlobStore.UploadInfo(uploadResp.UploadId)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(len(info.Parts), gc.Equals, 0)
 	c.Assert(info.Hash, gc.Equals, "")
@@ -133,14 +148,14 @@ func (s *APISuite) TestPutUploadNoParts(c *gc.C) {
 		Do:      bakeryDo(s.idmServer.Client("bob")),
 		URL:     storeURL("upload"),
 	})
-	var uploadIdResp params.UploadIdResponse
-	err := json.Unmarshal(resp.Body.Bytes(), &uploadIdResp)
+	var uploadResp params.NewUploadResponse
+	err := json.Unmarshal(resp.Body.Bytes(), &uploadResp)
 	c.Assert(err, gc.Equals, nil)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:  s.srv,
 		Method:   "PUT",
 		Do:       bakeryDo(s.idmServer.Client("bob")),
-		URL:      storeURL("upload/" + uploadIdResp.UploadId),
+		URL:      storeURL("upload/" + uploadResp.UploadId),
 		JSONBody: params.Parts{},
 		ExpectBody: &params.FinishUploadResponse{
 			Hash: hashOfString(""),
@@ -170,8 +185,8 @@ func (s *APISuite) TestPutUploadOnePart(c *gc.C) {
 		Do:      bakeryDo(s.idmServer.Client("bob")),
 		URL:     storeURL("upload"),
 	})
-	var uploadIdResp params.UploadIdResponse
-	err := json.Unmarshal(resp.Body.Bytes(), &uploadIdResp)
+	var uploadResp params.NewUploadResponse
+	err := json.Unmarshal(resp.Body.Bytes(), &uploadResp)
 	c.Assert(err, gc.Equals, nil)
 
 	part := "0123456789"
@@ -179,7 +194,7 @@ func (s *APISuite) TestPutUploadOnePart(c *gc.C) {
 		Handler: s.srv,
 		Method:  "PUT",
 		Do:      bakeryDo(s.idmServer.Client("bob")),
-		URL:     storeURL("upload/" + uploadIdResp.UploadId + "/0?hash=" + hashOfString(part)),
+		URL:     storeURL("upload/" + uploadResp.UploadId + "/0?hash=" + hashOfString(part)),
 		Body:    strings.NewReader(part),
 	})
 
@@ -187,7 +202,7 @@ func (s *APISuite) TestPutUploadOnePart(c *gc.C) {
 		Handler: s.srv,
 		Method:  "PUT",
 		Do:      bakeryDo(s.idmServer.Client("bob")),
-		URL:     storeURL("upload/" + uploadIdResp.UploadId),
+		URL:     storeURL("upload/" + uploadResp.UploadId),
 		JSONBody: params.Parts{
 			Parts: []params.Part{{
 				Hash: hashOfString(part),
@@ -206,8 +221,8 @@ func (s *APISuite) TestPutUploadParts(c *gc.C) {
 		Method:  "POST",
 		URL:     storeURL("upload"),
 	})
-	var uploadIdResp params.UploadIdResponse
-	err := json.Unmarshal(resp.Body.Bytes(), &uploadIdResp)
+	var uploadResp params.NewUploadResponse
+	err := json.Unmarshal(resp.Body.Bytes(), &uploadResp)
 	c.Assert(err, gc.Equals, nil)
 
 	part1 := newDataSource(1, 5*1024*1024)
@@ -218,7 +233,7 @@ func (s *APISuite) TestPutUploadParts(c *gc.C) {
 		Method:        "PUT",
 		Do:            bakeryDo(s.idmServer.Client("bob")),
 		ContentLength: size1,
-		URL:           storeURL("upload/" + uploadIdResp.UploadId + "/0?hash=" + hash1),
+		URL:           storeURL("upload/" + uploadResp.UploadId + "/0?hash=" + hash1),
 		Body:          part1,
 	})
 	part2 := newDataSource(2, 5*1024*1024)
@@ -229,7 +244,7 @@ func (s *APISuite) TestPutUploadParts(c *gc.C) {
 		Method:        "PUT",
 		Do:            bakeryDo(s.idmServer.Client("bob")),
 		ContentLength: size2,
-		URL:           storeURL("upload/" + uploadIdResp.UploadId + "/1?hash=" + hash2),
+		URL:           storeURL("upload/" + uploadResp.UploadId + "/1?hash=" + hash2),
 		Body:          part2,
 	})
 
@@ -242,7 +257,7 @@ func (s *APISuite) TestPutUploadParts(c *gc.C) {
 		Handler: s.srv,
 		Method:  "PUT",
 		Do:      bakeryDo(s.idmServer.Client("bob")),
-		URL:     storeURL("upload/" + uploadIdResp.UploadId),
+		URL:     storeURL("upload/" + uploadResp.UploadId),
 		JSONBody: params.Parts{
 			Parts: []params.Part{{
 				Hash: hash1,

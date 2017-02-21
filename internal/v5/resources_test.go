@@ -82,7 +82,7 @@ func (s *ResourceSuite) TestMultipartPost(c *gc.C) {
 		Method:  "POST",
 		URL:     storeURL("upload"),
 	})
-	var uploadIdResp params.UploadIdResponse
+	var uploadIdResp params.NewUploadResponse
 	err := json.Unmarshal(resp.Body.Bytes(), &uploadIdResp)
 	c.Assert(err, gc.Equals, nil)
 	uploadId := uploadIdResp.UploadId

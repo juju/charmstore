@@ -189,13 +189,13 @@ func (p *Pool) RequestStore() (*Store, error) {
 func (p *Pool) newBlobStore(db StoreDatabase) *blobstore.Store {
 	bs := blobstore.New(db.Database, "entitystore")
 	if p.config.MinUploadPartSize != 0 {
-		bs.SetMinPartSize(p.config.MinUploadPartSize)
+		bs.MinPartSize = p.config.MinUploadPartSize
 	}
 	if p.config.MaxUploadPartSize != 0 {
-		bs.SetMaxPartSize(p.config.MaxUploadPartSize)
+		bs.MaxPartSize = p.config.MaxUploadPartSize
 	}
 	if p.config.MaxUploadParts != 0 {
-		bs.SetMaxParts(p.config.MaxUploadParts)
+		bs.MaxParts = p.config.MaxUploadParts
 	}
 	return bs
 }
