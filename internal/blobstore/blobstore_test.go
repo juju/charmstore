@@ -20,6 +20,7 @@ import (
 	"gopkg.in/errgo.v1"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/blobstore"
+	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
 )
 
 func TestPackage(t *testing.T) {
@@ -419,7 +420,7 @@ func (s *BlobStoreSuite) TestFinishUploadSuccess(c *gc.C) {
 	}})
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(hash, gc.Equals, hashOf(content0+content1))
-	c.Assert(idx, jc.DeepEquals, &blobstore.MultipartIndex{
+	c.Assert(idx, jc.DeepEquals, &mongodoc.MultipartIndex{
 		Sizes: []uint32{
 			uint32(len(content0)),
 			uint32(len(content1)),
@@ -439,7 +440,7 @@ func (s *BlobStoreSuite) TestFinishUploadSuccessOnePart(c *gc.C) {
 	}})
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(hash, gc.Equals, hashOf(content0))
-	c.Assert(idx, jc.DeepEquals, &blobstore.MultipartIndex{
+	c.Assert(idx, jc.DeepEquals, &mongodoc.MultipartIndex{
 		Sizes: []uint32{
 			uint32(len(content0)),
 		},
@@ -465,7 +466,7 @@ func (s *BlobStoreSuite) TestFinishUploadAgain(c *gc.C) {
 	}})
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(hash, gc.Equals, hashOf(content0))
-	c.Assert(idx, jc.DeepEquals, &blobstore.MultipartIndex{
+	c.Assert(idx, jc.DeepEquals, &mongodoc.MultipartIndex{
 		Sizes: []uint32{
 			uint32(len(content0)),
 		},
@@ -478,7 +479,7 @@ func (s *BlobStoreSuite) TestFinishUploadAgain(c *gc.C) {
 	}})
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(hash, gc.Equals, hashOf(content0))
-	c.Assert(idx, jc.DeepEquals, &blobstore.MultipartIndex{
+	c.Assert(idx, jc.DeepEquals, &mongodoc.MultipartIndex{
 		Sizes: []uint32{
 			uint32(len(content0)),
 		},
@@ -679,6 +680,12 @@ func (s *BlobStoreSuite) TestUploadInfo(c *gc.C) {
 		}},
 		Hash: hashOf(part0 + part1 + part2),
 	})
+
+	// Check that we can read the blob from the index
+	// derived from the UploadInfo.
+	idx, ok := info.Index()
+	c.Assert(ok, gc.Equals, true)
+	s.assertBlobContent(c, id, idx, part0+part1+part2)
 }
 
 var multipartSeekTests = []struct {
@@ -746,14 +753,14 @@ func (s *BlobStoreSuite) TestMultipartSeek(c *gc.C) {
 	}
 }
 
-func (s *BlobStoreSuite) putMultipart(c *gc.C, contents ...string) (string, *blobstore.MultipartIndex) {
+func (s *BlobStoreSuite) putMultipart(c *gc.C, contents ...string) (string, *mongodoc.MultipartIndex) {
 	id, idx := s.putMultipartNoRemove(c, contents...)
 	err := s.store.RemoveUpload(id)
 	c.Assert(err, gc.Equals, nil)
 	return id, idx
 }
 
-func (s *BlobStoreSuite) putMultipartNoRemove(c *gc.C, contents ...string) (string, *blobstore.MultipartIndex) {
+func (s *BlobStoreSuite) putMultipartNoRemove(c *gc.C, contents ...string) (string, *mongodoc.MultipartIndex) {
 	id, err := s.store.NewUpload(time.Now().Add(time.Minute))
 	c.Assert(err, gc.Equals, nil)
 
@@ -779,7 +786,7 @@ func (s *BlobStoreSuite) assertBlobDoesNotExist(c *gc.C, name string) {
 	c.Assert(errgo.Cause(err), gc.Equals, blobstore.ErrNotFound)
 }
 
-func (s *BlobStoreSuite) assertBlobContent(c *gc.C, name string, idx *blobstore.MultipartIndex, content string) {
+func (s *BlobStoreSuite) assertBlobContent(c *gc.C, name string, idx *mongodoc.MultipartIndex, content string) {
 	r, size, err := s.store.Open(name, idx)
 	c.Assert(err, gc.IsNil)
 	defer r.Close()

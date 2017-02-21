@@ -31,7 +31,9 @@ func (s *commonSuite) newStore(c *gc.C, withElasticSearch bool) *Store {
 	if withElasticSearch {
 		si = &SearchIndex{s.ES, s.TestIndex}
 	}
-	p, err := NewPool(s.Session.DB("juju_test"), si, &bakery.NewServiceParams{}, ServerParams{})
+	p, err := NewPool(s.Session.DB("juju_test"), si, &bakery.NewServiceParams{}, ServerParams{
+		MinUploadPartSize: 10,
+	})
 	c.Assert(err, gc.IsNil)
 	store := p.Store()
 	defer p.Close()

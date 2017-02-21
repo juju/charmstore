@@ -13,6 +13,8 @@ import (
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2"
+
+	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
 )
 
 var logger = loggo.GetLogger("charmstore.internal.blobstore")
@@ -60,7 +62,7 @@ func (s *Store) Put(r io.Reader, name string, size int64, hash string) error {
 
 // Open opens the entry with the given name. It returns an error
 // with an ErrNotFound cause if the entry does not exist.
-func (s *Store) Open(name string, index *MultipartIndex) (ReadSeekCloser, int64, error) {
+func (s *Store) Open(name string, index *mongodoc.MultipartIndex) (ReadSeekCloser, int64, error) {
 	if index != nil {
 		return newMultiReader(s, name, index)
 	}
@@ -75,7 +77,7 @@ func (s *Store) Open(name string, index *MultipartIndex) (ReadSeekCloser, int64,
 }
 
 // Remove the given name from the Store.
-func (s *Store) Remove(name string, index *MultipartIndex) error {
+func (s *Store) Remove(name string, index *mongodoc.MultipartIndex) error {
 	err := s.mstore.RemoveForEnvironment("", name)
 	if errors.IsNotFound(err) {
 		return errgo.WithCausef(err, ErrNotFound, "")

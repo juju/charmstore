@@ -8,6 +8,8 @@ import (
 	"sort"
 
 	"gopkg.in/errgo.v1"
+
+	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
 )
 
 // TODO use equivalent constants in io package when we can use more
@@ -47,7 +49,7 @@ type multiReader struct {
 	pos int64
 }
 
-func newMultiReader(store *Store, blobPrefix string, idx *MultipartIndex) (ReadSeekCloser, int64, error) {
+func newMultiReader(store *Store, blobPrefix string, idx *mongodoc.MultipartIndex) (ReadSeekCloser, int64, error) {
 	switch len(idx.Sizes) {
 	case 0:
 		return emptyBlob{}, 0, nil

@@ -172,6 +172,50 @@ func (s *Store) UploadResource(id *router.ResolvedURL, name string, blob io.Read
 	return res, nil
 }
 
+// AddResourceWithUploadId is like UploadResource except that it associates
+// the resource with an already-uploaded multipart upload.
+func (s *Store) AddResourceWithUploadId(id *router.ResolvedURL, name string, uploadId string) (*mongodoc.Resource, error) {
+	entity, err := s.FindEntity(id, FieldSelector("charmmeta", "baseurl"))
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	if !charmHasResource(entity.CharmMeta, name) {
+		return nil, errgo.Newf("charm does not have resource %q", name)
+	}
+	info, err := s.BlobStore.UploadInfo(uploadId)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	var size int64
+	for _, p := range info.Parts {
+		size += p.Size
+	}
+	idx, ok := info.Index()
+	if !ok {
+		return nil, errgo.Newf("upload not completed yet")
+	}
+	res, err := s.addResource(&mongodoc.Resource{
+		BaseURL:    entity.BaseURL,
+		Name:       name,
+		Revision:   -1,
+		BlobHash:   info.Hash,
+		BlobIndex:  idx,
+		Size:       size,
+		BlobName:   uploadId,
+		UploadTime: time.Now().UTC(),
+	})
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrDuplicateUpload))
+	}
+	if err := s.BlobStore.RemoveUpload(uploadId); err != nil {
+		// We can't remove the upload document, but we've
+		// still succeeded in doing what the user asked,
+		// so just log the error.
+		logger.Errorf("cannot remove upload for %v: %v", id, err)
+	}
+	return res, nil
+}
+
 // addResource adds r to the resources collection. If r does not specify
 // a revision number will be one higher than any existing revisions. The
 // inserted resource is returned on success.
@@ -255,7 +299,7 @@ func charmHasResource(meta *charm.Meta, name string) bool {
 
 // OpenResourceBlob returns the blob associated with the given resource.
 func (s *Store) OpenResourceBlob(res *mongodoc.Resource) (*Blob, error) {
-	r, size, err := s.BlobStore.Open(res.BlobName, nil)
+	r, size, err := s.BlobStore.Open(res.BlobName, res.BlobIndex)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot open archive data for %s resource %q", res.BaseURL, fmt.Sprintf("%s/%d", res.Name, res.Revision))
 	}
