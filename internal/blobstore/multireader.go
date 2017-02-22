@@ -84,7 +84,7 @@ func (r *multiReader) Read(buf []byte) (int, error) {
 	if r.pos >= r.size {
 		return 0, io.EOF
 	}
-	if r.r == nil || r.pos >= r.endPos[r.rindex] {
+	if r.r == nil || r.pos >= r.endPos[r.rindex] || r.pos < r.startPos(r.rindex) {
 		if r.r != nil {
 			r.r.Close()
 			r.r = nil

@@ -689,10 +689,11 @@ func (s *BlobStoreSuite) TestUploadInfo(c *gc.C) {
 }
 
 var multipartSeekTests = []struct {
-	offset    int64
-	whence    int
-	expectPos int64
-	expect    string
+	initialOffset int64
+	offset        int64
+	whence        int
+	expectPos     int64
+	expect        string
 }{{
 	offset:    0,
 	whence:    0,
@@ -719,11 +720,17 @@ var multipartSeekTests = []struct {
 	expectPos: 15 + 26 + 26 - 3,
 	expect:    "XYZ",
 }, {
-	// Note: dependent on previous test.
-	offset:    -10,
-	whence:    1,
-	expectPos: 15 + 26 + 26 - 10,
-	expect:    "QRSTUVWXYZ",
+	initialOffset: 20,
+	offset:        -10,
+	whence:        1,
+	expectPos:     10,
+	expect:        "12345",
+}, {
+	initialOffset: 60,
+	offset:        0,
+	whence:        0,
+	expectPos:     0,
+	expect:        "123456789 ",
 }}
 
 func (s *BlobStoreSuite) TestMultipartSeek(c *gc.C) {
@@ -738,7 +745,9 @@ func (s *BlobStoreSuite) TestMultipartSeek(c *gc.C) {
 
 	for i, test := range multipartSeekTests {
 		c.Logf("test %d: offset %d whence %d", i, test.offset, test.whence)
-		p, err := r.Seek(test.offset, test.whence)
+		p, err := r.Seek(test.initialOffset, 0)
+		c.Assert(err, gc.Equals, nil)
+		p, err = r.Seek(test.offset, test.whence)
 		c.Assert(err, gc.Equals, nil)
 		c.Assert(p, gc.Equals, test.expectPos)
 		buf := make([]byte, 10)
