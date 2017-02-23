@@ -1,0 +1,55 @@
+// Copyright 2017 Canonical Ltd.
+// Licensed under the AGPLv3, see LICENCE file for details.
+
+package charmstore
+
+import (
+	"time"
+
+	tomb "gopkg.in/tomb.v2"
+)
+
+var gcInterval = 5 * time.Minute
+
+// blobstoreGC implements the worker that runs the blobstore
+// garbage collector.
+type blobstoreGC struct {
+	tomb tomb.Tomb
+	pool *Pool
+}
+
+// newBlobstoreGC returns a new running blobstore garbage
+// collector worker.
+func newBlobstoreGC(pool *Pool) *blobstoreGC {
+	gc := &blobstoreGC{
+		pool: pool,
+	}
+	gc.tomb.Go(gc.run)
+	return gc
+}
+
+// Kill implements worker.Worker.Kill.
+func (gc *blobstoreGC) Kill() {
+	gc.tomb.Kill(nil)
+}
+
+// Kill implements worker.Worker.Wait.
+func (gc *blobstoreGC) Wait() error {
+	return gc.tomb.Wait()
+}
+
+func (gc *blobstoreGC) run() error {
+	for {
+		store := gc.pool.Store()
+		err := store.BlobStore.RemoveExpiredUploads(store.isUploadOwnedBy)
+		store.Close()
+		if err != nil {
+			logger.Errorf("blob garbage collection failed: %v", err)
+		}
+		select {
+		case <-gc.tomb.Dying():
+			return tomb.ErrDying
+		case <-time.After(gcInterval):
+		}
+	}
+}

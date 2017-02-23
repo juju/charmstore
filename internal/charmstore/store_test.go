@@ -3270,6 +3270,7 @@ func (s *StoreSuite) TestEntityResolvedURL(c *gc.C) {
 
 func (s *StoreSuite) TestCopyCopiesSessions(c *gc.C) {
 	store := s.newStore(c, false)
+	defer store.Close()
 
 	wordpress := storetesting.Charms.CharmDir("wordpress")
 	url := MustParseResolvedURL("23 cs:~charmers/precise/wordpress-23")
@@ -4121,6 +4122,51 @@ func (s *StoreSuite) TestPublish(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 		c.Assert(storetesting.NormalizeBaseEntity(baseEntity), jc.DeepEquals, storetesting.NormalizeBaseEntity(test.expectedBaseEntity))
 	}
+}
+
+func (s *StoreSuite) TestIsUploadOwnedBy(c *gc.C) {
+	store := s.newStore(c, false)
+	defer store.Close()
+	// This is a test of an internal method because
+	// the cases that isUploadOwnedBy are called
+	// are hard to stimulate in tests.
+
+	// First add a charm that has a resource.
+	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
+	meta := storetesting.MetaWithResources(nil, "someResource")
+	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
+	c.Assert(err, jc.ErrorIsNil)
+
+	contents := []string{
+		"123456789 123456789 ",
+		"abcdefghijklmnopqrstuvwyz",
+	}
+	uid := putMultipart(c, store.BlobStore, time.Time{}, contents...)
+
+	res, err := store.AddResourceWithUploadId(id, "someResource", uid)
+	c.Assert(err, jc.ErrorIsNil)
+
+	owner := resourceUploadOwner(res)
+	// isUploadOwnedBy should return true if called on the
+	// existing resource.
+	ok, err := store.isUploadOwnedBy(uid, owner)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(ok, gc.Equals, true)
+
+	// isUploadOwnedBy should return false with a different
+	// upload id.
+	ok, err = store.isUploadOwnedBy(uid+"x", owner)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(ok, gc.Equals, false)
+
+	// isUploadOwnedBy should return false when the resource
+	// document is removed.
+	_, err = store.DB.Resources().RemoveAll(nil)
+	c.Assert(err, gc.Equals, nil)
+
+	ok, err = store.isUploadOwnedBy(uid, owner)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(ok, gc.Equals, false)
 }
 
 func (s *StoreSuite) TestPublishWithFailedESInsert(c *gc.C) {

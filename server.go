@@ -120,6 +120,10 @@ type ServerParams struct {
 	// parts that can be uploaded in a single upload.
 	// If it's zero, a default value will be used.
 	MaxUploadParts int `json:"max-upload-parts"`
+
+	// RunBlobStoreGC holds whether the server will run
+	// the blobstore garbage collector worker.
+	RunBlobStoreGC bool
 }
 
 // NewServer returns a new handler that handles charm store requests and stores

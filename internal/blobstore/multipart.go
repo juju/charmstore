@@ -381,9 +381,10 @@ func (s *Store) copyBlob(w io.Writer, name string) error {
 // SetOwner sets the "owner" of a given upload. This should be set just
 // before the owner document is updated to refer to the upload.
 // SetOwner will fail if the upload is already owned.
-// Once the owner has been set, the caller has 10 minutes leeway
-// to associate the upload id with some owner document.
-func (s *Store) SetOwner(uploadId, owner string) error {
+// The upload expiry deadline is also set to expires, so
+// the caller has that much leeway to associate the upload id
+// with some owner document.
+func (s *Store) SetOwner(uploadId, owner string, expires time.Time) error {
 	err := s.uploadc.Update(bson.D{
 		{"_id", uploadId},
 		{"hash", bson.D{{"$exists", true}}},
@@ -395,7 +396,7 @@ func (s *Store) SetOwner(uploadId, owner string) error {
 	}, bson.D{{
 		"$set", bson.D{
 			{"owner", owner},
-			{"expires", time.Now().Add(10 * time.Minute)},
+			{"expires", expires},
 		},
 	}})
 	if err == nil {
@@ -425,8 +426,9 @@ func (s *Store) SetOwner(uploadId, owner string) error {
 
 // RemoveExpiredUploads deletes any multipart entries that have passed
 // their expiry date. If an expired upload is found with an owner, the
-// given isOwnedBy function is called to make sure that it is not
-// actually used.
+// given isOwnedBy function is called with the upload id and its current
+// owner to make sure that it is not actually used - isOwnedBy should
+// report whether the owner actually retains a reference to the given upload.
 func (s *Store) RemoveExpiredUploads(isOwnedBy func(uploadId, owner string) (bool, error)) error {
 	return s.removeExpiredUploads(isOwnedBy, time.Now())
 }
@@ -438,9 +440,7 @@ func (s *Store) removeExpiredUploads(isOwnedBy func(uploadId, owner string) (boo
 	defer it.Close()
 	var udoc uploadDoc
 	for it.Next(&udoc) {
-		err := s.removeUpload(&udoc, func(owner string) (bool, error) {
-			return isOwnedBy(udoc.Id, owner)
-		})
+		err := s.removeUpload(&udoc, isOwnedBy)
 		if err != nil && errgo.Cause(err) != errUploadInUse {
 			return errgo.Mask(err)
 		}
@@ -454,10 +454,11 @@ func (s *Store) removeExpiredUploads(isOwnedBy func(uploadId, owner string) (boo
 // RemoveUpload deletes all the parts associated with the given upload
 // id. It is a no-op if called twice on the same upload id. If the
 // upload has an owner and isOwnedBy is not nil, isOwnedBy
-// will be called to determine be sure that it is not actually used.
+// will be called with uploadId and the upload's current owner
+// to determine be sure that it is not actually used.
 // If isOwnedBy is nil, it is assumed to return true - i.e. the
 // document is owned.
-func (s *Store) RemoveUpload(uploadId string, isOwnedBy func(owner string) (bool, error)) error {
+func (s *Store) RemoveUpload(uploadId string, isOwnedBy func(uploadId, owner string) (bool, error)) error {
 	udoc, err := s.getUpload(uploadId)
 	if err != nil {
 		if errgo.Cause(err) == ErrNotFound {
@@ -470,13 +471,13 @@ func (s *Store) RemoveUpload(uploadId string, isOwnedBy func(owner string) (bool
 
 // removeUpload removes the upload document. It removes the parts
 // associated with it if they're not in use.
-func (s *Store) removeUpload(udoc *uploadDoc, isOwnedBy func(owner string) (bool, error)) error {
+func (s *Store) removeUpload(udoc *uploadDoc, isOwnedBy func(uploadId, owner string) (bool, error)) error {
 	if udoc.Owner == "" {
 		return s.removeUnownedUpload(udoc)
 	}
 	owned := true
 	if isOwnedBy != nil {
-		owned1, err := isOwnedBy(udoc.Owner)
+		owned1, err := isOwnedBy(udoc.Id, udoc.Owner)
 		if err != nil {
 			return errgo.Notef(err, "cannot check blob ownership")
 		}

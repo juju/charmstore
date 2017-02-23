@@ -246,7 +246,7 @@ func (s *resourceSuite) TestAddResourceWithUploadId(c *gc.C) {
 		"123456789 123456789 ",
 		"abcdefghijklmnopqrstuvwyz",
 	}
-	uid := putMultipart(c, store.BlobStore, contents...)
+	uid := putMultipart(c, store.BlobStore, time.Time{}, contents...)
 
 	res, err := store.AddResourceWithUploadId(id, "someResource", uid)
 	c.Assert(err, jc.ErrorIsNil)
@@ -280,9 +280,9 @@ func (s *resourceSuite) TestAddResourceWithSharedUploadId(c *gc.C) {
 		"123456789 123456789 ",
 		"abcdefghijklmnopqrstuvwyz",
 	}
-	uid := putMultipart(c, store.BlobStore, contents...)
+	uid := putMultipart(c, store.BlobStore, time.Time{}, contents...)
 
-	err = store.BlobStore.SetOwner(uid, "test")
+	err = store.BlobStore.SetOwner(uid, "test", time.Now().Add(time.Minute))
 	c.Assert(err, gc.Equals, nil)
 
 	// We get an error but the upload should not be removed.
@@ -303,8 +303,11 @@ func (s *resourceSuite) TestAddResourceWithSharedUploadId(c *gc.C) {
 	c.Assert(string(data), gc.Equals, strings.Join(contents, ""))
 }
 
-func putMultipart(c *gc.C, bs *blobstore.Store, contents ...string) string {
-	id, err := bs.NewUpload(time.Now().Add(time.Minute))
+func putMultipart(c *gc.C, bs *blobstore.Store, expires time.Time, contents ...string) string {
+	if expires.IsZero() {
+		expires = time.Now().Add(time.Minute)
+	}
+	id, err := bs.NewUpload(expires)
 	c.Assert(err, gc.Equals, nil)
 
 	parts := make([]blobstore.Part, len(contents))
