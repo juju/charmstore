@@ -310,7 +310,7 @@ var getLogsErrorsTests = []struct {
 	about:         "invalid id",
 	querystring:   "?id=no-such:reference",
 	expectStatus:  http.StatusBadRequest,
-	expectMessage: `invalid id value: charm or bundle URL has invalid schema: "no-such:reference"`,
+	expectMessage: `invalid id value: cannot parse URL "no-such:reference": schema "no-such" not valid`,
 	expectCode:    params.ErrBadRequest,
 }, {
 	about:         "invalid log level",

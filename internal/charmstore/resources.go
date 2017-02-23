@@ -162,7 +162,7 @@ func (s *Store) UploadResource(id *router.ResolvedURL, name string, blob io.Read
 		Size:       size,
 		BlobName:   blobName,
 		UploadTime: time.Now().UTC(),
-	})
+	}, "")
 	if err != nil {
 		if err := s.BlobStore.Remove(blobName, nil); err != nil {
 			logger.Errorf("cannot remove blob %s after error: %v", blobName, err)
@@ -203,15 +203,9 @@ func (s *Store) AddResourceWithUploadId(id *router.ResolvedURL, name string, upl
 		Size:       size,
 		BlobName:   uploadId,
 		UploadTime: time.Now().UTC(),
-	})
+	}, uploadId)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrDuplicateUpload))
-	}
-	if err := s.BlobStore.RemoveUpload(uploadId); err != nil {
-		// We can't remove the upload document, but we've
-		// still succeeded in doing what the user asked,
-		// so just log the error.
-		logger.Errorf("cannot remove upload for %v: %v", id, err)
 	}
 	return res, nil
 }
@@ -219,26 +213,53 @@ func (s *Store) AddResourceWithUploadId(id *router.ResolvedURL, name string, upl
 // addResource adds r to the resources collection. If r does not specify
 // a revision number will be one higher than any existing revisions. The
 // inserted resource is returned on success.
-func (s *Store) addResource(r *mongodoc.Resource) (*mongodoc.Resource, error) {
+func (s *Store) addResource(r *mongodoc.Resource, uploadId string) (*mongodoc.Resource, error) {
 	if r.Revision < 0 {
-		resource := *r
-		var err error
-		resource.Revision, err = s.nextResourceRevision(r.BaseURL, r.Name)
+		r1 := *r
+		rev, err := s.nextResourceRevision(r.BaseURL, r.Name)
 		if err != nil {
 			return nil, errgo.Mask(err)
 		}
-		r = &resource
+		r1.Revision = rev
+		r = &r1
 	}
 	if err := r.Validate(); err != nil {
 		return nil, errgo.Mask(err)
 	}
-	if err := s.DB.Resources().Insert(r); err != nil {
-		if mgo.IsDup(err) {
-			return nil, errgo.WithCausef(nil, params.ErrDuplicateUpload, "")
+	if uploadId != "" {
+		err := s.BlobStore.SetOwner(uploadId, fmt.Sprintf("resource %s %s %d",
+			r.BaseURL.String(),
+			r.Name,
+			r.Revision,
+		))
+		if err != nil {
+			return nil, errgo.Notef(err, "cannot set owner of upload")
 		}
-		return nil, errgo.Notef(err, "cannot insert resource")
 	}
-	return r, nil
+	err := s.DB.Resources().Insert(r)
+	if uploadId != "" {
+		// Remove the upload document because we're done with it now.
+		// If there was an error, we'll remove the upload parts too.
+		isOwnedBy := func(owner string) (bool, error) {
+			// If addResource completed successfully, it is now owned so
+			// we return true, otherwise it's orphaned and we return false
+			// so all the upload parts will be removed.
+			return err == nil, nil
+		}
+		if removeErr := s.BlobStore.RemoveUpload(uploadId, isOwnedBy); removeErr != nil {
+			// We can't remove the upload document, but we've
+			// still succeeded in doing what the user asked,
+			// so just log the error.
+			logger.Errorf("cannot remove upload for %v: %v", r.BaseURL, removeErr)
+		}
+	}
+	if err == nil {
+		return r, nil
+	}
+	if mgo.IsDup(err) {
+		return nil, errgo.WithCausef(nil, params.ErrDuplicateUpload, "")
+	}
+	return nil, errgo.Notef(err, "cannot insert resource")
 }
 
 // nextRevisionNumber calculates the next revision number to use for a

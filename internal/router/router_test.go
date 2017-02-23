@@ -1076,13 +1076,13 @@ var routerGetTests = []struct {
 	},
 	monitorKind: "meta",
 }, {
-	about:        "meta request with invalid entity reference",
+	about:        `cannot parse URL "robots.txt": name "robots.txt" not valid`,
 	urlStr:       "/robots.txt/meta/any",
 	handlers:     Handlers{},
 	expectStatus: http.StatusNotFound,
 	expectBody: params.Error{
 		Code:    params.ErrNotFound,
-		Message: `URL has invalid charm or bundle name: "robots.txt"`,
+		Message: `cannot parse URL "robots.txt": name "robots.txt" not valid`,
 	},
 	monitorKind: "",
 }, {
@@ -1093,7 +1093,7 @@ var routerGetTests = []struct {
 	expectStatus:              http.StatusBadRequest,
 	expectBody: params.Error{
 		Code:    params.ErrBadRequest,
-		Message: `URL has invalid charm or bundle name: "robots.txt"`,
+		Message: `cannot parse URL "robots.txt": name "robots.txt" not valid`,
 	},
 	monitorKind: "meta",
 }}
@@ -2060,7 +2060,7 @@ var splitIdTests = []struct {
 	expectURL: "cs:~user/wordpress",
 }, {
 	path:        "",
-	expectError: `URL has invalid charm or bundle name: ""`,
+	expectError: `cannot parse URL "": name "" not valid`,
 }, {
 	path:        "~foo-bar-/wordpress",
 	expectError: `charm or bundle URL has invalid user name: "~foo-bar-/wordpress"`,
@@ -2071,7 +2071,7 @@ func (s *RouterSuite) TestSplitId(c *gc.C) {
 		c.Logf("test %d: %s", i, test.path)
 		url, rest, err := splitId(test.path)
 		if test.expectError != "" {
-			c.Assert(err, gc.ErrorMatches, test.expectError)
+			c.Assert(err, gc.ErrorMatches, test.expectError, gc.Commentf("details: %v", errgo.Details(err)))
 			c.Assert(url, gc.IsNil)
 			c.Assert(rest, gc.Equals, "")
 			continue
