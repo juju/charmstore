@@ -45,6 +45,14 @@ type uploadDoc struct {
 
 	// Parts holds all the currently uploaded parts.
 	Parts []*PartInfo
+
+	// Owner holds the owner of the upload - usually
+	// the name of the entity that will refer to the
+	// upload. This is set just before the entity
+	// is updated to guard against the garbage collector
+	// accidentally removing an upload because the
+	// update process failed half-way through.
+	Owner string `bson:",omitempty"`
 }
 
 // Note that the PartInfo type is also used as a document
@@ -370,17 +378,70 @@ func (s *Store) copyBlob(w io.Writer, name string) error {
 	return nil
 }
 
-// RemoveExpiredUploads deletes any multipart entries
-// that have passed their expiry date.
-func (s *Store) RemoveExpiredUploads() error {
+// SetOwner sets the "owner" of a given upload. This should be set just
+// before the owner document is updated to refer to the upload.
+// SetOwner will fail if the upload is already owned.
+// Once the owner has been set, the caller has 10 minutes leeway
+// to associate the upload id with some owner document.
+func (s *Store) SetOwner(uploadId, owner string) error {
+	err := s.uploadc.Update(bson.D{
+		{"_id", uploadId},
+		{"hash", bson.D{{"$exists", true}}},
+		{"$or", []bson.D{{{
+			"owner", bson.D{{"$exists", false}},
+		}}, {{
+			"owner", owner,
+		}}}},
+	}, bson.D{{
+		"$set", bson.D{
+			{"owner", owner},
+			{"expires", time.Now().Add(10 * time.Minute)},
+		},
+	}})
+	if err == nil {
+		return nil
+	}
+	if err != mgo.ErrNotFound {
+		return errgo.Notef(err, "cannot set owner")
+	}
+	// We don't know exactly why the update failed, so retrieve the
+	// upload document so we can return a error that's not totally
+	// ambiguous.
+	udoc, err := s.getUpload(uploadId)
+	switch {
+	case errgo.Cause(err) == ErrNotFound:
+		return errgo.WithCausef(nil, ErrNotFound, "upload has been removed")
+	case err != nil:
+		return errgo.Notef(err, "cannot get upload document")
+	case udoc.Hash == "":
+		return errgo.Newf("cannot set owner on incomplete upload")
+	case udoc.Owner != "":
+		return errgo.Newf("upload already used by something else")
+	default:
+		// Should never happen.
+		return errgo.Newf("cannot set owner for some unknown reason")
+	}
+}
+
+// RemoveExpiredUploads deletes any multipart entries that have passed
+// their expiry date. If an expired upload is found with an owner, the
+// given isOwnedBy function is called to make sure that it is not
+// actually used.
+func (s *Store) RemoveExpiredUploads(isOwnedBy func(uploadId, owner string) (bool, error)) error {
+	return s.removeExpiredUploads(isOwnedBy, time.Now())
+}
+
+func (s *Store) removeExpiredUploads(isOwnedBy func(uploadId, owner string) (bool, error), now time.Time) error {
 	it := s.uploadc.Find(bson.D{
-		{"expires", bson.D{{"$lt", time.Now()}}},
+		{"expires", bson.D{{"$lt", now}}},
 	}).Iter()
 	defer it.Close()
 	var udoc uploadDoc
 	for it.Next(&udoc) {
-		err := s.removeUpload(&udoc)
-		if err != nil {
+		err := s.removeUpload(&udoc, func(owner string) (bool, error) {
+			return isOwnedBy(udoc.Id, owner)
+		})
+		if err != nil && errgo.Cause(err) != errUploadInUse {
 			return errgo.Mask(err)
 		}
 	}
@@ -390,10 +451,13 @@ func (s *Store) RemoveExpiredUploads() error {
 	return nil
 }
 
-// RemoveUpload deletes all the parts associated with the
-// given upload id. It is a no-op if called twice on the
-// same upload id.
-func (s *Store) RemoveUpload(uploadId string) error {
+// RemoveUpload deletes all the parts associated with the given upload
+// id. It is a no-op if called twice on the same upload id. If the
+// upload has an owner and isOwnedBy is not nil, isOwnedBy
+// will be called to determine be sure that it is not actually used.
+// If isOwnedBy is nil, it is assumed to return true - i.e. the
+// document is owned.
+func (s *Store) RemoveUpload(uploadId string, isOwnedBy func(owner string) (bool, error)) error {
 	udoc, err := s.getUpload(uploadId)
 	if err != nil {
 		if errgo.Cause(err) == ErrNotFound {
@@ -401,50 +465,67 @@ func (s *Store) RemoveUpload(uploadId string) error {
 		}
 		return errgo.Mask(err)
 	}
-	return s.removeUpload(udoc)
+	return s.removeUpload(udoc, isOwnedBy)
 }
 
 // removeUpload removes the upload document. It removes the parts
-// associated with it if the upload is not yet completed.
-//
-// TODO this has a few problems:
-//
-// - if there's a completed resource that's not actually added as a
-// resource, its parts will stick around forever.
-//
-// - if the same upload is used for two resources and then the charm for
-// one is deleted, then there's no way of knowing that the resources are
-// shared.
-func (s *Store) removeUpload(udoc *uploadDoc) error {
-	removedDoc := false
-	removeParts := udoc.Hash == ""
-	if removeParts {
-		// It's possible that FinishUpload has been called
-		// at the same time as RemoveUpload, so only
-		// remove the upload document if that hasn't
-		// happened.
-		err := s.uploadc.Remove(bson.D{
-			{"_id", udoc.Id},
-			{"hash", bson.D{{"$exists", false}}},
-		})
-		switch err {
-		case nil:
-			removedDoc = true
-		case mgo.ErrNotFound:
-			// Someone called FinishUpload concurrently.
-			removeParts = false
-		default:
-			return errgo.Mask(err)
+// associated with it if they're not in use.
+func (s *Store) removeUpload(udoc *uploadDoc, isOwnedBy func(owner string) (bool, error)) error {
+	if udoc.Owner == "" {
+		return s.removeUnownedUpload(udoc)
+	}
+	owned := true
+	if isOwnedBy != nil {
+		owned1, err := isOwnedBy(udoc.Owner)
+		if err != nil {
+			return errgo.Notef(err, "cannot check blob ownership")
 		}
+		owned = owned1
 	}
-	if !removedDoc {
-		if err := s.uploadc.RemoveId(udoc.Id); err != nil && err != mgo.ErrNotFound {
-			return errgo.Mask(err)
-		}
+	return s.removeOwnedUpload(udoc, !owned)
+}
+
+// removeOwnedUpload removes an upload that has a non-empty
+// owner field. If isOrphan is true, the upload's parts will be removed
+// too.
+func (s *Store) removeOwnedUpload(udoc *uploadDoc, isOrphan bool) error {
+	if err := s.uploadc.RemoveId(udoc.Id); err != nil && err != mgo.ErrNotFound {
+		return errgo.Mask(err)
 	}
-	if !removeParts {
-		return nil
+	if isOrphan {
+		return s.removeParts(udoc)
 	}
+	return nil
+}
+
+// errUploadInUse is returned to signify that an
+// upload document cannot be removed because
+// it is in use.
+var errUploadInUse = errgo.Newf("upload document is in use")
+
+// removeUnownedUpload removes an upload that has an empty
+// owner field. It returns errUploadInUse if the upload
+// has become owned since the document was retrieved.
+func (s *Store) removeUnownedUpload(udoc *uploadDoc) error {
+	// It's possible that SetOwner has been called at the
+	// same time as RemoveUpload, so only remove the upload
+	// document if that hasn't happened.
+	err := s.uploadc.Remove(bson.D{
+		{"_id", udoc.Id},
+		{"owner", bson.D{{"$exists", false}}},
+	})
+	switch err {
+	case nil:
+		return s.removeParts(udoc)
+	case mgo.ErrNotFound:
+		// Someone called SetOwner concurrently.
+		return errUploadInUse
+	default:
+		return errgo.Mask(err)
+	}
+}
+
+func (s *Store) removeParts(udoc *uploadDoc) error {
 	var removeErr error
 	for i := range udoc.Parts {
 		name := uploadPartName(udoc.Id, i)

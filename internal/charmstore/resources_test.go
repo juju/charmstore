@@ -251,6 +251,10 @@ func (s *resourceSuite) TestAddResourceWithUploadId(c *gc.C) {
 	res, err := store.AddResourceWithUploadId(id, "someResource", uid)
 	c.Assert(err, jc.ErrorIsNil)
 
+	// Check that the upload document has been removed.
+	_, err = store.BlobStore.UploadInfo(uid)
+	c.Assert(errgo.Cause(err), gc.Equals, blobstore.ErrNotFound)
+
 	checkResourceDocs(c, store, id, []string{"someResource/0"}, []*mongodoc.Resource{res})
 	allContents := strings.Join(contents, "")
 	blob, err := store.OpenResourceBlob(res)
@@ -261,6 +265,42 @@ func (s *resourceSuite) TestAddResourceWithUploadId(c *gc.C) {
 	data, err := ioutil.ReadAll(blob)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(string(data), gc.Equals, allContents)
+}
+
+func (s *resourceSuite) TestAddResourceWithSharedUploadId(c *gc.C) {
+	store := s.newStore(c, false)
+	defer store.Close()
+
+	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
+	meta := storetesting.MetaWithResources(nil, "someResource")
+	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
+	c.Assert(err, jc.ErrorIsNil)
+
+	contents := []string{
+		"123456789 123456789 ",
+		"abcdefghijklmnopqrstuvwyz",
+	}
+	uid := putMultipart(c, store.BlobStore, contents...)
+
+	err = store.BlobStore.SetOwner(uid, "test")
+	c.Assert(err, gc.Equals, nil)
+
+	// We get an error but the upload should not be removed.
+	_, err = store.AddResourceWithUploadId(id, "someResource", uid)
+	c.Assert(err, gc.ErrorMatches, `cannot set owner of upload: upload already used by something else`)
+
+	// Check that the blob is still around.
+	info, err := store.BlobStore.UploadInfo(uid)
+	c.Assert(err, gc.Equals, nil)
+
+	idx, ok := info.Index()
+	c.Assert(ok, gc.Equals, true)
+	r, _, err := store.BlobStore.Open(uid, idx)
+	c.Assert(err, gc.Equals, nil)
+	defer r.Close()
+	data, err := ioutil.ReadAll(r)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(string(data), gc.Equals, strings.Join(contents, ""))
 }
 
 func putMultipart(c *gc.C, bs *blobstore.Store, contents ...string) string {
