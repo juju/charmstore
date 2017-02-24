@@ -515,7 +515,7 @@ func (s *BlobStoreSuite) TestFinishUploadCalledWhenCalculatingHash(c *gc.C) {
 		done <- err
 	}()
 	time.Sleep(100 * time.Millisecond)
-	err = s.store.RemoveUpload(id, func(owner string) (bool, error) {
+	err = s.store.RemoveUpload(id, func(_, _ string) (bool, error) {
 		return false, nil
 	})
 	c.Assert(err, gc.Equals, nil)
@@ -572,28 +572,28 @@ func (s *BlobStoreSuite) TestSetOwner(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	// Check that we can't call SetOwner on an incomplete upload.
-	err = s.store.SetOwner(id, "something")
+	err = s.store.SetOwner(id, "something", expires)
 	c.Assert(err, gc.ErrorMatches, `cannot set owner on incomplete upload`)
 
 	_, _, err = s.store.FinishUpload(id, []blobstore.Part{{Hash: hashOf(content)}})
 	c.Assert(err, gc.Equals, nil)
 
-	now := time.Now()
-	err = s.store.SetOwner(id, "something")
+	newExpires := time.Now().Add(5 * time.Minute).Truncate(time.Millisecond)
+	err = s.store.SetOwner(id, "something", newExpires)
 	c.Assert(err, gc.Equals, nil)
 
 	info, err := s.store.UploadInfo(id)
 	c.Assert(err, gc.Equals, nil)
-	if got, want := info.Expires, now.Add(10*time.Minute); got.Before(want.Add(-time.Minute)) || got.After(want.Add(time.Minute)) {
-		c.Fatalf("unexpected expiry time after SetOwner; got %v want %v", got, want)
+	if !info.Expires.Equal(newExpires) {
+		c.Fatalf("unexpected expiry time, got %v want %v", info.Expires, newExpires)
 	}
 
 	// Check that we can't set the owner to something else.
-	err = s.store.SetOwner(id, "other")
+	err = s.store.SetOwner(id, "other", newExpires)
 	c.Assert(err, gc.ErrorMatches, `upload already used by something else`)
 
 	// Check that we can set the owner to the same thing again.
-	err = s.store.SetOwner(id, "something")
+	err = s.store.SetOwner(id, "something", newExpires)
 	c.Assert(err, gc.Equals, nil)
 
 	err = s.store.RemoveUpload(id, nil)
@@ -601,7 +601,7 @@ func (s *BlobStoreSuite) TestSetOwner(c *gc.C) {
 
 	// Check that we get a not-found error when the upload
 	// has actually been removed.
-	err = s.store.SetOwner(id, "something")
+	err = s.store.SetOwner(id, "something", newExpires)
 	c.Check(errgo.Cause(err), gc.Equals, blobstore.ErrNotFound)
 	c.Assert(err, gc.ErrorMatches, `upload has been removed`)
 }
@@ -633,7 +633,9 @@ func (s *BlobStoreSuite) TestRemoveOwnedBlobWithOwnershipCheckReturningTrue(c *g
 	id, idx := s.putMultipartNoRemove(c, content0, content1)
 
 	called := 0
-	err := s.store.RemoveUpload(id, func(uploadId string) (bool, error) {
+	err := s.store.RemoveUpload(id, func(uploadId, owner string) (bool, error) {
+		c.Check(uploadId, gc.Equals, id)
+		c.Check(owner, gc.Equals, "test")
 		called++
 		return true, nil
 	})
@@ -655,7 +657,9 @@ func (s *BlobStoreSuite) TestRemoveOwnedBlobWithOwnershipCheckReturningFalse(c *
 	id, _ := s.putMultipartNoRemove(c, content0, content1)
 
 	called := 0
-	err := s.store.RemoveUpload(id, func(uploadId string) (bool, error) {
+	err := s.store.RemoveUpload(id, func(uploadId, owner string) (bool, error) {
+		c.Check(uploadId, gc.Equals, id)
+		c.Check(owner, gc.Equals, "test")
 		called++
 		return false, nil
 	})
@@ -685,7 +689,7 @@ func (s *BlobStoreSuite) TestRemoveExpiredUploads(c *gc.C) {
 		ids[i] = id
 	}
 
-	err := s.store.RemoveExpiredUploads(func(uploadId, owner  string) (bool, error) {
+	err := s.store.RemoveExpiredUploads(func(uploadId, owner string) (bool, error) {
 		c.Errorf("isOwnedBy called unexpectedly")
 		return false, nil
 	})
@@ -710,17 +714,18 @@ func (s *BlobStoreSuite) TestRemoveExpiredUploadsRemovesOrphanedBlobs(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	_, _, err = s.store.FinishUpload(id, []blobstore.Part{{Hash: hashOf(content)}})
 	c.Assert(err, gc.Equals, nil)
-	err = s.store.SetOwner(id, "test")
+	newExpires := time.Now().Add(5 * time.Second)
+	err = s.store.SetOwner(id, "test", newExpires)
 	c.Assert(err, gc.Equals, nil)
 
 	called := 0
-	err = blobstore.RemoveExpiredUploads(s.store, func(uploadId, owner  string) (bool, error) {
+	err = blobstore.RemoveExpiredUploads(s.store, func(uploadId, owner string) (bool, error) {
 		called++
 		c.Check(uploadId, gc.Equals, id)
 		c.Check(owner, gc.Equals, "test")
 		// Note: return false to indicate that the blob is orphaned.
 		return false, nil
-	}, time.Now().Add(10 * time.Minute + time.Second))
+	}, newExpires.Add(time.Millisecond))
 	c.Assert(err, gc.Equals, nil)
 	c.Check(called, gc.Equals, 1)
 
@@ -736,17 +741,18 @@ func (s *BlobStoreSuite) TestRemoveExpiredUploadsDoesNotRemoveNonOrphanBlobs(c *
 	c.Assert(err, gc.Equals, nil)
 	idx, _, err := s.store.FinishUpload(id, []blobstore.Part{{Hash: hashOf(content)}})
 	c.Assert(err, gc.Equals, nil)
-	err = s.store.SetOwner(id, "test")
+	newExpires := time.Now().Add(5 * time.Second)
+	err = s.store.SetOwner(id, "test", newExpires)
 	c.Assert(err, gc.Equals, nil)
 
 	called := 0
-	err = blobstore.RemoveExpiredUploads(s.store, func(uploadId, owner  string) (bool, error) {
+	err = blobstore.RemoveExpiredUploads(s.store, func(uploadId, owner string) (bool, error) {
 		called++
 		c.Check(uploadId, gc.Equals, id)
 		c.Check(owner, gc.Equals, "test")
 		// Note: return true to indicate that the blob is owned.
 		return true, nil
-	}, time.Now().Add(10 * time.Minute + time.Second))
+	}, newExpires.Add(time.Millisecond))
 	c.Assert(err, gc.Equals, nil)
 	c.Check(called, gc.Equals, 1)
 
@@ -918,7 +924,8 @@ func (s *BlobStoreSuite) putMultipart(c *gc.C, contents ...string) (string, *mon
 }
 
 func (s *BlobStoreSuite) putMultipartNoRemove(c *gc.C, contents ...string) (string, *mongodoc.MultipartIndex) {
-	id, err := s.store.NewUpload(time.Now().Add(time.Minute))
+	expires := time.Now().Add(time.Minute)
+	id, err := s.store.NewUpload(expires)
 	c.Assert(err, gc.Equals, nil)
 
 	parts := make([]blobstore.Part, len(contents))
@@ -930,7 +937,7 @@ func (s *BlobStoreSuite) putMultipartNoRemove(c *gc.C, contents ...string) (stri
 	}
 	idx, _, err := s.store.FinishUpload(id, parts)
 	c.Assert(err, gc.Equals, nil)
-	err = s.store.SetOwner(id, "test")
+	err = s.store.SetOwner(id, "test", expires)
 	c.Assert(err, gc.Equals, nil)
 	return id, idx
 }
@@ -964,8 +971,8 @@ func (s *BlobStoreSuite) newUpload(c *gc.C) string {
 	return id
 }
 
-func isOwnedByNotCalled(c *gc.C) func(owner string) (bool, error) {
-	return func(owner string) (bool, error) {
+func isOwnedByNotCalled(c *gc.C) func(_, _ string) (bool, error) {
+	return func(_, _ string) (bool, error) {
 		c.Errorf("isOwnedBy called unexpectedly")
 		return false, nil
 	}

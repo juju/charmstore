@@ -105,6 +105,7 @@ func serve(confPath string) error {
 		MinUploadPartSize:       conf.MinUploadPartSize,
 		MaxUploadPartSize:       conf.MaxUploadPartSize,
 		MaxUploadParts:          conf.MaxUploadParts,
+		RunBlobStoreGC:          true,
 	}
 
 	if conf.AuditLogFile != "" {

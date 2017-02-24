@@ -227,11 +227,8 @@ func (s *Store) addResource(r *mongodoc.Resource, uploadId string) (*mongodoc.Re
 		return nil, errgo.Mask(err)
 	}
 	if uploadId != "" {
-		err := s.BlobStore.SetOwner(uploadId, fmt.Sprintf("resource %s %s %d",
-			r.BaseURL.String(),
-			r.Name,
-			r.Revision,
-		))
+		// See Store.isUploadOwnedBy for the consumer of this format.
+		err := s.BlobStore.SetOwner(uploadId, resourceUploadOwner(r), time.Now().Add(10*time.Minute))
 		if err != nil {
 			return nil, errgo.Notef(err, "cannot set owner of upload")
 		}
@@ -240,8 +237,8 @@ func (s *Store) addResource(r *mongodoc.Resource, uploadId string) (*mongodoc.Re
 	if uploadId != "" {
 		// Remove the upload document because we're done with it now.
 		// If there was an error, we'll remove the upload parts too.
-		isOwnedBy := func(owner string) (bool, error) {
-			// If addResource completed successfully, it is now owned so
+		isOwnedBy := func(_, owner string) (bool, error) {
+			// If the insert completed successfully, it is now owned so
 			// we return true, otherwise it's orphaned and we return false
 			// so all the upload parts will be removed.
 			return err == nil, nil
@@ -329,4 +326,15 @@ func (s *Store) OpenResourceBlob(res *mongodoc.Resource) (*Blob, error) {
 		Size:           size,
 		Hash:           res.BlobHash,
 	}, nil
+}
+
+// resourceUploadOwner returns the owner string for
+// uploads that will be associated with the given
+// resource.
+func resourceUploadOwner(r *mongodoc.Resource) string {
+	return fmt.Sprintf("resource %s %s %d",
+		r.BaseURL.String(),
+		r.Name,
+		r.Revision,
+	)
 }

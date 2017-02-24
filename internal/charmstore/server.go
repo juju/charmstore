@@ -13,6 +13,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/juju/worker.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgostorage"
 	"gopkg.in/mgo.v2"
@@ -103,6 +104,10 @@ type ServerParams struct {
 	// parts that can be uploaded in a single upload.
 	// If it's zero, a default value will be used.
 	MaxUploadParts int `json:"max-upload-parts"`
+
+	// RunBlobStoreGC holds whether the server will run
+	// the blobstore garbage collector worker.
+	RunBlobStoreGC bool
 }
 
 const defaultRootKeyExpiryDuration = 24 * time.Hour
@@ -173,7 +178,9 @@ func NewServer(db *mgo.Database, si *SearchIndex, config ServerParams, versions 
 		handle(srv.mux, root, h)
 		srv.handlers = append(srv.handlers, h)
 	}
-
+	if config.RunBlobStoreGC {
+		srv.blobstoreGC = newBlobstoreGC(pool)
+	}
 	return srv, nil
 }
 
@@ -189,9 +196,10 @@ func prometheusHandler() http.Handler {
 }
 
 type Server struct {
-	pool     *Pool
-	mux      *router.ServeMux
-	handlers []HTTPCloseHandler
+	pool        *Pool
+	mux         *router.ServeMux
+	handlers    []HTTPCloseHandler
+	blobstoreGC *blobstoreGC
 }
 
 // ServeHTTP implements http.Handler.ServeHTTP.
@@ -202,6 +210,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 // Close closes the server. It must be called when the server
 // is finished with.
 func (s *Server) Close() {
+	if s.blobstoreGC != nil {
+		if err := worker.Stop(s.blobstoreGC); err != nil {
+			logger.Errorf("failed to stop blobstore GC: %v", err)
+		}
+	}
 	s.pool.Close()
 	for _, h := range s.handlers {
 		h.Close()

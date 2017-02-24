@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -1155,6 +1156,41 @@ func (s *Store) DeleteEntity(id *router.ResolvedURL) error {
 	}
 
 	return nil
+}
+
+// isUploadOwnedBy reports whether the given owner has a reference
+// to the given uploaded blob. Currently this only knows about
+// resources, but future work could add support for charms too.
+func (s *Store) isUploadOwnedBy(uploadId, owner string) (rb bool, _ error) {
+	parts := strings.Split(owner, " ")
+	if len(parts) != 4 {
+		logger.Infof("badly formatted upload owner %q", owner)
+		return false, nil
+	}
+	kind, baseURLStr, name, revStr := parts[0], parts[1], parts[2], parts[3]
+	if kind != "resource" {
+		logger.Infof("unknown upload owner kind in %q", owner)
+		return false, nil
+	}
+	baseURL, err := charm.ParseURL(baseURLStr)
+	if err != nil {
+		logger.Infof("bad URL in upload owner in %q", owner)
+		return false, nil
+	}
+	rev, err := strconv.Atoi(revStr)
+	if err != nil {
+		logger.Infof("bad URL in upload owner in %q", owner)
+		return false, nil
+	}
+	var r mongodoc.Resource
+	err = s.DB.Resources().Find(newResourceQuery(baseURL, name, rev)).One(&r)
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			return false, nil
+		}
+		return false, errgo.Mask(err)
+	}
+	return r.BlobName == uploadId, nil
 }
 
 // StoreDatabase wraps an mgo.DB ands adds a few convenience methods.
