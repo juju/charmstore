@@ -4,6 +4,7 @@
 package blobstore
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io"
 	"time"
@@ -109,11 +110,7 @@ func (info *UploadInfo) Index() (*mongodoc.MultipartIndex, bool) {
 // creating the upload, each part must be uploaded individually, and
 // then the whole completed by calling FinishUpload and RemoveUpload.
 func (s *Store) NewUpload(expires time.Time) (uploadId string, err error) {
-	// TODO this makes an upload id that's 78 bytes.
-	// A base64-encoded 256 bit random number would
-	// only be 45 bytes and secure enough that we could
-	// probably dispense with ownership checking.
-	uploadId = fmt.Sprintf("%x", bson.NewObjectId())
+	uploadId = base64.RawURLEncoding.EncodeToString([]byte(bson.NewObjectId()))
 	if err := s.uploadc.Insert(uploadDoc{
 		Id:      uploadId,
 		Expires: expires,
