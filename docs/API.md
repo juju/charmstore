@@ -1805,6 +1805,8 @@ The above example is equivalent to the `meta/common-info` example above.
 
 The `meta/resources` path returns information on all the resources associated with the given charm *id* as an array of resource objects.
 
+If the resource exists in the charm metadata but has not been uploaded,
+the Revision, Fingerprint and Size fields will be -1, null and 0 respectively.
 ```go
 
 type Resource struct {
@@ -1842,15 +1844,18 @@ associated with the charm *id* as a resource object (see above).
 
 If *revision* is omitted, information on the latest revision of the resource is returned.
 
+If the resource exists in the charm metadata but has not been uploaded,
+the Revision, Fingerprint and Size fields will be -1, null and 0 respectively.
+
 ### Resources
 
-#### POST *id*/resource/*name*?hash=*sha384*[&filename=*path*]
-
-
+#### POST *id*/resource/*name*?[hash=*sha384*][&filename=*path*][&upload-id=*uploadid*]
+GET 
 Posting to the `resource` path uploads a resource (an arbitrary "blob"
 of data) associated with the charm with the given *id*, which must not
 be a bundle. The *sha384* parameter
-must hold the hex-encoded SHA384 hash of the blob.
+must hold the hex-encoded SHA384 hash of the blob unless
+*uploadid* is specified.
 
 If provided, the *path* parameter should hold the filename
 that the resource has been read from, and its file extension will
@@ -1859,6 +1864,11 @@ declared charm metadata resources of the resolved charm.
 
 As a special case, if the filename in the charm metadata has no
 extension, any file name will be allowed.
+
+If *upload-id* is specified, it should refer to an already-uploaded blob
+(see the Uploads section in this document) and the hash parameter does
+not need to be specified, otherwise the resource will be read from the
+body of the HTTP request.
 
 ```go
 type ResourcesRevision struct {
@@ -2188,6 +2198,18 @@ Request body:
 }
 ```
 
+#### GET *id*/meta/can-write
+
+This path reports whether the client has permission to modify the
+charm, including uploading new revisions of the charm and attaching
+resources.
+
+```go
+type CanWriteResponse struct {
+	CanWrite bool
+}
+```
+
 #### GET *id*/meta/perm/*key*
 
 This path returns the contents of the given permission *key* (that can be
@@ -2375,4 +2397,96 @@ Example: `GET changes/published?limit=10&start=31-07-2014`
         "PublishTime": "2014-07-31T15:04:05Z"
     }
 ]
+```
+
+### Uploads
+
+When uploading a large resource to a charm, it can be unreliable
+to do it in a single HTTP request, so the charm store provides a
+way to upload the data as a set of parts that are then stitched
+together to make the whole resource.
+
+#### POST /upload[?expires=*expires*]
+
+This endpoint starts an upload. If the uploaded data is not used within
+the given expiry duration, it will be discarded. If the expiry duration
+is greater than some maximum (currently 24 hours), it will be limited
+to that maximum. The duration is in a format acceptable to Go's
+time.ParseDuration function (e.g. "8h", "5m3s").
+
+The response holds a JSON object containing information about the upload.
+
+```go
+type NewUploadResponse struct {
+	// UploadId holds the id of the upload.
+	UploadId string
+
+	// Expires holds when the upload id expires (encoded
+	// in RFC3339 format).
+	Expires time.Time
+
+	// MinPartSize holds the minimum size of a part that may
+	// be uploaded (not including the last part).
+	MinPartSize int64
+
+	// MaxPartSize holds the maximum size of a part that may
+	// be uploaded.
+	MaxPartSize int64
+
+	// MaxParts holds the maximum number of parts.
+	MaxParts int
+}
+```
+
+Once an upload has been started, all its parts should be uploaded
+(they do not have to be uploaded in order), and then finished
+with a PUT to /upload/*uploadid* before the upload can be used
+to attach a resource to a charm.
+
+Example: `POST /v5/upload
+
+```json
+{
+	UploadId: "WLQfoTqvbCHcVojo",
+	Expires: "2017-02-28T12:46:25.878Z",
+	MinPartSize: 5242880,
+	MaxPartSize: 4294967295,
+	MaxParts: 400
+}
+```
+
+#### PUT /upload/*uploadid*/*part*?hash=*sha384*
+
+This endpoint uploads a single part with the given part number *part*
+to the upload with the given *uploadid*. The hash parameter must specify
+the SHA384 hash of the uploaded part in hexadecimal format. The data
+is read from the request body. The request must specify the size of the
+data in its Content-Length header.
+
+#### PUT /upload/*uploadid*
+
+This endpoint completes an upload. The body should contain a JSON object
+holding the hashes of all the parts that have been uploaded. Once this
+request has completed successfully, the upload can be used as a resource.
+
+```go
+type Parts struct {
+	Parts []Part
+}
+
+// Part represents one part of a multipart blob.
+type Part struct {
+	// SHA384 hash of part (hex-encoded).
+	Hash string
+}
+```
+
+The response will return the hash of all the data
+in all the uploaded parts.
+
+```go
+type FinishUploadResponse struct {
+	// Hash holds the SHA384 hash of the complete blob. (hex-encoded)
+	Hash string
+}
 ```
