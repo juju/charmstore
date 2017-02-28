@@ -139,6 +139,9 @@ func (s *Store) UploadEntity(url *router.ResolvedURL, blob io.Reader, blobHash s
 		return errgo.Notef(err, "cannot open newly created blob")
 	}
 	defer r.Close()
+	if err := s.AddRevision(url); err != nil {
+		return errgo.Mask(err)
+	}
 	if err := s.addEntityFromReader(url, r, blobName, blobHash, blobHash256, size, chans); err != nil {
 		if err1 := s.BlobStore.Remove(blobName, nil); err1 != nil {
 			logger.Errorf("cannot remove blob %s after error: %v", blobName, err1)
@@ -511,7 +514,6 @@ func (s *Store) addCharm(c charm.Charm, p addParams) (err error) {
 	// final gateway before a potentially invalid url might be stored
 	// in the database.
 	id := p.url.URL
-	logger.Infof("add charm url %s; promulgated rev %d", &id, p.url.PromulgatedRevision)
 	entity := &mongodoc.Entity{
 		URL:                     &id,
 		PromulgatedURL:          p.url.PromulgatedURL(),

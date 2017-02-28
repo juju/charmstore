@@ -201,6 +201,22 @@ type BaseEntity struct {
 	NoIngest bool `bson:",omitempty"`
 }
 
+// LatestRevision holds an entry in the revisions collection.
+type LatestRevision struct {
+	// URL holds the id that the latest revision is associated
+	// with. URL.Revision is always -1.
+	URL *charm.URL `bson:"_id"`
+
+	// BaseURL holds the reference URL of the charm or bundle
+	// (this omits the series from URL)
+	// e.g. cs:wordpress, cs:~user/foo
+	BaseURL *charm.URL
+
+	// Revision holds the latest known revision for the
+	// URL.
+	Revision int
+}
+
 // ResourceRevision specifies an association of a resource name to a
 // revision.
 type ResourceRevision struct {
