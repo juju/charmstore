@@ -403,6 +403,17 @@ var metaEndpoints = []metaEndpoint{{
 		c.Assert(data, gc.DeepEquals, []string{params.Everyone})
 	},
 }, {
+	name: "can-write",
+	get: func(store *charmstore.Store, url *router.ResolvedURL) (interface{}, error) {
+		return params.CanWriteResponse{
+			CanWrite: url.URL.User == "charmers",
+		}, nil
+	},
+	checkURL: newResolvedURL("cs:~bob/utopic/wordpress-2", -1),
+	assertCheckData: func(c *gc.C, data interface{}) {
+		c.Assert(data, gc.DeepEquals, params.CanWriteResponse{false})
+	},
+}, {
 	name: "tags",
 	get: entityGetter(func(entity *mongodoc.Entity) interface{} {
 		if entity.URL.Series == "bundle" {
@@ -674,14 +685,17 @@ func (s *APISuite) TestAllMetaEndpointsTested(c *gc.C) {
 	// Make sure that we're testing all the metadata
 	// endpoints that we need to.
 	s.addPublicCharmFromRepo(c, "wordpress", newResolvedURL("~charmers/precise/wordpress-23", 23))
-	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
-		Handler: s.srv,
-		URL:     storeURL("precise/wordpress-23/meta"),
-	})
-	c.Logf("meta response body: %s", rec.Body)
 	var list []string
-	err := json.Unmarshal(rec.Body.Bytes(), &list)
-	c.Assert(err, gc.IsNil)
+	s.doAsUser("charmers", func() {
+		rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
+			Handler: s.srv,
+			Do:      bakeryDo(nil),
+			URL:     storeURL("precise/wordpress-23/meta"),
+		})
+		c.Logf("meta response body: %s", rec.Body)
+		err := json.Unmarshal(rec.Body.Bytes(), &list)
+		c.Assert(err, gc.IsNil)
+	})
 
 	listNames := make(map[string]bool)
 	for _, name := range list {
@@ -737,6 +751,7 @@ func (s *APISuite) addTestEntities(c *gc.C) []*router.ResolvedURL {
 }
 
 func (s *APISuite) TestMetaEndpointsSingle(c *gc.C) {
+	s.idmServer.SetDefaultUser("charmers")
 	urls := s.addTestEntities(c)
 	for i, ep := range metaEndpoints {
 		c.Logf("test %d. %s", i, ep.name)
@@ -754,6 +769,7 @@ func (s *APISuite) TestMetaEndpointsSingle(c *gc.C) {
 			if isNull(expectData) {
 				httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 					Handler:      s.srv,
+					Do:           bakeryDo(nil),
 					URL:          storeURL(path),
 					ExpectStatus: http.StatusNotFound,
 					ExpectBody: params.Error{
@@ -1452,14 +1468,6 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 	})
 }
 
-// assertChannelACLs asserts that the ChannelACLs field of the base entity with the
-// given URL are as given.
-func (s *APISuite) assertChannelACLs(c *gc.C, url string, acls map[params.Channel]mongodoc.ACL) {
-	e, err := s.store.FindBaseEntity(charm.MustParseURL(url), nil)
-	c.Assert(err, gc.IsNil)
-	c.Assert(e.ChannelACLs, jc.DeepEquals, acls)
-}
-
 func (s *APISuite) TestMetaPermPutUnauthorized(c *gc.C) {
 	id := "precise/wordpress-23"
 	s.addPublicCharmFromRepo(c, "wordpress", newResolvedURL("~charmers/"+id, 23))
@@ -1476,6 +1484,113 @@ func (s *APISuite) TestMetaPermPutUnauthorized(c *gc.C) {
 			Code:    params.ErrUnauthorized,
 			Message: "authentication failed: missing HTTP auth header",
 		},
+	})
+}
+
+func (s *APISuite) TestMetaCanWriteNoAuth(c *gc.C) {
+	id := "precise/wordpress-23"
+	s.addPublicCharmFromRepo(c, "wordpress", newResolvedURL("~charmers/"+id, 23))
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:      s.srv,
+		URL:          storeURL("~charmers/" + id + "/meta/can-write"),
+		Do:           bakeryDo(nil),
+		ExpectStatus: http.StatusUnauthorized,
+		ExpectError:  `cannot get discharge from .*: third party refused discharge: cannot discharge: bad agent-login cookie in request: no agent-login cookie found`,
+	})
+}
+
+func (s *APISuite) TestMetaCanWriteUnauthorized(c *gc.C) {
+	id := "precise/wordpress-23"
+	s.addPublicCharmFromRepo(c, "wordpress", newResolvedURL("~charmers/"+id, 23))
+	s.doAsUser("bob", func() {
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler: s.srv,
+			URL:     storeURL("~charmers/" + id + "/meta/can-write"),
+			Do:      bakeryDo(nil),
+			ExpectBody: params.CanWriteResponse{
+				CanWrite: false,
+			},
+		})
+	})
+}
+
+func (s *APISuite) TestMetaCanWriteAuthorized(c *gc.C) {
+	id := "precise/wordpress-23"
+	s.addPublicCharmFromRepo(c, "wordpress", newResolvedURL("~charmers/"+id, 23))
+	s.doAsUser("charmers", func() {
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler: s.srv,
+			URL:     storeURL("~charmers/" + id + "/meta/can-write"),
+			Do:      bakeryDo(nil),
+			ExpectBody: params.CanWriteResponse{
+				CanWrite: true,
+			},
+		})
+	})
+}
+
+func (s *APISuite) TestMetaCanWriteWithAnotherMeta(c *gc.C) {
+	id, _ := s.addPublicCharmFromRepo(c, "wordpress", newResolvedURL("~charmers/precise/wordpress-23", 23))
+	s.doAsUser("charmers", func() {
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler: s.srv,
+			URL:     storeURL(id.URL.Path() + "/meta/any?include=can-write&include=id"),
+			Do:      bakeryDo(nil),
+			ExpectBody: params.MetaAnyResponse{
+				Id: &id.URL,
+				Meta: map[string]interface{}{
+					"can-write": params.CanWriteResponse{
+						CanWrite: true,
+					},
+					"id": params.IdResponse{
+						Id:       &id.URL,
+						User:     id.URL.User,
+						Series:   id.URL.Series,
+						Name:     id.URL.Name,
+						Revision: id.URL.Revision,
+					},
+				},
+			},
+		})
+	})
+}
+
+func (s *APISuite) TestMetaCanWriteDifferentStableAPIPerms(c *gc.C) {
+	id, _ := s.addPublicCharmFromRepo(c, "wordpress", newResolvedURL("~bob/precise/wordpress-23", 23))
+	err := s.store.SetPerms(&id.URL, "stable.write", "charmers")
+	c.Assert(err, gc.IsNil)
+	// Bob can't write to the stable channel.
+	s.doAsUser("bob", func() {
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler: s.srv,
+			URL:     storeURL(id.URL.Path() + "/meta/can-write"),
+			Do:      bakeryDo(nil),
+			ExpectBody: params.CanWriteResponse{
+				CanWrite: false,
+			},
+		})
+	})
+	// But charmers can.
+	s.doAsUser("charmers", func() {
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler: s.srv,
+			URL:     storeURL(id.URL.Path() + "/meta/can-write"),
+			Do:      bakeryDo(nil),
+			ExpectBody: params.CanWriteResponse{
+				CanWrite: true,
+			},
+		})
+	})
+	// And bob can write to the unstable channel.
+	s.doAsUser("bob", func() {
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler: s.srv,
+			URL:     storeURL(id.URL.Path() + "/meta/can-write?channel=unpublished"),
+			Do:      bakeryDo(nil),
+			ExpectBody: params.CanWriteResponse{
+				CanWrite: true,
+			},
+		})
 	})
 }
 
@@ -1817,6 +1932,7 @@ func isNull(v interface{}) bool {
 }
 
 func (s *APISuite) TestMetaEndpointsAny(c *gc.C) {
+	s.idmServer.SetDefaultUser("charmers")
 	rurls := s.addTestEntities(c)
 	// We check the meta endpoint for both promulgated and non-promulgated
 	// versions of each URL.
@@ -4141,6 +4257,14 @@ func (s *APISuite) TestLogout(c *gc.C) {
 		MaxAge: -1,
 		Raw:    "macaroon-1234567890=; Path=/; Max-Age=0",
 	})
+}
+
+// assertChannelACLs asserts that the ChannelACLs field of the base entity with the
+// given URL are as given.
+func (s *APISuite) assertChannelACLs(c *gc.C, url string, acls map[params.Channel]mongodoc.ACL) {
+	e, err := s.store.FindBaseEntity(charm.MustParseURL(url), nil)
+	c.Assert(err, gc.IsNil)
+	c.Assert(e.ChannelACLs, jc.DeepEquals, acls)
 }
 
 // entityACLs returns the ACLs that apply to the entity with the given URL.

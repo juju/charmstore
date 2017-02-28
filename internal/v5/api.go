@@ -293,6 +293,7 @@ func RouterHandlers(h *ReqHandler) *router.Handlers {
 			"perm/":            h.puttableBaseEntityHandler(h.metaPermWithKey, h.putMetaPermWithKey, "channelacls"),
 			"promulgated":      h.baseEntityHandler(h.metaPromulgated, "promulgated"),
 			"can-ingest":       h.baseEntityHandler(h.metaCanIngest, "noingest"),
+			"can-write":        h.baseEntityHandler(h.metaCanWrite),
 			"resources":        h.EntityHandler(h.metaResources, "charmmeta"),
 			"resources/":       h.EntityHandler(h.metaResourcesSingle, "charmmeta"),
 			"revision-info":    router.SingleIncludeHandler(h.metaRevisionInfo),
@@ -1110,6 +1111,18 @@ func (h *ReqHandler) metaPromulgated(entity *mongodoc.BaseEntity, id *router.Res
 func (h *ReqHandler) metaCanIngest(entity *mongodoc.BaseEntity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	return params.CanIngestResponse{
 		CanIngest: !entity.NoIngest,
+	}, nil
+}
+
+// GET id/meta/can-write
+// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetacan-write
+func (h *ReqHandler) metaCanWrite(entity *mongodoc.BaseEntity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
+	err := h.AuthorizeEntityForOp(id, req, OpWrite)
+	if err != nil && errgo.Cause(err) != params.ErrUnauthorized {
+		return nil, errgo.Mask(err, isDischargeRequiredError)
+	}
+	return params.CanWriteResponse{
+		CanWrite: err == nil,
 	}, nil
 }
 
