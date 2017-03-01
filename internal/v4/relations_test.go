@@ -268,7 +268,7 @@ func (s *RelationsSuite) TestMetaCharmRelated(c *gc.C) {
 		})
 		// Clean up the entities in the store.
 		_, err := s.store.DB.Entities().RemoveAll(nil)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 }
 
@@ -571,7 +571,7 @@ func (s *RelationsSuite) TestMetaBundlesContaining(c *gc.C) {
 		})
 		if test.addCharm != nil {
 			err := s.store.DB.Entities().Remove(bson.D{{"_id", &test.addCharm.URL}})
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 		}
 	}
 }
@@ -584,7 +584,7 @@ func (s *RelationsSuite) TestMetaBundlesContainingBundleACL(c *gc.C) {
 		if url.URL.Name == "useless" {
 			// The useless bundle is not available for "everyone".
 			err := s.store.SetPerms(&url.URL, "stable.read", url.URL.User)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 		}
 	}
 
@@ -612,11 +612,11 @@ func sameMetaAnyResponses(expect interface{}) httptesting.BodyAsserter {
 		}
 		var got []*params.MetaAnyResponse
 		err := json.Unmarshal(m, &got)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		sort.Sort(metaAnyResponseById(got))
 		sort.Sort(metaAnyResponseById(expectMeta))
 		data, err := json.Marshal(got)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(string(data), jc.JSONEquals, expect)
 	}
 }

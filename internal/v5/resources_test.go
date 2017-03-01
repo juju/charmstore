@@ -64,13 +64,13 @@ func (s *ResourceSuite) TestPost(c *gc.C) {
 
 	// Check that the resource has really been uploaded.
 	r, err := s.store.ResolveResource(id, "someResource", 1, "")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	blob, err := s.store.OpenResourceBlob(r)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer blob.Close()
 	data, err := ioutil.ReadAll(blob)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(string(data), gc.Equals, content)
 }
 
@@ -148,13 +148,13 @@ func (s *ResourceSuite) TestMultipartPost(c *gc.C) {
 
 	// Check that the resource has really been uploaded.
 	r, err := s.store.ResolveResource(id, "someResource", 1, "")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	blob, err := s.store.OpenResourceBlob(r)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer blob.Close()
 	data, err := ioutil.ReadAll(blob)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(string(data), gc.Equals, allContents)
 
 	// Check that the upload info has been removed.
@@ -200,12 +200,12 @@ func (s *ResourceSuite) TestGet(c *gc.C) {
 
 	// If we publish the resource, it should be available with no revision.
 	err := s.store.Publish(id, map[string]int{"someResource": 2}, params.StableChannel)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Make it public so that we can check that the cache-control
 	// headers change appropriately.
 	err = s.store.SetPerms(&id.URL, "stable.read", params.Everyone)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	resp = httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.srv,
@@ -463,7 +463,7 @@ func (s *ResourceSuite) TestDownloadPrivateCharmResource(c *gc.C) {
 			},
 		},
 	}))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	content := "some content"
 	s.uploadResource(c, id, "someResource", content)
 
@@ -513,7 +513,7 @@ func (s *ResourceSuite) TestMetaResources(c *gc.C) {
 		"resource1": 0,
 		"resource2": 0,
 	}, params.StableChannel)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:      s.srv,
@@ -612,7 +612,7 @@ func (s *ResourceSuite) TestMetaResourcesSingleResourceNotUploaded(c *gc.C) {
 	id := newResolvedURL("~charmers/precise/wordpress-0", -1)
 	meta := storetesting.MetaWithResources(nil, "someResource")
 	err := s.store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler: s.srv,

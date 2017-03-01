@@ -49,11 +49,11 @@ func (s *SearchSuite) SetUpTest(c *gc.C) {
 	s.commonSuite.SetUpTest(c)
 	s.addCharmsToStore(c)
 	err := s.store.SetPerms(charm.MustParseURL("cs:~charmers/riak"), "stable.read", "charmers", "test-user")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.store.UpdateSearch(newResolvedURL("~charmers/trusty/riak-0", 0))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.esSuite.ES.RefreshIndex(s.esSuite.TestIndex)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *SearchSuite) addCharmsToStore(c *gc.C) {
@@ -283,7 +283,7 @@ func (s *SearchSuite) TestSuccessfulSearches(c *gc.C) {
 		})
 		var sr params.SearchResponse
 		err := json.Unmarshal(rec.Body.Bytes(), &sr)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(sr.Results, gc.HasLen, len(test.results))
 		c.Logf("results: %s", rec.Body.Bytes())
 		assertResultSet(c, sr, test.results)
@@ -297,7 +297,7 @@ func (s *SearchSuite) TestPaginatedSearch(c *gc.C) {
 	})
 	var sr params.SearchResponse
 	err := json.Unmarshal(rec.Body.Bytes(), &sr)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(sr.Results, gc.HasLen, 1)
 	c.Assert(sr.Total, gc.Equals, 2)
 }
@@ -396,7 +396,7 @@ func (s *SearchSuite) TestMetadataFields(c *gc.C) {
 			}
 		}
 		err := json.Unmarshal(rec.Body.Bytes(), &sr)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(sr.Results, gc.HasLen, 1)
 		c.Assert(string(sr.Results[0].Meta), jc.JSONEquals, test.meta)
 	}
@@ -412,7 +412,7 @@ func (s *SearchSuite) TestSearchError(c *gc.C) {
 	c.Assert(rec.Code, gc.Equals, http.StatusInternalServerError)
 	var resp params.Error
 	err = json.Unmarshal(rec.Body.Bytes(), &resp)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(resp.Code, gc.Equals, params.ErrorCode(""))
 	c.Assert(resp.Message, gc.Matches, "error performing search: search failed: .*")
 }
@@ -437,9 +437,9 @@ func (s *SearchSuite) TestSearchIncludeError(c *gc.C) {
 	// work, but only return a single result.
 	entity, err := s.store.FindEntity(newResolvedURL("~charmers/precise/wordpress-23", 23), nil)
 
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.store.BlobStore.Remove(entity.BlobName, nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Now search again - we should get one result less
 	// (and the error will be logged).
@@ -449,7 +449,7 @@ func (s *SearchSuite) TestSearchIncludeError(c *gc.C) {
 	// uses LoggingSuite.
 	var tw loggo.TestWriter
 	err = loggo.RegisterWriter("test-log", &tw)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	rec = httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.srv,
@@ -565,7 +565,7 @@ func (s *SearchSuite) TestSorting(c *gc.C) {
 		})
 		var sr params.SearchResponse
 		err := json.Unmarshal(rec.Body.Bytes(), &sr)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		// Not using assertResultSet(c, sr, test.results) as it does sort internally
 		c.Assert(sr.Results, gc.HasLen, len(test.results), gc.Commentf("expected %#v", test.results))
 		c.Logf("results: %s", rec.Body.Bytes())
@@ -582,7 +582,7 @@ func (s *SearchSuite) TestSortUnsupportedField(c *gc.C) {
 	})
 	var e params.Error
 	err := json.Unmarshal(rec.Body.Bytes(), &e)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(e.Code, gc.Equals, params.ErrBadRequest)
 	c.Assert(e.Message, gc.Equals, "invalid sort field: unrecognized sort parameter \"foo\"")
 }
@@ -599,18 +599,18 @@ func (s *SearchSuite) TestDownloadsBoost(c *gc.C) {
 		s.addPublicCharm(c, getSearchCharm(n), url)
 		for i := 0; i < cnt; i++ {
 			err := s.store.IncrementDownloadCounts(url)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 		}
 	}
 	err := s.esSuite.ES.RefreshIndex(s.esSuite.TestIndex)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.srv,
 		URL:     storeURL("search?owner=downloads-test"),
 	})
 	var sr params.SearchResponse
 	err = json.Unmarshal(rec.Body.Bytes(), &sr)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(sr.Results, gc.HasLen, 3)
 	c.Assert(sr.Results[0].Id.Name, gc.Equals, "varnish")
 	c.Assert(sr.Results[1].Id.Name, gc.Equals, "wordpress")
@@ -639,7 +639,7 @@ func (s *SearchSuite) TestSearchWithAdminCredentials(c *gc.C) {
 	}
 	var sr params.SearchResponse
 	err := json.Unmarshal(rec.Body.Bytes(), &sr)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	assertResultSet(c, sr, expected)
 }
 
@@ -664,7 +664,7 @@ func (s *SearchSuite) TestSearchWithUserMacaroon(c *gc.C) {
 	}
 	var sr params.SearchResponse
 	err := json.Unmarshal(rec.Body.Bytes(), &sr)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	assertResultSet(c, sr, expected)
 }
 
@@ -690,7 +690,7 @@ func (s *SearchSuite) TestSearchWithUserInGroups(c *gc.C) {
 	}
 	var sr params.SearchResponse
 	err := json.Unmarshal(rec.Body.Bytes(), &sr)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	assertResultSet(c, sr, expected)
 }
 
@@ -716,7 +716,7 @@ func (s *SearchSuite) TestSearchWithBadAdminCredentialsAndACookie(c *gc.C) {
 	}
 	var sr params.SearchResponse
 	err := json.Unmarshal(rec.Body.Bytes(), &sr)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	assertResultSet(c, sr, expected)
 }
 

@@ -132,7 +132,7 @@ func (s *StatsSuite) TestServerStatsUpdate(c *gc.C) {
 
 		var err error
 		_, countsBefore, err = s.store.ArchiveDownloadCounts(ref, true)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 
 		rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
 			Handler:  s.srv,
@@ -146,7 +146,7 @@ func (s *StatsSuite) TestServerStatsUpdate(c *gc.C) {
 		c.Assert(rec.Code, gc.Equals, test.status)
 
 		_, countsAfter, err = s.store.ArchiveDownloadCounts(ref, true)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(countsAfter.Total-countsBefore.Total, gc.Equals, int64(1))
 		if test.previousMonth {
 			c.Assert(countsAfter.LastDay-countsBefore.LastDay, gc.Equals, int64(0))
@@ -239,7 +239,7 @@ func (s *StatsSuite) TestServerStatsUpdateErrors(c *gc.C) {
 		if test.partialUpdate {
 			var err error
 			_, countsBefore, err = s.store.ArchiveDownloadCounts(ref, true)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 		}
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 			Handler:      s.srv,
@@ -256,7 +256,7 @@ func (s *StatsSuite) TestServerStatsUpdateErrors(c *gc.C) {
 		})
 		if test.partialUpdate {
 			_, countsAfter, err := s.store.ArchiveDownloadCounts(ref, true)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 			c.Assert(countsAfter.Total-countsBefore.Total, gc.Equals, int64(1))
 			c.Assert(countsAfter.LastDay-countsBefore.LastDay, gc.Equals, int64(1))
 		}
@@ -307,14 +307,14 @@ func (s *StatsSuite) TestStatsCounter(c *gc.C) {
 
 	for _, key := range [][]string{{"a", "b"}, {"a", "b"}, {"a", "c"}, {"a"}} {
 		err := s.store.IncCounter(key)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 
 	var all []interface{}
 	err := s.store.DB.StatCounters().Find(nil).All(&all)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	data, err := json.Marshal(all)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Logf("%s", data)
 
 	expected := map[string]int64{
@@ -357,7 +357,7 @@ func (s *StatsSuite) TestStatsCounterList(c *gc.C) {
 	}
 	for _, key := range incs {
 		err := s.store.IncCounter(key)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 
 	tests := []struct {
@@ -458,7 +458,7 @@ func (s *StatsSuite) TestStatsCounterBy(c *gc.C) {
 		t = t.Add(time.Duration(i) * charmstore.StatsGranularity)
 
 		err := s.store.IncCounterAtTime(inc.key, t)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 
 	tests := []struct {

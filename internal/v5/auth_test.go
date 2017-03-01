@@ -360,21 +360,21 @@ func (s *authSuite) TestReadAuthorization(c *gc.C) {
 		// Add a charm to the store, used for testing.
 		rurl := newResolvedURL("~charmers/utopic/wordpress-42", -1)
 		err := s.store.AddCharmWithArchive(rurl, storetesting.Charms.CharmDir("wordpress"))
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 
 		// publish the charm on any required channels.
 		if len(test.channels) > 0 {
 			err := s.store.Publish(rurl, nil, test.channels...)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 		}
 
 		// Change the ACLs for the testing charm.
 		err = s.store.SetPerms(&rurl.URL, "unpublished.read", test.unpublishedReadPerm...)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		err = s.store.SetPerms(&rurl.URL, "edge.read", test.edgeReadPerm...)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		err = s.store.SetPerms(&rurl.URL, "stable.read", test.stableReadPerm...)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 
 		// Define an helper function used to send requests and check responses.
 		doRequest := func(path string, expectStatus int, expectBody interface{}) {
@@ -400,7 +400,7 @@ func (s *authSuite) TestReadAuthorization(c *gc.C) {
 
 		// Remove all entities from the store.
 		_, err = s.store.DB.Entities().RemoveAll(nil)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 }
 
@@ -578,21 +578,21 @@ func (s *authSuite) TestWriteAuthorization(c *gc.C) {
 		// Add a charm to the store, used for testing.
 		rurl := newResolvedURL("~charmers/utopic/wordpress-42", -1)
 		err := s.store.AddCharmWithArchive(rurl, storetesting.Charms.CharmDir("wordpress"))
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 
 		// publish the charm on any required channels.
 		if len(test.channels) > 0 {
 			err := s.store.Publish(rurl, nil, test.channels...)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 		}
 
 		// Change the ACLs for the testing charm.
 		err = s.store.SetPerms(&rurl.URL, "unpublished.write", test.unpublishedWritePerm...)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		err = s.store.SetPerms(&rurl.URL, "edge.write", test.edgeWritePerm...)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		err = s.store.SetPerms(&rurl.URL, "stable.write", test.stableWritePerm...)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 
 		makeRequest := func(path string, expectStatus int, expectBody interface{}) {
 			rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
@@ -619,7 +619,7 @@ func (s *authSuite) TestWriteAuthorization(c *gc.C) {
 
 		// Remove all entities from the store.
 		_, err = s.store.DB.Entities().RemoveAll(nil)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 
 	}
 }
@@ -769,9 +769,9 @@ func (s *authSuite) TestUploadEntityAuthorization(c *gc.C) {
 
 		// Remove all entities from the store.
 		_, err := s.store.DB.Entities().RemoveAll(nil)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		_, err = s.store.DB.BaseEntities().RemoveAll(nil)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 }
 
@@ -785,10 +785,10 @@ type readSeekCloser interface {
 func archiveInfo(c *gc.C, name string) (r readSeekCloser, hashSum string, size int64) {
 	ch := storetesting.Charms.CharmArchive(c.MkDir(), name)
 	f, err := os.Open(ch.Path)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	hash, size := hashOf(f)
 	_, err = f.Seek(0, 0)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	return f, hash, size
 }
 
@@ -831,7 +831,7 @@ func (s *authSuite) TestIsEntityCaveat(c *gc.C) {
 	// Change the ACLs for charms we've just uploaded, otherwise
 	// no authorization checking will take place.
 	err := s.store.SetPerms(charm.MustParseURL("cs:~charmers/wordpress"), "stable.read", "bob")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	client := s.login("bob", "is-entity cs:~charmers/utopic/wordpress-42")
 	s.idmServer.SetDefaultUser("")
@@ -851,7 +851,7 @@ func (s *authSuite) TestIsEntityCaveat(c *gc.C) {
 			c.Assert(rec.Code, gc.Equals, http.StatusUnauthorized)
 			var respErr httpbakery.Error
 			err := json.Unmarshal(rec.Body.Bytes(), &respErr)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 			c.Assert(respErr.Message, gc.Matches, test.expectError)
 			continue
 		}
@@ -899,17 +899,17 @@ func (s *authSuite) TestDelegatableMacaroon(c *gc.C) {
 	c.Assert(gotBody, gc.NotNil)
 	var m macaroon.Macaroon
 	err := json.Unmarshal(gotBody, &m)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	caveats := m.Caveats()
 	foundExpiry := false
 	for _, cav := range caveats {
 		cond, arg, err := checkers.ParseCaveat(string(cav.Id))
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		switch cond {
 		case checkers.CondTimeBefore:
 			t, err := time.Parse(time.RFC3339Nano, arg)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 			c.Assert(t, jc.TimeBetween(now.Add(v5.DelegatableMacaroonExpiry), now.Add(v5.DelegatableMacaroonExpiry+time.Second)))
 			foundExpiry = true
 		}
@@ -923,12 +923,12 @@ func (s *authSuite) TestDelegatableMacaroon(c *gc.C) {
 	err = s.store.AddCharmWithArchive(
 		rurl,
 		storetesting.Charms.CharmDir("wordpress"))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.store.Publish(rurl, nil, params.StableChannel)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	// Change the ACLs for the testing charm.
 	err = s.store.SetPerms(charm.MustParseURL("cs:~charmers/wordpress"), "stable.read", "bob")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// First check that we require authorization to access the charm.
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
@@ -943,9 +943,9 @@ func (s *authSuite) TestDelegatableMacaroon(c *gc.C) {
 
 	client := httpbakery.NewClient()
 	u, err := url.Parse("http://127.0.0.1")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = httpbakery.SetCookie(client.Jar, u, macaroon.Slice{&m})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler: s.srv,
@@ -977,11 +977,11 @@ func (s *authSuite) TestDelegatableMacaroonWithBasicAuth(c *gc.C) {
 
 func (s *authSuite) TestDelegatableMacaroonWithIds(c *gc.C) {
 	err := s.store.AddCharmWithArchive(newResolvedURL("~charmers/utopic/wordpress-1", 1), storetesting.NewCharm(nil))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.store.AddCharmWithArchive(newResolvedURL("~charmers/utopic/wordpress-2", 2), storetesting.NewCharm(nil))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.store.AddCharmWithArchive(newResolvedURL("~charmers/precise/mysql-1", 1), storetesting.NewCharm(nil))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Check that we can't acquire a delegatable macaroon if we
 	// don't already have permission.
@@ -1046,7 +1046,7 @@ func (s *authSuite) TestDelegatableMacaroonWithIds(c *gc.C) {
 
 func (s *authSuite) TestRenewDelegatableMacaroonWithIds(c *gc.C) {
 	err := s.store.AddCharmWithArchive(newResolvedURL("~charmers/utopic/wordpress-1", 1), storetesting.NewCharm(nil))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Fake the current time so that we can easily test expiration times.
 	t0 := time.Now()
@@ -1152,11 +1152,11 @@ func (s *authSuite) TestDelegatableMacaroonCannotBeUsedForWriting(c *gc.C) {
 
 	id := newResolvedURL("~charmers/utopic/wordpress-1", 1)
 	err := s.store.AddCharmWithArchive(id, storetesting.NewCharm(nil))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.store.SetPerms(&id.URL, "stable.read", "bob")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.store.Publish(id, nil, params.StableChannel)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	var m *macaroon.Macaroon
 	s.doAsUser("bob", func() {
@@ -1180,7 +1180,7 @@ func (s *authSuite) TestDelegatableMacaroonCannotBeUsedForWriting(c *gc.C) {
 
 func (s *authSuite) TestRenewMacaroon(c *gc.C) {
 	m, err := macaroon.New([]byte("key"), []byte("id"), "somewhere")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	m.AddFirstPartyCaveat("active-time-before xxx")
 	m.AddFirstPartyCaveat("hello")
 	m.AddThirdPartyCaveat([]byte("otherkey"), []byte("x"), "location")
@@ -1188,15 +1188,15 @@ func (s *authSuite) TestRenewMacaroon(c *gc.C) {
 	m.AddFirstPartyCaveat("active-time-before yyy")
 
 	newm, err := macaroon.New([]byte("otherkey"), []byte("id2"), "somewhere")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	expectTime := "2016-04-22T16:30:00Z"
 
 	expiry, err := time.Parse(time.RFC3339, expectTime)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	err = v5.RenewMacaroon(newm, macaroon.Slice{m}, expiry)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// The new macaroon should have all the first party caveats
 	// from the original, omitting the third party caveats
@@ -1218,7 +1218,7 @@ func (s *authSuite) TestNewServerWithoutIdentityAgent(c *gc.C) {
 
 	db := s.Session.DB("charmstore")
 	srv, err := charmstore.NewServer(db, nil, config, map[string]charmstore.NewAPIHandlerFunc{"v5": v5.NewAPIHandler})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer srv.Close()
 
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -1249,7 +1249,7 @@ func (s *authSuite) getDelegatableMacaroon(c *gc.C, ch params.Channel, urlStrs .
 	c.Assert(gotBody, gc.NotNil)
 	var m macaroon.Macaroon
 	err := json.Unmarshal(gotBody, &m)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	return &m
 }
 

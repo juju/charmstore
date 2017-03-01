@@ -6,7 +6,6 @@ package mongodoc_test
 import (
 	"time"
 
-	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/mgo.v2/bson"
@@ -154,7 +153,7 @@ func (s *ResourceSuite) TestValidate(c *gc.C) {
 		c.Logf("%d. %s", i, test.about)
 		err := test.resource.Validate()
 		if test.expectError == "" {
-			c.Assert(err, jc.ErrorIsNil)
+			c.Assert(err, gc.Equals, nil)
 			continue
 		}
 		c.Assert(err, gc.ErrorMatches, test.expectError)

@@ -46,10 +46,10 @@ func (s *migrationsIntegrationSuite) dump(c *gc.C) {
 	// environment variables which are needed for
 	// dumpMigrationHistory to run.
 	session, err := jujutesting.MgoServer.Dial()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer session.Close()
 	err = dumpMigrationHistory(session, earliestDeployedVersion, migrationHistory)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 var migrationHistory = []versionSpec{{
@@ -587,9 +587,9 @@ var migrationFromDumpBaseEntityTests = []struct {
 func (s *migrationsIntegrationSuite) TestMigrationFromDump(c *gc.C) {
 	db := s.Session.DB("juju_test")
 	err := createDatabaseAtVersion(db, migrationHistory[len(migrationHistory)-1].version)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.runMigrations(db)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	store := s.newStore(c, false)
 	defer store.Close()
@@ -600,7 +600,7 @@ func (s *migrationsIntegrationSuite) TestMigrationFromDump(c *gc.C) {
 		c.Logf("test %d: entity %v", i, test.id)
 
 		e, err := store.FindEntity(MustParseResolvedURL(test.id), nil)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		for j, check := range test.checkers {
 			c.Logf("test %d: entity %v; check %d", i, test.id, j)
 			check(c, e)
@@ -611,7 +611,7 @@ func (s *migrationsIntegrationSuite) TestMigrationFromDump(c *gc.C) {
 		c.Logf("test %d: base entity %v", i, test.id)
 
 		e, err := store.FindBaseEntity(charm.MustParseURL(test.id), nil)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		for j, check := range test.checkers {
 			c.Logf("test %d: base entity %v; check %d", i, test.id, j)
 			check(c, e)
@@ -661,7 +661,7 @@ func checkAllEntityInvariants(c *gc.C, store *Store) {
 	var entities []*mongodoc.Entity
 
 	err := store.DB.Entities().Find(nil).All(&entities)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	for _, e := range entities {
 		c.Logf("check entity invariants %v", e.URL)
 		checkEntityInvariants(c, e, store)
@@ -669,7 +669,7 @@ func checkAllEntityInvariants(c *gc.C, store *Store) {
 
 	var baseEntities []*mongodoc.BaseEntity
 	err = store.DB.BaseEntities().Find(nil).All(&baseEntities)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	for _, e := range baseEntities {
 		c.Logf("check base entity invariants %v", e.URL)
 		checkBaseEntityInvariants(c, e, store)
@@ -737,15 +737,15 @@ func checkEntityInvariants(c *gc.C, e *mongodoc.Entity, store *Store) {
 
 	// Check that the blobs exist.
 	r, err := store.OpenBlob(EntityResolvedURL(e))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	r.Close()
 	r, err = store.OpenBlobPreV5(EntityResolvedURL(e))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	r.Close()
 
 	// Check that the base entity exists.
 	_, err = store.FindBaseEntity(e.URL, nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func stringInSlice(s string, ss []string) bool {
@@ -774,7 +774,7 @@ func checkBaseEntityInvariants(c *gc.C, e *mongodoc.BaseEntity, store *Store) {
 				c.Assert(url.Series, gc.Equals, series)
 			}
 			ce, err := store.FindEntity(MustParseResolvedURL(url.String()), nil)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 			if !params.ValidChannels[ch] {
 				c.Fatalf("unknown channel %q found", ch)
 			}

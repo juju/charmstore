@@ -62,7 +62,7 @@ func (s *ServerSuite) TestNewServerWithVersions(c *gc.C) {
 	h, err := NewServer(db, nil, serverParams, map[string]NewAPIHandlerFunc{
 		"version1": serveVersion("version1"),
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer h.Close()
 	assertServesVersion(c, h, "version1")
 	assertDoesNotServeVersion(c, h, "version2")
@@ -72,7 +72,7 @@ func (s *ServerSuite) TestNewServerWithVersions(c *gc.C) {
 		"version1": serveVersion("version1"),
 		"version2": serveVersion("version2"),
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer h.Close()
 	assertServesVersion(c, h, "version1")
 	assertServesVersion(c, h, "version2")
@@ -83,7 +83,7 @@ func (s *ServerSuite) TestNewServerWithVersions(c *gc.C) {
 		"version2": serveVersion("version2"),
 		"version3": serveVersion("version3"),
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer h.Close()
 	assertServesVersion(c, h, "version1")
 	assertServesVersion(c, h, "version2")
@@ -93,7 +93,7 @@ func (s *ServerSuite) TestNewServerWithVersions(c *gc.C) {
 		"version1": serveVersion("version1"),
 		"":         serveVersion(""),
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer h.Close()
 	assertServesVersion(c, h, "")
 	assertServesVersion(c, h, "version1")
@@ -115,7 +115,7 @@ func (s *ServerSuite) TestNewServerWithConfig(c *gc.C) {
 	h, err := NewServer(s.Session.DB("foo"), nil, params, map[string]NewAPIHandlerFunc{
 		"version1": serveConfig,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer h.Close()
 
 	// The IdentityLocation field is filled out from the IdentityAPIURL
@@ -157,7 +157,7 @@ func (s *ServerSuite) TestNewServerWithElasticSearch(c *gc.C) {
 			"version1": serveConfig,
 		},
 	)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer h.Close()
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler: h,
@@ -209,7 +209,7 @@ func (s *ServerSuite) TestServerStartsBlobstoreGC(c *gc.C) {
 		RunBlobStoreGC: true,
 	}
 	h, err := NewServer(s.Session.DB("juju_test"), nil, params, nopAPI)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer h.Close()
 
 	// The blob should be garbage-collected immediately but because
@@ -272,7 +272,7 @@ func (s *ServerSuite) newStore(c *gc.C, dbName string) *Store {
 	p, err := NewPool(s.Session.DB(dbName), nil, &bakery.NewServiceParams{}, ServerParams{
 		MinUploadPartSize: 10,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	store := p.Store()
 	defer p.Close()
 	return store

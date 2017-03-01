@@ -50,16 +50,16 @@ func (s *zipSuite) makeZipReader(c *gc.C, contents map[string]string) (io.ReadSe
 			header.Method = zip.Store
 		}
 		f, err := w.CreateHeader(header)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		_, err = f.Write([]byte(content))
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 	c.Assert(w.Close(), gc.IsNil)
 
 	// Retrieve the zip files in the archive.
 	zipReader := bytes.NewReader(buf.Bytes())
 	r, err := zip.NewReader(zipReader, int64(buf.Len()))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(r.File, gc.HasLen, len(contents))
 	return zipReader, r.File
 }
@@ -72,11 +72,11 @@ func (s *zipSuite) TestZipFileReader(c *gc.C) {
 	for i, f := range files {
 		c.Logf("test %d: %s", i, f.Name)
 		zf, err := charmstore.NewZipFile(f)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		zfr, err := charmstore.ZipFileReader(zipReader, zf)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		content, err := ioutil.ReadAll(zfr)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(string(content), gc.Equals, s.contents[f.Name])
 	}
 }
@@ -104,9 +104,9 @@ func (s *zipSuite) TestNewZipFile(c *gc.C) {
 	for i, f := range files {
 		c.Logf("test %d: %s", i, f.Name)
 		zf, err := charmstore.NewZipFile(f)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		offset, err := f.DataOffset()
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 
 		c.Assert(zf.Offset, gc.Equals, offset)
 		c.Assert(zf.Size, gc.Equals, int64(f.CompressedSize64))

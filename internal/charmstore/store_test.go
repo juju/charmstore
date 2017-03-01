@@ -131,7 +131,7 @@ func (s *StoreSuite) testURLFinding(c *gc.C, check func(store *Store, expand *ch
 	for i, test := range urlFindingTests {
 		c.Logf("test %d: %q from %q", i, test.expand, test.inStore)
 		_, err := store.DB.Entities().RemoveAll(nil)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		urls := MustParseResolvedURLs(test.inStore)
 		for _, url := range urls {
 			name := url.URL.Name
@@ -139,7 +139,7 @@ func (s *StoreSuite) testURLFinding(c *gc.C, check func(store *Store, expand *ch
 				charms[name] = storetesting.Charms.CharmDir(name)
 			}
 			err := store.AddCharmWithArchive(url, charms[name])
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 		}
 		check(store, charm.MustParseURL(test.expand), MustParseResolvedURLs(test.expect))
 	}
@@ -151,19 +151,19 @@ func (s *StoreSuite) TestRequestStore(c *gc.C) {
 		MaxMgoSessions:          1,
 	}
 	p, err := NewPool(s.Session.DB("juju_test"), nil, nil, config)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer p.Close()
 
 	// Instances within the limit can be acquired
 	// instantly without error.
 	store, err := p.RequestStore()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	store.Close()
 
 	// Check that when we get another instance,
 	// we reuse the original.
 	store1, err := p.RequestStore()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer store1.Close()
 	c.Assert(store1, gc.Equals, store)
 
@@ -185,10 +185,10 @@ func (s *StoreSuite) TestRequestStoreSatisfiedWithinTimeout(c *gc.C) {
 		MaxMgoSessions:          1,
 	}
 	p, err := NewPool(s.Session.DB("juju_test"), nil, nil, config)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer p.Close()
 	store, err := p.RequestStore()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Start a goroutine that will close the Store after a short period.
 	go func() {
@@ -196,7 +196,7 @@ func (s *StoreSuite) TestRequestStoreSatisfiedWithinTimeout(c *gc.C) {
 		store.Close()
 	}()
 	store1, err := p.RequestStore()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(store1, gc.Equals, store)
 	store1.Close()
 }
@@ -207,10 +207,10 @@ func (s *StoreSuite) TestRequestStoreLimitCanBeExceeded(c *gc.C) {
 		MaxMgoSessions:          1,
 	}
 	p, err := NewPool(s.Session.DB("juju_test"), nil, nil, config)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer p.Close()
 	store, err := p.RequestStore()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer store.Close()
 
 	store1 := store.Copy()
@@ -228,7 +228,7 @@ func (s *StoreSuite) TestRequestStoreFailsWhenPoolIsClosed(c *gc.C) {
 		MaxMgoSessions:          1,
 	}
 	p, err := NewPool(s.Session.DB("juju_test"), nil, nil, config)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	p.Close()
 	store, err := p.RequestStore()
 	c.Assert(err, gc.ErrorMatches, "charm store has been closed")
@@ -241,18 +241,18 @@ func (s *StoreSuite) TestRequestStoreLimitMaintained(c *gc.C) {
 		MaxMgoSessions:          1,
 	}
 	p, err := NewPool(s.Session.DB("juju_test"), nil, nil, config)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer p.Close()
 
 	// Acquire an instance.
 	store, err := p.RequestStore()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer store.Close()
 
 	// Acquire another instance, exceeding the limit,
 	// and put it back.
 	store1 := p.Store()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	store1.Close()
 
 	// We should still be unable to acquire another
@@ -264,7 +264,7 @@ func (s *StoreSuite) TestRequestStoreLimitMaintained(c *gc.C) {
 
 func (s *StoreSuite) TestPoolDoubleClose(c *gc.C) {
 	p, err := NewPool(s.Session.DB("juju_test"), nil, nil, ServerParams{})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	p.Close()
 	p.Close()
 
@@ -277,7 +277,7 @@ func (s *StoreSuite) TestFindEntities(c *gc.C) {
 	s.testURLFinding(c, func(store *Store, expand *charm.URL, expect []*router.ResolvedURL) {
 		// Check FindEntities works when just retrieving the id and promulgated id.
 		gotEntities, err := store.FindEntities(expand, FieldSelector("_id", "promulgated-url"))
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		if expand.User == "" {
 			sort.Sort(entitiesByPromulgatedURL(gotEntities))
 		} else {
@@ -293,7 +293,7 @@ func (s *StoreSuite) TestFindEntities(c *gc.C) {
 
 		// check FindEntities works when retrieving all fields.
 		gotEntities, err = store.FindEntities(expand, nil)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		if expand.User == "" {
 			sort.Sort(entitiesByPromulgatedURL(gotEntities))
 		} else {
@@ -303,7 +303,7 @@ func (s *StoreSuite) TestFindEntities(c *gc.C) {
 		for i, url := range expect {
 			var entity mongodoc.Entity
 			err := store.DB.Entities().FindId(&url.URL).One(&entity)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 			c.Assert(gotEntities[i], jc.DeepEquals, &entity)
 		}
 	})
@@ -315,16 +315,16 @@ func (s *StoreSuite) TestFindEntity(c *gc.C) {
 
 	rurl := MustParseResolvedURL("cs:~charmers/precise/wordpress-5")
 	err := store.AddCharmWithArchive(rurl, storetesting.Charms.CharmDir("wordpress"))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	entity0, err := store.FindEntity(rurl, nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(entity0, gc.NotNil)
 	c.Assert(entity0.Size, gc.Not(gc.Equals), 0)
 
 	// Check that the field selector works.
 	entity2, err := store.FindEntity(rurl, FieldSelector("blobhash"))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(entity2.BlobHash, gc.Equals, entity0.BlobHash)
 	c.Assert(entity2.Size, gc.Equals, int64(0))
 
@@ -433,7 +433,7 @@ func (s *StoreSuite) TestFindBaseEntity(c *gc.C) {
 		// Add initial charms to the store.
 		for _, url := range MustParseResolvedURLs(test.stored) {
 			err := store.AddCharmWithArchive(url, ch)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 		}
 
 		// Find the entity.
@@ -444,15 +444,15 @@ func (s *StoreSuite) TestFindBaseEntity(c *gc.C) {
 			c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 			c.Assert(baseEntity, gc.IsNil)
 		} else {
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 			c.Assert(storetesting.NormalizeBaseEntity(baseEntity), jc.DeepEquals, storetesting.NormalizeBaseEntity(test.expect))
 		}
 
 		// Remove all the entities from the store.
 		_, err = store.DB.Entities().RemoveAll(nil)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		_, err = store.DB.BaseEntities().RemoveAll(nil)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 }
 
@@ -464,15 +464,15 @@ func (s *StoreSuite) TestAddCharmsWithTheSameBaseEntity(c *gc.C) {
 	ch := storetesting.Charms.CharmDir("wordpress")
 	url := router.MustNewResolvedURL("~charmers/trusty/wordpress-12", 12)
 	err := store.AddCharmWithArchive(url, ch)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Add a second charm to the database, sharing the same base URL.
 	err = store.AddCharmWithArchive(router.MustNewResolvedURL("~charmers/utopic/wordpress-13", -1), ch)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Ensure a single base entity has been created.
 	num, err := store.DB.BaseEntities().Count()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(num, gc.Equals, 1)
 }
 
@@ -560,12 +560,12 @@ func (s *StoreSuite) TestBundleUnitCount(c *gc.C) {
 		b := storetesting.NewBundle(test.data)
 		s.addRequiredCharms(c, b)
 		err := store.AddBundleWithArchive(url, b)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 
 		// Retrieve the bundle from the database.
 		var doc mongodoc.Entity
 		err = entities.FindId(&url.URL).One(&doc)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 
 		c.Assert(*doc.BundleUnitCount, gc.Equals, test.expectUnits)
 	}
@@ -876,17 +876,17 @@ func (s *StoreSuite) TestBundleMachineCount(c *gc.C) {
 		url.URL.Revision = i
 		url.PromulgatedRevision = i
 		err := test.data.Verify(nil, nil)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		// Add the bundle used for this test.
 		b := storetesting.NewBundle(test.data)
 		s.addRequiredCharms(c, b)
 		err = store.AddBundleWithArchive(url, b)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 
 		// Retrieve the bundle from the database.
 		var doc mongodoc.Entity
 		err = entities.FindId(&url.URL).One(&doc)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 
 		c.Assert(*doc.BundleMachineCount, gc.Equals, test.expectMachines)
 	}
@@ -898,22 +898,22 @@ func (s *StoreSuite) TestOpenBlob(c *gc.C) {
 	defer store.Close()
 	url := router.MustNewResolvedURL("cs:~charmers/precise/wordpress-23", 23)
 	err := store.AddCharmWithArchive(url, charmArchive)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	f, err := os.Open(charmArchive.Path)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer f.Close()
 	expectHash := hashOfReader(f)
 
 	blob, err := store.OpenBlob(url)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer blob.Close()
 
 	c.Assert(hashOfReader(blob), gc.Equals, expectHash)
 	c.Assert(blob.Hash, gc.Equals, expectHash)
 
 	info, err := f.Stat()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(blob.Size, gc.Equals, info.Size())
 }
 
@@ -924,16 +924,16 @@ func (s *StoreSuite) TestOpenBlobPreV5(c *gc.C) {
 
 	url := router.MustNewResolvedURL("cs:~charmers/multi-series-23", 23)
 	err := store.AddCharmWithArchive(url, ch)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	blob, err := store.OpenBlobPreV5(url)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer blob.Close()
 
 	data, err := ioutil.ReadAll(blob)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	preV5Ch, err := charm.ReadCharmArchiveBytes(data)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Check that the hashes and sizes are consistent with the data
 	// we've read.
@@ -941,7 +941,7 @@ func (s *StoreSuite) TestOpenBlobPreV5(c *gc.C) {
 	c.Assert(blob.Size, gc.Equals, int64(len(data)))
 
 	entity, err := store.FindEntity(url, nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	c.Assert(entity.PreV5BlobHash, gc.Equals, blob.Hash)
 	c.Assert(entity.PreV5BlobHash256, gc.Equals, fmt.Sprintf("%x", sha256.Sum256(data)))
@@ -951,14 +951,14 @@ func (s *StoreSuite) TestOpenBlobPreV5(c *gc.C) {
 
 	// Sanity check that the series really are in the post-v5 blob.
 	blob, err = store.OpenBlob(url)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer blob.Close()
 
 	data, err = ioutil.ReadAll(blob)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	postV5Ch, err := charm.ReadCharmArchiveBytes(data)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	c.Assert(postV5Ch.Meta().Series, jc.DeepEquals, []string{"trusty", "precise"})
 }
@@ -970,16 +970,16 @@ func (s *StoreSuite) TestOpenBlobPreV5WithMultiSeriesCharmInSingleSeriesId(c *gc
 
 	url := router.MustNewResolvedURL("cs:~charmers/precise/multi-series-23", 23)
 	err := store.AddCharmWithArchive(url, ch)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	blob, err := store.OpenBlobPreV5(url)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer blob.Close()
 
 	data, err := ioutil.ReadAll(blob)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	preV5Ch, err := charm.ReadCharmArchiveBytes(data)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	c.Assert(preV5Ch.Meta().Series, gc.HasLen, 0)
 }
@@ -997,15 +997,15 @@ func (s *StoreSuite) TestAddLog(c *gc.C) {
 	// Add logs to the store.
 	beforeAdding := time.Now().Add(-time.Second)
 	err := store.AddLog(&infoData, mongodoc.InfoLevel, mongodoc.IngestionType, nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = store.AddLog(&errorData, mongodoc.ErrorLevel, mongodoc.IngestionType, urls)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	afterAdding := time.Now().Add(time.Second)
 
 	// Retrieve the logs from the store.
 	var docs []mongodoc.Log
 	err = store.DB.Logs().Find(nil).Sort("_id").All(&docs)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(docs, gc.HasLen, 2)
 
 	// The docs have been correctly added to the Mongo collection.
@@ -1048,12 +1048,12 @@ func (s *StoreSuite) TestAddLogBaseURLs(c *gc.C) {
 		charm.MustParseURL("trusty/mysql-42"),
 		charm.MustParseURL("~who/utopic/wordpress"),
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Retrieve the log from the store.
 	var doc mongodoc.Log
 	err = store.DB.Logs().Find(nil).One(&doc)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// The log includes the base URLs.
 	c.Assert(doc.URLs, jc.DeepEquals, []*charm.URL{
@@ -1076,12 +1076,12 @@ func (s *StoreSuite) TestAddLogDuplicateURLs(c *gc.C) {
 		charm.MustParseURL("trusty/mysql-42"),
 		charm.MustParseURL("mysql"),
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Retrieve the log from the store.
 	var doc mongodoc.Log
 	err = store.DB.Logs().Find(nil).One(&doc)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// The log excludes duplicate URLs.
 	c.Assert(doc.URLs, jc.DeepEquals, []*charm.URL{
@@ -1095,7 +1095,7 @@ func (s *StoreSuite) TestCollections(c *gc.C) {
 	defer store.Close()
 	colls := store.DB.Collections()
 	names, err := store.DB.CollectionNames()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	// Some collections don't have indexes so they are created only when used.
 	createdOnUse := map[string]bool{
 		"migrations": true,
@@ -1148,10 +1148,10 @@ func (s *StoreSuite) TestOpenCachedBlobFileWithInvalidEntity(c *gc.C) {
 	wordpress := storetesting.Charms.CharmDir("wordpress")
 	url := router.MustNewResolvedURL("cs:~charmers/precise/wordpress-23", 23)
 	err := store.AddCharmWithArchive(url, wordpress)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	entity, err := store.FindEntity(url, FieldSelector("charmmeta"))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	r, err := store.OpenCachedBlobFile(entity, "", nil)
 	c.Assert(err, gc.ErrorMatches, "provided entity does not have required fields")
 	c.Assert(r, gc.Equals, nil)
@@ -1164,31 +1164,31 @@ func (s *StoreSuite) TestOpenCachedBlobFileWithFoundContent(c *gc.C) {
 	wordpress := storetesting.Charms.CharmDir("wordpress")
 	url := router.MustNewResolvedURL("cs:~charmers/precise/wordpress-23", 23)
 	err := store.AddCharmWithArchive(url, wordpress)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Get our expected content.
 	data, err := ioutil.ReadFile(filepath.Join(wordpress.Path, "metadata.yaml"))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	expectContent := string(data)
 
 	entity, err := store.FindEntity(url, FieldSelector("blobname", "contents"))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Check that, when we open the file for the first time,
 	// we see the expected content.
 	r, err := store.OpenCachedBlobFile(entity, mongodoc.FileIcon, func(f *zip.File) bool {
 		return path.Clean(f.Name) == "metadata.yaml"
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer r.Close()
 	data, err = ioutil.ReadAll(r)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(string(data), gc.Equals, expectContent)
 
 	// When retrieving the entity again, check that the Contents
 	// map has been set appropriately...
 	entity, err = store.FindEntity(url, FieldSelector("blobname", "contents"))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(entity.Contents, gc.HasLen, 1)
 	c.Assert(entity.Contents[mongodoc.FileIcon].IsValid(), gc.Equals, true)
 
@@ -1198,10 +1198,10 @@ func (s *StoreSuite) TestOpenCachedBlobFileWithFoundContent(c *gc.C) {
 		c.Errorf("isFile called unexpectedly")
 		return false
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer r.Close()
 	data, err = ioutil.ReadAll(r)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(string(data), gc.Equals, expectContent)
 }
 
@@ -1212,10 +1212,10 @@ func (s *StoreSuite) TestOpenCachedBlobFileWithNotFoundContent(c *gc.C) {
 	wordpress := storetesting.Charms.CharmDir("wordpress")
 	url := router.MustNewResolvedURL("cs:~charmers/precise/wordpress-23", 23)
 	err := store.AddCharmWithArchive(url, wordpress)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	entity, err := store.FindEntity(url, FieldSelector("blobname", "contents"))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Check that, when we open the file for the first time,
 	// we get a NotFound error.
@@ -1229,7 +1229,7 @@ func (s *StoreSuite) TestOpenCachedBlobFileWithNotFoundContent(c *gc.C) {
 	// When retrieving the entity again, check that the Contents
 	// map has been set appropriately...
 	entity, err = store.FindEntity(url, FieldSelector("blobname", "contents"))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(entity.Contents, gc.DeepEquals, map[mongodoc.FileId]mongodoc.ZipFile{
 		mongodoc.FileIcon: {},
 	})
@@ -1249,7 +1249,7 @@ func (s *StoreSuite) TestSESPutDoesNotErrorWithNoESConfigured(c *gc.C) {
 	store := s.newStore(c, false)
 	defer store.Close()
 	err := store.UpdateSearch(nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 var findBestEntityCharms = []struct {
@@ -2445,31 +2445,31 @@ func (s *StoreSuite) TestFindBestEntity(c *gc.C) {
 	defer store.Close()
 	for _, ch := range findBestEntityCharms {
 		err := store.AddCharmWithArchive(ch.id, ch.charm)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		err = store.SetPromulgated(ch.id, ch.id.PromulgatedRevision != -1)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		if ch.edge {
 			err := store.Publish(ch.id, nil, params.EdgeChannel)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 		}
 		if ch.stable {
 			err := store.Publish(ch.id, nil, params.StableChannel)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 		}
 	}
 
 	for _, b := range findBestEntityBundles {
 		err := store.AddBundleWithArchive(b.id, b.bundle)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		err = store.SetPromulgated(b.id, b.id.PromulgatedRevision != -1)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		if b.edge {
 			err := store.Publish(b.id, nil, params.EdgeChannel)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 		}
 		if b.stable {
 			err := store.Publish(b.id, nil, params.StableChannel)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 		}
 	}
 
@@ -2485,7 +2485,7 @@ func (s *StoreSuite) TestFindBestEntity(c *gc.C) {
 				}
 				continue
 			}
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 			c.Assert(EntityResolvedURL(entity), jc.DeepEquals, test.expectID)
 		}
 	}
@@ -2540,13 +2540,13 @@ func (s *StoreSuite) TestMatchingInterfacesQuery(c *gc.C) {
 	}}
 	for _, e := range entities {
 		err := store.DB.Entities().Insert(denormalizedEntity(e))
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 	for i, test := range matchingInterfacesQueryTests {
 		c.Logf("test %d: req %v; prov %v", i, test.required, test.provided)
 		var entities []*mongodoc.Entity
 		err := store.MatchingInterfacesQuery(test.required, test.provided).All(&entities)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		var got []string
 		for _, e := range entities {
 			got = append(got, e.URL.String())
@@ -2573,19 +2573,19 @@ func (s *StoreSuite) TestUpdateEntity(c *gc.C) {
 		c.Logf("test %d. %s", i, test.url)
 		url := router.MustNewResolvedURL(test.url, 10)
 		_, err := store.DB.Entities().RemoveAll(nil)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		err = store.DB.Entities().Insert(denormalizedEntity(&mongodoc.Entity{
 			URL:            charm.MustParseURL("~charmers/trusty/wordpress-10"),
 			PromulgatedURL: charm.MustParseURL("trusty/wordpress-4"),
 		}))
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		err = store.UpdateEntity(url, bson.D{{"$set", bson.D{{"extrainfo.test", []byte("PASS")}}}})
 		if test.expectErr != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectErr)
 		} else {
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 			entity, err := store.FindEntity(url, nil)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 			c.Assert(string(entity.ExtraInfo["test"]), gc.Equals, "PASS")
 		}
 	}
@@ -2608,23 +2608,23 @@ func (s *StoreSuite) TestUpdateBaseEntity(c *gc.C) {
 		c.Logf("test %d. %s", i, test.url)
 		url := router.MustNewResolvedURL(test.url, 10)
 		_, err := store.DB.BaseEntities().RemoveAll(nil)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		err = store.DB.BaseEntities().Insert(&mongodoc.BaseEntity{
 			URL:         charm.MustParseURL("~charmers/wordpress"),
 			User:        "charmers",
 			Name:        "wordpress",
 			Promulgated: true,
 		})
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		err = store.UpdateBaseEntity(url, bson.D{{"$set", bson.D{{"channelacls.unpublished", mongodoc.ACL{
 			Read: []string{"test"},
 		}}}}})
 		if test.expectErr != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectErr)
 		} else {
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 			baseEntity, err := store.FindBaseEntity(&url.URL, nil)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 			c.Assert(baseEntity.ChannelACLs[params.UnpublishedChannel].Read, jc.DeepEquals, []string{"test"})
 		}
 	}
@@ -2991,37 +2991,37 @@ func (s *StoreSuite) TestSetPromulgated(c *gc.C) {
 		c.Logf("\ntest %d. %s", i, test.about)
 		url := router.MustNewResolvedURL(test.url, -1)
 		_, err := store.DB.Entities().RemoveAll(nil)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		_, err = store.DB.BaseEntities().RemoveAll(nil)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		for _, entity := range test.entities {
 			err := store.DB.Entities().Insert(entity)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 		}
 		for _, baseEntity := range test.baseEntities {
 			err := store.DB.BaseEntities().Insert(baseEntity)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 		}
 		err = store.SetPromulgated(url, test.promulgate)
 		if test.expectErr != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectErr)
 			continue
 		}
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		n, err := store.DB.Entities().Count()
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(n, gc.Equals, len(test.expectEntities))
 		n, err = store.DB.BaseEntities().Count()
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(n, gc.Equals, len(test.expectBaseEntities))
 		for i, expectEntity := range test.expectEntities {
 			entity, err := store.FindEntity(EntityResolvedURL(expectEntity), nil)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 			c.Assert(entity, jc.DeepEquals, expectEntity, gc.Commentf("entity %d", i))
 		}
 		for _, expectBaseEntity := range test.expectBaseEntities {
 			baseEntity, err := store.FindBaseEntity(expectBaseEntity.URL, nil)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 			c.Assert(storetesting.NormalizeBaseEntity(baseEntity), jc.DeepEquals, storetesting.NormalizeBaseEntity(expectBaseEntity))
 		}
 	}
@@ -3070,57 +3070,57 @@ func (s *StoreSuite) TestSetPromulgatedUpdateSearch(c *gc.C) {
 
 	// Change the promulgated wordpress version to openstack-charmers.
 	err := store.SetPromulgated(url, true)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = store.ES.RefreshIndex(s.TestIndex)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	// Check that the search records contain the correct information.
 	var zdoc SearchDoc
 	doc := zdoc
 	err = store.ES.GetDocument(s.TestIndex, typeName, store.ES.getID(charm.MustParseURL("~charmers/trusty/wordpress-0")), &doc)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(doc.PromulgatedURL, gc.IsNil)
 	c.Assert(doc.PromulgatedRevision, gc.Equals, -1)
 	doc = zdoc
 	err = store.ES.GetDocument(s.TestIndex, typeName, store.ES.getID(charm.MustParseURL("~charmers/precise/wordpress-0")), &doc)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(doc.PromulgatedURL, gc.IsNil)
 	c.Assert(doc.PromulgatedRevision, gc.Equals, -1)
 	doc = zdoc
 	err = store.ES.GetDocument(s.TestIndex, typeName, store.ES.getID(charm.MustParseURL("~openstack-charmers/trusty/wordpress-0")), &doc)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(doc.PromulgatedURL.String(), gc.Equals, "cs:trusty/wordpress-3")
 	c.Assert(doc.PromulgatedRevision, gc.Equals, 3)
 	doc = zdoc
 	err = store.ES.GetDocument(s.TestIndex, typeName, store.ES.getID(charm.MustParseURL("~openstack-charmers/precise/wordpress-0")), &doc)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(doc.PromulgatedURL.String(), gc.Equals, "cs:precise/wordpress-2")
 	c.Assert(doc.PromulgatedRevision, gc.Equals, 2)
 
 	// Remove the promulgated flag from openstack-charmers, meaning wordpress is
 	// no longer promulgated.
 	err = store.SetPromulgated(url, false)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = store.ES.RefreshIndex(s.TestIndex)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	// Check that the search records contain the correct information.
 	doc = zdoc
 	err = store.ES.GetDocument(s.TestIndex, typeName, store.ES.getID(charm.MustParseURL("~charmers/trusty/wordpress-0")), &doc)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(doc.PromulgatedURL, gc.IsNil)
 	c.Assert(doc.PromulgatedRevision, gc.Equals, -1)
 	doc = zdoc
 	err = store.ES.GetDocument(s.TestIndex, typeName, store.ES.getID(charm.MustParseURL("~charmers/precise/wordpress-0")), &doc)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(doc.PromulgatedURL, gc.IsNil)
 	c.Assert(doc.PromulgatedRevision, gc.Equals, -1)
 	doc = zdoc
 	err = store.ES.GetDocument(s.TestIndex, typeName, store.ES.getID(charm.MustParseURL("~openstack-charmers/trusty/wordpress-0")), &doc)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(doc.PromulgatedURL, gc.IsNil)
 	c.Assert(doc.PromulgatedRevision, gc.Equals, -1)
 	doc = zdoc
 	err = store.ES.GetDocument(s.TestIndex, typeName, store.ES.getID(charm.MustParseURL("~openstack-charmers/precise/wordpress-0")), &doc)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(doc.PromulgatedURL, gc.IsNil)
 	c.Assert(doc.PromulgatedRevision, gc.Equals, -1)
 }
@@ -3164,7 +3164,7 @@ func (s *StoreSuite) TestCopyCopiesSessions(c *gc.C) {
 	wordpress := storetesting.Charms.CharmDir("wordpress")
 	url := MustParseResolvedURL("23 cs:~charmers/precise/wordpress-23")
 	err := store.AddCharmWithArchive(url, wordpress)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	store1 := store.Copy()
 	defer store1.Close()
@@ -3173,16 +3173,16 @@ func (s *StoreSuite) TestCopyCopiesSessions(c *gc.C) {
 	store.Close()
 
 	entity, err := store1.FindEntity(url, nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Also check the blob store, as it has its own session reference.
 	r, _, err := store1.BlobStore.Open(entity.BlobName, nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	r.Close()
 
 	// Also check the macaroon storage as that also has its own session reference.
 	m, err := store1.Bakery.NewMacaroon(nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(m, gc.NotNil)
 }
 
@@ -3195,7 +3195,7 @@ func (s *StoreSuite) TestAddAudit(c *gc.C) {
 	}
 
 	p, err := NewPool(s.Session.DB("juju_test"), nil, nil, config)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer p.Close()
 
 	store := p.Store()
@@ -3219,7 +3219,7 @@ func (s *StoreSuite) TestAddAudit(c *gc.C) {
 		store.addAuditAtTime(e, now)
 	}
 	data, err := ioutil.ReadFile(filename)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	lines := strings.Split(strings.TrimSuffix(string(data), "\n"), "\n")
 	c.Assert(lines, gc.HasLen, len(entries))
@@ -3231,7 +3231,7 @@ func (s *StoreSuite) TestAddAudit(c *gc.C) {
 
 func (s *StoreSuite) TestAddAuditWithNoLumberjack(c *gc.C) {
 	p, err := NewPool(s.Session.DB("juju_test"), nil, nil, ServerParams{})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer p.Close()
 
 	store := p.Store()
@@ -3308,21 +3308,21 @@ func (s *StoreSuite) TestBundleCharms(c *gc.C) {
 	defer store.Close()
 	rurl := router.MustNewResolvedURL("cs:~charmers/saucy/mysql-0", 0)
 	err := store.AddCharmWithArchive(rurl, mysql)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = store.Publish(rurl, nil, params.StableChannel)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	riak := storetesting.Charms.CharmArchive(c.MkDir(), "riak")
 	rurl = router.MustNewResolvedURL("cs:~charmers/trusty/riak-42", 42)
 	err = store.AddCharmWithArchive(rurl, riak)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = store.Publish(rurl, nil, params.StableChannel)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	wordpress := storetesting.Charms.CharmArchive(c.MkDir(), "wordpress")
 	rurl = router.MustNewResolvedURL("cs:~charmers/utopic/wordpress-47", 47)
 	err = store.AddCharmWithArchive(rurl, wordpress)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = store.Publish(rurl, nil, params.StableChannel)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	tests := []struct {
 		about  string
@@ -3380,7 +3380,7 @@ func (s *StoreSuite) TestBundleCharms(c *gc.C) {
 	for i, test := range tests {
 		c.Logf("test %d: %s", i, test.about)
 		charms, err := store.bundleCharms(test.ids)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		// Ensure the charms returned are what we expect.
 		c.Assert(charms, gc.HasLen, len(test.charms))
 		for i, ch := range charms {
@@ -4105,15 +4105,15 @@ func (s *StoreSuite) TestPublish(c *gc.C) {
 
 		// Remove existing entities and base entities.
 		_, err := store.DB.Entities().RemoveAll(nil)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		_, err = store.DB.BaseEntities().RemoveAll(nil)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		// Insert the existing entity.
 		err = store.DB.Entities().Insert(denormalizedEntity(test.initialEntity))
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		// Insert the existing base entity.
 		err = store.DB.BaseEntities().Insert(test.initialBaseEntity)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 
 		// Publish the entity.
 		err = store.Publish(test.url, nil, test.channels...)
@@ -4121,12 +4121,12 @@ func (s *StoreSuite) TestPublish(c *gc.C) {
 			c.Assert(err, gc.ErrorMatches, test.expectedErr)
 			continue
 		}
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		entity, err := store.FindEntity(test.url, nil)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(entity, jc.DeepEquals, denormalizedEntity(test.expectedEntity))
 		baseEntity, err := store.FindBaseEntity(&test.url.URL, nil)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(storetesting.NormalizeBaseEntity(baseEntity), jc.DeepEquals, storetesting.NormalizeBaseEntity(test.expectedBaseEntity))
 	}
 }
@@ -4142,7 +4142,7 @@ func (s *StoreSuite) TestIsUploadOwnedBy(c *gc.C) {
 	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
 	meta := storetesting.MetaWithResources(nil, "someResource")
 	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	contents := []string{
 		"123456789 123456789 ",
@@ -4151,7 +4151,7 @@ func (s *StoreSuite) TestIsUploadOwnedBy(c *gc.C) {
 	uid := putMultipart(c, store.BlobStore, time.Time{}, contents...)
 
 	res, err := store.AddResourceWithUploadId(id, "someResource", uid)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	owner := resourceUploadOwner(res)
 	// isUploadOwnedBy should return true if called on the
@@ -4189,7 +4189,7 @@ func (s *StoreSuite) TestPublishWithFailedESInsert(c *gc.C) {
 
 	url := router.MustNewResolvedURL("~charmers/precise/wordpress-12", -1)
 	err := store.AddCharmWithArchive(url, storetesting.Charms.CharmDir("wordpress"))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = store.Publish(url, nil, params.StableChannel)
 	c.Assert(err, gc.ErrorMatches, "cannot index cs:~charmers/precise/wordpress-12 to ElasticSearch: .*")
 }

@@ -30,7 +30,7 @@ var _ = gc.Suite(&StatsSuite{})
 func (s *StatsSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	pool, err := charmstore.NewPool(s.Session.DB("foo"), nil, nil, charmstore.ServerParams{})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.store = pool.Store()
 	pool.Close()
 }
@@ -47,20 +47,20 @@ func (s *StatsSuite) TestSumCounters(c *gc.C) {
 
 	req := charmstore.CounterRequest{Key: []string{"a"}}
 	cs, err := s.store.Counters(&req)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(cs, gc.DeepEquals, []charmstore.Counter{{Key: req.Key, Count: 0}})
 
 	for i := 0; i < 10; i++ {
 		err := s.store.IncCounter([]string{"a", "b", "c"})
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 	for i := 0; i < 7; i++ {
 		s.store.IncCounter([]string{"a", "b"})
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 	for i := 0; i < 3; i++ {
 		s.store.IncCounter([]string{"a", "z", "b"})
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 
 	tests := []struct {
@@ -82,7 +82,7 @@ func (s *StatsSuite) TestSumCounters(c *gc.C) {
 		c.Logf("Test: %#v\n", t)
 		req = charmstore.CounterRequest{Key: t.key, Prefix: t.prefix}
 		cs, err := s.store.Counters(&req)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(cs, gc.DeepEquals, []charmstore.Counter{{Key: t.key, Prefix: t.prefix, Count: t.result}})
 	}
 
@@ -90,30 +90,30 @@ func (s *StatsSuite) TestSumCounters(c *gc.C) {
 	// stored correctly.
 	counters := s.store.DB.StatCounters()
 	docs1, err := counters.Count()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	if docs1 != 3 && docs1 != 4 {
 		c.Errorf("Expected 3 or 4 docs in counters collection, got %d", docs1)
 	}
 
 	// Hack times so that the next operation adds another document.
 	err = counters.Update(nil, bson.D{{"$set", bson.D{{"t", 1}}}})
-	c.Check(err, gc.IsNil)
+	c.Check(err, gc.Equals, nil)
 
 	err = s.store.IncCounter([]string{"a", "b", "c"})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	docs2, err := counters.Count()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(docs2, gc.Equals, docs1+1)
 
 	req = charmstore.CounterRequest{Key: []string{"a", "b", "c"}}
 	cs, err = s.store.Counters(&req)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(cs, gc.DeepEquals, []charmstore.Counter{{Key: req.Key, Count: 11}})
 
 	req = charmstore.CounterRequest{Key: []string{"a"}, Prefix: true}
 	cs, err = s.store.Counters(&req)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(cs, gc.DeepEquals, []charmstore.Counter{{Key: req.Key, Prefix: true, Count: 21}})
 }
 
@@ -125,11 +125,11 @@ func (s *StatsSuite) TestCountersReadOnlySum(c *gc.C) {
 	// Summing up an unknown key shouldn't add the key to the database.
 	req := charmstore.CounterRequest{Key: []string{"a", "b", "c"}}
 	_, err := s.store.Counters(&req)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	tokens := s.Session.DB("juju").C("stat.tokens")
 	n, err := tokens.Count()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(n, gc.Equals, 0)
 }
 
@@ -141,7 +141,7 @@ func (s *StatsSuite) TestCountersTokenCaching(c *gc.C) {
 	assertSum := func(i int, want int64) {
 		req := charmstore.CounterRequest{Key: []string{strconv.Itoa(i)}}
 		cs, err := s.store.Counters(&req)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(cs[0].Count, gc.Equals, want)
 	}
 	assertSum(100000, 0)
@@ -152,7 +152,7 @@ func (s *StatsSuite) TestCountersTokenCaching(c *gc.C) {
 	// of genSize entries each.
 	for i := 0; i < genSize*2; i++ {
 		err := s.store.IncCounter([]string{strconv.Itoa(i)})
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 
 	// Now go behind the scenes and corrupt all the tokens.
@@ -164,7 +164,7 @@ func (s *StatsSuite) TestCountersTokenCaching(c *gc.C) {
 	}
 	for iter.Next(&t) {
 		err := tokens.UpdateId(t.Id, bson.M{"$set": bson.M{"t": "corrupted" + t.Token}})
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 	c.Assert(iter.Err(), gc.IsNil)
 
@@ -206,14 +206,14 @@ func (s *StatsSuite) TestCounterTokenUniqueness(c *gc.C) {
 			wg0.Wait()
 			defer wg1.Done()
 			err := s.store.IncCounter([]string{"a"})
-			c.Check(err, gc.IsNil)
+			c.Check(err, gc.Equals, nil)
 		}()
 	}
 	wg1.Wait()
 
 	req := charmstore.CounterRequest{Key: []string{"a"}}
 	cs, err := s.store.Counters(&req)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(cs[0].Count, gc.Equals, int64(10))
 }
 
@@ -239,7 +239,7 @@ func (s *StatsSuite) TestListCounters(c *gc.C) {
 	}
 	for _, key := range incs {
 		err := s.store.IncCounter(key)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 
 	tests := []struct {
@@ -271,7 +271,7 @@ func (s *StatsSuite) TestListCounters(c *gc.C) {
 
 	// Use a different store to exercise cache filling.
 	pool, err := charmstore.NewPool(s.store.DB.Database, nil, nil, charmstore.ServerParams{})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	st := pool.Store()
 	defer st.Close()
 	pool.Close()
@@ -279,7 +279,7 @@ func (s *StatsSuite) TestListCounters(c *gc.C) {
 	for i := range tests {
 		req := &charmstore.CounterRequest{Key: tests[i].prefix, Prefix: true, List: true}
 		result, err := st.Counters(req)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(result, gc.DeepEquals, tests[i].result)
 	}
 }
@@ -318,7 +318,7 @@ func (s *StatsSuite) TestListCountersBy(c *gc.C) {
 		t = t.Add(time.Duration(i) * charmstore.StatsGranularity)
 
 		err := s.store.IncCounterAtTime(inc.key, t)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 
 	tests := []struct {
@@ -425,7 +425,7 @@ func (s *StatsSuite) TestListCountersBy(c *gc.C) {
 
 	for _, test := range tests {
 		result, err := s.store.Counters(&test.request)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(result, gc.DeepEquals, test.result)
 	}
 }
@@ -568,7 +568,7 @@ func (s *StatsSuite) TestArchiveDownloadCounts(c *gc.C) {
 		for _, charm := range test.charms {
 			ch := storetesting.Charms.CharmDir(charm.id.URL.Name)
 			err := s.store.AddCharmWithArchive(charm.id, ch)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 			url := charm.id.URL
 			now := time.Now()
 			setDownloadCounts(c, s.store, &url, now, charm.lastDay)
@@ -585,7 +585,7 @@ func (s *StatsSuite) TestArchiveDownloadCounts(c *gc.C) {
 			}
 		}
 		thisRevision, allRevisions, err := s.store.ArchiveDownloadCounts(test.id, true)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(thisRevision, jc.DeepEquals, test.expectThisRevision)
 		c.Assert(allRevisions, jc.DeepEquals, test.expectAllRevisions)
 	}
@@ -599,7 +599,7 @@ func setDownloadCounts(c *gc.C, s *charmstore.Store, id *charm.URL, t time.Time,
 	key := charmstore.EntityStatsKey(id, kind)
 	for i := 0; i < n; i++ {
 		err := s.IncCounterAtTime(key, t)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 }
 
@@ -607,9 +607,9 @@ func (s *StatsSuite) TestIncrementDownloadCounts(c *gc.C) {
 	ch := storetesting.Charms.CharmDir("wordpress")
 	id := charmstore.MustParseResolvedURL("0 ~charmers/trusty/wordpress-1")
 	err := s.store.AddCharmWithArchive(id, ch)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.store.IncrementDownloadCounts(id)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	expect := charmstore.AggregatedCounts{
 		LastDay:   1,
 		LastWeek:  1,
@@ -617,11 +617,11 @@ func (s *StatsSuite) TestIncrementDownloadCounts(c *gc.C) {
 		Total:     1,
 	}
 	thisRevision, allRevisions, err := s.store.ArchiveDownloadCounts(charm.MustParseURL("~charmers/trusty/wordpress-1"), true)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(thisRevision, jc.DeepEquals, expect)
 	c.Assert(allRevisions, jc.DeepEquals, expect)
 	thisRevision, allRevisions, err = s.store.ArchiveDownloadCounts(charm.MustParseURL("trusty/wordpress-0"), true)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(thisRevision, jc.DeepEquals, expect)
 	c.Assert(allRevisions, jc.DeepEquals, expect)
 }
@@ -630,9 +630,9 @@ func (s *StatsSuite) TestIncrementDownloadCountsOnPromulgatedMultiSeriesCharm(c 
 	ch := storetesting.Charms.CharmDir("multi-series")
 	id := charmstore.MustParseResolvedURL("0 ~charmers/wordpress-1")
 	err := s.store.AddCharmWithArchive(id, ch)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.store.IncrementDownloadCounts(id)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	expect := charmstore.AggregatedCounts{
 		LastDay:   1,
 		LastWeek:  1,
@@ -640,11 +640,11 @@ func (s *StatsSuite) TestIncrementDownloadCountsOnPromulgatedMultiSeriesCharm(c 
 		Total:     1,
 	}
 	thisRevision, allRevisions, err := s.store.ArchiveDownloadCounts(charm.MustParseURL("~charmers/wordpress-1"), true)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(thisRevision, jc.DeepEquals, expect)
 	c.Assert(allRevisions, jc.DeepEquals, expect)
 	thisRevision, allRevisions, err = s.store.ArchiveDownloadCounts(charm.MustParseURL("wordpress-0"), true)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(thisRevision, jc.DeepEquals, expect)
 	c.Assert(allRevisions, jc.DeepEquals, expect)
 }
@@ -654,9 +654,9 @@ func (s *StatsSuite) TestIncrementDownloadCountsOnIdWithPreferredSeries(c *gc.C)
 	id := charmstore.MustParseResolvedURL("0 ~charmers/wordpress-1")
 	id.PreferredSeries = "trusty"
 	err := s.store.AddCharmWithArchive(id, ch)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.store.IncrementDownloadCounts(id)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	expect := charmstore.AggregatedCounts{
 		LastDay:   1,
 		LastWeek:  1,
@@ -664,11 +664,11 @@ func (s *StatsSuite) TestIncrementDownloadCountsOnIdWithPreferredSeries(c *gc.C)
 		Total:     1,
 	}
 	thisRevision, allRevisions, err := s.store.ArchiveDownloadCounts(charm.MustParseURL("~charmers/wordpress-1"), true)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(thisRevision, jc.DeepEquals, expect)
 	c.Assert(allRevisions, jc.DeepEquals, expect)
 	thisRevision, allRevisions, err = s.store.ArchiveDownloadCounts(charm.MustParseURL("wordpress-0"), true)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(thisRevision, jc.DeepEquals, expect)
 	c.Assert(allRevisions, jc.DeepEquals, expect)
 }
@@ -677,9 +677,9 @@ func (s *StatsSuite) TestIncrementDownloadCountsCaching(c *gc.C) {
 	ch := storetesting.Charms.CharmDir("wordpress")
 	id := charmstore.MustParseResolvedURL("0 ~charmers/trusty/wordpress-1")
 	err := s.store.AddCharmWithArchive(id, ch)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.store.IncrementDownloadCounts(id)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	expect := charmstore.AggregatedCounts{
 		LastDay:   1,
 		LastWeek:  1,
@@ -693,16 +693,16 @@ func (s *StatsSuite) TestIncrementDownloadCountsCaching(c *gc.C) {
 		Total:     2,
 	}
 	thisRevision, allRevisions, err := s.store.ArchiveDownloadCounts(charm.MustParseURL("~charmers/trusty/wordpress-1"), false)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(thisRevision, jc.DeepEquals, expect)
 	c.Assert(allRevisions, jc.DeepEquals, expect)
 	err = s.store.IncrementDownloadCounts(id)
 	thisRevision, allRevisions, err = s.store.ArchiveDownloadCounts(charm.MustParseURL("~charmers/trusty/wordpress-1"), false)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(thisRevision, jc.DeepEquals, expect)
 	c.Assert(allRevisions, jc.DeepEquals, expect)
 	thisRevision, allRevisions, err = s.store.ArchiveDownloadCounts(charm.MustParseURL("~charmers/trusty/wordpress-1"), true)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(thisRevision, jc.DeepEquals, expectAfter)
 	c.Assert(allRevisions, jc.DeepEquals, expectAfter)
 }

@@ -69,11 +69,11 @@ func (s *Suite) TestSuccessfulPostDocument(c *gc.C) {
 		"a": "b",
 	}
 	id, err := s.ES.PostDocument(s.TestIndex, "testtype", doc)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(id, gc.NotNil)
 	var result map[string]string
 	err = s.ES.GetDocument(s.TestIndex, "testtype", id, &result)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *Suite) TestSuccessfulPutNewDocument(c *gc.C) {
@@ -82,15 +82,15 @@ func (s *Suite) TestSuccessfulPutNewDocument(c *gc.C) {
 	}
 	// Show that no document with this id exists.
 	exists, err := s.ES.HasDocument(s.TestIndex, "testtype", "a")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(exists, gc.Equals, false)
 	err = s.ES.PutDocument(s.TestIndex, "testtype", "a", doc)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	var result map[string]string
 	err = s.ES.GetDocument(s.TestIndex, "testtype", "a", &result)
 	c.Assert(result["a"], gc.Equals, "b")
 	exists, err = s.ES.HasDocument(s.TestIndex, "testtype", "a")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(exists, gc.Equals, true)
 }
 
@@ -99,10 +99,10 @@ func (s *Suite) TestSuccessfulPutUpdatedDocument(c *gc.C) {
 		"a": "b",
 	}
 	err := s.ES.PutDocument(s.TestIndex, "testtype", "a", doc)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	doc["a"] = "c"
 	err = s.ES.PutDocument(s.TestIndex, "testtype", "a", doc)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	var result map[string]string
 	err = s.ES.GetDocument(s.TestIndex, "testtype", "a", &result)
 	c.Assert(result["a"], gc.Equals, "c")
@@ -114,15 +114,15 @@ func (s *Suite) TestPutVersionWithTypeNewDocument(c *gc.C) {
 	}
 	// Show that no document with this id exists.
 	exists, err := s.ES.HasDocument(s.TestIndex, "testtype", "a")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(exists, gc.Equals, false)
 	err = s.ES.PutDocumentVersionWithType(s.TestIndex, "testtype", "a", 1, es.ExternalGTE, doc)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	var result map[string]string
 	err = s.ES.GetDocument(s.TestIndex, "testtype", "a", &result)
 	c.Assert(result["a"], gc.Equals, "b")
 	exists, err = s.ES.HasDocument(s.TestIndex, "testtype", "a")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(exists, gc.Equals, true)
 }
 
@@ -132,18 +132,18 @@ func (s *Suite) TestPutVersionWithTypeUpdateCurrentDocumentVersion(c *gc.C) {
 	}
 	// Show that no document with this id exists.
 	exists, err := s.ES.HasDocument(s.TestIndex, "testtype", "a")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(exists, gc.Equals, false)
 	err = s.ES.PutDocumentVersionWithType(s.TestIndex, "testtype", "a", 1, es.ExternalGTE, doc)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	doc["a"] = "c"
 	err = s.ES.PutDocumentVersionWithType(s.TestIndex, "testtype", "a", 1, es.ExternalGTE, doc)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	var result map[string]string
 	err = s.ES.GetDocument(s.TestIndex, "testtype", "a", &result)
 	c.Assert(result["a"], gc.Equals, "c")
 	exists, err = s.ES.HasDocument(s.TestIndex, "testtype", "a")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(exists, gc.Equals, true)
 }
 
@@ -153,18 +153,18 @@ func (s *Suite) TestPutVersionWithTypeUpdateLaterDocumentVersion(c *gc.C) {
 	}
 	// Show that no document with this id exists.
 	exists, err := s.ES.HasDocument(s.TestIndex, "testtype", "a")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(exists, gc.Equals, false)
 	err = s.ES.PutDocumentVersionWithType(s.TestIndex, "testtype", "a", 1, es.ExternalGTE, doc)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	doc["a"] = "c"
 	err = s.ES.PutDocumentVersionWithType(s.TestIndex, "testtype", "a", 3, es.ExternalGTE, doc)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	var result map[string]string
 	err = s.ES.GetDocument(s.TestIndex, "testtype", "a", &result)
 	c.Assert(result["a"], gc.Equals, "c")
 	exists, err = s.ES.HasDocument(s.TestIndex, "testtype", "a")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(exists, gc.Equals, true)
 }
 
@@ -174,10 +174,10 @@ func (s *Suite) TestPutVersionWithTypeUpdateEarlierDocumentVersion(c *gc.C) {
 	}
 	// Show that no document with this id exists.
 	exists, err := s.ES.HasDocument(s.TestIndex, "testtype", "a")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(exists, gc.Equals, false)
 	err = s.ES.PutDocumentVersionWithType(s.TestIndex, "testtype", "a", 3, es.ExternalGTE, doc)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	doc["a"] = "c"
 	err = s.ES.PutDocumentVersionWithType(s.TestIndex, "testtype", "a", 1, es.ExternalGTE, doc)
 	c.Assert(err, gc.Equals, es.ErrConflict)
@@ -185,7 +185,7 @@ func (s *Suite) TestPutVersionWithTypeUpdateEarlierDocumentVersion(c *gc.C) {
 	err = s.ES.GetDocument(s.TestIndex, "testtype", "a", &result)
 	c.Assert(result["a"], gc.Equals, "b")
 	exists, err = s.ES.HasDocument(s.TestIndex, "testtype", "a")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(exists, gc.Equals, true)
 }
 
@@ -194,9 +194,9 @@ func (s *Suite) TestDelete(c *gc.C) {
 		"a": "b",
 	}
 	_, err := s.ES.PostDocument(s.TestIndex, "testtype", doc)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.ES.DeleteIndex(s.TestIndex)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *Suite) TestDeleteErrorOnNonExistingIndex(c *gc.C) {
@@ -208,9 +208,9 @@ func (s *Suite) TestDeleteErrorOnNonExistingIndex(c *gc.C) {
 func (s *Suite) TestIndexesCreatedAutomatically(c *gc.C) {
 	doc := map[string]string{"a": "b"}
 	_, err := s.ES.PostDocument(s.TestIndex, "testtype", doc)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	indexes, err := s.ES.ListAllIndexes()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(indexes, gc.Not(gc.HasLen), 0)
 	found := false
 	for _, index2 := range indexes {
@@ -223,7 +223,7 @@ func (s *Suite) TestIndexesCreatedAutomatically(c *gc.C) {
 
 func (s *Suite) TestHealthIsWorking(c *gc.C) {
 	result, err := s.ES.Health()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(result.ClusterName, gc.NotNil)
 	c.Assert(result.ActivePrimaryShards, gc.NotNil)
 	c.Assert(result.ActiveShards, gc.NotNil)
@@ -239,17 +239,17 @@ func (s *Suite) TestHealthIsWorking(c *gc.C) {
 func (s *Suite) TestSearch(c *gc.C) {
 	doc := map[string]string{"foo": "bar"}
 	_, err := s.ES.PostDocument(s.TestIndex, "testtype", doc)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	doc["foo"] = "baz"
 	id2, err := s.ES.PostDocument(s.TestIndex, "testtype", doc)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.ES.RefreshIndex(s.TestIndex)
 	q := es.QueryDSL{
 		Query:  es.TermQuery{Field: "foo", Value: "baz"},
 		Fields: []string{"foo"},
 	}
 	results, err := s.ES.Search(s.TestIndex, "testtype", q)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(results.Hits.Total, gc.Equals, 1)
 	c.Assert(results.Hits.Hits[0].ID, gc.Equals, id2)
 	c.Assert(results.Hits.Hits[0].Fields.GetString("foo"), gc.Equals, "baz")
@@ -266,7 +266,7 @@ func (s *Suite) TestPutMapping(c *gc.C) {
 		},
 	}
 	err := s.ES.PutMapping(s.TestIndex, "testtype", mapping)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *Suite) TestEscapeRegexp(c *gc.C) {
@@ -428,7 +428,7 @@ func (S *Suite) TestDecodingHealthStatus(c *gc.C) {
 
 	var h es.ClusterHealth
 	err := json.Unmarshal([]byte(health_message), &h)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(h.ClusterName, gc.Equals, "elasticsearch")
 	c.Assert(h.Status, gc.Equals, "green")
 	c.Assert(h.TimedOut, gc.Equals, true)

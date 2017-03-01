@@ -151,7 +151,7 @@ func (*utilSuite) TestRelativeURL(c *gc.C) {
 			c.Assert(err, gc.ErrorMatches, test.expectError)
 			c.Assert(result, gc.Equals, "")
 		} else {
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 			c.Check(result, gc.Equals, test.expect)
 		}
 	}
@@ -288,7 +288,7 @@ func (*utilSuite) TestUnmarshalJSONObject(c *gc.C) {
 			}
 			continue
 		}
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(string(v), jc.JSONEquals, test.expectValue)
 	}
 }

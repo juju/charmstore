@@ -56,7 +56,7 @@ func (s *ConfigSuite) readConfig(c *gc.C, content string) (*config.Config, error
 	// Write the configuration content to file.
 	path := path.Join(c.MkDir(), "charmd.conf")
 	err := ioutil.WriteFile(path, []byte(content), 0666)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Read the configuration.
 	return config.Read(path)
@@ -64,7 +64,7 @@ func (s *ConfigSuite) readConfig(c *gc.C, content string) (*config.Config, error
 
 func (s *ConfigSuite) TestRead(c *gc.C) {
 	conf, err := s.readConfig(c, testConfig)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(conf, jc.DeepEquals, &config.Config{
 		AuditLogFile:     "/var/log/charmstore/audit.log",
 		AuditLogMaxAge:   1,

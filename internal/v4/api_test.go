@@ -538,7 +538,7 @@ func (s *APISuite) TestEndpointGet(c *gc.C) {
 	for i, ep := range metaEndpoints {
 		c.Logf("test %d: %s\n", i, ep.name)
 		data, err := ep.get(s.store, ep.checkURL)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		ep.assertCheckData(c, data)
 	}
 }
@@ -554,7 +554,7 @@ func (s *APISuite) TestAllMetaEndpointsTested(c *gc.C) {
 	c.Logf("meta response body: %s", rec.Body)
 	var list []string
 	err := json.Unmarshal(rec.Body.Bytes(), &list)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	listNames := make(map[string]bool)
 	for _, name := range list {
@@ -615,7 +615,7 @@ func (s *APISuite) TestMetaEndpointsSingle(c *gc.C) {
 			charmId := strings.TrimPrefix(url.String(), "cs:")
 			path := charmId + "/meta/" + ep.name
 			expectData, err := ep.get(s.store, url)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 			c.Logf("	expected data for %q: %#v", url, expectData)
 			if isNull(expectData) {
 				httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -646,7 +646,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 		newResolvedURL("~charmers/trusty/wordpress-1", 1),
 	} {
 		err := s.store.AddCharmWithArchive(u, storetesting.NewCharm(nil))
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 	s.doAsUser("charmers", func() {
 		s.assertGet(c, "wordpress/meta/perm?channel=unpublished", params.PermResponse{
@@ -730,7 +730,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 	// Publish one of the revisions to edge, then PUT to meta/perm
 	// and check that the edge ACLs have changed.
 	err := s.store.Publish(newResolvedURL("~charmers/precise/wordpress-23", 23), nil, params.EdgeChannel)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	s.doAsUser("bob", func() {
 		// Check that we aren't allowed to put to the newly published entity as bob.
@@ -789,7 +789,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 	// Publish wordpress-1 to stable and check that the stable ACLs
 	// have changed.
 	err = s.store.Publish(newResolvedURL("~charmers/trusty/wordpress-1", 1), nil, params.StableChannel)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// The stable permissions only allow charmers currently, so act as
 	// charmers again.
@@ -1101,7 +1101,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 // given URL are as given.
 func (s *APISuite) assertChannelACLs(c *gc.C, url string, acls map[params.Channel]mongodoc.ACL) {
 	e, err := s.store.FindBaseEntity(charm.MustParseURL(url), nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(e.ChannelACLs, jc.DeepEquals, acls)
 }
 
@@ -1397,7 +1397,7 @@ func (s *APISuite) TestCommonInfo(c *gc.C) {
 			"key": "something",
 		})
 		e, err := s.store.FindBaseEntity(charm.MustParseURL(u), nil)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(e.CommonInfo, gc.DeepEquals, map[string][]byte{
 			"key": []byte("\"something\""),
 		})
@@ -1440,7 +1440,7 @@ func (s *APISuite) TestMetaEndpointsAny(c *gc.C) {
 				continue
 			}
 			val, err := ep.get(s.store, url)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 			if val != nil {
 				expectData.Meta[ep.name] = val
 			}
@@ -1544,7 +1544,7 @@ func (s *APISuite) TestBundleArchiveReplacesApplicationsWithServices(c *gc.C) {
 	})
 	c.Assert(rr.Code, gc.Equals, http.StatusOK)
 	r, err := zip.NewReader(bytes.NewReader(rr.Body.Bytes()), int64(rr.Body.Len()))
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	var bundleMetadataFound bool
 	for _, f := range r.File {
 		if f.Name != "bundle.yaml" {
@@ -1552,12 +1552,12 @@ func (s *APISuite) TestBundleArchiveReplacesApplicationsWithServices(c *gc.C) {
 		}
 		bundleMetadataFound = true
 		rc, err := f.Open()
-		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(err, gc.Equals, nil)
 		metadata, err := ioutil.ReadAll(rc)
-		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(err, gc.Equals, nil)
 		var m map[string]interface{}
 		err = yaml.Unmarshal(metadata, &m)
-		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(err, gc.Equals, nil)
 		_, ok := m["services"]
 		c.Assert(ok, gc.Equals, true)
 		_, ok = m["applications"]
@@ -1858,7 +1858,7 @@ func (s *APISuite) TestResolveURL(c *gc.C) {
 			c.Assert(rurl, gc.IsNil)
 			continue
 		}
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(rurl, jc.DeepEquals, test.expect)
 	}
 }
@@ -1934,9 +1934,9 @@ func (s *APISuite) TestServeExpandId(c *gc.C) {
 	s.addPublicCharmFromRepo(c, "wordpress", newResolvedURL("cs:~charmers/utopic/wordpress-42", 42))
 	s.addPublicCharmFromRepo(c, "wordpress", newResolvedURL("cs:~charmers/trusty/wordpress-47", 47))
 	err := s.store.AddCharmWithArchive(newResolvedURL("cs:~charmers/trusty/wordpress-48", 48), storetesting.NewCharm(nil))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.store.Publish(newResolvedURL("cs:~charmers/trusty/wordpress-48", 48), nil, params.EdgeChannel)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.addPublicCharmFromRepo(c, "multi-series", newResolvedURL("cs:~charmers/wordpress-5", 49))
 
 	s.addPublicCharmFromRepo(c, "wordpress", newResolvedURL("cs:~charmers/precise/haproxy-1", 1))
@@ -2409,13 +2409,13 @@ func (s *APISuite) TestMetaStats(c *gc.C) {
 				key := []string{params.StatsArchiveDownload, url.URL.Series, url.URL.Name, url.URL.User, strconv.Itoa(url.URL.Revision)}
 				for i := 0; i < downloads; i++ {
 					err := s.store.IncCounterAtTime(key, date)
-					c.Assert(err, gc.IsNil)
+					c.Assert(err, gc.Equals, nil)
 				}
 				if url.PromulgatedRevision > -1 {
 					key := []string{params.StatsArchiveDownloadPromulgated, url.URL.Series, url.URL.Name, "", strconv.Itoa(url.PromulgatedRevision)}
 					for i := 0; i < downloads; i++ {
 						err := s.store.IncCounterAtTime(key, date)
-						c.Assert(err, gc.IsNil)
+						c.Assert(err, gc.Equals, nil)
 					}
 				}
 			}
@@ -2425,9 +2425,9 @@ func (s *APISuite) TestMetaStats(c *gc.C) {
 
 		// Clean up the collections.
 		_, err := s.store.DB.Entities().RemoveAll(nil)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		_, err = s.store.DB.StatCounters().RemoveAll(nil)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 }
 
@@ -2608,12 +2608,12 @@ func (s *APISuite) publishCharmsAtKnownTimes(c *gc.C, charms []publishSpec) {
 		id, _ := s.addPublicCharmFromRepo(c, "wordpress", ch.id)
 		t := ch.published().PublishTime
 		err := s.store.UpdateEntity(id, bson.D{{"$set", bson.D{{"uploadtime", t}}}})
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		if len(ch.acl) > 0 {
 			err := s.store.SetPerms(&id.URL, "unpublished.read", ch.acl...)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 			err = s.store.SetPerms(&id.URL, "stable.read", ch.acl...)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 		}
 	}
 }
@@ -2666,7 +2666,7 @@ func (s *APISuite) TestHash256Laziness(c *gc.C) {
 
 	// Retrieve the SHA256 hash.
 	entity, err := s.store.FindEntity(id, charmstore.FieldSelector("blobhash256"))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(entity.BlobHash256, gc.Not(gc.Equals), "")
 }
 
@@ -2741,10 +2741,10 @@ func (s *APISuite) TestURLChannelResolving(c *gc.C) {
 	s.idmServer.SetDefaultUser("charmers")
 	for _, add := range urlChannelResolvingEntities {
 		err := s.store.AddCharmWithArchive(add.id, storetesting.NewCharm(nil))
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		if add.channel != params.UnpublishedChannel {
 			err = s.store.Publish(add.id, nil, add.channel)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 		}
 	}
 	for i, test := range urlChannelResolvingTests {
@@ -2841,7 +2841,7 @@ func (s *APISuite) assertPut(c *gc.C, url string, val interface{}) {
 
 func (s *APISuite) assertPut0(c *gc.C, url string, val interface{}, asAdmin bool) {
 	body, err := json.Marshal(val)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	p := httptesting.DoRequestParams{
 		Handler: s.srv,
 		URL:     storeURL(url),
@@ -2892,15 +2892,15 @@ func (s *APISuite) TestMacaroon(c *gc.C) {
 	c.Assert(rec.Code, gc.Equals, http.StatusOK, gc.Commentf("body: %s", rec.Body.String()))
 	var m macaroon.Macaroon
 	err := json.Unmarshal(rec.Body.Bytes(), &m)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(m.Location(), gc.Equals, "charmstore")
 
 	s.idmServer.SetDefaultUser("who")
 	client := httpbakery.NewClient()
 	ms, err := client.DischargeAll(&m)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	macaroonCookie, err := httpbakery.NewCookie(ms)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:      s.srv,
 		URL:          storeURL("log"),
@@ -3219,16 +3219,16 @@ func (s *APISuite) TestPromulgate(c *gc.C) {
 	for i, test := range promulgateTests {
 		c.Logf("%d. %s\n", i, test.about)
 		_, err := s.store.DB.Entities().RemoveAll(nil)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		_, err = s.store.DB.BaseEntities().RemoveAll(nil)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		for _, e := range test.entities {
 			err := s.store.DB.Entities().Insert(e)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 		}
 		for _, e := range test.baseEntities {
 			err := s.store.DB.BaseEntities().Insert(e)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 		}
 		if test.method == "" {
 			test.method = "PUT"
@@ -3253,13 +3253,13 @@ func (s *APISuite) TestPromulgate(c *gc.C) {
 		}
 		httptesting.AssertJSONCall(c, p)
 		n, err := s.store.DB.Entities().Count()
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(n, gc.Equals, len(test.expectEntities))
 		for _, e := range test.expectEntities {
 			storetesting.AssertEntity(c, s.store.DB.Entities(), e)
 		}
 		n, err = s.store.DB.BaseEntities().Count()
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(n, gc.Equals, len(test.expectBaseEntities))
 		for _, e := range test.expectBaseEntities {
 			storetesting.AssertBaseEntity(c, s.store.DB.BaseEntities(), e)
@@ -3274,7 +3274,7 @@ func (s *APISuite) TestEndpointRequiringBaseEntityWithPromulgatedId(c *gc.C) {
 
 	// Unpromulgate the base entity
 	err := s.store.SetPromulgated(url, false)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Check that we can still enquire about the promulgation status
 	// of the entity when using its promulgated URL.
@@ -3296,7 +3296,7 @@ func (s *APISuite) TestTooManyConcurrentRequests(c *gc.C) {
 	}
 	db := s.Session.DB("charmstore")
 	srv, err := charmstore.NewServer(db, nil, config, map[string]charmstore.NewAPIHandlerFunc{"v4": v4.NewAPIHandler})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer srv.Close()
 
 	// Get a store from the pool so that we'll be
@@ -3322,7 +3322,7 @@ func (s *APISuite) TestTooManyConcurrentRequests(c *gc.C) {
 var dischargeRequiredBody httptesting.BodyAsserter = func(c *gc.C, body json.RawMessage) {
 	var response httpbakery.Error
 	err := json.Unmarshal(body, &response)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(response.Code, gc.Equals, httpbakery.ErrDischargeRequired)
 	c.Assert(response.Message, gc.Equals, "verification failed: no macaroon cookies in request")
 	c.Assert(response.Info.Macaroon, gc.NotNil)
@@ -3336,7 +3336,7 @@ var dischargeRequiredBody httptesting.BodyAsserter = func(c *gc.C, body json.Raw
 
 func (s *APISuite) TestSetAuthCookie(c *gc.C) {
 	m, err := macaroon.New([]byte("key"), []byte("id"), "location")
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	ms := macaroon.Slice{m}
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.srv,
@@ -3359,13 +3359,13 @@ func (s *APISuite) TestSetAuthCookie(c *gc.C) {
 	c.Assert(len(cookies), gc.Equals, 1)
 	expected, err := httpbakery.NewCookie(ms)
 	expected.Path = "/"
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(cookies[0].Value, gc.Equals, expected.Value)
 }
 
 func (s *APISuite) TestSetAuthCookieBodyError(c *gc.C) {
 	m, err := macaroon.New([]byte("key"), []byte("id"), "location")
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:      s.srv,
 		URL:          storeURL("set-auth-cookie"),
@@ -3380,7 +3380,7 @@ func (s *APISuite) TestSetAuthCookieBodyError(c *gc.C) {
 
 func (s *APISuite) TestSetAuthCookieMethodError(c *gc.C) {
 	m, err := macaroon.New([]byte("key"), []byte("id"), "location")
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:      s.srv,
 		URL:          storeURL("set-auth-cookie"),

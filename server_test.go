@@ -63,7 +63,7 @@ func (s *ServerSuite) TestNewServerWithVersions(c *gc.C) {
 	db := s.Session.DB("foo")
 
 	h, err := charmstore.NewServer(db, nil, "", s.config, charmstore.V4)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer h.Close()
 
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -120,6 +120,6 @@ func (s *ServerESSuite) TestNewServerWithElasticsearch(c *gc.C) {
 	db := s.Session.DB("foo")
 
 	srv, err := charmstore.NewServer(db, s.ES, s.TestIndex, s.config, charmstore.V4)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	srv.Close()
 }

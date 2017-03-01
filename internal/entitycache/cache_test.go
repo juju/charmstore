@@ -63,7 +63,7 @@ func (*suite) TestEntityIssuesBaseEntityQueryConcurrently(c *gc.C) {
 	go func() {
 		defer close(queryDone)
 		e, err := cache.Entity(charm.MustParseURL("~bob/wordpress-1"), map[string]int{"blobname": 1})
-		c.Check(err, gc.IsNil)
+		c.Check(err, gc.Equals, nil)
 		c.Check(e, jc.DeepEquals, selectEntityFields(entity, entityFields("blobname")))
 	}()
 
@@ -88,11 +88,11 @@ func (*suite) TestEntityIssuesBaseEntityQueryConcurrently(c *gc.C) {
 	// on the query channels and we won't receive it, so the test
 	// will deadlock.
 	e, err := cache.Entity(charm.MustParseURL("~bob/wordpress-1"), map[string]int{"baseurl": 1, "blobname": 1})
-	c.Check(err, gc.IsNil)
+	c.Check(err, gc.Equals, nil)
 	c.Check(e, jc.DeepEquals, selectEntityFields(entity, entityFields("blobname")))
 
 	be, err := cache.BaseEntity(charm.MustParseURL("~bob/wordpress"), map[string]int{"name": 1})
-	c.Check(err, gc.IsNil)
+	c.Check(err, gc.Equals, nil)
 	c.Check(be, jc.DeepEquals, selectBaseEntityFields(baseEntity, baseEntityFields("name")))
 }
 
@@ -117,7 +117,7 @@ func (*suite) TestEntityIssuesBaseEntityQuerySequentiallyForPromulgatedURL(c *gc
 	go func() {
 		defer close(queryDone)
 		e, err := cache.Entity(charm.MustParseURL("wordpress-1"), map[string]int{"blobname": 1})
-		c.Check(err, gc.IsNil)
+		c.Check(err, gc.Equals, nil)
 		c.Check(e, jc.DeepEquals, selectEntityFields(entity, entityFields("blobname")))
 	}()
 
@@ -147,11 +147,11 @@ func (*suite) TestEntityIssuesBaseEntityQuerySequentiallyForPromulgatedURL(c *gc
 	// on the query channels and we won't receive it, so the test
 	// will deadlock.
 	e, err := cache.Entity(charm.MustParseURL("wordpress-1"), map[string]int{"baseurl": 1, "blobname": 1})
-	c.Check(err, gc.IsNil)
+	c.Check(err, gc.Equals, nil)
 	c.Check(e, jc.DeepEquals, selectEntityFields(entity, entityFields("blobname")))
 
 	be, err := cache.BaseEntity(charm.MustParseURL("~bob/wordpress"), map[string]int{"name": 1})
-	c.Check(err, gc.IsNil)
+	c.Check(err, gc.Equals, nil)
 	c.Check(be, jc.DeepEquals, selectBaseEntityFields(baseEntity, baseEntityFields("name")))
 }
 
@@ -180,7 +180,7 @@ func (*suite) TestFetchWhenFieldsChangeBeforeQueryResult(c *gc.C) {
 	go func() {
 		defer close(queryDone)
 		e, err := cache.Entity(charm.MustParseURL("~bob/wordpress-1"), nil)
-		c.Check(err, gc.IsNil)
+		c.Check(err, gc.Equals, nil)
 		c.Check(e, jc.DeepEquals, selectEntityFields(entity, entityFields()))
 	}()
 
@@ -200,7 +200,7 @@ func (*suite) TestFetchWhenFieldsChangeBeforeQueryResult(c *gc.C) {
 		defer close(query2Done)
 		// Note the extra "size" field.
 		e, err := cache.Entity(charm.MustParseURL("~bob/wordpress-1"), map[string]int{"size": 1})
-		c.Check(err, gc.IsNil)
+		c.Check(err, gc.Equals, nil)
 		c.Check(e, jc.DeepEquals, selectEntityFields(entity2, entityFields("size")))
 	}()
 	// The second query should be sent immediately without waiting
@@ -224,7 +224,7 @@ func (*suite) TestFetchWhenFieldsChangeBeforeQueryResult(c *gc.C) {
 	close(store.entityqc)
 	close(store.baseEntityqc)
 	e, err := cache.Entity(charm.MustParseURL("~bob/wordpress-1"), nil)
-	c.Check(err, gc.IsNil)
+	c.Check(err, gc.Equals, nil)
 	c.Check(e, jc.DeepEquals, selectEntityFields(entity2, entityFields("size")))
 }
 
@@ -254,7 +254,7 @@ func (*suite) TestSecondFetchesWaitForFirst(c *gc.C) {
 	go func() {
 		defer initialRequestGroup.Done()
 		e, err := cache.Entity(charm.MustParseURL("~bob/wordpress-1"), nil)
-		c.Check(err, gc.IsNil)
+		c.Check(err, gc.Equals, nil)
 		c.Check(e, jc.DeepEquals, selectEntityFields(entity, entityFields()))
 	}()
 
@@ -269,7 +269,7 @@ func (*suite) TestSecondFetchesWaitForFirst(c *gc.C) {
 		go func() {
 			defer initialRequestGroup.Done()
 			e, err := cache.Entity(charm.MustParseURL("~bob/wordpress-1"), nil)
-			c.Check(err, gc.IsNil)
+			c.Check(err, gc.Equals, nil)
 			c.Check(e, jc.DeepEquals, selectEntityFields(entity, entityFields()))
 		}()
 	}
@@ -291,7 +291,7 @@ func (*suite) TestSecondFetchesWaitForFirst(c *gc.C) {
 	go func() {
 		defer close(otherRequestDone)
 		e, err := cache.Entity(charm.MustParseURL("~bob/wordpress-2"), nil)
-		c.Check(err, gc.IsNil)
+		c.Check(err, gc.Equals, nil)
 		c.Check(e, jc.DeepEquals, selectEntityFields(entity2, entityFields()))
 	}()
 	query2 := <-store.entityqc
@@ -418,14 +418,14 @@ func (*suite) TestStartFetch(c *gc.C) {
 	go func() {
 		defer close(entityQueryDone)
 		e, err := cache.Entity(url, nil)
-		c.Check(err, gc.IsNil)
+		c.Check(err, gc.Equals, nil)
 		c.Check(e, jc.DeepEquals, selectEntityFields(entity, entityFields()))
 	}()
 	baseEntityQueryDone := make(chan struct{})
 	go func() {
 		defer close(baseEntityQueryDone)
 		e, err := cache.BaseEntity(baseURL, nil)
-		c.Check(err, gc.IsNil)
+		c.Check(err, gc.Equals, nil)
 		c.Check(e, jc.DeepEquals, baseEntity)
 	}()
 
@@ -471,14 +471,14 @@ func (*suite) TestAddEntityFields(c *gc.C) {
 	go func() {
 		defer close(queryDone)
 		e, err := cache.Entity(charm.MustParseURL("cs:~bob/wordpress-1"), map[string]int{"blobname": 1})
-		c.Check(err, gc.IsNil)
+		c.Check(err, gc.Equals, nil)
 		c.Check(e, jc.DeepEquals, selectEntityFields(entity, entityFields("blobname", "size")))
 
 		// Adding existing entity fields should have no effect.
 		cache.AddEntityFields(map[string]int{"blobname": 1, "size": 1})
 
 		e, err = cache.Entity(charm.MustParseURL("cs:~bob/wordpress-1"), map[string]int{"size": 1})
-		c.Check(err, gc.IsNil)
+		c.Check(err, gc.Equals, nil)
 		c.Check(e, jc.DeepEquals, selectEntityFields(entity, entityFields("blobname", "size")))
 
 		// Adding a new field should will cause the cache to be invalidated
@@ -486,7 +486,7 @@ func (*suite) TestAddEntityFields(c *gc.C) {
 
 		cache.AddEntityFields(map[string]int{"blobhash": 1})
 		e, err = cache.Entity(charm.MustParseURL("cs:~bob/wordpress-1"), nil)
-		c.Check(err, gc.IsNil)
+		c.Check(err, gc.Equals, nil)
 		c.Check(e, jc.DeepEquals, selectEntityFields(entity, entityFields("blobname", "size", "blobhash")))
 	}()
 
@@ -534,7 +534,7 @@ func (*suite) TestLookupByDifferentKey(c *gc.C) {
 	cache := entitycache.New(store)
 	defer cache.Close()
 	e, err := cache.Entity(charm.MustParseURL("~bob/wordpress-1"), nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Check(e, jc.DeepEquals, selectEntityFields(entity, entityFields()))
 
 	oldEntity := e
@@ -548,7 +548,7 @@ func (*suite) TestLookupByDifferentKey(c *gc.C) {
 		BlobName: "w2",
 	}
 	e, err = cache.Entity(charm.MustParseURL("~bob/wordpress"), nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Logf("got %p; old entity %p; new entity %p", e, oldEntity, entity)
 	c.Assert(e, gc.Equals, oldEntity)
 	c.Assert(entityFetchCount, gc.Equals, 2)
@@ -607,7 +607,7 @@ func (s *suite) TestIterSingle(c *gc.C) {
 
 	// Check that the entity can now be fetched from the cache.
 	e, err := cache.Entity(charm.MustParseURL("~bob/wordpress-1"), nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(e, gc.Equals, cachedEntity)
 
 	// A request for the base entity should now block
@@ -620,7 +620,7 @@ func (s *suite) TestIterSingle(c *gc.C) {
 	go func() {
 		defer close(queryDone)
 		e, err := cache.BaseEntity(charm.MustParseURL("~bob/wordpress"), nil)
-		c.Check(err, gc.IsNil)
+		c.Check(err, gc.Equals, nil)
 		c.Check(e, jc.DeepEquals, selectBaseEntityFields(baseEntity, baseEntityFields()))
 	}()
 
@@ -664,12 +664,12 @@ func (*suite) TestIterWithEntryAlreadyInCache(c *gc.C) {
 	cache := entitycache.New(store)
 	defer cache.Close()
 	e, err := cache.Entity(charm.MustParseURL("~bob/wordpress-1"), map[string]int{"size": 1, "blobsize": 1})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Check(e, jc.DeepEquals, selectEntityFields(store.entities[0], entityFields("size", "blobsize")))
 	cachedEntity := e
 
 	be, err := cache.BaseEntity(charm.MustParseURL("~bob/wordpress"), nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Check(be, jc.DeepEquals, selectBaseEntityFields(store.baseEntities[0], baseEntityFields()))
 	cachedBaseEntity := be
 
@@ -710,11 +710,11 @@ func (*suite) TestIterWithEntryAlreadyInCache(c *gc.C) {
 
 	// The original cached entities should still be there.
 	e, err = cache.Entity(charm.MustParseURL("~bob/wordpress-1"), nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(e, gc.Equals, cachedEntity)
 
 	be, err = cache.BaseEntity(charm.MustParseURL("~bob/wordpress"), nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(be, gc.Equals, cachedBaseEntity)
 }
 
@@ -812,10 +812,10 @@ func (*suite) TestIterEntityBatchLimitExceeded(c *gc.C) {
 	// Check that all the entities and base entities are in fact cached.
 	for _, want := range entities {
 		got, err := cache.Entity(want.URL, nil)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(got, jc.DeepEquals, want)
 		gotBase, err := cache.BaseEntity(want.URL, nil)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(gotBase, jc.DeepEquals, &mongodoc.BaseEntity{
 			URL: want.BaseURL,
 		})
@@ -828,7 +828,7 @@ func (*suite) TestIterError(c *gc.C) {
 	iter := cache.CustomIter(fakeIter, nil)
 	// Err returns nil while the iteration is in progress.
 	err := iter.Err()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	replyc := <-fakeIter.req
 	replyc <- iterReply{
