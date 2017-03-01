@@ -18,7 +18,6 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
-	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
@@ -170,7 +169,6 @@ func (h *ReqHandler) servePostArchive(id *charm.URL, w http.ResponseWriter, req 
 	if req.ContentLength == -1 {
 		return badRequestf(nil, "Content-Length not specified")
 	}
-
 	oldURL, oldHash, err := h.latestRevisionInfo(id)
 	if err != nil && errgo.Cause(err) != params.ErrNotFound {
 		return errgo.Notef(err, "cannot get hash of latest revision")
@@ -183,13 +181,12 @@ func (h *ReqHandler) servePostArchive(id *charm.URL, w http.ResponseWriter, req 
 			PromulgatedId: oldURL.PromulgatedURL(),
 		})
 	}
-	rid := &router.ResolvedURL{URL: *id}
-	// Choose the next revision number for the upload.
-	if oldURL == nil {
-		rid.URL.Revision = 0
-	} else {
-		rid.URL.Revision = oldURL.URL.Revision + 1
+	newRevision, err := h.Store.NewRevision(id)
+	if err != nil {
+		return errgo.Notef(err, "cannot get new revision")
 	}
+	rid := &router.ResolvedURL{URL: *id}
+	rid.URL.Revision = newRevision
 	rid.PromulgatedRevision, err = h.getNewPromulgatedRevision(id)
 	if err != nil {
 		return errgo.Mask(err)
@@ -279,6 +276,10 @@ func (h *ReqHandler) servePutArchive(id *charm.URL, w http.ResponseWriter, req *
 			return badRequestf(nil, "promulgated URL has no revision")
 		}
 		rid.PromulgatedRevision = pid.Revision
+	}
+	// Register the new revisions we're about to use.
+	if err := h.Store.AddRevision(rid); err != nil {
+		return errgo.Mask(err)
 	}
 	if err := h.Store.UploadEntity(rid, req.Body, hash, req.ContentLength, chans); err != nil {
 		return errgo.Mask(err,
@@ -381,20 +382,17 @@ func (h *ReqHandler) getNewPromulgatedRevision(id *charm.URL) (int, error) {
 	if baseEntity == nil || !baseEntity.Promulgated {
 		return -1, nil
 	}
-	query := h.Store.EntitiesQuery(&charm.URL{
+	purl := &charm.URL{
+		Schema:   "cs",
 		Series:   id.Series,
 		Name:     id.Name,
 		Revision: -1,
-	})
-	var entity mongodoc.Entity
-	err = query.Sort("-promulgated-revision").Select(bson.D{{"promulgated-revision", 1}}).One(&entity)
-	if err == mgo.ErrNotFound {
-		return 0, nil
 	}
+	rev, err := h.Store.NewRevision(purl)
 	if err != nil {
 		return 0, errgo.Mask(err)
 	}
-	return entity.PromulgatedRevision + 1, nil
+	return rev, nil
 }
 
 // archiveReadError creates an appropriate error for errors in reading an

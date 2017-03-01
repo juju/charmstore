@@ -892,52 +892,6 @@ func (s *StoreSuite) TestBundleMachineCount(c *gc.C) {
 	}
 }
 
-func urlStrings(urls []*charm.URL) []string {
-	urlStrs := make([]string, len(urls))
-	for i, url := range urls {
-		urlStrs[i] = url.String()
-	}
-	return urlStrs
-}
-
-// MustParseResolvedURL parses a resolved URL in string form, with
-// the optional promulgated revision preceding the entity URL
-// separated by a space.
-func MustParseResolvedURL(urlStr string) *router.ResolvedURL {
-	s := strings.Fields(urlStr)
-	promRev := -1
-	switch len(s) {
-	default:
-		panic(fmt.Errorf("invalid resolved URL string %q", urlStr))
-	case 2:
-		var err error
-		promRev, err = strconv.Atoi(s[0])
-		if err != nil || promRev < 0 {
-			panic(fmt.Errorf("invalid resolved URL string %q", urlStr))
-		}
-	case 1:
-	}
-	url := charm.MustParseURL(s[len(s)-1])
-	if url.User == "" {
-		panic("resolved URL with no user")
-	}
-	if url.Revision == -1 {
-		panic("resolved URL with no revision")
-	}
-	return &router.ResolvedURL{
-		URL:                 *url,
-		PromulgatedRevision: promRev,
-	}
-}
-
-func MustParseResolvedURLs(urlStrs []string) []*router.ResolvedURL {
-	urls := make([]*router.ResolvedURL, len(urlStrs))
-	for i, u := range urlStrs {
-		urls[i] = MustParseResolvedURL(u)
-	}
-	return urls
-}
-
 func (s *StoreSuite) TestOpenBlob(c *gc.C) {
 	charmArchive := storetesting.Charms.CharmArchive(c.MkDir(), "wordpress")
 	store := s.newStore(c, false)
@@ -1290,71 +1244,6 @@ func (s *StoreSuite) TestOpenCachedBlobFileWithNotFoundContent(c *gc.C) {
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	c.Assert(r, gc.Equals, nil)
 }
-
-func hashOfReader(r io.Reader) string {
-	hash := sha512.New384()
-	_, err := io.Copy(hash, r)
-	if err != nil {
-		panic(err)
-	}
-	return fmt.Sprintf("%x", hash.Sum(nil))
-}
-
-func hashOfString(s string) string {
-	return hashOfReader(strings.NewReader(s))
-}
-
-func getSizeAndHashes(c interface{}) (int64, string, string) {
-	var r io.ReadWriter
-	var err error
-	switch c := c.(type) {
-	case ArchiverTo:
-		r = new(bytes.Buffer)
-		err = c.ArchiveTo(r)
-	case *charm.BundleArchive:
-		r, err = os.Open(c.Path)
-	case *charm.CharmArchive:
-		r, err = os.Open(c.Path)
-	default:
-		panic(fmt.Sprintf("unable to get size and hash for type %T", c))
-	}
-	if err != nil {
-		panic(err)
-	}
-	hash := blobstore.NewHash()
-	hash256 := sha256.New()
-	size, err := io.Copy(io.MultiWriter(hash, hash256), r)
-	if err != nil {
-		panic(err)
-	}
-	return size, fmt.Sprintf("%x", hash.Sum(nil)), fmt.Sprintf("%x", hash256.Sum(nil))
-}
-
-// testingBundle implements charm.Bundle, allowing tests
-// to create a bundle with custom data.
-type testingBundle struct {
-	data *charm.BundleData
-}
-
-func (b *testingBundle) Data() *charm.BundleData {
-	return b.data
-}
-
-func (b *testingBundle) ReadMe() string {
-	// For the purposes of this implementation, the charm readme is not
-	// relevant.
-	return ""
-}
-
-const fakeContent = "fake content"
-
-// Define fake blob attributes to be used in tests.
-var fakeBlobSize, fakeBlobHash = func() (int64, string) {
-	b := []byte(fakeContent)
-	h := blobstore.NewHash()
-	h.Write(b)
-	return int64(len(b)), fmt.Sprintf("%x", h.Sum(nil))
-}()
 
 func (s *StoreSuite) TestSESPutDoesNotErrorWithNoESConfigured(c *gc.C) {
 	store := s.newStore(c, false)
@@ -3507,6 +3396,124 @@ func (s *StoreSuite) TestBundleCharms(c *gc.C) {
 	}
 }
 
+func (s *StoreSuite) TestNewRevisionFirstTime(c *gc.C) {
+	store := s.newStore(c, true)
+	defer store.Close()
+	id := charm.MustParseURL("~bob/precise/wordpress")
+	rev, err := store.NewRevision(id)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(rev, gc.Equals, 0)
+}
+
+func (s *StoreSuite) TestNewRevisionSeveralTimes(c *gc.C) {
+	store := s.newStore(c, true)
+	defer store.Close()
+	id := charm.MustParseURL("~bob/precise/wordpress")
+	for i := 0; i < 5; i++ {
+		rev, err := store.NewRevision(id)
+		c.Assert(err, gc.Equals, nil)
+		c.Assert(rev, gc.Equals, i)
+	}
+}
+
+func (s *StoreSuite) TestNewRevisionConcurrent(c *gc.C) {
+	store := s.newStore(c, true)
+	defer store.Close()
+	rch := make(chan string)
+	expect := make(map[string]bool)
+	for n := 0; n < 10; n++ {
+		for i := 0; i < 3; i++ {
+			id := charm.MustParseURL(fmt.Sprintf("c%d", n))
+			expect[id.WithRevision(i).String()] = true
+			go func() {
+				rev, err := store.NewRevision(id)
+				c.Check(err, gc.Equals, nil)
+				id.Revision = rev
+				rch <- id.String()
+			}()
+		}
+	}
+	got := make(map[string]bool)
+	for i := 0; i < 10*3; i++ {
+		got[<-rch] = true
+	}
+	c.Assert(got, jc.DeepEquals, expect)
+}
+
+func (s *StoreSuite) TestNewRevisionWithExistingSingleSeries(c *gc.C) {
+	store := s.newStore(c, true)
+	defer store.Close()
+	for _, id := range MustParseResolvedURLs([]string{
+		"2 ~charmers/precise/wordpress-11",
+		"~charmers/precise/wordpress-12",
+		"1 ~charmers/quantal/wordpress-14",
+		"0 ~charmers/quantal/wordpress-5",
+		"~bob/wordpress-20",
+	}) {
+		err := store.AddRevision(id)
+		c.Assert(err, gc.Equals, nil)
+	}
+	rev, err := store.NewRevision(charm.MustParseURL("cs:~charmers/wordpress"))
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(rev, gc.Equals, 15)
+
+	rev, err = store.NewRevision(charm.MustParseURL("cs:wordpress"))
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(rev, gc.Equals, 3)
+}
+
+func (s *StoreSuite) TestAddRevisionFirstTime(c *gc.C) {
+	store := s.newStore(c, true)
+	defer store.Close()
+	id := router.MustNewResolvedURL("~charmers/precise/wordpress-12", 10)
+	err := store.AddRevision(id)
+	c.Assert(err, gc.Equals, nil)
+
+	rev, err := store.NewRevision(&id.URL)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(rev, gc.Equals, 13)
+
+	rev, err = store.NewRevision(id.PromulgatedURL())
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(rev, gc.Equals, 11)
+}
+
+func (s *StoreSuite) TestAddRevisionWithoutPromulgatedURL(c *gc.C) {
+	store := s.newStore(c, true)
+	defer store.Close()
+	id := router.MustNewResolvedURL("~charmers/precise/wordpress-12", -1)
+	err := store.AddRevision(id)
+	c.Assert(err, gc.Equals, nil)
+
+	rev, err := store.NewRevision(&id.URL)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(rev, gc.Equals, 13)
+
+	rev, err = store.NewRevision(charm.MustParseURL("~precise/wordpress"))
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(rev, gc.Equals, 0)
+}
+
+func (s *StoreSuite) TestAddRevisionWithExisting(c *gc.C) {
+	store := s.newStore(c, true)
+	defer store.Close()
+	id := router.MustNewResolvedURL("~bob/precise/wordpress-3", -1)
+	err := store.AddRevision(id)
+	c.Assert(err, gc.Equals, nil)
+
+	rev, err := store.NewRevision(&id.URL)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(rev, gc.Equals, 4)
+
+	id = router.MustNewResolvedURL("~bob/precise/wordpress-4", -1)
+	err = store.AddRevision(id)
+	c.Assert(err, gc.Equals, nil)
+
+	rev, err = store.NewRevision(&id.URL)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(rev, gc.Equals, 5)
+}
+
 var publishTests = []struct {
 	about              string
 	url                *router.ResolvedURL
@@ -4186,6 +4193,117 @@ func (s *StoreSuite) TestPublishWithFailedESInsert(c *gc.C) {
 	err = store.Publish(url, nil, params.StableChannel)
 	c.Assert(err, gc.ErrorMatches, "cannot index cs:~charmers/precise/wordpress-12 to ElasticSearch: .*")
 }
+
+func urlStrings(urls []*charm.URL) []string {
+	urlStrs := make([]string, len(urls))
+	for i, url := range urls {
+		urlStrs[i] = url.String()
+	}
+	return urlStrs
+}
+
+// MustParseResolvedURL parses a resolved URL in string form, with
+// the optional promulgated revision preceding the entity URL
+// separated by a space.
+func MustParseResolvedURL(urlStr string) *router.ResolvedURL {
+	s := strings.Fields(urlStr)
+	promRev := -1
+	switch len(s) {
+	default:
+		panic(fmt.Errorf("invalid resolved URL string %q", urlStr))
+	case 2:
+		var err error
+		promRev, err = strconv.Atoi(s[0])
+		if err != nil || promRev < 0 {
+			panic(fmt.Errorf("invalid resolved URL string %q", urlStr))
+		}
+	case 1:
+	}
+	url := charm.MustParseURL(s[len(s)-1])
+	if url.User == "" {
+		panic("resolved URL with no user")
+	}
+	if url.Revision == -1 {
+		panic("resolved URL with no revision")
+	}
+	return &router.ResolvedURL{
+		URL:                 *url,
+		PromulgatedRevision: promRev,
+	}
+}
+
+func MustParseResolvedURLs(urlStrs []string) []*router.ResolvedURL {
+	urls := make([]*router.ResolvedURL, len(urlStrs))
+	for i, u := range urlStrs {
+		urls[i] = MustParseResolvedURL(u)
+	}
+	return urls
+}
+
+func hashOfReader(r io.Reader) string {
+	hash := sha512.New384()
+	_, err := io.Copy(hash, r)
+	if err != nil {
+		panic(err)
+	}
+	return fmt.Sprintf("%x", hash.Sum(nil))
+}
+
+func hashOfString(s string) string {
+	return hashOfReader(strings.NewReader(s))
+}
+
+func getSizeAndHashes(c interface{}) (int64, string, string) {
+	var r io.ReadWriter
+	var err error
+	switch c := c.(type) {
+	case ArchiverTo:
+		r = new(bytes.Buffer)
+		err = c.ArchiveTo(r)
+	case *charm.BundleArchive:
+		r, err = os.Open(c.Path)
+	case *charm.CharmArchive:
+		r, err = os.Open(c.Path)
+	default:
+		panic(fmt.Sprintf("unable to get size and hash for type %T", c))
+	}
+	if err != nil {
+		panic(err)
+	}
+	hash := blobstore.NewHash()
+	hash256 := sha256.New()
+	size, err := io.Copy(io.MultiWriter(hash, hash256), r)
+	if err != nil {
+		panic(err)
+	}
+	return size, fmt.Sprintf("%x", hash.Sum(nil)), fmt.Sprintf("%x", hash256.Sum(nil))
+}
+
+// testingBundle implements charm.Bundle, allowing tests
+// to create a bundle with custom data.
+type testingBundle struct {
+	data *charm.BundleData
+}
+
+func (b *testingBundle) Data() *charm.BundleData {
+	return b.data
+}
+
+func (b *testingBundle) ReadMe() string {
+	// For the purposes of this implementation, the charm readme is not
+	// relevant.
+	return ""
+}
+
+const fakeContent = "fake content"
+
+// Define fake blob attributes to be used in tests.
+var fakeBlobSize, fakeBlobHash = func() (int64, string) {
+	b := []byte(fakeContent)
+	h := blobstore.NewHash()
+	h.Write(b)
+	return int64(len(b)), fmt.Sprintf("%x", h.Sum(nil))
+}()
 
 func entity(url, purl string, supportedSeries ...string) *mongodoc.Entity {
 	id := charm.MustParseURL(url)

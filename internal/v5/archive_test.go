@@ -311,12 +311,10 @@ func (s *ArchiveSuite) TestConcurrentUploads(c *gc.C) {
 
 	// Our strategy for testing concurrent uploads is as follows: We
 	// repeat uploading a bunch of simultaneous uploads to the same
-	// charm. Each upload should either succeed, or fail with an
-	// ErrDuplicateUpload error. We make sure that all replies are
-	// like this, and that at least one duplicate upload error is
-	// found, so that we know we've tested that error path.
+	// charm. Each upload should succeed. We make sure that all replies are
+	// like this.
 
-	errorBodies := make(chan io.ReadCloser)
+	tries := make(chan struct{})
 
 	// upload performs one upload of the testing charm.
 	// It sends the response body on the errorBodies channel when
@@ -333,11 +331,9 @@ func (s *ArchiveSuite) TestConcurrentUploads(c *gc.C) {
 		if !c.Check(err, gc.IsNil) {
 			return
 		}
-		if resp.StatusCode == http.StatusOK {
-			resp.Body.Close()
-			return
-		}
-		errorBodies <- resp.Body
+		defer resp.Body.Close()
+		c.Check(resp.StatusCode, gc.Equals, http.StatusOK)
+		tries <- struct{}{}
 	}
 
 	// The try loop continues concurrently uploading
@@ -357,52 +353,25 @@ func (s *ArchiveSuite) TestConcurrentUploads(c *gc.C) {
 			}
 			wg.Wait()
 		}
-		close(errorBodies)
+		close(tries)
 	}(try)
 
-	// We continue the loop until we have found an
-	// error (or the maximum iteration count has
-	// been exceeded).
-	foundError := false
 	count := 0
 loop:
 	for {
 		select {
-		case body, ok := <-errorBodies:
+		case _, ok := <-tries:
 			if !ok {
 				// The try loop has terminated,
 				// so we need to stop too.
 				break loop
 			}
-			dec := json.NewDecoder(body)
-			var errResp params.Error
-			err := dec.Decode(&errResp)
-			body.Close()
-			c.Assert(err, gc.IsNil)
-			c.Assert(errResp, jc.DeepEquals, params.Error{
-				Message: "duplicate upload",
-				Code:    params.ErrDuplicateUpload,
-			})
-			// We've found the error we're looking for,
-			// so we signal to the try loop that it can stop.
-			// We will process any outstanding error bodies,
-			// before seeing errorBodies closed and exiting
-			// the loop.
-			foundError = true
-			if try != nil {
+		case try <- struct{}{}:
+			if count++; count > 10 {
 				close(try)
 				try = nil
 			}
-		case try <- struct{}{}:
-			// In cases we've seen, the actual maximum value of
-			// count is 1, but let's allow for serious scheduler vagaries.
-			if count++; count > 200 {
-				c.Fatalf("200 tries with no duplicate error")
-			}
 		}
-	}
-	if !foundError {
-		c.Errorf("no duplicate-upload errors found")
 	}
 }
 
@@ -458,7 +427,7 @@ func (s *ArchiveSuite) TestPostMultiSeriesPromulgatedRevisionAfterAllSingleSerie
 	s.assertUploadCharm(c, "PUT", newResolvedURL("~charmers/trusty/juju-gui-12", 9), "mysql", nil)
 	s.assertUploadCharm(c, "PUT", newResolvedURL("~charmers/precise/juju-gui-44", 33), "mysql", nil)
 
-	// Check that the new multi-series promulgated revision takes the
+	// Check that the new multi-series promulgated revision has
 	// a revision number larger than the largest of all the single
 	// series revisions.
 	s.assertUploadCharm(c, "POST", newResolvedURL("~charmers/juju-gui-45", 34), "multi-series", nil)

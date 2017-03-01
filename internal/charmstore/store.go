@@ -405,6 +405,9 @@ func (s *Store) ensureIndexes() error {
 		// TODO this index should be created by the mgo gridfs code.
 		s.DB.C("entitystore.files"),
 		mgo.Index{Key: []string{"filename"}},
+	}, {
+		s.DB.Revisions(),
+		mgo.Index{Key: []string{"baseurl"}},
 	}}
 	for _, idx := range indexes {
 		err := idx.c.EnsureIndex(idx.i)
@@ -432,6 +435,89 @@ func (s *Store) addAuditAtTime(entry audit.Entry, t time.Time) {
 	if err != nil {
 		logger.Errorf("Cannot write audit log entry: %v", err)
 	}
+}
+
+// NewRevision returns a new revision number for the
+// given entity URL.
+func (s *Store) NewRevision(id *charm.URL) (int, error) {
+	id = id.WithRevision(-1)
+	col := s.DB.Revisions()
+	change := mgo.Change{
+		Update:    bson.D{{"$inc", bson.D{{"revision", 1}}}},
+		ReturnNew: true,
+	}
+	var doc mongodoc.LatestRevision
+	_, err := col.FindId(id).Apply(change, &doc)
+	if err == nil {
+		return doc.Revision, nil
+	}
+	if err != mgo.ErrNotFound {
+		return 0, errgo.Notef(err, "cannot obtain new revision")
+	}
+	// This is the first revision of a given name.
+	firstRev := 0
+	if id.Series == "" {
+		// It's multi-series. Choose a revision that's greater
+		// than any existing single-series variant.
+		err := col.Find(bson.D{{"baseurl", mongodoc.BaseURL(id)}}).Sort("-revision").One(&doc)
+		if err == nil {
+			firstRev = doc.Revision + 1
+		} else if err != mgo.ErrNotFound {
+			return 0, errgo.Notef(err, "cannot find latest single-series revision")
+		}
+	}
+	err = col.Insert(mongodoc.LatestRevision{
+		URL:      id,
+		BaseURL:  mongodoc.BaseURL(id),
+		Revision: firstRev,
+	})
+	if mgo.IsDup(err) {
+		// We were in a race and they won. Recur to
+		// use the usual increment method to find the id.
+		return s.NewRevision(id)
+	}
+	return firstRev, nil
+}
+
+// AddRevision records a new revision of the given id,
+// meaning that any subequent NewRevision call
+// for the id will return a higher revision number.
+func (s *Store) AddRevision(id *router.ResolvedURL) error {
+	if err := s.addRevision(&id.URL); err != nil {
+		return errgo.Mask(err)
+	}
+	if purl := id.PromulgatedURL(); purl != nil {
+		if err := s.addRevision(purl); err != nil {
+			return errgo.Mask(err)
+		}
+	}
+	return nil
+}
+
+// addRevision is the internal version of AddRevision
+// which acts on a single non-resolved URL.
+func (s *Store) addRevision(id *charm.URL) error {
+	rev := id.Revision
+	id = id.WithRevision(-1)
+	_, err := s.DB.Revisions().Upsert(bson.D{
+		{"_id", id},
+		{"revision", bson.D{{"$lt", rev}}},
+	}, mongodoc.LatestRevision{
+		URL:      id,
+		BaseURL:  mongodoc.BaseURL(id),
+		Revision: rev,
+	})
+	if err == nil {
+		return nil
+	}
+	if mgo.IsDup(err) {
+		// We didn't find any documents to update
+		// but still failed to insert a new document,
+		// which implies that there is an existing
+		// document with a higher id.
+		return nil
+	}
+	return errgo.Notef(err, "cannot add revision")
 }
 
 // FindEntity finds the entity in the store with the given URL, which
@@ -1228,6 +1314,12 @@ func (s StoreDatabase) Entities() *mgo.Collection {
 	return s.C("entities")
 }
 
+// Revisions holds the mongo collection where the latest
+// revision numbers are stored.
+func (s StoreDatabase) Revisions() *mgo.Collection {
+	return s.C("revisions")
+}
+
 // BaseEntities returns the mongo collection where base entities are stored.
 func (s StoreDatabase) BaseEntities() *mgo.Collection {
 	return s.C("base_entities")
@@ -1255,14 +1347,15 @@ func (s StoreDatabase) Macaroons() *mgo.Collection {
 // allCollections holds for each collection used by the charm store a
 // function returns that collection.
 var allCollections = []func(StoreDatabase) *mgo.Collection{
+	StoreDatabase.BaseEntities,
+	StoreDatabase.Entities,
+	StoreDatabase.Logs,
+	StoreDatabase.Macaroons,
+	StoreDatabase.Migrations,
+	StoreDatabase.Resources,
+	StoreDatabase.Revisions,
 	StoreDatabase.StatCounters,
 	StoreDatabase.StatTokens,
-	StoreDatabase.Entities,
-	StoreDatabase.BaseEntities,
-	StoreDatabase.Resources,
-	StoreDatabase.Logs,
-	StoreDatabase.Migrations,
-	StoreDatabase.Macaroons,
 }
 
 // Collections returns a slice of all the collections used
