@@ -4194,6 +4194,75 @@ func (s *StoreSuite) TestPublishWithFailedESInsert(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, "cannot index cs:~charmers/precise/wordpress-12 to ElasticSearch: .*")
 }
 
+func (s *StoreSuite) TestDeleteEntity(c *gc.C) {
+	store := s.newStore(c, false)
+	defer store.Close()
+	url := router.MustNewResolvedURL("~charmers/precise/wordpress-12", -1)
+	err := store.AddCharmWithArchive(url, storetesting.NewCharm(&charm.Meta{
+		Series: []string{"precise"},
+	}))
+	c.Assert(err, gc.Equals, nil)
+	url1 := *url
+	url1.URL.Revision = 13
+	err = store.AddCharmWithArchive(&url1, storetesting.NewCharm(&charm.Meta{
+		Series: []string{"precise"},
+	}))
+	c.Assert(err, gc.Equals, nil)
+
+	entity, err := store.FindEntity(url, nil)
+	c.Assert(err, gc.Equals, nil)
+
+	err = store.DeleteEntity(url)
+	c.Assert(err, gc.Equals, nil)
+
+	_, err = store.FindEntity(url, nil)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+
+	_, _, err = store.BlobStore.Open(entity.BlobName, nil)
+	c.Assert(errgo.Cause(err), gc.Equals, blobstore.ErrNotFound)
+
+	_, _, err = store.BlobStore.Open(preV5CompatibilityBlobName(entity.BlobName), nil)
+	c.Assert(errgo.Cause(err), gc.Equals, blobstore.ErrNotFound)
+}
+
+func (s *StoreSuite) TestDeleteEntityWithOnlyOneRevision(c *gc.C) {
+	store := s.newStore(c, false)
+	defer store.Close()
+	url := router.MustNewResolvedURL("~charmers/precise/wordpress-12", -1)
+	err := store.AddCharmWithArchive(url, storetesting.NewCharm(&charm.Meta{
+		Series: []string{"precise"},
+	}))
+	c.Assert(err, gc.Equals, nil)
+
+	err = store.DeleteEntity(url)
+	c.Assert(err, gc.ErrorMatches, `cannot delete last revision of charm or bundle`)
+}
+
+func (s *StoreSuite) TestDeleteEntityWithPublishedRevision(c *gc.C) {
+	store := s.newStore(c, false)
+	defer store.Close()
+	url := router.MustNewResolvedURL("~charmers/precise/wordpress-12", -1)
+	err := store.AddCharmWithArchive(url, storetesting.NewCharm(&charm.Meta{
+		Series: []string{"precise"},
+	}))
+	c.Assert(err, gc.Equals, nil)
+	err = store.Publish(url, nil, params.EdgeChannel, params.BetaChannel)
+	c.Assert(err, gc.Equals, nil)
+	url1 := *url
+	url1.URL.Revision = 13
+	err = store.AddCharmWithArchive(&url1, storetesting.NewCharm(&charm.Meta{
+		Series: []string{"precise"},
+	}))
+	c.Assert(err, gc.Equals, nil)
+
+	err = store.DeleteEntity(url)
+	c.Assert(err, gc.ErrorMatches, `cannot delete "cs:~charmers/precise/wordpress-12" because it is the current revision in channels \[beta edge\]`)
+
+	// Check that it really hasn't been deleted.
+	_, err = store.FindEntity(url, nil)
+	c.Assert(err, gc.Equals, nil)
+}
+
 func urlStrings(urls []*charm.URL) []string {
 	urlStrs := make([]string, len(urls))
 	for i, url := range urls {

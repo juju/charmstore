@@ -55,7 +55,8 @@ var _ = gc.Suite(&ArchiveSuite{})
 
 func (s *ArchiveSuite) SetUpSuite(c *gc.C) {
 	s.enableIdentity = true
-	s.commonSuite.SetUpSuite(c)
+	s.commonArchiveSuite.SetUpSuite(c)
+	c.Logf("after SetUpSuite, enableIdentity %v", s.enableIdentity)
 }
 
 func (s *ArchiveSuite) TestGetCharmWithTermsWhenTermsServiceNotConfigured(c *gc.C) {
@@ -1211,39 +1212,29 @@ func (s *ArchiveSuite) assertArchiveFileContents(c *gc.C, zipFile *zip.ReadClose
 
 func (s *ArchiveSuite) TestDelete(c *gc.C) {
 	// Add a charm to the database (including the archive).
-	id := "~charmers/utopic/mysql-42"
-	url := newResolvedURL(id, -1)
-	err := s.store.AddCharmWithArchive(url, storetesting.Charms.CharmArchive(c.MkDir(), "mysql"))
-	c.Assert(err, gc.Equals, nil)
+	id, _ := s.addPublicCharm(c, storetesting.NewCharm(nil), newResolvedURL("~charmers/utopic/mysql-42", -1))
+	// Add a second charm so that we're not trying to delete the last revision.
+	s.addPublicCharm(c, storetesting.NewCharm(nil), newResolvedURL("~charmers/utopic/mysql-43", -1))
 
 	// Retrieve the corresponding entity.
 	var entity mongodoc.Entity
-	err = s.store.DB.Entities().FindId(&url.URL).Select(bson.D{{"blobname", 1}}).One(&entity)
+	err := s.store.DB.Entities().FindId(&id.URL).Select(bson.D{{"blobname", 1}}).One(&entity)
 	c.Assert(err, gc.Equals, nil)
 
-	// Delete the charm using the API.
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler:      s.srv,
-		URL:          storeURL(id + "/archive"),
-		Method:       "DELETE",
-		Username:     testUsername,
-		Password:     testPassword,
-		ExpectStatus: http.StatusMethodNotAllowed,
-		ExpectBody: params.Error{
-			Message: `DELETE not allowed`,
-			Code:    params.ErrMethodNotAllowed,
-		},
+	s.doAsUser("charmers", func() {
+		// Delete the charm using the API.
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler: s.srv,
+			Do:      bakeryDo(nil),
+			URL:     storeURL(id.URL.Path() + "/archive"),
+			Method:  "DELETE",
+		})
 	})
 
-	// TODO(mhilton) reinstate this check when DELETE is re-enabled.
-	//	// The entity has been deleted.
-	//	count, err := s.store.DB.Entities().FindId(url).Count()
-	//	c.Assert(err, gc.Equals, nil)
-	//	c.Assert(count, gc.Equals, 0)
-	//
-	//	// The blob has been deleted.
-	//	_, _, err = s.store.BlobStore.Open(entity.BlobName)
-	//	c.Assert(err, gc.ErrorMatches, "resource.*not found")
+	// The entity has been deleted.
+	count, err := s.store.DB.Entities().FindId(&id.URL).Count()
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(count, gc.Equals, 0)
 }
 
 func (s *ArchiveSuite) TestDeleteSpecificCharm(c *gc.C) {
@@ -1255,18 +1246,14 @@ func (s *ArchiveSuite) TestDeleteSpecificCharm(c *gc.C) {
 		c.Assert(err, gc.Equals, nil)
 	}
 
-	// Delete the second charm using the API.
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler:      s.srv,
-		URL:          storeURL("~charmers/utopic/mysql-42/archive"),
-		Method:       "DELETE",
-		Username:     testUsername,
-		Password:     testPassword,
-		ExpectStatus: http.StatusMethodNotAllowed,
-		ExpectBody: params.Error{
-			Message: `DELETE not allowed`,
-			Code:    params.ErrMethodNotAllowed,
-		},
+	s.doAsUser("charmers", func() {
+		// Delete the second charm using the API.
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler: s.srv,
+			Do:      bakeryDo(nil),
+			URL:     storeURL("~charmers/utopic/mysql-42/archive"),
+			Method:  "DELETE",
+		})
 	})
 
 	// The other two charms are still present in the database.
@@ -1283,77 +1270,112 @@ func (s *ArchiveSuite) TestDeleteSpecificCharm(c *gc.C) {
 
 func (s *ArchiveSuite) TestDeleteNotFound(c *gc.C) {
 	// Try to delete a non existing charm using the API.
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler:      s.srv,
-		URL:          storeURL("~charmers/utopic/no-such-0/archive"),
-		Method:       "DELETE",
-		Username:     testUsername,
-		Password:     testPassword,
-		ExpectStatus: http.StatusMethodNotAllowed,
-		ExpectBody: params.Error{
-			Message: `DELETE not allowed`,
-			Code:    params.ErrMethodNotAllowed,
-		},
+	s.doAsUser("charmers", func() {
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler:      s.srv,
+			Do:           bakeryDo(nil),
+			URL:          storeURL("~charmers/utopic/no-such-0/archive"),
+			Method:       "DELETE",
+			ExpectStatus: http.StatusNotFound,
+			ExpectBody: params.Error{
+				Message: `no matching charm or bundle for cs:~charmers/utopic/no-such-0`,
+				Code:    params.ErrNotFound,
+			},
+		})
 	})
 }
 
-// TODO(mhilton) reinstate this test when DELETE is re-enabled.
-//func (s *ArchiveSuite) TestDeleteError(c *gc.C) {
-//	// Add a charm to the database (not including the archive).
-//	id := "~charmers/utopic/mysql-42"
-//	url := newResolvedURL(id, -1)
-//	err := s.store.AddCharmWithArchive(url, storetesting.Charms.CharmArchive(c.MkDir(), "mysql"))
-//	c.Assert(err, gc.Equals, nil)
-//
-//	err = s.store.DB.Entities().UpdateId(&url.URL, bson.M{
-//		"$set": bson.M{
-//			"blobname": "no-such-name",
-//		},
-//	})
-//	c.Assert(err, gc.Equals, nil)
-//	// TODO update entity to change BlobName to "no-such-name"
-//
-//	// Try to delete the charm using the API.
-//	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-//		Handler:      s.srv,
-//		URL:          storeURL(id + "/archive"),
-//		Method:       "DELETE",
-//		Username:     testUsername,
-//		Password:     testPassword,
-//		ExpectStatus: http.StatusInternalServerError,
-//		ExpectBody: params.Error{
-//			Message: `cannot delete "cs:~charmers/utopic/mysql-42": cannot remove blob no-such-name: resource at path "global/no-such-name" not found`,
-//		},
-//	})
-//}
+func (s *ArchiveSuite) TestDeleteError(c *gc.C) {
+	// Add a charm to the database (not including the archive).
+	id, _ := s.addPublicCharm(c, storetesting.NewCharm(nil), newResolvedURL("~charmers/utopic/mysql-42", -1))
+	// Add a second charm so that we're not deleting the last revision.
+	s.addPublicCharm(c, storetesting.NewCharm(nil), newResolvedURL("~charmers/utopic/mysql-43", -1))
 
-// TODO(mhilton) reinstate this test when DELETE is re-enabled
-//.func (s *ArchiveSuite) TestDeleteCounters(c *gc.C) {
-//	if !storetesting.MongoJSEnabled() {
-//		c.Skip("MongoDB JavaScript not available")
-//	}
-//
-//	// Add a charm to the database (including the archive).
-//	id := "~charmers/utopic/mysql-42"
-//	err := s.store.AddCharmWithArchive(
-//		newResolvedURL(id, -1),
-//		storetesting.Charms.CharmArchive(c.MkDir(), "mysql"))
-//	c.Assert(err, gc.Equals, nil)
-//
-//	// Delete the charm using the API.
-//	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
-//		Handler:  s.srv,
-//		Method:   "DELETE",
-//		URL:      storeURL(id + "/archive"),
-//		Username: testUsername,
-//		Password: testPassword,
-//	})
-//	c.Assert(rec.Code, gc.Equals, http.StatusOK)
-//
-//	// Check that the delete count for the entity has been updated.
-//	key := []string{params.StatsArchiveDelete, "utopic", "mysql", "charmers", "42"}
-//	stats.CheckCounterSum(c, s.store, key, false, 1)
-//}
+	err := s.store.DB.Entities().UpdateId(&id.URL, bson.M{
+		"$set": bson.M{
+			"blobname": "no-such-name",
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	s.doAsUser("charmers", func() {
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler:      s.srv,
+			Do:           bakeryDo(nil),
+			URL:          storeURL(id.URL.Path() + "/archive"),
+			Method:       "DELETE",
+			ExpectStatus: http.StatusInternalServerError,
+			ExpectBody: params.Error{
+				Message: `cannot delete "cs:~charmers/utopic/mysql-42": cannot remove blob no-such-name: resource at path "global/no-such-name" not found`,
+			},
+		})
+	})
+}
+
+func (s *ArchiveSuite) TestDeletePublishedRevision(c *gc.C) {
+	s.addPublicCharm(c, storetesting.NewCharm(nil), newResolvedURL("~charmers/precise/wordpress-0", -1))
+	s.addPublicCharm(c, storetesting.NewCharm(nil), newResolvedURL("~charmers/precise/wordpress-1", -1))
+	s.doAsUser("charmers", func() {
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler:      s.srv,
+			Do:           bakeryDo(nil),
+			URL:          storeURL("~charmers/precise/wordpress-1/archive"),
+			Method:       "DELETE",
+			ExpectStatus: http.StatusForbidden,
+			ExpectBody: params.Error{
+				Code:    params.ErrForbidden,
+				Message: `cannot delete "cs:~charmers/precise/wordpress-1": cannot delete "cs:~charmers/precise/wordpress-1" because it is the current revision in channels [stable]`,
+			},
+		})
+	})
+}
+
+func (s *ArchiveSuite) TestDeleteUnauthorized(c *gc.C) {
+	// Add a charm to the database (not including the archive).
+	id := "~charmers/utopic/mysql-42"
+	url := newResolvedURL(id, -1)
+	err := s.store.AddCharmWithArchive(url, storetesting.Charms.CharmArchive(c.MkDir(), "mysql"))
+	c.Assert(err, gc.Equals, nil)
+
+	s.doAsUser("bob", func() {
+		// Try to delete the charm using the API.
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler:      s.srv,
+			Do:           bakeryDo(nil),
+			URL:          storeURL(id + "/archive"),
+			Method:       "DELETE",
+			ExpectStatus: http.StatusUnauthorized,
+			ExpectBody: params.Error{
+				Code:    params.ErrUnauthorized,
+				Message: `access denied for user "bob"`,
+			},
+		})
+	})
+}
+
+func (s *ArchiveSuite) TestDeleteCounters(c *gc.C) {
+	if !storetesting.MongoJSEnabled() {
+		c.Skip("MongoDB JavaScript not available")
+	}
+
+	// Add a charm to the database (including the archive).
+	s.addPublicCharm(c, storetesting.NewCharm(nil), newResolvedURL("~charmers/utopic/mysql-41", -1))
+	s.addPublicCharm(c, storetesting.NewCharm(nil), newResolvedURL("~charmers/utopic/mysql-42", -1))
+
+	// Delete the charm using the API.
+	s.doAsUser("charmers", func() {
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler: s.srv,
+			Do:      bakeryDo(nil),
+			Method:  "DELETE",
+			URL:     storeURL("~charmers/utopic/mysql-41/archive"),
+		})
+	})
+
+	// Check that the delete count for the entity has been updated.
+	key := []string{params.StatsArchiveDelete, "utopic", "mysql", "charmers", "41"}
+	stats.CheckCounterSum(c, s.store, key, false, 1)
+}
 
 type basicAuthArchiveSuite struct {
 	commonSuite
@@ -1365,15 +1387,14 @@ func (s *basicAuthArchiveSuite) TestPostAuthErrors(c *gc.C) {
 	s.checkAuthErrors(c, "POST", "~charmers/utopic/django/archive")
 }
 
-// TODO(mhilton) reinstate this test when DELETE is re-enabled.
-//func (s *basicAuthArchiveSuite) TestDeleteAuthErrors(c *gc.C) {
-//	err := s.store.AddCharmWithArchive(
-//		newResolvedURL("~charmers/utopic/django-42", 42),
-//		storetesting.Charms.CharmArchive(c.MkDir(), "wordpress"),
-//	)
-//	c.Assert(err, gc.Equals, nil)
-//	s.checkAuthErrors(c, "DELETE", "utopic/django-42/archive")
-//}
+func (s *basicAuthArchiveSuite) TestDeleteAuthErrors(c *gc.C) {
+	err := s.store.AddCharmWithArchive(
+		newResolvedURL("~charmers/utopic/django-42", 42),
+		storetesting.Charms.CharmArchive(c.MkDir(), "wordpress"),
+	)
+	c.Assert(err, gc.Equals, nil)
+	s.checkAuthErrors(c, "DELETE", "utopic/django-42/archive")
+}
 
 func (s *basicAuthArchiveSuite) TestPostErrorReadsFully(c *gc.C) {
 	h := s.handler(c)

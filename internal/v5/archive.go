@@ -42,7 +42,8 @@ import (
 func (h *ReqHandler) serveArchive(id *charm.URL, w http.ResponseWriter, req *http.Request) error {
 	resolveId := h.ResolvedIdHandler
 	switch req.Method {
-	// TODO: support DELETE when it is understood how that interacts with channels.
+	case "DELETE":
+		return resolveId(h.serveDeleteArchive)(id, w, req)
 	case "GET":
 		return resolveId(h.serveGetArchive)(id, w, req)
 	case "POST", "PUT":
@@ -135,8 +136,11 @@ func (h *ReqHandler) SendEntityArchive(id *router.ResolvedURL, w http.ResponseWr
 }
 
 func (h *ReqHandler) serveDeleteArchive(id *router.ResolvedURL, w http.ResponseWriter, req *http.Request) error {
+	if err := h.AuthorizeEntityForOp(id, req, OpWrite); err != nil {
+		return errgo.Mask(err, errgo.Any)
+	}
 	if err := h.Store.DeleteEntity(id); err != nil {
-		return errgo.NoteMask(err, fmt.Sprintf("cannot delete %q", id.PreferredURL()), errgo.Is(params.ErrNotFound))
+		return errgo.NoteMask(err, fmt.Sprintf("cannot delete %q", id.PreferredURL()), errgo.Is(params.ErrNotFound), errgo.Is(params.ErrForbidden))
 	}
 	h.Store.IncCounterAsync(charmstore.EntityStatsKey(&id.URL, params.StatsArchiveDelete))
 	return nil
