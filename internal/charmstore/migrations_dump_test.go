@@ -491,7 +491,6 @@ func (csv *charmStoreVersion) uploadWithPost(apiVersion string, entity ArchiverT
 	}
 	hash := blobstore.NewHash()
 	hash.Write(buf.Bytes())
-	logger.Infof("archive %d bytes", len(buf.Bytes()))
 	req, err := http.NewRequest("POST", fmt.Sprintf("/%s/%s/archive?hash=%x", apiVersion, url, hash.Sum(nil)), &buf)
 	if err != nil {
 		return errgo.Mask(err)

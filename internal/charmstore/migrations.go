@@ -6,9 +6,9 @@ package charmstore // import "gopkg.in/juju/charmstore.v5-unstable/internal/char
 import (
 	"time"
 
+	"github.com/juju/utils/parallel"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
-	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
@@ -28,6 +28,7 @@ const (
 	migrationEdgeBaseEntities        mongodoc.MigrationName = "rename development to edge in base entities"
 	migrationPublishedEntities       mongodoc.MigrationName = "include published status in a single entity field"
 	migrationCandidateBetaChannels   mongodoc.MigrationName = "populate candidate and beta channel ACLs"
+	migrationRevisionsCollection     mongodoc.MigrationName = "populate revisions collection"
 )
 
 // migrations holds all the migration functions that are executed in the order
@@ -71,17 +72,16 @@ var migrations = []migration{{
 }, {
 	name: migrationStats,
 }, {
-	name:    migrationEdgeEntities,
-	migrate: migrateEdgeEntities,
+	name: migrationEdgeEntities,
 }, {
-	name:    migrationEdgeBaseEntities,
-	migrate: migrateEdgeBaseEntities,
+	name: migrationEdgeBaseEntities,
 }, {
-	name:    migrationPublishedEntities,
-	migrate: migratePublishedEntities,
+	name: migrationPublishedEntities,
 }, {
-	name:    migrationCandidateBetaChannels,
-	migrate: migrateCandidateBetaChannels,
+	name: migrationCandidateBetaChannels,
+}, {
+	name:    migrationRevisionsCollection,
+	migrate: migrateRevisionsCollection,
 }}
 
 // migration holds a migration function with its corresponding name.
@@ -164,104 +164,48 @@ func setExecuted(db StoreDatabase, name mongodoc.MigrationName) error {
 	return nil
 }
 
-// migrateEdgeEntities renames the "development" entity field to "edge".
-func migrateEdgeEntities(db StoreDatabase) error {
-	if _, err := db.Entities().UpdateAll(nil, bson.D{{
-		"$rename", bson.D{{"development", "edge"}},
-	}}); err != nil {
-		return errgo.Notef(err, "cannot rename development field in entities")
+// migrateRevisionsCollection populates the revisions collection
+// from the entities in the database.
+func migrateRevisionsCollection(db StoreDatabase) error {
+	revs := make(map[string]int)
+	set := func(url *charm.URL) {
+		rev := url.Revision
+		url = url.WithRevision(-1)
+		urlStr := url.String()
+		if oldRev, ok := revs[urlStr]; !ok || rev > oldRev {
+			revs[urlStr] = rev
+		}
 	}
-	return nil
-}
-
-// migrateEdgeBaseEntities renames all "development" keys in base entity
-// embedded documents to "edge".
-func migrateEdgeBaseEntities(db StoreDatabase) error {
-	if _, err := db.BaseEntities().UpdateAll(nil, bson.D{{
-		"$rename", bson.D{
-			{"channelacls.development", "channelacls.edge"},
-			{"channelentities.development", "channelentities.edge"},
-			{"channelresources.development", "channelresources.edge"},
-		},
-	}}); err != nil {
-		return errgo.Notef(err, "cannot rename development keys in base entities")
-	}
-	return nil
-}
-
-type preMigratePublishedEntitiesEntity struct {
-	URL          *charm.URL `bson:"_id"`
-	Stable, Edge bool
-}
-
-// migratePublishedEntities deletes the "edge" and "stable" boolean fields in
-// the entity document and replaces them with a single "published" map.
-func migratePublishedEntities(db StoreDatabase) error {
-	entities := db.Entities()
-	iter := entities.Find(bson.D{{
-		// Assume that if an entity has the "stable" field, it also has the
-		// "edge" one and it hasn't been migrated yet.
-		"stable", bson.D{{"$exists", true}},
-	}}).Select(map[string]int{
-		"stable": 1,
-		"edge":   1,
-	}).Iter()
-
-	// For every resulting entity populate the "published" field and then
-	// remove "stable" and "edge" ones.
-	var entity preMigratePublishedEntitiesEntity
+	iter := db.Entities().Find(nil).Select(bson.M{"baseurl": 1, "promulgated-url": 1}).Iter()
+	var entity mongodoc.Entity
 	for iter.Next(&entity) {
-		err := entities.UpdateId(entity.URL, bson.D{{
-			"$set", bson.D{
-				{"published", map[params.Channel]bool{
-					params.StableChannel: entity.Stable,
-					params.EdgeChannel:   entity.Edge,
-				}},
-			},
-		}, {
-			"$unset", bson.D{
-				{"stable", ""},
-				{"edge", ""},
-			},
-		}})
-		if err != nil {
-			return errgo.Notef(err, "cannot update entity")
+		set(entity.URL)
+		if entity.PromulgatedURL != nil {
+			set(entity.PromulgatedURL)
 		}
 	}
 	if err := iter.Err(); err != nil {
-		return errgo.Notef(err, "cannot iterate through entities")
+		return errgo.Notef(err, "could not iterate through all entities")
 	}
-	return nil
-}
-
-// migrateCandidateBetaChannels populates base entity ACLs for the candidate
-// and beta channels.
-func migrateCandidateBetaChannels(db StoreDatabase) error {
-	baseEntities := db.BaseEntities()
-	iter := baseEntities.Find(bson.D{{
-		// Assume that, if a base entity does not have the "channelacls.beta"
-		// field, then the "channelacls.candidate" one is also missing and the
-		// document must be migrated.
-		"channelacls.beta", bson.D{{"$exists", false}},
-	}}).Select(map[string]int{"channelacls": 1}).Iter()
-
-	// For every resulting base entity populate "channelacls.beta" and
-	// "channelacls.candidate" with contents from "channelacls.unpublished".
-	var baseEntity mongodoc.BaseEntity
-	for iter.Next(&baseEntity) {
-		acls := baseEntity.ChannelACLs[params.UnpublishedChannel]
-		err := baseEntities.UpdateId(baseEntity.URL, bson.D{{
-			"$set", bson.D{
-				{"channelacls.candidate", acls},
-				{"channelacls.beta", acls},
-			},
-		}})
-		if err != nil {
-			return errgo.Notef(err, "cannot update base entity")
-		}
+	col := db.Revisions()
+	run := parallel.NewRun(20)
+	for urlStr, rev := range revs {
+		urlStr, rev := urlStr, rev
+		run.Do(func() error {
+			url := charm.MustParseURL(urlStr)
+			err := col.Insert(mongodoc.LatestRevision{
+				URL:      url,
+				BaseURL:  mongodoc.BaseURL(url),
+				Revision: rev,
+			})
+			if err != nil && !mgo.IsDup(err) {
+				return errgo.Notef(err, "insert %v failed", url)
+			}
+			return nil
+		})
 	}
-	if err := iter.Err(); err != nil {
-		return errgo.Notef(err, "cannot iterate through base entities")
+	if err := run.Wait(); err != nil {
+		return errgo.Mask(err)
 	}
 	return nil
 }

@@ -3,6 +3,7 @@ package charmstore
 import (
 	"flag"
 	"net/http"
+	"sort"
 
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
@@ -23,11 +24,16 @@ type migrationsIntegrationSuite struct {
 
 var _ = gc.Suite(&migrationsIntegrationSuite{})
 
-const earliestDeployedVersion = "4.5.6"
+const earliestDeployedVersion = "4.5.9"
 
+// To create a dump file, run:
+// 	go test -check.f migrationsIntegrationSuite -dump-migration-history
 var dumpMigrationHistoryFlag = flag.Bool("dump-migration-history", false, "dump migration history to file")
 
 func (s *migrationsIntegrationSuite) SetUpSuite(c *gc.C) {
+	// Make sure logging works even before the rest of
+	// commonSuite is started.
+	s.LoggingSuite.SetUpSuite(c)
 	if *dumpMigrationHistoryFlag {
 		s.dump(c)
 	}
@@ -269,6 +275,42 @@ var migrationHistory = []versionSpec{{
 		}
 		return nil
 	},
+}, {
+	// Add support for new channels: stable, candidate, beta and edge.
+	// Add zesty to series.
+	version: "4.5.9",
+	update: func(db *mgo.Database, csv *charmStoreVersion) error {
+		// TODO add charm that's published to new channels.
+		err := csv.Upload("v5", []uploadSpec{{
+			usePost: true,
+			// Uploads to ~charmers/zesty/promulgated-0
+			id: "~charmers/zesty/promulgated",
+			// Uploads to zesty/promulgated-0
+			promulgatedId: "zesty/promulgated",
+			entity:        storetesting.NewCharm(nil),
+		}, {
+			usePost: true,
+			// Uploads to ~charmers/allchans-0
+			id: "~charmers/allchans",
+			entity: storetesting.NewCharm(&charm.Meta{
+				Series: []string{"xenial"},
+			}),
+		}})
+		if err != nil {
+			return errgo.Mask(err)
+		}
+		if err := csv.Put("/v5/~charmers/allchans-0/publish", &params.PublishRequest{
+			Channels: []params.Channel{
+				params.StableChannel,
+				params.CandidateChannel,
+				params.BetaChannel,
+				params.EdgeChannel,
+			},
+		}); err != nil {
+			return errgo.Mask(err)
+		}
+		return nil
+	},
 }}
 
 var migrationFromDumpEntityTests = []struct {
@@ -279,94 +321,101 @@ var migrationFromDumpEntityTests = []struct {
 	checkers: []entityChecker{
 		hasPromulgatedRevision(0),
 		hasCompatibilityBlob(false),
-		isEdge(true),
-		isStable(true),
+		isPublished(params.EdgeChannel, params.StableChannel),
 	},
 }, {
 	id: "~charmers/precise/promulgated-1",
 	checkers: []entityChecker{
 		hasPromulgatedRevision(1),
 		hasCompatibilityBlob(false),
-		isEdge(true),
-		isStable(false),
+		isPublished(params.EdgeChannel),
+	},
+}, {
+	id: "~charmers/zesty/promulgated-0",
+	checkers: []entityChecker{
+		hasPromulgatedRevision(0),
+		hasCompatibilityBlob(false),
+		isPublished(),
 	},
 }, {
 	id: "~bob/trusty/nonpromulgated-0",
 	checkers: []entityChecker{
 		hasPromulgatedRevision(-1),
 		hasCompatibilityBlob(false),
-		isEdge(true),
-		isStable(true),
+		isPublished(params.EdgeChannel, params.StableChannel),
 	},
 }, {
 	id: "~charmers/bundle/promulgatedbundle-0",
 	checkers: []entityChecker{
 		hasPromulgatedRevision(0),
 		hasCompatibilityBlob(false),
-		isEdge(true),
-		isStable(true),
+		isPublished(params.EdgeChannel, params.StableChannel),
 	},
 }, {
 	id: "~charmers/bundle/nonpromulgatedbundle-0",
 	checkers: []entityChecker{
 		hasPromulgatedRevision(-1),
 		hasCompatibilityBlob(false),
-		isEdge(true),
-		isStable(true),
+		isPublished(params.EdgeChannel, params.StableChannel),
 	},
 }, {
 	id: "~charmers/multiseries-0",
 	checkers: []entityChecker{
 		hasPromulgatedRevision(-1),
 		hasCompatibilityBlob(true),
-		isEdge(true),
-		isStable(true),
+		isPublished(params.EdgeChannel, params.StableChannel),
 	},
 }, {
 	id: "~charmers/multiseries-1",
 	checkers: []entityChecker{
 		hasPromulgatedRevision(-1),
 		hasCompatibilityBlob(true),
-		isEdge(true),
-		isStable(true),
+		isPublished(params.EdgeChannel, params.StableChannel),
 	},
 }, {
 	id: "~someone/precise/southerncharm-0",
 	checkers: []entityChecker{
 		hasPromulgatedRevision(-1),
 		hasCompatibilityBlob(false),
-		isEdge(true),
-		isStable(true),
+		isPublished(params.EdgeChannel, params.StableChannel),
 	},
 }, {
 	id: "~someone/precise/southerncharm-3",
 	checkers: []entityChecker{
 		hasPromulgatedRevision(-1),
 		hasCompatibilityBlob(false),
-		isEdge(true),
-		isStable(false),
+		isPublished(params.EdgeChannel),
 	},
 }, {
 	id: "~someone/trusty/southerncharm-5",
 	checkers: []entityChecker{
 		hasPromulgatedRevision(-1),
 		hasCompatibilityBlob(false),
-		isEdge(true),
-		isStable(false),
+		isPublished(params.EdgeChannel),
 	},
 }, {
 	id: "~someone/trusty/southerncharm-6",
 	checkers: []entityChecker{
 		hasPromulgatedRevision(-1),
 		hasCompatibilityBlob(false),
-		isEdge(true),
-		isStable(true),
+		isPublished(params.EdgeChannel, params.StableChannel),
 		hasMetrics(nil),
 	},
 }, {
 	id: "~someone/trusty/empty-metered-42",
 	checkers: []entityChecker{
 		hasMetrics(nil),
+		hasPromulgatedRevision(-1),
+	},
+}, {
+	id: "~charmers/allchans-0",
+	checkers: []entityChecker{
+		isPublished(
+			params.StableChannel,
+			params.CandidateChannel,
+			params.BetaChannel,
+			params.EdgeChannel,
+		),
 	},
 }}
 
@@ -568,6 +617,44 @@ func (s *migrationsIntegrationSuite) TestMigrationFromDump(c *gc.C) {
 			check(c, e)
 		}
 	}
+
+	// Check that the latest revisions table has been populated correctly.
+	var revs []mongodoc.LatestRevision
+	err = store.DB.Revisions().Find(nil).Sort("_id").All(&revs)
+	c.Assert(err, gc.Equals, nil)
+
+	expectRevisions := []string{
+		"cs:bundle/promulgatedbundle-0",
+		"cs:precise/promulgated-1",
+		"cs:zesty/promulgated-0",
+		"cs:~bob/trusty/nonpromulgated-0",
+		"cs:~charmers/allchans-0",
+		"cs:~charmers/bundle/nonpromulgatedbundle-0",
+		"cs:~charmers/bundle/promulgatedbundle-0",
+		"cs:~charmers/multiseries-1",
+		"cs:~charmers/precise/promulgated-1",
+		"cs:~charmers/trusty/different-acls-0",
+		"cs:~charmers/trusty/legacystats-1rev-notset-0",
+		"cs:~charmers/trusty/legacystats-2rev-notset-1",
+		"cs:~charmers/trusty/legacystats-setonfirst-2",
+		"cs:~charmers/trusty/legacystats-setonlast-2",
+		"cs:~charmers/trusty/legacystats-setonsecond-2",
+		"cs:~charmers/zesty/promulgated-0",
+		"cs:~someone/precise/southerncharm-3",
+		"cs:~someone/trusty/empty-metered-42",
+		"cs:~someone/trusty/southerncharm-6",
+	}
+	sort.Strings(expectRevisions)
+	expectRevDocs := make([]mongodoc.LatestRevision, len(expectRevisions))
+	for i, r := range expectRevisions {
+		url := charm.MustParseURL(r)
+		expectRevDocs[i] = mongodoc.LatestRevision{
+			URL:      url.WithRevision(-1),
+			BaseURL:  mongodoc.BaseURL(url),
+			Revision: url.Revision,
+		}
+	}
+	c.Assert(revs, jc.DeepEquals, expectRevDocs)
 }
 
 func checkAllEntityInvariants(c *gc.C, store *Store) {
@@ -732,15 +819,15 @@ func hasCompatibilityBlob(hasBlob bool) entityChecker {
 	}
 }
 
-func isEdge(isDev bool) entityChecker {
-	return func(c *gc.C, entity *mongodoc.Entity) {
-		c.Assert(entity.Published[params.EdgeChannel], gc.Equals, isDev)
+func isPublished(channels ...params.Channel) entityChecker {
+	cmap := make(map[params.Channel]bool)
+	for _, c := range channels {
+		cmap[c] = true
 	}
-}
-
-func isStable(isStable bool) entityChecker {
 	return func(c *gc.C, entity *mongodoc.Entity) {
-		c.Assert(entity.Published[params.StableChannel], gc.Equals, isStable)
+		for _, ch := range params.OrderedChannels {
+			c.Assert(entity.Published[ch], gc.Equals, cmap[ch], gc.Commentf("channel %v", ch))
+		}
 	}
 }
 
