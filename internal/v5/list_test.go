@@ -52,7 +52,7 @@ func (s *ListSuite) SetUpTest(c *gc.C) {
 	s.addCharmsToStore(c)
 	// hide the riak charm
 	err := s.store.SetPerms(charm.MustParseURL("cs:~charmers/riak"), "stable.read", "charmers", "test-user")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *ListSuite) addCharmsToStore(c *gc.C) {
@@ -146,7 +146,7 @@ func (s *ListSuite) TestSuccessfulList(c *gc.C) {
 		})
 		var sr params.ListResponse
 		err := json.Unmarshal(rec.Body.Bytes(), &sr)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(sr.Results, gc.HasLen, len(test.results))
 		c.Logf("results: %s", rec.Body.Bytes())
 		for i := range test.results {
@@ -249,7 +249,7 @@ func (s *ListSuite) TestMetadataFields(c *gc.C) {
 			}
 		}
 		err := json.Unmarshal(rec.Body.Bytes(), &sr)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(sr.Results, gc.HasLen, 1)
 		c.Assert(string(sr.Results[0].Meta), jc.JSONEquals, test.meta)
 	}
@@ -272,9 +272,9 @@ func (s *ListSuite) TestListIncludeError(c *gc.C) {
 	// Now remove one of the blobs. The list should still
 	// work, but only return a single result.
 	entity, err := s.store.FindEntity(newResolvedURL("~charmers/precise/wordpress-23", 23), nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.store.BlobStore.Remove(entity.BlobName, nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Now list again - we should get one result less
 	// (and the error will be logged).
@@ -284,7 +284,7 @@ func (s *ListSuite) TestListIncludeError(c *gc.C) {
 	// uses LoggingSuite.
 	var tw loggo.TestWriter
 	err = loggo.RegisterWriter("test-log", &tw)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	rec = httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.srv,
@@ -368,7 +368,7 @@ func (s *ListSuite) TestSortingList(c *gc.C) {
 		})
 		var sr params.ListResponse
 		err := json.Unmarshal(rec.Body.Bytes(), &sr)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(sr.Results, gc.HasLen, len(test.results), gc.Commentf("expected %#v", test.results))
 		c.Logf("results: %s", rec.Body.Bytes())
 		for i := range test.results {
@@ -384,7 +384,7 @@ func (s *ListSuite) TestSortUnsupportedListField(c *gc.C) {
 	})
 	var e params.Error
 	err := json.Unmarshal(rec.Body.Bytes(), &e)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(e.Code, gc.Equals, params.ErrBadRequest)
 	c.Assert(e.Message, gc.Equals, "invalid sort field: unrecognized sort parameter \"text\"")
 }
@@ -406,7 +406,7 @@ func (s *ListSuite) TestGetLatestRevisionOnly(c *gc.C) {
 	})
 	var sr params.ListResponse
 	err := json.Unmarshal(rec.Body.Bytes(), &sr)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(sr.Results, gc.HasLen, 4, gc.Commentf("expected %#v", testresults))
 	c.Logf("results: %s", rec.Body.Bytes())
 	for i := range testresults {
@@ -424,7 +424,7 @@ func (s *ListSuite) TestGetLatestRevisionOnly(c *gc.C) {
 		URL:     storeURL("list?sort=name"),
 	})
 	err = json.Unmarshal(rec.Body.Bytes(), &sr)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(sr.Results, gc.HasLen, 4, gc.Commentf("expected %#v", testresults))
 	c.Logf("results: %s", rec.Body.Bytes())
 	for i := range testresults {
@@ -434,7 +434,7 @@ func (s *ListSuite) TestGetLatestRevisionOnly(c *gc.C) {
 
 func (s *ListSuite) assertPut(c *gc.C, url string, val interface{}) {
 	body, err := json.Marshal(val)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.srv,
 		URL:     storeURL(url),
@@ -467,7 +467,7 @@ func (s *ListSuite) TestListWithAdminCredentials(c *gc.C) {
 	}
 	var sr params.ListResponse
 	err := json.Unmarshal(rec.Body.Bytes(), &sr)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	assertListResultSet(c, sr, expected)
 }
 
@@ -487,7 +487,7 @@ func (s *ListSuite) TestListWithUserMacaroon(c *gc.C) {
 	}
 	var sr params.ListResponse
 	err := json.Unmarshal(rec.Body.Bytes(), &sr)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	assertListResultSet(c, sr, expected)
 }
 
@@ -495,9 +495,9 @@ func (s *ListSuite) TestSearchWithBadAdminCredentialsAndACookie(c *gc.C) {
 	m, err := s.store.Bakery.NewMacaroon([]checkers.Caveat{
 		idmclient.UserDeclaration("test-user"),
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	macaroonCookie, err := httpbakery.NewCookie(macaroon.Slice{m})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler:  s.srv,
 		URL:      storeURL("list"),
@@ -514,7 +514,7 @@ func (s *ListSuite) TestSearchWithBadAdminCredentialsAndACookie(c *gc.C) {
 	}
 	var sr params.ListResponse
 	err = json.Unmarshal(rec.Body.Bytes(), &sr)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	assertListResultSet(c, sr, expected)
 }
 

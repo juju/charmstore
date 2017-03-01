@@ -164,7 +164,7 @@ func (s *commonSuite) startServer(c *gc.C) {
 	db := s.Session.DB("charmstore")
 	var err error
 	s.srv, err = charmstore.NewServer(db, si, config, map[string]charmstore.NewAPIHandlerFunc{"v4": v4.NewAPIHandler})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.srvParams = config
 
 	if s.enableIdentity {
@@ -172,7 +172,7 @@ func (s *commonSuite) startServer(c *gc.C) {
 		config.PublicKeyLocator = nil
 		config.IdentityAPIURL = ""
 		s.noMacaroonSrv, err = charmstore.NewServer(db, si, config, map[string]charmstore.NewAPIHandlerFunc{"v4": v4.NewAPIHandler})
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	} else {
 		s.noMacaroonSrv = s.srv
 	}
@@ -186,16 +186,16 @@ func (s *commonSuite) addPublicCharmFromRepo(c *gc.C, charmName string, rurl *ro
 
 func (s *commonSuite) addPublicCharm(c *gc.C, ch charm.Charm, rurl *router.ResolvedURL) (*router.ResolvedURL, charm.Charm) {
 	err := s.store.AddCharmWithArchive(rurl, ch)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.setPublic(c, rurl)
 	return rurl, ch
 }
 
 func (s *commonSuite) setPublic(c *gc.C, rurl *router.ResolvedURL) {
 	err := s.store.SetPerms(&rurl.URL, "stable.read", params.Everyone)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.store.Publish(rurl, nil, params.StableChannel)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *commonSuite) addPublicBundleFromRepo(c *gc.C, bundleName string, rurl *router.ResolvedURL, addRequiredCharms bool) (*router.ResolvedURL, charm.Bundle) {
@@ -207,7 +207,7 @@ func (s *commonSuite) addPublicBundle(c *gc.C, bundle charm.Bundle, rurl *router
 		s.addRequiredCharms(c, bundle)
 	}
 	err := s.store.AddBundleWithArchive(rurl, bundle)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.setPublic(c, rurl)
 	return rurl, bundle
 }
@@ -226,7 +226,7 @@ func (s *commonSuite) addCharms(c *gc.C, charms map[string]charm.Charm) {
 func (s *commonSuite) setPerms(c *gc.C, readACLs map[string][]string) {
 	for url, acl := range readACLs {
 		err := s.store.SetPerms(charm.MustParseURL(url), "stable.read", acl...)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 }
 
@@ -235,10 +235,10 @@ func (s *commonSuite) setPerms(c *gc.C, readACLs map[string][]string) {
 // is responsible for calling Put on the returned handler.
 func (s *commonSuite) handler(c *gc.C) v4.ReqHandler {
 	h, err := v4.New(s.store.Pool(), s.srvParams, "")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer h.Close()
 	rh, err := h.NewReqHandler(new(http.Request))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	// It would be nice if we could call s.AddCleanup here
 	// to call rh.Put when the test has completed, but
 	// unfortunately CleanupSuite.TearDownTest runs
@@ -325,7 +325,7 @@ func (s *commonSuite) assertPutAsAdmin(c *gc.C, url string, val interface{}) {
 
 func (s *commonSuite) assertPut0(c *gc.C, url string, val interface{}, asAdmin bool) {
 	body, err := json.Marshal(val)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	p := httptesting.JSONCallParams{
 		Handler: s.srv,
 		URL:     storeURL(url),
@@ -373,7 +373,7 @@ func (s *commonSuite) assertGetIsUnauthorized(c *gc.C, url, expectMessage string
 // error message.
 func (s *commonSuite) assertPutIsUnauthorized(c *gc.C, url string, val interface{}, expectMessage string) {
 	body, err := json.Marshal(val)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler: s.srv,
 		URL:     storeURL(url),

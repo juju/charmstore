@@ -71,7 +71,7 @@ func (s *migrationsSuite) TestMigrate(c *gc.C) {
 
 	// Start the server.
 	err := s.newServer(c)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// The two migrations have been correctly executed in order.
 	c.Assert(s.executed, jc.DeepEquals, names)
@@ -81,7 +81,7 @@ func (s *migrationsSuite) TestMigrate(c *gc.C) {
 
 	// Restart the server again and check migrations this time are not run.
 	err = s.newServer(c)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(s.executed, jc.DeepEquals, names)
 	s.checkExecuted(c, names...)
 }
@@ -92,7 +92,7 @@ func (s *migrationsSuite) TestMigrateNoMigrations(c *gc.C) {
 
 	// Start the server.
 	err := s.newServer(c)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// No migrations were executed.
 	c.Assert(s.executed, gc.HasLen, 0)
@@ -102,16 +102,16 @@ func (s *migrationsSuite) TestMigrateNoMigrations(c *gc.C) {
 func (s *migrationsSuite) TestMigrateNewMigration(c *gc.C) {
 	// Simulate two migrations were already run.
 	err := setExecuted(s.db, "migr-1")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = setExecuted(s.db, "migr-2")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Create migrations.
 	s.makeMigrations(c, "migr-1", "migr-2", "migr-3")
 
 	// Start the server.
 	err = s.newServer(c)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Only one migration has been executed.
 	c.Assert(s.executed, jc.DeepEquals, []mongodoc.MigrationName{"migr-3"})
@@ -123,7 +123,7 @@ func (s *migrationsSuite) TestMigrateNewMigration(c *gc.C) {
 func (s *migrationsSuite) TestMigrateErrorUnknownMigration(c *gc.C) {
 	// Simulate that a migration was already run.
 	err := setExecuted(s.db, "migr-1")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Create migrations, without including the already executed one.
 	s.makeMigrations(c, "migr-2", "migr-3")
@@ -186,7 +186,7 @@ func (s *migrationsSuite) checkExecuted(c *gc.C, expected ...mongodoc.MigrationN
 	var obtained []mongodoc.MigrationName
 	var doc mongodoc.Migration
 	if err := s.db.Migrations().Find(nil).One(&doc); err != mgo.ErrNotFound {
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		obtained = doc.Executed
 	}
 	c.Assert(obtained, jc.SameContents, expected)

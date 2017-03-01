@@ -34,7 +34,7 @@ func (s *commonSuite) newStore(c *gc.C, withElasticSearch bool) *Store {
 	p, err := NewPool(s.Session.DB("juju_test"), si, &bakery.NewServiceParams{}, ServerParams{
 		MinUploadPartSize: 10,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	store := p.Store()
 	defer p.Close()
 	return store
@@ -62,8 +62,8 @@ func addRequiredCharms(c *gc.C, store *Store, bundle charm.Bundle) {
 			rurl.PromulgatedRevision = -1
 		}
 		err := store.AddCharmWithArchive(&rurl, ch)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		err = store.Publish(&rurl, nil, params.StableChannel)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 }

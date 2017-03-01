@@ -44,7 +44,7 @@ func (s *resourceSuite) TestInsert(c *gc.C) {
 
 	// First insert works correctly.
 	err := store.DB.Resources().Insert(r)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Attempting to insert the same revision fails.
 	r.BlobHash = "78910"
@@ -54,7 +54,7 @@ func (s *resourceSuite) TestInsert(c *gc.C) {
 	// Inserting a different revision succeeds.
 	r.Revision = 1
 	err = store.DB.Resources().Insert(r)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 var newResourceQueryTests = []struct {
@@ -102,20 +102,20 @@ func (s *resourceSuite) TestNewResourceQuery(c *gc.C) {
 	} {
 		parts := strings.SplitN(r, "|", 3)
 		rev, err := strconv.Atoi(parts[2])
-		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(err, gc.Equals, nil)
 		err = store.DB.Resources().Insert(&mongodoc.Resource{
 			BaseURL:  charm.MustParseURL(parts[0]),
 			Name:     parts[1],
 			Revision: rev,
 		})
-		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 	for i, test := range newResourceQueryTests {
 		c.Logf("%d. %s", i, test.about)
 		q := newResourceQuery(test.url, test.name, test.revision)
 		var results []*mongodoc.Resource
 		err := store.DB.Resources().Find(q).All(&results)
-		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(err, gc.Equals, nil)
 		sortResources(test.expectResources)
 		sortResources(results)
 		c.Assert(results, jc.DeepEquals, test.expectResources)
@@ -129,17 +129,17 @@ func (s *resourceSuite) TestListResourcesCharmWithResources(c *gc.C) {
 	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
 	meta := storetesting.MetaWithResources(nil, "resource1", "resource2")
 	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	uploadResources(c, store, id, "")
 
 	err = store.Publish(id, map[string]int{
 		"resource1": 0,
 		"resource2": 0,
 	}, params.StableChannel)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	docs, err := store.ListResources(id, params.StableChannel)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	checkResourceDocs(c, store, id, []string{"resource1/0", "resource2/0"}, docs)
 }
@@ -150,10 +150,10 @@ func (s *resourceSuite) TestListResourcesCharmWithoutResources(c *gc.C) {
 
 	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
 	err := store.AddCharmWithArchive(id, storetesting.NewCharm(nil))
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	resources, err := store.ListResources(id, params.StableChannel)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	c.Check(resources, gc.HasLen, 0)
 }
@@ -164,7 +164,7 @@ func (s *resourceSuite) TestListResourcesWithNoChannel(c *gc.C) {
 
 	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
 	err := store.AddCharmWithArchive(id, storetesting.NewCharm(nil))
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	resources, err := store.ListResources(id, "")
 	c.Assert(err, gc.ErrorMatches, "no channel specified")
@@ -185,10 +185,10 @@ func (s *resourceSuite) TestListResourcesBundle(c *gc.C) {
 	})
 	s.addRequiredCharms(c, b)
 	err := store.AddBundleWithArchive(id, b)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	resources, err := store.ListResources(id, params.StableChannel)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(resources, gc.HasLen, 0)
 }
 
@@ -198,13 +198,13 @@ func (s *resourceSuite) TestListResourcesResourceNotFound(c *gc.C) {
 	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
 	ch := storetesting.NewCharm(storetesting.MetaWithResources(nil, "resource1", "resource2"))
 	err := store.AddCharmWithArchive(id, ch)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	uploadResource(c, store, id, "resource1", "something")
 
 	// A resource exists for resource1, but not resource2. Expect a
 	// placeholder to be returned for resource2.
 	docs, err := store.ListResources(id, params.UnpublishedChannel)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	checkResourceDocs(c, store, id, []string{"resource1/0", "resource2/-1"}, docs)
 }
@@ -216,12 +216,12 @@ func (s *resourceSuite) TestUploadResource(c *gc.C) {
 	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
 	meta := storetesting.MetaWithResources(nil, "someResource")
 	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	now := time.Now()
 	blob := "content 1"
 	res, err := store.UploadResource(id, "someResource", strings.NewReader(blob), hashOfString(blob), int64(len(blob)))
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	if res.UploadTime.Before(now) {
 		c.Fatalf("upload time earlier than expected; want > %v; got %v", now, res.UploadTime)
 	}
@@ -229,7 +229,7 @@ func (s *resourceSuite) TestUploadResource(c *gc.C) {
 
 	blob = "content 2"
 	res, err = store.UploadResource(id, "someResource", strings.NewReader(blob), hashOfString(blob), int64(len(blob)))
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	checkResourceDocs(c, store, id, []string{"someResource/1"}, []*mongodoc.Resource{res})
 }
 
@@ -240,7 +240,7 @@ func (s *resourceSuite) TestAddResourceWithUploadId(c *gc.C) {
 	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
 	meta := storetesting.MetaWithResources(nil, "someResource")
 	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	contents := []string{
 		"123456789 123456789 ",
@@ -249,7 +249,7 @@ func (s *resourceSuite) TestAddResourceWithUploadId(c *gc.C) {
 	uid := putMultipart(c, store.BlobStore, time.Time{}, contents...)
 
 	res, err := store.AddResourceWithUploadId(id, "someResource", uid)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Check that the upload document has been removed.
 	_, err = store.BlobStore.UploadInfo(uid)
@@ -258,12 +258,12 @@ func (s *resourceSuite) TestAddResourceWithUploadId(c *gc.C) {
 	checkResourceDocs(c, store, id, []string{"someResource/0"}, []*mongodoc.Resource{res})
 	allContents := strings.Join(contents, "")
 	blob, err := store.OpenResourceBlob(res)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer blob.Close()
 	c.Assert(blob.Size, gc.Equals, int64(len(allContents)))
 	c.Assert(blob.Hash, gc.Equals, hashOfString(allContents))
 	data, err := ioutil.ReadAll(blob)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(string(data), gc.Equals, allContents)
 }
 
@@ -274,7 +274,7 @@ func (s *resourceSuite) TestAddResourceWithSharedUploadId(c *gc.C) {
 	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
 	meta := storetesting.MetaWithResources(nil, "someResource")
 	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	contents := []string{
 		"123456789 123456789 ",
@@ -352,7 +352,7 @@ func (s *resourceSuite) TestUploadResourceErrors(c *gc.C) {
 	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
 	meta := storetesting.MetaWithResources(nil, "someResource")
 	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	for i, test := range uploadResourceErrorTests {
 		c.Logf("%d. %s", i, test.about)
@@ -434,24 +434,24 @@ func (s *resourceSuite) TestResolveResource(c *gc.C) {
 	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
 	meta := storetesting.MetaWithResources(nil, "someResource")
 	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Upload three version of the resource.
 	for i := 0; i < 3; i++ {
 		content := fmt.Sprintf("content%d", i)
 		_, err := store.UploadResource(id, "someResource", strings.NewReader(content), hashOfString(content), int64(len(content)))
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 	// Publish the charm to different channels with the different resources.
 	err = store.Publish(id, map[string]int{
 		"someResource": 0,
 	}, params.StableChannel)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	err = store.Publish(id, map[string]int{
 		"someResource": 1,
 	}, params.EdgeChannel)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	for i, test := range resolveResourceTests {
 		c.Logf("%d. %s", i, test.about)
@@ -461,7 +461,7 @@ func (s *resourceSuite) TestResolveResource(c *gc.C) {
 			c.Assert(errgo.Cause(err), gc.Equals, test.expectErrorCause)
 			continue
 		}
-		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(err, gc.Equals, nil)
 		checkResourceDocs(c, store, id, []string{fmt.Sprintf("someResource/%d", test.expectResource)}, []*mongodoc.Resource{res})
 	}
 }
@@ -472,7 +472,7 @@ func (s *resourceSuite) TestPublishWithResourceNotInMetadata(c *gc.C) {
 
 	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
 	err := store.AddCharmWithArchive(id, storetesting.NewCharm(nil))
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	err = store.Publish(id, map[string]int{
 		"resource1": 0,
@@ -488,7 +488,7 @@ func (s *resourceSuite) TestPublishWithResourceNotFound(c *gc.C) {
 	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
 	meta := storetesting.MetaWithResources(nil, "resource1")
 	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	err = store.Publish(id, map[string]int{
 		"resource1": 0,
@@ -504,7 +504,7 @@ func (s *resourceSuite) TestPublishWithoutAllRequiredResources(c *gc.C) {
 	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
 	meta := storetesting.MetaWithResources(nil, "resource1", "resource2", "resource3")
 	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	uploadResource(c, store, id, "resource2", "content")
 
@@ -522,21 +522,21 @@ func (s *resourceSuite) TestOpenResourceBlob(c *gc.C) {
 	meta := storetesting.MetaWithResources(nil, "someResource")
 	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
 	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	content := "some content"
 	uploadResource(c, store, id, "someResource", content)
 
 	res, err := store.ResolveResource(id, "someResource", -1, params.UnpublishedChannel)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	blob, err := store.OpenResourceBlob(res)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer blob.Close()
 	c.Assert(blob.Size, gc.Equals, int64(len(content)))
 	c.Assert(blob.Hash, gc.Equals, hashOfString(content))
 	data, err := ioutil.ReadAll(blob)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(string(data), gc.Equals, content)
 
 	// Change the blob name so that it's invalid so that we can
@@ -551,20 +551,20 @@ func (s *resourceSuite) TestOpenResourceBlob(c *gc.C) {
 // followed by the given content suffix.
 func uploadResources(c *gc.C, store *Store, id *router.ResolvedURL, contentSuffix string) {
 	entity, err := store.FindEntity(id, nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	for name := range entity.CharmMeta.Resources {
 		c.Logf("uploading resource %v", name)
 		content := name + contentSuffix
 		hash := hashOfString(content)
 		r := strings.NewReader(content)
 		_, err := store.UploadResource(id, name, r, hash, int64(len(content)))
-		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 }
 
 func uploadResource(c *gc.C, store *Store, id *router.ResolvedURL, name string, blob string) {
 	_, err := store.UploadResource(id, name, strings.NewReader(blob), hashOfString(blob), int64(len(blob)))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func resourceRevisions(resources []*mongodoc.Resource) map[string]int {
@@ -596,7 +596,7 @@ func checkResourceDocs(c *gc.C, store *Store, id *router.ResolvedURL, expectReso
 			continue
 		}
 		expectDoc, err := store.ResolveResource(id, rid.Name, rid.Revision, params.UnpublishedChannel)
-		c.Assert(err, gc.IsNil, gc.Commentf("resource %v/%d", rid.Name, rid.Revision))
+		c.Assert(err, gc.Equals, nil, gc.Commentf("resource %v/%d", rid.Name, rid.Revision))
 
 		// Mongo's time stamps are only accurate to a millisecond.
 		// If we're checking against a document that's been created

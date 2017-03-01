@@ -176,7 +176,7 @@ func (s *commonSuite) startServer(c *gc.C) {
 	db := s.Session.DB("charmstore")
 	var err error
 	s.srv, err = charmstore.NewServer(db, si, config, map[string]charmstore.NewAPIHandlerFunc{"v5": v5.NewAPIHandler})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.srvParams = config
 
 	if s.enableIdentity {
@@ -184,7 +184,7 @@ func (s *commonSuite) startServer(c *gc.C) {
 		config.PublicKeyLocator = nil
 		config.IdentityAPIURL = ""
 		s.noMacaroonSrv, err = charmstore.NewServer(db, si, config, map[string]charmstore.NewAPIHandlerFunc{"v5": v5.NewAPIHandler})
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	} else {
 		s.noMacaroonSrv = s.srv
 	}
@@ -202,7 +202,7 @@ func (s *commonSuite) addPublicCharmFromRepo(c *gc.C, charmName string, rurl *ro
 // with the content "<resourcename> content".
 func (s *commonSuite) addPublicCharm(c *gc.C, ch charm.Charm, id *router.ResolvedURL) (*router.ResolvedURL, charm.Charm) {
 	err := s.store.AddCharmWithArchive(id, ch)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	var resources map[string]int
 	if len(ch.Meta().Resources) > 0 {
@@ -210,7 +210,7 @@ func (s *commonSuite) addPublicCharm(c *gc.C, ch charm.Charm, id *router.Resolve
 		// The charm has resources. Ensure that all the required resources are uploaded,
 		// then publish with them.
 		resDocs, err := s.store.ListResources(id, params.UnpublishedChannel)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		for _, doc := range resDocs {
 			if doc.Revision == -1 {
 				// The resource doesn't exist so upload one.
@@ -226,9 +226,9 @@ func (s *commonSuite) addPublicCharm(c *gc.C, ch charm.Charm, id *router.Resolve
 
 func (s *commonSuite) setPublicWithResources(c *gc.C, rurl *router.ResolvedURL, resources map[string]int) {
 	err := s.store.SetPerms(&rurl.URL, "stable.read", params.Everyone)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.store.Publish(rurl, resources, params.StableChannel)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *commonSuite) setPublic(c *gc.C, rurl *router.ResolvedURL) {
@@ -244,7 +244,7 @@ func (s *commonSuite) addPublicBundle(c *gc.C, bundle charm.Bundle, rurl *router
 		s.addRequiredCharms(c, bundle)
 	}
 	err := s.store.AddBundleWithArchive(rurl, bundle)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.setPublic(c, rurl)
 	return rurl, bundle
 }
@@ -263,7 +263,7 @@ func (s *commonSuite) addCharms(c *gc.C, charms map[string]charm.Charm) {
 func (s *commonSuite) setPerms(c *gc.C, readACLs map[string][]string) {
 	for url, acl := range readACLs {
 		err := s.store.SetPerms(charm.MustParseURL(url), "stable.read", acl...)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 }
 
@@ -272,10 +272,10 @@ func (s *commonSuite) setPerms(c *gc.C, readACLs map[string][]string) {
 // is responsible for calling Put on the returned handler.
 func (s *commonSuite) handler(c *gc.C) *v5.ReqHandler {
 	h, err := v5.New(s.store.Pool(), s.srvParams, "")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer h.Close()
 	rh, err := h.NewReqHandler(new(http.Request))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	// It would be nice if we could call s.AddCleanup here
 	// to call rh.Put when the test has completed, but
 	// unfortunately CleanupSuite.TearDownTest runs
@@ -362,7 +362,7 @@ func (s *commonSuite) assertPutAsAdmin(c *gc.C, url string, val interface{}) {
 
 func (s *commonSuite) assertPut0(c *gc.C, url string, val interface{}, asAdmin bool) {
 	body, err := json.Marshal(val)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	p := httptesting.JSONCallParams{
 		Handler: s.srv,
 		URL:     storeURL(url),
@@ -410,7 +410,7 @@ func (s *commonSuite) assertGetIsUnauthorized(c *gc.C, url, expectMessage string
 // error message.
 func (s *commonSuite) assertPutIsUnauthorized(c *gc.C, url string, val interface{}, expectMessage string) {
 	body, err := json.Marshal(val)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler: s.srv,
 		URL:     storeURL(url),
@@ -442,7 +442,7 @@ func (s *commonSuite) doAsUser(user string, f func()) {
 func (s *commonSuite) uploadResource(c *gc.C, id *router.ResolvedURL, name string, content string) {
 	hash := hashOfString(content)
 	_, err := s.store.UploadResource(id, name, strings.NewReader(content), hash, int64(len(content)))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func bakeryDo(client *httpbakery.Client) func(*http.Request) (*http.Response, error) {

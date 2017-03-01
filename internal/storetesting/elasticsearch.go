@@ -58,7 +58,7 @@ func (s *ElasticSearchSuite) TearDownTest(c *gc.C) {
 // end of the test.
 func (s *ElasticSearchSuite) NewIndex(c *gc.C) string {
 	uuid, err := utils.NewUUID()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	id := time.Now().Format("20060102") + uuid.String()
 	s.indexes = append(s.indexes, id)
 	return id

@@ -75,7 +75,7 @@ func (b EntityBuilder) Build() *mongodoc.Entity {
 func AssertEntity(c *gc.C, db *mgo.Collection, expect *mongodoc.Entity) {
 	var entity mongodoc.Entity
 	err := db.FindId(expect.URL).One(&entity)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(&entity, jc.DeepEquals, expect)
 }
 
@@ -130,7 +130,7 @@ func (b BaseEntityBuilder) Build() *mongodoc.BaseEntity {
 func AssertBaseEntity(c *gc.C, db *mgo.Collection, expect *mongodoc.BaseEntity) {
 	var baseEntity mongodoc.BaseEntity
 	err := db.FindId(expect.URL).One(&baseEntity)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(NormalizeBaseEntity(&baseEntity), jc.DeepEquals, NormalizeBaseEntity(expect))
 }
 

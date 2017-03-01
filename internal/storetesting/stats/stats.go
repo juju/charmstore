@@ -23,7 +23,7 @@ func CheckCounterSum(c *gc.C, store *charmstore.Store, key []string, prefix bool
 			Prefix: prefix,
 		}
 		cs, err := store.Counters(&req)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		if sum = cs[0].Count; sum == expected {
 			if expected == 0 && retry < 2 {
 				continue // Wait a bit to make sure.
@@ -42,7 +42,7 @@ func CheckSearchTotalDownloads(c *gc.C, store *charmstore.Store, id *charm.URL, 
 		var err error
 		time.Sleep(100 * time.Millisecond)
 		doc, err = store.ES.GetSearchDocument(id)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		if doc.TotalDownloads == expected {
 			if expected == 0 && retry < 2 {
 				continue // Wait a bit to make sure.

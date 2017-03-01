@@ -23,7 +23,6 @@ import (
 	"sync"
 	"time"
 
-	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
@@ -298,11 +297,11 @@ func (s *ArchiveSuite) TestPostErrors(c *gc.C) {
 func (s *ArchiveSuite) TestConcurrentUploads(c *gc.C) {
 	wordpress := storetesting.Charms.CharmArchive(c.MkDir(), "wordpress")
 	f, err := os.Open(wordpress.Path)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	var buf bytes.Buffer
 	_, err = io.Copy(&buf, f)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	hash, _ := hashOf(bytes.NewReader(buf.Bytes()))
 
@@ -324,11 +323,11 @@ func (s *ArchiveSuite) TestConcurrentUploads(c *gc.C) {
 		body := bytes.NewReader(buf.Bytes())
 		url := srv.URL + storeURL("~charmers/precise/wordpress/archive?hash="+hash)
 		req, err := http.NewRequest("POST", url, body)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		req.Header.Set("Content-Type", "application/zip")
 		req.SetBasicAuth(testUsername, testPassword)
 		resp, err := http.DefaultClient.Do(req)
-		if !c.Check(err, gc.IsNil) {
+		if !c.Check(err, gc.Equals, nil) {
 			return
 		}
 		defer resp.Body.Close()
@@ -573,9 +572,9 @@ func (s *ArchiveSuite) TestPostBundle(c *gc.C) {
 		newResolvedURL("cs:~charmers/utopic/logging-1", 1),
 	} {
 		err := s.store.AddCharmWithArchive(rurl, storetesting.Charms.CharmArchive(c.MkDir(), rurl.URL.Name))
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		err = s.store.Publish(rurl, nil, params.StableChannel)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 
 	// A bundle that did not exist before should get revision 0.
@@ -784,7 +783,7 @@ func (s *ArchiveSuite) TestPostInvalidCharmMetadata(c *gc.C) {
 func (s *ArchiveSuite) TestPostInvalidBundleData(c *gc.C) {
 	path := storetesting.Charms.BundleArchivePath(c.MkDir(), "bad")
 	f, err := os.Open(path)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer f.Close()
 	// Here we exercise both bundle internal verification (bad relation) and
 	// validation with respect to charms (wordpress and mysql are missing).
@@ -845,13 +844,13 @@ func (s *ArchiveSuite) TestUploadOfCurrentCharmReadsFully(c *gc.C) {
 
 	ch := storetesting.Charms.CharmArchive(c.MkDir(), "wordpress")
 	f, err := os.Open(ch.Path)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer f.Close()
 
 	// Calculate blob hashes.
 	hash := blobstore.NewHash()
 	_, err = io.Copy(hash, f)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	hashSum := fmt.Sprintf("%x", hash.Sum(nil))
 
 	// Simulate upload of current version
@@ -859,7 +858,7 @@ func (s *ArchiveSuite) TestUploadOfCurrentCharmReadsFully(c *gc.C) {
 	defer h.Close()
 	b := bytes.NewBuffer([]byte("test body"))
 	r, err := http.NewRequest("POST", "/~charmers/precise/wordpress/archive?hash="+hashSum, b)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	r.Header.Set("Content-Type", "application/zip")
 	r.SetBasicAuth(testUsername, testPassword)
 	rec := httptest.NewRecorder()
@@ -878,7 +877,7 @@ func (s *ArchiveSuite) TestUploadOfCurrentCharmReadsFully(c *gc.C) {
 func (s *ArchiveSuite) assertCannotUpload(c *gc.C, id string, content io.ReadSeeker, httpStatus int, errorCode params.ErrorCode, errorMessage string) {
 	hash, size := hashOf(content)
 	_, err := content.Seek(0, 0)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	path := fmt.Sprintf("%s/archive?hash=%s", id, hash)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -932,7 +931,7 @@ func (s *commonArchiveSuite) assertUploadCharm(c *gc.C, method string, url *rout
 func (s *commonArchiveSuite) assertUploadBundle(c *gc.C, method string, url *router.ResolvedURL, bundleName string) {
 	path := storetesting.Charms.BundleArchivePath(c.MkDir(), bundleName)
 	b, err := charm.ReadBundleArchive(path)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	id, size := s.assertUpload(c, uploadParams{
 		method:   method,
 		id:       url,
@@ -958,18 +957,18 @@ type uploadParams struct {
 
 func (s *commonArchiveSuite) assertUpload(c *gc.C, p uploadParams) (id *charm.URL, size int64) {
 	f, err := os.Open(p.fileName)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer f.Close()
 
 	// Calculate blob hashes.
 	hash := blobstore.NewHash()
 	hash256 := sha256.New()
 	size, err = io.Copy(io.MultiWriter(hash, hash256), f)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	hashSum := fmt.Sprintf("%x", hash.Sum(nil))
 	hash256Sum := fmt.Sprintf("%x", hash256.Sum(nil))
 	_, err = f.Seek(0, 0)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	uploadURL := p.id.URL
 	if p.method == "POST" {
@@ -1017,7 +1016,7 @@ func (s *commonArchiveSuite) assertUpload(c *gc.C, p uploadParams) (id *charm.UR
 	for _, ch := range params.OrderedChannels {
 		_, err := s.store.FindBestEntity(&p.id.URL, ch, nil)
 		if expectChans[ch] {
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 		} else {
 			c.Assert(err, gc.NotNil)
 			c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
@@ -1025,7 +1024,7 @@ func (s *commonArchiveSuite) assertUpload(c *gc.C, p uploadParams) (id *charm.UR
 	}
 
 	entity, err := s.store.FindEntity(p.id, nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(entity.BlobHash, gc.Equals, hashSum)
 	if p.id.URL.Series != "" {
 		c.Assert(entity.BlobHash256, gc.Equals, hash256Sum)
@@ -1042,7 +1041,7 @@ func (s *commonArchiveSuite) assertUpload(c *gc.C, p uploadParams) (id *charm.UR
 	// Test that the expected entry has been created
 	// in the blob store.
 	r, _, err := s.store.BlobStore.Open(entity.BlobName, nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	r.Close()
 
 	return expectId, size
@@ -1142,7 +1141,7 @@ func (s *ArchiveSuite) TestArchiveFileErrors(c *gc.C) {
 	s.addPublicCharmFromRepo(c, "wordpress", newResolvedURL("cs:~charmers/utopic/wordpress-0", 0))
 	id, _ := s.addPublicCharmFromRepo(c, "mysql", newResolvedURL("cs:~charmers/utopic/mysql-0", 0))
 	err := s.store.SetPerms(&id.URL, "stable.read", "no-one")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.idmServer.SetDefaultUser("bob")
 	for i, test := range archiveFileErrorsTests {
 		c.Logf("test %d: %s", i, test.about)
@@ -1164,7 +1163,7 @@ func (s *ArchiveSuite) TestArchiveFileGet(c *gc.C) {
 	id := newResolvedURL("cs:~charmers/utopic/all-hooks-0", 0)
 	s.addPublicCharm(c, ch, id)
 	zipFile, err := zip.OpenReader(ch.Path)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer zipFile.Close()
 
 	// Check a file in the root directory.
@@ -1184,10 +1183,10 @@ func (s *ArchiveSuite) assertArchiveFileContents(c *gc.C, zipFile *zip.ReadClose
 	for _, file := range zipFile.File {
 		if file.Name == filePath {
 			r, err := file.Open()
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 			defer r.Close()
 			expectBytes, err = ioutil.ReadAll(r)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 			break
 		}
 	}
@@ -1215,12 +1214,12 @@ func (s *ArchiveSuite) TestDelete(c *gc.C) {
 	id := "~charmers/utopic/mysql-42"
 	url := newResolvedURL(id, -1)
 	err := s.store.AddCharmWithArchive(url, storetesting.Charms.CharmArchive(c.MkDir(), "mysql"))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Retrieve the corresponding entity.
 	var entity mongodoc.Entity
 	err = s.store.DB.Entities().FindId(&url.URL).Select(bson.D{{"blobname", 1}}).One(&entity)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Delete the charm using the API.
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -1239,7 +1238,7 @@ func (s *ArchiveSuite) TestDelete(c *gc.C) {
 	// TODO(mhilton) reinstate this check when DELETE is re-enabled.
 	//	// The entity has been deleted.
 	//	count, err := s.store.DB.Entities().FindId(url).Count()
-	//	c.Assert(err, gc.IsNil)
+	//	c.Assert(err, gc.Equals, nil)
 	//	c.Assert(count, gc.Equals, 0)
 	//
 	//	// The blob has been deleted.
@@ -1253,7 +1252,7 @@ func (s *ArchiveSuite) TestDeleteSpecificCharm(c *gc.C) {
 		err := s.store.AddCharmWithArchive(
 			newResolvedURL(id, -1),
 			storetesting.Charms.CharmArchive(c.MkDir(), "mysql"))
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 
 	// Delete the second charm using the API.
@@ -1278,7 +1277,7 @@ func (s *ArchiveSuite) TestDeleteSpecificCharm(c *gc.C) {
 	count, err := s.store.DB.Entities().Find(bson.D{{
 		"_id", bson.D{{"$in", urls}},
 	}}).Count()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(count, gc.Equals, 2)
 }
 
@@ -1304,14 +1303,14 @@ func (s *ArchiveSuite) TestDeleteNotFound(c *gc.C) {
 //	id := "~charmers/utopic/mysql-42"
 //	url := newResolvedURL(id, -1)
 //	err := s.store.AddCharmWithArchive(url, storetesting.Charms.CharmArchive(c.MkDir(), "mysql"))
-//	c.Assert(err, gc.IsNil)
+//	c.Assert(err, gc.Equals, nil)
 //
 //	err = s.store.DB.Entities().UpdateId(&url.URL, bson.M{
 //		"$set": bson.M{
 //			"blobname": "no-such-name",
 //		},
 //	})
-//	c.Assert(err, gc.IsNil)
+//	c.Assert(err, gc.Equals, nil)
 //	// TODO update entity to change BlobName to "no-such-name"
 //
 //	// Try to delete the charm using the API.
@@ -1339,7 +1338,7 @@ func (s *ArchiveSuite) TestDeleteNotFound(c *gc.C) {
 //	err := s.store.AddCharmWithArchive(
 //		newResolvedURL(id, -1),
 //		storetesting.Charms.CharmArchive(c.MkDir(), "mysql"))
-//	c.Assert(err, gc.IsNil)
+//	c.Assert(err, gc.Equals, nil)
 //
 //	// Delete the charm using the API.
 //	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
@@ -1372,7 +1371,7 @@ func (s *basicAuthArchiveSuite) TestPostAuthErrors(c *gc.C) {
 //		newResolvedURL("~charmers/utopic/django-42", 42),
 //		storetesting.Charms.CharmArchive(c.MkDir(), "wordpress"),
 //	)
-//	c.Assert(err, gc.IsNil)
+//	c.Assert(err, gc.Equals, nil)
 //	s.checkAuthErrors(c, "DELETE", "utopic/django-42/archive")
 //}
 
@@ -1382,7 +1381,7 @@ func (s *basicAuthArchiveSuite) TestPostErrorReadsFully(c *gc.C) {
 
 	b := strings.NewReader("test body")
 	r, err := http.NewRequest("POST", "/~charmers/trusty/wordpress/archive", b)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	r.Header.Set("Content-Type", "application/zip")
 	r.SetBasicAuth(testUsername, testPassword)
 	rec := httptest.NewRecorder()
@@ -1396,7 +1395,7 @@ func (s *basicAuthArchiveSuite) TestPostAuthErrorReadsFully(c *gc.C) {
 	defer h.Close()
 	b := strings.NewReader("test body")
 	r, err := http.NewRequest("POST", "/~charmers/trusty/wordpress/archive", b)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	r.Header.Set("Content-Type", "application/zip")
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, r)
@@ -1551,14 +1550,14 @@ func (s *ArchiveSuite) TestGetNewPromulgatedRevision(c *gc.C) {
 	for _, url := range charms {
 		ch := storetesting.NewCharm(new(charm.Meta))
 		err := s.store.AddCharmWithArchive(mustParseResolvedURL(url), ch)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 	handler := s.handler(c)
 	defer handler.Close()
 	for i, test := range getNewPromulgatedRevisionTests {
 		c.Logf("%d. %s", i, test.about)
 		rev, err := v5.GetNewPromulgatedRevision(handler, test.id)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(rev, gc.Equals, test.expectRev)
 	}
 }
@@ -1738,16 +1737,16 @@ func (s *ArchiveSuiteWithTerms) TestGetArchiveWithBlankMacaroon(c *gc.C) {
 	c.Assert(gotBody, gc.NotNil)
 	var m macaroon.Macaroon
 	err := json.Unmarshal(gotBody, &m)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	bClient := httpbakery.NewClient()
 	ms, err := bClient.DischargeAll(&m)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	u, err := url.Parse("http://127.0.0.1")
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = httpbakery.SetCookie(client.Jar, u, ms)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler:     s.srv,

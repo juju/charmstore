@@ -59,16 +59,16 @@ func (s *APISuite) TearDownTest(c *gc.C) {
 func newServer(c *gc.C, session *mgo.Session, config charmstore.ServerParams) (*charmstore.Server, *charmstore.Store) {
 	db := session.DB("charmstore")
 	pool, err := charmstore.NewPool(db, nil, nil, config)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	srv, err := charmstore.NewServer(db, nil, config, map[string]charmstore.NewAPIHandlerFunc{"": legacy.NewAPIHandler})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	return srv, pool.Store()
 }
 
 func (s *APISuite) TestCharmArchive(c *gc.C) {
 	_, wordpress := s.addPublicCharm(c, "wordpress", "cs:precise/wordpress-0")
 	archiveBytes, err := ioutil.ReadFile(wordpress.Path)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.srv,
@@ -109,7 +109,7 @@ func (s *APISuite) TestGetElidesSeriesFromMultiSeriesCharmMetadata(c *gc.C) {
 	c.Assert(rec.Code, gc.Equals, http.StatusOK)
 
 	gotCh, err := charm.ReadCharmArchiveBytes(rec.Body.Bytes())
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	chMeta := ch.Meta()
 	chMeta.Series = nil
@@ -159,7 +159,7 @@ func (s *APISuite) TestServeCharmInfo(c *gc.C) {
 	wordpressURL, wordpress := s.addPublicCharm(c, "wordpress", "cs:precise/wordpress-1")
 	hashSum := fileSHA256(c, wordpress.Path)
 	digest, err := json.Marshal("who@canonical.com-bzr-digest")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	tests := []struct {
 		about     string
@@ -235,7 +235,7 @@ func (s *APISuite) TestServeCharmInfo(c *gc.C) {
 		err = s.store.UpdateEntity(wordpressURL, bson.D{{
 			"$set", bson.D{{"extrainfo", test.extrainfo}},
 		}})
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		expectInfo := charmrepo.InfoResponse{
 			CanonicalURL: test.canonical,
 			Sha256:       test.sha,
@@ -315,17 +315,17 @@ func (s *APISuite) TestAPIInfoWithGatedCharm(c *gc.C) {
 
 func fileSHA256(c *gc.C, path string) string {
 	f, err := os.Open(path)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	hash := sha256.New()
 	_, err = io.Copy(hash, f)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	return fmt.Sprintf("%x", hash.Sum(nil))
 }
 
 func (s *APISuite) TestCharmPackageGet(c *gc.C) {
 	wordpressURL, wordpress := s.addPublicCharm(c, "wordpress", "cs:precise/wordpress-0")
 	archiveBytes, err := ioutil.ReadFile(wordpress.Path)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	srv := httptest.NewServer(s.srv)
 	defer srv.Close()
@@ -334,11 +334,11 @@ func (s *APISuite) TestCharmPackageGet(c *gc.C) {
 	s.PatchValue(&charmrepo.LegacyStore.BaseURL, srv.URL)
 
 	ch, err := charmrepo.LegacyStore.Get(&wordpressURL.URL)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	chArchive := ch.(*charm.CharmArchive)
 
 	data, err := ioutil.ReadFile(chArchive.Path)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(data, gc.DeepEquals, archiveBytes)
 }
 
@@ -354,7 +354,7 @@ func (s *APISuite) TestCharmPackageCharmInfo(c *gc.C) {
 	s.PatchValue(&charmrepo.LegacyStore.BaseURL, srv.URL)
 
 	resp, err := charmrepo.LegacyStore.Info(wordpressURL.PreferredURL(), mysqlURL.PreferredURL(), notFoundURL)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(resp, gc.HasLen, 3)
 	c.Assert(resp, jc.DeepEquals, []*charmrepo.InfoResponse{{
 		CanonicalURL: wordpressURL.String(),
@@ -401,16 +401,16 @@ func (s *APISuite) addPublicCharm(c *gc.C, charmName, curl string) (*router.Reso
 	}
 	archive := storetesting.Charms.CharmArchive(c.MkDir(), charmName)
 	err := s.store.AddCharmWithArchive(rurl, archive)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.setPublic(c, rurl)
 	return rurl, archive
 }
 
 func (s *APISuite) setPublic(c *gc.C, rurl *router.ResolvedURL) {
 	err := s.store.SetPerms(&rurl.URL, "stable.read", params.Everyone)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.store.Publish(rurl, nil, params.StableChannel)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 var serveCharmEventErrorsTests = []struct {
@@ -470,13 +470,13 @@ func (s *APISuite) TestServeCharmEvent(c *gc.C) {
 			params.BzrDigestKey: []byte(":"),
 		}}},
 	}})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Retrieve the entities.
 	mysql, err := s.store.FindEntity(mysqlUrl, nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	riak, err := s.store.FindEntity(riakUrl, nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	tests := []struct {
 		about  string
@@ -599,7 +599,7 @@ func (s *APISuite) TestServeCharmEventLastRevision(c *gc.C) {
 
 	// Retrieve the most recent revision of the entity.
 	entity, err := s.store.FindEntity(url2, nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Ensure the last revision is correctly returned.
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -619,18 +619,18 @@ func (s *APISuite) TestServeCharmEventLastRevision(c *gc.C) {
 
 func (s *APISuite) addExtraInfoDigest(c *gc.C, id *router.ResolvedURL, digest string) {
 	b, err := json.Marshal(digest)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.store.UpdateEntity(id, bson.D{{
 		"$set", bson.D{{"extrainfo", map[string][]byte{
 			params.BzrDigestKey: b,
 		}}},
 	}})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *APISuite) updateUploadTime(c *gc.C, id *router.ResolvedURL, uploadTime time.Time) {
 	err := s.store.UpdateEntity(id, bson.D{{
 		"$set", bson.D{{"uploadtime", uploadTime}},
 	}})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }

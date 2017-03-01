@@ -221,7 +221,7 @@ func (s *APISuite) TestStatusBaseEntitiesError(c *gc.C) {
 		Name: "django",
 	}
 	err := s.store.DB.BaseEntities().Insert(entity)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	s.AssertDebugStatus(c, false, map[string]params.DebugStatus{
 		"base_entities": {
@@ -245,7 +245,7 @@ func (s *APISuite) AssertDebugStatus(c *gc.C, complete bool, status map[string]p
 	c.Assert(rec.Header().Get("Content-Type"), gc.Equals, "application/json")
 	var gotStatus map[string]params.DebugStatus
 	err := json.Unmarshal(rec.Body.Bytes(), &gotStatus)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	for key, r := range gotStatus {
 		if _, found := status[key]; !complete && !found {
 			delete(gotStatus, key)
@@ -275,7 +275,7 @@ func (s *statusWithElasticSearchSuite) TestStatusWithElasticSearch(c *gc.C) {
 	})
 	var results map[string]params.DebugStatus
 	err := json.Unmarshal(rec.Body.Bytes(), &results)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(results["elasticsearch"].Name, gc.Equals, "Elastic search is running")
 	c.Assert(results["elasticsearch"].Value, jc.Contains, "cluster_name:")
 }

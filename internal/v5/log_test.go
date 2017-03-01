@@ -226,7 +226,7 @@ func (s *logSuite) TestGetLogs(c *gc.C) {
 	for _, key := range []string{"info1", "error1", "info2", "warning1", "error2", "info3", "error3", "stats"} {
 		resp := logResponses[key]
 		err := s.store.AddLog(&resp.Data, paramsLogLevels[resp.Level], paramsLogTypes[resp.Type], resp.URLs)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 	afterAdding := time.Now().Add(time.Second)
 
@@ -248,7 +248,7 @@ func (s *logSuite) TestGetLogs(c *gc.C) {
 		var logs []*params.LogResponse
 		decoder := json.NewDecoder(rec.Body)
 		err := decoder.Decode(&logs)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 
 		// Check and then reset the response time so that the whole body
 		// can be more easily compared later.
@@ -351,7 +351,7 @@ func (s *logSuite) TestGetLogsErrorInvalidLog(c *gc.C) {
 		Type:  mongodoc.IngestionType,
 		Time:  time.Now(),
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	// The log is just ignored.
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:      s.srv,
@@ -387,7 +387,7 @@ func (s *logSuite) TestPostLogs(c *gc.C) {
 	// Ensure the log message has been added to the database.
 	var doc mongodoc.Log
 	err := s.store.DB.Logs().Find(nil).One(&doc)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(string(doc.Data), gc.Equals, `"info data"`)
 	c.Assert(doc.Level, gc.Equals, mongodoc.InfoLevel)
 	c.Assert(doc.Type, gc.Equals, mongodoc.IngestionType)
@@ -413,7 +413,7 @@ func (s *logSuite) TestPostLogsMultipleEntries(c *gc.C) {
 		Type:  params.IngestionType,
 	}}
 	body, err := json.Marshal(logs)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// Send the request.
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -433,7 +433,7 @@ func (s *logSuite) TestPostLogsMultipleEntries(c *gc.C) {
 	// TODO avoid reordering logs by adding a sequence number.
 	var docs []mongodoc.Log
 	err = s.store.DB.Logs().Find(nil).Sort("level").All(&docs)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(docs, gc.HasLen, 2)
 	c.Check(string(docs[0].Data), gc.Equals, string(infoData))
 	c.Check(docs[0].Level, gc.Equals, mongodoc.InfoLevel)

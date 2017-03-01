@@ -88,7 +88,7 @@ func (s *APISuite) TestServeDiagram(c *gc.C) {
 	url := newResolvedURL("cs:~charmers/bundle/wordpressbundle-42", 42)
 	s.addRequiredCharms(c, bundle)
 	err := s.store.AddBundleWithArchive(url, bundle)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.setPublic(c, url)
 
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
@@ -150,7 +150,7 @@ func (s *APISuite) TestServeDiagramNoPosition(c *gc.C) {
 	url := newResolvedURL("cs:~charmers/bundle/wordpressbundle-42", 42)
 	s.addRequiredCharms(c, bundle)
 	err := s.store.AddBundleWithArchive(url, bundle)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.setPublic(c, url)
 
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
@@ -202,7 +202,7 @@ func (s *APISuite) TestServeReadMe(c *gc.C) {
 		content := fmt.Sprintf("some content %d", i)
 		if test.name != "" {
 			err := ioutil.WriteFile(filepath.Join(wordpress.Path, test.name), []byte(content), 0666)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 		}
 
 		url.URL.Revision = i
@@ -229,7 +229,7 @@ func (s *APISuite) TestServeReadMe(c *gc.C) {
 func charmWithExtraFile(c *gc.C, name, file, content string) *charm.CharmDir {
 	ch := storetesting.Charms.ClonedDir(c.MkDir(), name)
 	err := ioutil.WriteFile(filepath.Join(ch.Path, file), []byte(content), 0666)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	return ch
 }
 
@@ -240,7 +240,7 @@ func (s *APISuite) TestServeIcon(c *gc.C) {
 
 	url := newResolvedURL("cs:~charmers/precise/wordpress-0", -1)
 	err := s.store.AddCharmWithArchive(url, wordpress)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.setPublic(c, url)
 
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
@@ -267,11 +267,11 @@ func (s *APISuite) TestServeIcon(c *gc.C) {
 	// Reload the charm with an icon that already has viewBox.
 	wordpress = storetesting.Charms.ClonedDir(c.MkDir(), "wordpress")
 	err = ioutil.WriteFile(filepath.Join(wordpress.Path, "icon.svg"), []byte(expected), 0666)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	url.URL.Revision++
 	err = s.store.AddCharmWithArchive(url, wordpress)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.setPublic(c, url)
 
 	// Check that we still get expected svg.
@@ -343,7 +343,7 @@ func (s *APISuite) TestServeDefaultIconForBadXML(c *gc.C) {
 func (s *APISuite) TestProcessIconWorksOnDefaultIcon(c *gc.C) {
 	var buf bytes.Buffer
 	err := v5.ProcessIcon(&buf, strings.NewReader(v5.DefaultIcon))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	assertXMLEqual(c, buf.Bytes(), []byte(v5.DefaultIcon))
 }
 
@@ -356,7 +356,7 @@ func (s *APISuite) TestProcessIconDoesNotQuoteNewlines(c *gc.C) {
 `
 	var buf bytes.Buffer
 	err := v5.ProcessIcon(&buf, strings.NewReader(icon))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	if strings.Contains(buf.String(), "&#x") {
 		c.Errorf("newlines were quoted in processed icon output")
 	}
@@ -431,7 +431,7 @@ func assertXMLContains(c *gc.C, body []byte, need map[string]func(xml.Token) boo
 		if err == io.EOF {
 			break
 		}
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		for what, f := range need {
 			if f(tok) {
 				delete(need, what)

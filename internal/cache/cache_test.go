@@ -21,27 +21,27 @@ var _ = gc.Suite(&suite{})
 func (*suite) TestSimpleGet(c *gc.C) {
 	p := cache.New(time.Hour)
 	v, err := p.Get("a", fetchValue(2))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(v, gc.Equals, 2)
 }
 
 func (*suite) TestSimpleRefresh(c *gc.C) {
 	p := cache.New(time.Hour)
 	v, err := p.Get("a", fetchValue(2))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(v, gc.Equals, 2)
 
 	v, err = p.Get("a", fetchValue(4))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(v, gc.Equals, 2)
 
 	p.Evict("a")
 	v, err = p.Get("a", fetchValue(3))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(v, gc.Equals, 3)
 
 	v, err = p.Get("a", fetchValue(4))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(v, gc.Equals, 3)
 }
 
@@ -57,11 +57,11 @@ func (*suite) TestFetchError(c *gc.C) {
 func (*suite) TestFetchOnlyOnce(c *gc.C) {
 	p := cache.New(time.Hour)
 	v, err := p.Get("a", fetchValue(2))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(v, gc.Equals, 2)
 
 	v, err = p.Get("a", fetchError(errUnexpectedFetch))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(v, gc.Equals, 2)
 }
 
@@ -69,12 +69,12 @@ func (*suite) TestEntryExpiresAfterMaxEntryAge(c *gc.C) {
 	now := time.Now()
 	p := cache.New(time.Minute)
 	v, err := cache.GetAtTime(p, "a", fetchValue(2), now)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(v, gc.Equals, 2)
 
 	// Entry is definitely not expired before half the entry expiry time.
 	v, err = cache.GetAtTime(p, "a", fetchError(errUnexpectedFetch), now.Add(time.Minute/2-1))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(v, gc.Equals, 2)
 
 	// Entry is definitely expired after the entry expiry time
@@ -88,14 +88,14 @@ func (*suite) TestEntriesRemovedWhenNotRetrieved(c *gc.C) {
 
 	// Populate the cache with an initial entry.
 	v, err := cache.GetAtTime(p, "a", fetchValue("a"), now)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(v, gc.Equals, "a")
 	c.Assert(p.Len(), gc.Equals, 1)
 
 	// Fetch another item after the expiry time,
 	// causing current entries to be moved to old.
 	v, err = cache.GetAtTime(p, "b", fetchValue("b"), now.Add(time.Minute+1))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(v, gc.Equals, "b")
 	c.Assert(p.Len(), gc.Equals, 2)
 
@@ -103,7 +103,7 @@ func (*suite) TestEntriesRemovedWhenNotRetrieved(c *gc.C) {
 	// causing the old entries to be discarded because
 	// nothing has fetched them.
 	v, err = cache.GetAtTime(p, "b", fetchValue("b"), now.Add(time.Minute*2+2))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(v, gc.Equals, "b")
 	c.Assert(p.Len(), gc.Equals, 1)
 }
@@ -116,27 +116,27 @@ func (*suite) TestRefreshedEntry(c *gc.C) {
 
 	// Populate the cache with an initial entry.
 	v, err := cache.GetAtTime(p, "a", fetchValue("a"), now)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(v, gc.Equals, "a")
 	c.Assert(p.Len(), gc.Equals, 1)
 
 	// Fetch another item very close to the expiry time.
 	v, err = cache.GetAtTime(p, "b", fetchValue("b"), now.Add(time.Minute-1))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(v, gc.Equals, "b")
 	c.Assert(p.Len(), gc.Equals, 2)
 
 	// Fetch it again just after the expiry time,
 	// which should move it into the new map.
 	v, err = cache.GetAtTime(p, "b", fetchError(errUnexpectedFetch), now.Add(time.Minute+1))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(v, gc.Equals, "b")
 	c.Assert(p.Len(), gc.Equals, 2)
 
 	// Fetch another item, causing "a" to be removed from the cache
 	// and keeping "b" in there.
 	v, err = cache.GetAtTime(p, "c", fetchValue("c"), now.Add(time.Minute*2+2))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(v, gc.Equals, "c")
 	c.Assert(p.Len(), gc.Equals, 2)
 }
@@ -151,14 +151,14 @@ func (*suite) TestConcurrentFetch(c *gc.C) {
 	go func() {
 		defer wg.Done()
 		v, err := p.Get("a", fetchValue("a"))
-		c.Check(err, gc.IsNil)
+		c.Check(err, gc.Equals, nil)
 		c.Check(v, gc.Equals, "a")
 	}()
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		v, err := p.Get("b", fetchValue("b"))
-		c.Check(err, gc.IsNil)
+		c.Check(err, gc.Equals, nil)
 		c.Check(v, gc.Equals, "b")
 	}()
 	wg.Wait()
@@ -171,7 +171,7 @@ func (*suite) TestRefreshSpread(c *gc.C) {
 	const N = 100
 	for i := 0; i < N; i++ {
 		v, err := cache.GetAtTime(p, fmt.Sprint(i), fetchValue(i), now)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(v, gc.Equals, i)
 	}
 	counts := make([]int, time.Minute/time.Millisecond/10+1)

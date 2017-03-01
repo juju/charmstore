@@ -20,10 +20,10 @@ var _ = gc.Suite(&DocSuite{})
 func (s *DocSuite) TestIntBoolGetBSON(c *gc.C) {
 	test := bson.D{{"true", mongodoc.IntBool(true)}, {"false", mongodoc.IntBool(false)}}
 	b, err := bson.Marshal(test)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	result := make(map[string]int, 2)
 	err = bson.Unmarshal(b, &result)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(result["true"], gc.Equals, 1)
 	c.Assert(result["false"], gc.Equals, -1)
 }
@@ -31,17 +31,17 @@ func (s *DocSuite) TestIntBoolGetBSON(c *gc.C) {
 func (s *DocSuite) TestIntBoolSetBSON(c *gc.C) {
 	test := bson.D{{"true", 1}, {"false", -1}}
 	b, err := bson.Marshal(test)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	var result map[string]mongodoc.IntBool
 	err = bson.Unmarshal(b, &result)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(result, jc.DeepEquals, map[string]mongodoc.IntBool{"true": true, "false": false})
 }
 
 func (s *DocSuite) TestIntBoolSetBSONIncorrectType(c *gc.C) {
 	test := bson.D{{"test", "true"}}
 	b, err := bson.Marshal(test)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	var result map[string]mongodoc.IntBool
 	err = bson.Unmarshal(b, &result)
 	c.Assert(err, gc.ErrorMatches, "cannot unmarshal value: BSON kind 0x02 isn't compatible with type int")
@@ -50,7 +50,7 @@ func (s *DocSuite) TestIntBoolSetBSONIncorrectType(c *gc.C) {
 func (s *DocSuite) TestIntBoolSetBSONInvalidValue(c *gc.C) {
 	test := bson.D{{"test", 2}}
 	b, err := bson.Marshal(test)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	var result map[string]mongodoc.IntBool
 	err = bson.Unmarshal(b, &result)
 	c.Assert(err, gc.ErrorMatches, `invalid value 2`)

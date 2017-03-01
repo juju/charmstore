@@ -33,11 +33,11 @@ func (s *StoreSearchSuite) SetUpTest(c *gc.C) {
 	s.index = SearchIndex{s.ES, s.TestIndex}
 	s.ES.RefreshIndex(".versions")
 	pool, err := NewPool(s.Session.DB("foo"), &s.index, nil, ServerParams{})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.pool = pool
 	s.store = pool.Store()
 	s.addEntities(c)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *StoreSearchSuite) TearDownTest(c *gc.C) {
@@ -187,17 +187,17 @@ func (s *StoreSearchSuite) addEntities(c *gc.C) {
 	}
 	s.store.pool.statsCache.EvictAll()
 	err := s.store.syncSearch()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *StoreSearchSuite) TestSuccessfulExport(c *gc.C) {
 	s.store.pool.statsCache.EvictAll()
 	for _, ent := range searchEntities {
 		entity, err := s.store.FindEntity(EntityResolvedURL(ent.entity), nil)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		var actual json.RawMessage
 		err = s.store.ES.GetDocument(s.TestIndex, typeName, s.store.ES.getID(entity.URL), &actual)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		series := entity.SupportedSeries
 		if ent.bundleData != nil {
 			series = []string{"bundle"}
@@ -227,15 +227,15 @@ func (s *StoreSearchSuite) TestNoExportDeprecated(c *gc.C) {
 	)
 	var entity *mongodoc.Entity
 	err := s.store.DB.Entities().FindId("cs:~openstack-charmers/xenial/mysql-7").One(&entity)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	present, err := s.store.ES.HasDocument(s.TestIndex, typeName, s.store.ES.getID(entity.URL))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(present, gc.Equals, true)
 
 	err = s.store.DB.Entities().FindId("cs:~charmers/saucy/mysql-4").One(&entity)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	present, err = s.store.ES.HasDocument(s.TestIndex, typeName, s.store.ES.getID(entity.URL))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(present, gc.Equals, false)
 }
 
@@ -253,11 +253,11 @@ func (s *StoreSearchSuite) TestExportOnlyLatest(c *gc.C) {
 	var expected, old *mongodoc.Entity
 	var actual json.RawMessage
 	err := s.store.DB.Entities().FindId("cs:~charmers/precise/wordpress-23").One(&old)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.store.DB.Entities().FindId("cs:~charmers/precise/wordpress-24").One(&expected)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.store.ES.GetDocument(s.TestIndex, typeName, s.store.ES.getID(old.URL), &actual)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	doc := SearchDoc{
 		Entity:       expected,
 		ReadACLs:     []string{"charmers", params.Everyone},
@@ -292,11 +292,11 @@ func (s *StoreSearchSuite) TestExportMultiSeriesCharmsCreateExpandedVersions(c *
 	var expected, old *mongodoc.Entity
 	var actual json.RawMessage
 	err := s.store.DB.Entities().FindId("cs:~charmers/xenial/juju-gui-24").One(&old)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.store.DB.Entities().FindId("cs:~charmers/juju-gui-25").One(&expected)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.store.ES.GetDocument(s.TestIndex, typeName, s.store.ES.getID(expected.URL), &actual)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	doc := SearchDoc{
 		Entity:       expected,
 		ReadACLs:     []string{"charmers"},
@@ -306,7 +306,7 @@ func (s *StoreSearchSuite) TestExportMultiSeriesCharmsCreateExpandedVersions(c *
 	}
 	c.Assert(string(actual), jc.JSONEquals, doc)
 	err = s.store.ES.GetDocument(s.TestIndex, typeName, s.store.ES.getID(old.URL), &actual)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	expected.URL.Series = old.URL.Series
 	doc = SearchDoc{
 		Entity:       expected,
@@ -322,12 +322,12 @@ func (s *StoreSearchSuite) TestExportSearchDocument(c *gc.C) {
 	var entity *mongodoc.Entity
 	var actual json.RawMessage
 	err := s.store.DB.Entities().FindId("cs:~charmers/precise/wordpress-23").One(&entity)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	doc := SearchDoc{Entity: entity, TotalDownloads: 4000}
 	err = s.store.ES.update(&doc)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.store.ES.GetDocument(s.TestIndex, typeName, s.store.ES.getID(entity.URL), &actual)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(string(actual), jc.JSONEquals, doc)
 }
 
@@ -737,7 +737,7 @@ func (s *StoreSearchSuite) TestSearches(c *gc.C) {
 	for i, test := range searchTests {
 		c.Logf("test %d: %s", i, test.about)
 		res, err := s.store.Search(test.sp)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		sort.Sort(resolvedURLsByString(res.Results))
 		sort.Sort(resolvedURLsByString(test.results))
 		c.Check(Entities(res.Results), jc.DeepEquals, test.results)
@@ -761,26 +761,26 @@ func (r resolvedURLsByString) Len() int {
 
 func (s *StoreSearchSuite) TestPaginatedSearch(c *gc.C) {
 	err := s.store.ES.Database.RefreshIndex(s.TestIndex)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	sp := SearchParams{
 		Text: "wordpress",
 		Skip: 1,
 	}
 	res, err := s.store.Search(sp)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(res.Results, gc.HasLen, 1)
 	c.Assert(res.Total, gc.Equals, 2)
 }
 
 func (s *StoreSearchSuite) TestLimitTestSearch(c *gc.C) {
 	err := s.store.ES.Database.RefreshIndex(s.TestIndex)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	sp := SearchParams{
 		Text:  "wordpress",
 		Limit: 1,
 	}
 	res, err := s.store.Search(sp)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(res.Results, gc.HasLen, 1)
 }
 
@@ -802,7 +802,7 @@ func (s *StoreSearchSuite) TestPromulgatedRank(c *gc.C) {
 		},
 	}
 	res, err := s.store.Search(sp)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(Entities(res.Results), jc.DeepEquals, Entities{
 		ent,
 		searchEntities["varnish"].entity,
@@ -908,9 +908,9 @@ func (s *StoreSearchSuite) TestSorting(c *gc.C) {
 		c.Logf("test %d. %s", i, test.about)
 		var sp SearchParams
 		err := sp.ParseSortFields(test.sortQuery)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		res, err := s.store.Search(sp)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(Entities(res.Results), jc.DeepEquals, test.results)
 		c.Assert(res.Total, gc.Equals, len(test.results))
 	}
@@ -920,7 +920,7 @@ func (s *StoreSearchSuite) TestBoosting(c *gc.C) {
 	s.store.ES.Database.RefreshIndex(s.TestIndex)
 	var sp SearchParams
 	res, err := s.store.Search(sp)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(Entities(res.Results), jc.DeepEquals, Entities{
 		searchEntities["wordpress-simple"].entity,
 		searchEntities["mysql"].entity,
@@ -1101,7 +1101,7 @@ func (s *StoreSearchSuite) TestMultiSeriesCharmFiltersSeriesCorrectly(c *gc.C) {
 				"series": {test.series},
 			},
 		})
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		if test.notFound {
 			c.Assert(res.Results, gc.HasLen, 0)
 			continue
@@ -1126,7 +1126,7 @@ func (s *StoreSearchSuite) TestMultiSeriesCharmSortsSeriesCorrectly(c *gc.C) {
 	var sp SearchParams
 	sp.ParseSortFields("-series", "owner")
 	res, err := s.store.Search(sp)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(Entities(res.Results), jc.DeepEquals, Entities{
 		newEntity("cs:~charmers/yakkety/squid-forwardproxy-3", 3),
 		newEntity("cs:~charmers/juju-gui-25", -1, "trusty", "xenial", "utopic", "vivid", "wily", "yakkety"),
@@ -1144,37 +1144,37 @@ func (s *StoreSearchSuite) TestOnlyIndexStableCharms(c *gc.C) {
 	})
 	id := router.MustNewResolvedURL("~test/xenial/test-0", -1)
 	err := s.store.AddCharmWithArchive(id, ch)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.store.SetPerms(&id.URL, "read", "test", params.Everyone)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.store.SetPerms(&id.URL, "edge.read", "test", params.Everyone)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.store.SetPerms(&id.URL, "stable.read", "test", params.Everyone)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	var actual json.RawMessage
 
 	err = s.store.UpdateSearch(id)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.store.ES.GetDocument(s.TestIndex, typeName, s.store.ES.getID(&id.URL), &actual)
 	c.Assert(err, gc.ErrorMatches, "elasticsearch document not found")
 
 	err = s.store.Publish(id, nil, params.EdgeChannel)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.store.UpdateSearch(id)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.store.ES.GetDocument(s.TestIndex, typeName, s.store.ES.getID(&id.URL), &actual)
 	c.Assert(err, gc.ErrorMatches, "elasticsearch document not found")
 
 	err = s.store.Publish(id, nil, params.StableChannel)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.store.UpdateSearch(id)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.store.ES.GetDocument(s.TestIndex, typeName, s.store.ES.getID(&id.URL), &actual)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	entity, err := s.store.FindEntity(id, nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	doc := SearchDoc{
 		Entity:       entity,
 		ReadACLs:     []string{"test", params.Everyone},
@@ -1190,15 +1190,15 @@ func (s *StoreSearchSuite) TestOnlyIndexStableCharms(c *gc.C) {
 // automatically published on the stable channel.
 func addCharmForSearch(c *gc.C, s *Store, id *router.ResolvedURL, ch charm.Charm, acl []string, downloads int) {
 	err := s.AddCharmWithArchive(id, ch)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	for i := 0; i < downloads; i++ {
 		err := s.IncrementDownloadCounts(id)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 	err = s.SetPerms(&id.URL, "stable.read", acl...)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.Publish(id, nil, params.StableChannel)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 // addBundleForSearch adds a bundle to the specified store such that it
@@ -1206,15 +1206,15 @@ func addCharmForSearch(c *gc.C, s *Store, id *router.ResolvedURL, ch charm.Charm
 // automatically published on the stable channel.
 func addBundleForSearch(c *gc.C, s *Store, id *router.ResolvedURL, b charm.Bundle, acl []string, downloads int) {
 	err := s.AddBundleWithArchive(id, b)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	for i := 0; i < downloads; i++ {
 		err := s.IncrementDownloadCounts(id)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 	err = s.SetPerms(&id.URL, "stable.read", acl...)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = s.Publish(id, nil, params.StableChannel)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 }
 
 type Entities []*mongodoc.Entity

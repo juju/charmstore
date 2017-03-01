@@ -39,7 +39,7 @@ func (s *AddEntitySuite) TestAddCharmWithUser(c *gc.C) {
 	wordpress := storetesting.Charms.CharmDir("wordpress")
 	url := router.MustNewResolvedURL("cs:~who/precise/wordpress-23", -1)
 	err := store.AddCharmWithArchive(url, wordpress)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	assertBaseEntity(c, store, mongodoc.BaseURL(&url.URL), false)
 }
 
@@ -73,7 +73,7 @@ func (s *AddEntitySuite) TestAddBundleArchive(c *gc.C) {
 		storetesting.Charms.BundleArchivePath(c.MkDir(), "wordpress-simple"),
 	)
 	s.addRequiredCharms(c, bundleArchive)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.checkAddBundle(c, bundleArchive, router.MustNewResolvedURL("~charmers/bundle/wordpress-simple-2", 3))
 }
 
@@ -86,7 +86,7 @@ func (s *AddEntitySuite) TestAddUserOwnedBundleArchive(c *gc.C) {
 	bundleArchive, err := charm.ReadBundleArchive(
 		storetesting.Charms.BundleArchivePath(c.MkDir(), "wordpress-simple"),
 	)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.checkAddBundle(c, bundleArchive, router.MustNewResolvedURL("~charmers/bundle/wordpress-simple-1", -1))
 }
 
@@ -105,13 +105,13 @@ func (s *AddEntitySuite) TestAddCharmWithMultiSeries(c *gc.C) {
 	s.checkAddCharm(c, ch, router.MustNewResolvedURL("~charmers/multi-series-1", 1))
 	// Make sure it can be accessed with a number of names
 	e, err := store.FindBestEntity(charm.MustParseURL("~charmers/multi-series-1"), params.UnpublishedChannel, nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(e.URL.String(), gc.Equals, "cs:~charmers/multi-series-1")
 	e, err = store.FindBestEntity(charm.MustParseURL("~charmers/trusty/multi-series-1"), params.UnpublishedChannel, nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(e.URL.String(), gc.Equals, "cs:~charmers/multi-series-1")
 	e, err = store.FindBestEntity(charm.MustParseURL("~charmers/wily/multi-series-1"), params.UnpublishedChannel, nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(e.URL.String(), gc.Equals, "cs:~charmers/multi-series-1")
 	_, err = store.FindBestEntity(charm.MustParseURL("~charmers/precise/multi-series-1"), params.UnpublishedChannel, nil)
 	c.Assert(err, gc.ErrorMatches, "no matching charm or bundle for cs:~charmers/precise/multi-series-1")
@@ -123,7 +123,7 @@ func (s *AddEntitySuite) TestAddCharmWithSeriesWhenThereIsAnExistingMultiSeriesV
 	defer store.Close()
 	ch := storetesting.Charms.CharmArchive(c.MkDir(), "multi-series")
 	err := store.AddCharmWithArchive(router.MustNewResolvedURL("~charmers/multi-series-1", -1), ch)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	ch = storetesting.Charms.CharmArchive(c.MkDir(), "wordpress")
 	err = store.AddCharmWithArchive(router.MustNewResolvedURL("~charmers/trusty/multi-series-2", -1), ch)
 	c.Assert(err, gc.ErrorMatches, `charm name duplicates multi-series charm name cs:~charmers/multi-series-1`)
@@ -141,7 +141,7 @@ func (s *AddEntitySuite) TestAddBundleDuplicatingCharm(c *gc.C) {
 	defer store.Close()
 	ch := storetesting.Charms.CharmDir("wordpress")
 	err := store.AddCharmWithArchive(router.MustNewResolvedURL("~tester/precise/wordpress-2", -1), ch)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	b := storetesting.Charms.BundleDir("wordpress-simple")
 	s.addRequiredCharms(c, b)
@@ -156,7 +156,7 @@ func (s *AddEntitySuite) TestAddCharmDuplicatingBundle(c *gc.C) {
 	b := storetesting.Charms.BundleDir("wordpress-simple")
 	s.addRequiredCharms(c, b)
 	err := store.AddBundleWithArchive(router.MustNewResolvedURL("~charmers/bundle/wordpress-simple-2", -1), b)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	ch := storetesting.Charms.CharmDir("wordpress")
 	err = store.AddCharmWithArchive(router.MustNewResolvedURL("~charmers/precise/wordpress-simple-5", -1), ch)
@@ -301,7 +301,7 @@ func (s *AddEntitySuite) TestUploadEntityErrors(c *gc.C) {
 		c.Logf("test %d: %s", i, test.about)
 		var buf bytes.Buffer
 		err := test.upload.ArchiveTo(&buf)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		if test.blobHash == "" {
 			h := blobstore.NewHash()
 			h.Write(buf.Bytes())
@@ -344,15 +344,15 @@ services:
 	file := filepath.Join(c.MkDir(), "bundle.zip")
 	ioutil.WriteFile(file, blob.Bytes(), 0666)
 	bundle, err := charm.ReadBundle(file)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(bundle.Data().Applications, gc.HasLen, 2)
 
 	url := router.MustNewResolvedURL("cs:~who/bundle/wordpress-bundle-33", 33)
 	s.addRequiredCharms(c, bundle)
 	err = store.AddBundleWithArchive(url, bundle)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	entity, err := store.FindEntity(url, nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(entity.BundleData.Applications, gc.DeepEquals, bundle.Data().Applications)
 }
 
@@ -363,12 +363,12 @@ func (s *AddEntitySuite) checkAddCharm(c *gc.C, ch charm.Charm, url *router.Reso
 	// Add the charm to the store.
 	beforeAdding := time.Now()
 	err := store.AddCharmWithArchive(url, ch)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	afterAdding := time.Now()
 
 	var doc *mongodoc.Entity
 	err = store.DB.Entities().FindId(&url.URL).One(&doc)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	// The entity doc has been correctly added to the mongo collection.
 	size, hash, hash256 := getSizeAndHashes(ch)
@@ -398,13 +398,13 @@ func (s *AddEntitySuite) checkAddCharm(c *gc.C, ch charm.Charm, url *router.Reso
 
 	// The charm archive has been properly added to the blob store.
 	r, obtainedSize, err := store.BlobStore.Open(doc.BlobName, nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer r.Close()
 	c.Assert(obtainedSize, gc.Equals, size)
 	data, err := ioutil.ReadAll(r)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	charmArchive, err := charm.ReadCharmArchiveBytes(data)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(charmArchive.Meta(), jc.DeepEquals, ch.Meta())
 	c.Assert(charmArchive.Config(), jc.DeepEquals, ch.Config())
 	c.Assert(charmArchive.Actions(), jc.DeepEquals, ch.Actions())
@@ -426,12 +426,12 @@ func (s *AddEntitySuite) checkAddBundle(c *gc.C, bundle charm.Bundle, url *route
 	beforeAdding := time.Now()
 	s.addRequiredCharms(c, bundle)
 	err := store.AddBundleWithArchive(url, bundle)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	afterAdding := time.Now()
 
 	var doc *mongodoc.Entity
 	err = store.DB.Entities().FindId(&url.URL).One(&doc)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	sort.Sort(orderedURLs(doc.BundleCharms))
 
 	// Check the upload time and then reset it to its zero value
@@ -461,13 +461,13 @@ func (s *AddEntitySuite) checkAddBundle(c *gc.C, bundle charm.Bundle, url *route
 
 	// The bundle archive has been properly added to the blob store.
 	r, obtainedSize, err := store.BlobStore.Open(doc.BlobName, nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer r.Close()
 	c.Assert(obtainedSize, gc.Equals, size)
 	data, err := ioutil.ReadAll(r)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	bundleArchive, err := charm.ReadBundleArchiveBytes(data)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(bundleArchive.Data(), jc.DeepEquals, bundle.Data())
 	c.Assert(bundleArchive.ReadMe(), jc.DeepEquals, bundle.ReadMe())
 
@@ -526,7 +526,7 @@ func assertBlobFields(c *gc.C, doc *mongodoc.Entity, url *router.ResolvedURL, ha
 
 func assertBaseEntity(c *gc.C, store *Store, url *charm.URL, promulgated bool) {
 	baseEntity, err := store.FindBaseEntity(url, nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	acls := mongodoc.ACL{
 		Read:  []string{url.User},
 		Write: []string{url.User},

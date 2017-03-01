@@ -1235,7 +1235,7 @@ func (s *RouterSuite) TestParseBool(c *gc.C) {
 			c.Assert(err, gc.ErrorMatches, "unexpected bool value .*")
 			continue
 		}
-		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 }
 
@@ -1265,7 +1265,7 @@ func (s *RouterSuite) TestCORSHeaders(c *gc.C) {
 
 func (s *RouterSuite) TestHTTPRequestPassedThroughToMeta(c *gc.C) {
 	testReq, err := http.NewRequest("GET", "/wordpress/meta/foo", nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	doneQuery := false
 	query := func(id *ResolvedURL, selector map[string]int, req *http.Request) (interface{}, error) {
 		if req != testReq {
@@ -1313,7 +1313,7 @@ func (s *RouterSuite) TestHTTPRequestPassedThroughToMeta(c *gc.C) {
 
 	testReq, err = http.NewRequest("PUT", "/wordpress/meta/foo", strings.NewReader(`"hello"`))
 	testReq.Header.Set("Content-Type", "application/json")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	resp = httptest.NewRecorder()
 	h.ServeHTTP(resp, testReq)
 	c.Assert(resp.Code, gc.Equals, http.StatusOK, gc.Commentf("response body: %s", resp.Body))
@@ -1876,7 +1876,7 @@ func (s *RouterSuite) TestRouterPut(c *gc.C) {
 			resolve = test.resolveURL
 		}
 		bodyVal, err := json.Marshal(test.body)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		ctxt := alwaysContext
 		ctxt.resolveURL = resolve
 		router := New(&test.handlers, ctxt)
@@ -2037,7 +2037,7 @@ func (s *RouterSuite) TestGetMetadata(c *gc.C) {
 			c.Assert(result, gc.IsNil)
 			continue
 		}
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(result, jc.DeepEquals, test.expectResult)
 	}
 }
@@ -2170,7 +2170,7 @@ func (s *RouterSuite) TestWriteJSON(c *gc.C) {
 		N int
 	}
 	err := httprequest.WriteJSON(rec, http.StatusTeapot, Number{1234})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(rec.Code, gc.Equals, http.StatusTeapot)
 	c.Assert(rec.Body.String(), gc.Equals, `{"N":1234}`)
 	c.Assert(rec.Header().Get("content-type"), gc.Equals, "application/json")
@@ -2181,7 +2181,7 @@ func (s *RouterSuite) TestWriteError(c *gc.C) {
 	WriteError(rec, errgo.Newf("an error"))
 	var errResp params.Error
 	err := json.Unmarshal(rec.Body.Bytes(), &errResp)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(errResp, gc.DeepEquals, params.Error{Message: "an error"})
 	c.Assert(rec.Code, gc.Equals, http.StatusInternalServerError)
 
@@ -2193,7 +2193,7 @@ func (s *RouterSuite) TestWriteError(c *gc.C) {
 	WriteError(rec, &errResp0)
 	var errResp1 params.Error
 	err = json.Unmarshal(rec.Body.Bytes(), &errResp1)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(errResp1, gc.DeepEquals, errResp0)
 	c.Assert(rec.Code, gc.Equals, http.StatusInternalServerError)
 }
