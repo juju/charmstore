@@ -93,7 +93,6 @@ func serve(confPath string) error {
 		AuthUsername:            conf.AuthUsername,
 		AuthPassword:            conf.AuthPassword,
 		IdentityLocation:        conf.IdentityLocation,
-		IdentityAPIURL:          conf.IdentityAPIURL,
 		TermsLocation:           conf.TermsLocation,
 		AgentUsername:           conf.AgentUsername,
 		AgentKey:                conf.AgentKey,

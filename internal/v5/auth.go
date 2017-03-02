@@ -583,18 +583,6 @@ func (h *ReqHandler) newMacaroon(
 	}
 
 	idmCaveats := h.Handler.idmClient.IdentityCaveats()
-	if h.Handler.config.IdentityLocation != h.Handler.config.IdentityAPIURL {
-		// The identity discharge location differs from the URL we're using to talk
-		// to its API, so change change any third party caveats
-		// to refer to that.
-		// TODO remove the distinction between IdentityAPIURL and IdentityLocation.
-		for i := range idmCaveats {
-			c := &idmCaveats[i]
-			if c.Location != "" {
-				c.Location = h.Handler.config.IdentityLocation
-			}
-		}
-	}
 	caveats := make([]checkers.Caveat, 0, 5)
 	caveats = append(caveats, idmCaveats...)
 	caveats = append(caveats,

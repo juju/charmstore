@@ -118,7 +118,7 @@ func (s *ServerSuite) TestNewServerWithConfig(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	defer h.Close()
 
-	// The IdentityLocation field is filled out from the IdentityAPIURL
+	// The IdentityLocation field is filled out from the IdentityLocation
 	// and the final slash is trimmed.
 
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -127,7 +127,6 @@ func (s *ServerSuite) TestNewServerWithConfig(c *gc.C) {
 		ExpectBody: ServerParams{
 			AuthUsername:     "test-user",
 			AuthPassword:     "test-password",
-			IdentityAPIURL:   "http://0.1.2.3",
 			IdentityLocation: "http://0.1.2.3",
 			RootKeyPolicy: mgostorage.Policy{
 				ExpiryDuration: defaultRootKeyExpiryDuration,
@@ -138,9 +137,9 @@ func (s *ServerSuite) TestNewServerWithConfig(c *gc.C) {
 
 func (s *ServerSuite) TestNewServerWithElasticSearch(c *gc.C) {
 	params := ServerParams{
-		AuthUsername:   "test-user",
-		AuthPassword:   "test-password",
-		IdentityAPIURL: "http://0.1.2.3",
+		AuthUsername:     "test-user",
+		AuthPassword:     "test-password",
+		IdentityLocation: "http://0.1.2.3",
 	}
 	serveConfig := func(p *Pool, config ServerParams, _ string) (HTTPCloseHandler, error) {
 		return nopCloseHandler{
@@ -165,7 +164,6 @@ func (s *ServerSuite) TestNewServerWithElasticSearch(c *gc.C) {
 		ExpectBody: ServerParams{
 			AuthUsername:     "test-user",
 			AuthPassword:     "test-password",
-			IdentityAPIURL:   "http://0.1.2.3",
 			IdentityLocation: "http://0.1.2.3",
 			RootKeyPolicy: mgostorage.Policy{
 				ExpiryDuration: defaultRootKeyExpiryDuration,
@@ -203,10 +201,10 @@ func (s *ServerSuite) TestServerStartsBlobstoreGC(c *gc.C) {
 	// and isUploadOwnedBy.
 
 	params := ServerParams{
-		AuthUsername:   "test-user",
-		AuthPassword:   "test-password",
-		IdentityAPIURL: "http://0.1.2.3",
-		RunBlobStoreGC: true,
+		AuthUsername:     "test-user",
+		AuthPassword:     "test-password",
+		IdentityLocation: "http://0.1.2.3",
+		RunBlobStoreGC:   true,
 	}
 	h, err := NewServer(s.Session.DB("juju_test"), nil, params, nopAPI)
 	c.Assert(err, gc.Equals, nil)

@@ -77,8 +77,7 @@ func (s *ConfigSuite) TestRead(c *gc.C) {
 		IdentityPublicKey: &bakery.PublicKey{
 			Key: mustParseKey("+qNbDWly3kRTDVv2UN03hrv/CBt4W6nxY5dHdw+KJFA="),
 		},
-		IdentityAPIURL: "http://example.com/identity",
-		TermsLocation:  "localhost:8092",
+		TermsLocation: "localhost:8092",
 		TermsPublicKey: &bakery.PublicKey{
 			Key: mustParseKey("+qNbDWly3kRTDVv2UN03hrv/CBt4W6nxY5dHdw+KJFB="),
 		},
