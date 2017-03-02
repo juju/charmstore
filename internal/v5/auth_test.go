@@ -25,7 +25,6 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/macaroon.v2-unstable"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/v5"
 )
@@ -1208,27 +1207,6 @@ func (s *authSuite) TestRenewMacaroon(c *gc.C) {
 	}, {
 		Id: []byte("active-time-before " + expectTime),
 	}})
-}
-
-func (s *authSuite) TestNewServerWithoutIdentityAgent(c *gc.C) {
-	// If the IdentityAPIURL is empty but IdentityLocation is not, then
-	// we can discharge but not get groups.
-	config := s.srvParams
-	config.AgentUsername = ""
-
-	db := s.Session.DB("charmstore")
-	srv, err := charmstore.NewServer(db, nil, config, map[string]charmstore.NewAPIHandlerFunc{"v5": v5.NewAPIHandler})
-	c.Assert(err, gc.Equals, nil)
-	defer srv.Close()
-
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler: srv,
-		URL:     storeURL("whoami"),
-		Do:      bakeryDo(s.idmServer.Client("bob")),
-		ExpectBody: params.WhoAmIResponse{
-			User: "bob",
-		},
-	})
 }
 
 // getDelegatableMacaroon acquires a delegatable macaroon good for

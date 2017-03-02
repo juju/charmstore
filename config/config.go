@@ -31,19 +31,17 @@ type Config struct {
 	IdentityLocation  string            `yaml:"identity-location"`
 	TermsPublicKey    *bakery.PublicKey `yaml:"terms-public-key,omitempty"`
 	TermsLocation     string            `yaml:"terms-location,omitempty"`
-	// The identity API is optional
-	IdentityAPIURL    string          `yaml:"identity-api-url,omitempty"`
-	AgentUsername     string          `yaml:"agent-username,omitempty"`
-	AgentKey          *bakery.KeyPair `yaml:"agent-key,omitempty"`
-	MaxMgoSessions    int             `yaml:"max-mgo-sessions,omitempty"`
-	RequestTimeout    DurationString  `yaml:"request-timeout,omitempty"`
-	StatsCacheMaxAge  DurationString  `yaml:"stats-cache-max-age,omitempty"`
-	SearchCacheMaxAge DurationString  `yaml:"search-cache-max-age,omitempty"`
-	Database          string          `yaml:"database,omitempty"`
-	AccessLog         string          `yaml:"access-log"`
-	MinUploadPartSize int64           `json:"min-upload-part-size"`
-	MaxUploadPartSize int64           `json:"max-upload-part-size"`
-	MaxUploadParts    int             `json:"max-upload-parts"`
+	AgentUsername     string            `yaml:"agent-username,omitempty"`
+	AgentKey          *bakery.KeyPair   `yaml:"agent-key,omitempty"`
+	MaxMgoSessions    int               `yaml:"max-mgo-sessions,omitempty"`
+	RequestTimeout    DurationString    `yaml:"request-timeout,omitempty"`
+	StatsCacheMaxAge  DurationString    `yaml:"stats-cache-max-age,omitempty"`
+	SearchCacheMaxAge DurationString    `yaml:"search-cache-max-age,omitempty"`
+	Database          string            `yaml:"database,omitempty"`
+	AccessLog         string            `yaml:"access-log"`
+	MinUploadPartSize int64             `json:"min-upload-part-size"`
+	MaxUploadPartSize int64             `json:"max-upload-part-size"`
+	MaxUploadParts    int               `json:"max-upload-parts"`
 }
 
 func (c *Config) validate() error {

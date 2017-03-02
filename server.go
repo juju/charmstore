@@ -61,7 +61,6 @@ type ServerParams struct {
 	// IdentityLocation holds the location of the third party authorization
 	// service to use when creating third party caveats,
 	// for example: http://api.jujucharms.com/identity
-	// If it is empty, IdentityAPIURL will be used.
 	IdentityLocation string
 
 	// TermsLocations holds the location of the
@@ -72,10 +71,6 @@ type ServerParams struct {
 	// PublicKeyLocator holds a public key store.
 	// It may be nil.
 	PublicKeyLocator bakery.PublicKeyLocator
-
-	// IdentityAPIURL holds the URL of the identity manager,
-	// for example http://api.jujucharms.com/identity
-	IdentityAPIURL string
 
 	// AgentUsername and AgentKey hold the credentials used for agent
 	// authentication.

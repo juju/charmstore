@@ -6,10 +6,8 @@ auth-password: example-passwd
 #elasticsearch-addr: localhost:9200
 # For locally running services.
 #identity-public-key: CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk=
-#identity-api-url: http://localhost:8081
 # For production identity manager.
 identity-public-key: o/yOqSNWncMo1GURWuez/dGR30TscmmuIxgjztpoHEY=
-identity-api-url: https://api.jujucharms.com/identity
 identity-location: https://api.jujucharms.com/identity/v1/discharger
 # Agent credentials.
 #agent-username: charmstore@admin@idm

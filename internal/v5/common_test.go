@@ -182,7 +182,6 @@ func (s *commonSuite) startServer(c *gc.C) {
 	if s.enableIdentity {
 		config.IdentityLocation = ""
 		config.PublicKeyLocator = nil
-		config.IdentityAPIURL = ""
 		s.noMacaroonSrv, err = charmstore.NewServer(db, si, config, map[string]charmstore.NewAPIHandlerFunc{"v5": v5.NewAPIHandler})
 		c.Assert(err, gc.Equals, nil)
 	} else {

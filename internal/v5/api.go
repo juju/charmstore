@@ -120,10 +120,10 @@ func New(pool *charmstore.Pool, config charmstore.ServerParams, rootPath string)
 		searchCache: cache.New(config.SearchCacheMaxAge),
 		locator:     config.PublicKeyLocator,
 	}
-	if config.IdentityAPIURL != "" {
+	if config.IdentityLocation != "" {
 		idmClient, err := idmclient.New(idmclient.NewParams{
 			Client:        bclient,
-			BaseURL:       config.IdentityAPIURL,
+			BaseURL:       config.IdentityLocation,
 			AgentUsername: config.AgentUsername,
 		})
 		if err != nil {
