@@ -225,6 +225,20 @@ func (si *SearchIndex) update(doc *SearchDoc) error {
 	return nil
 }
 
+// delete deletes an entity into elasticsearch if elasticsearch
+// is configured.
+func (si *SearchIndex) delete(entity *mongodoc.Entity) error {
+	if si == nil || si.Database == nil {
+		return nil
+	}
+	doc := SearchDoc{Entity: entity}
+	err := si.DeleteDocument(si.Index, typeName, si.getID(doc.URL))
+	if err != nil && err != elasticsearch.ErrNotFound {
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
 // getID returns an ID for the elasticsearch document based on the contents of the
 // mongoDB document. This is to allow elasticsearch documents to be replaced with
 // updated versions when charm data is changed.
