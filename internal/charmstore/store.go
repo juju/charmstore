@@ -1217,10 +1217,54 @@ func (s *Store) AddLog(data *json.RawMessage, logLevel mongodoc.LogLevel, logTyp
 	return nil
 }
 
+// DeleteEntity deletes the entity with the given id from the store. If
+// the entity is the current published revision for any channel or the
+// last revision with the same base entity, it returns an error with an
+// ErrForbidden cause.
 func (s *Store) DeleteEntity(id *router.ResolvedURL) error {
-	entity, err := s.FindEntity(id, FieldSelector("blobname", "blobhash", "prev5blobhash"))
+	// Find all the entities that use the base URL of id so
+	// that we can refuse to delete the last reference to the
+	// base URL.
+	var entities []*mongodoc.Entity
+	err := s.DB.Entities().Find(bson.D{{"baseurl", mongodoc.BaseURL(&id.URL)}}).
+		Select(FieldSelector("blobname", "blobhash", "prev5blobhash")).
+		All(&entities)
 	if err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+		return errgo.Mask(err)
+	}
+	var entity *mongodoc.Entity
+	for _, e := range entities {
+		if *e.URL == id.URL {
+			entity = e
+			break
+		}
+	}
+	if entity == nil {
+		return errgo.WithCausef(nil, params.ErrNotFound, "")
+	}
+	if len(entities) == 1 {
+		return errgo.WithCausef(nil, params.ErrForbidden, "cannot delete last revision of charm or bundle")
+	}
+	// Find the base entity so that we can check that we're not
+	// removing any of the current released revisions.
+	baseEntity, err := s.FindBaseEntity(&id.URL, map[string]int{
+		"_id":             1,
+		"channelentities": 1,
+	})
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	var published []string
+	for ch, ids := range baseEntity.ChannelEntities {
+		for _, publishedId := range ids {
+			if *publishedId == id.URL {
+				published = append(published, string(ch))
+			}
+		}
+	}
+	if len(published) > 0 {
+		sort.Strings(published)
+		return errgo.WithCausef(nil, params.ErrForbidden, "cannot delete %q because it is the current revision in channels %s", &id.URL, published)
 	}
 	// Remove the entity.
 	if err := s.DB.Entities().RemoveId(&id.URL); err != nil {

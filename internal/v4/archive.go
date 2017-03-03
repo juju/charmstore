@@ -19,8 +19,11 @@ import (
 func (h ReqHandler) serveArchive(v5ServeArchive router.IdHandler) router.IdHandler {
 	get := h.ResolvedIdHandler(h.serveGetArchive)
 	return func(id *charm.URL, w http.ResponseWriter, req *http.Request) error {
-		if req.Method == "GET" {
+		switch req.Method {
+		case "GET":
 			return get(id, w, req)
+		case "DELETE":
+			return errgo.WithCausef(nil, params.ErrMethodNotAllowed, "DELETE not allowed")
 		}
 		return v5ServeArchive(id, w, req)
 	}
