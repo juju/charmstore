@@ -1286,10 +1286,11 @@ func (s *Store) DeleteEntity(id *router.ResolvedURL) error {
 			return errgo.Notef(err, "cannot remove compatibility blob %s", name)
 		}
 	}
-	if s.ES == nil || s.ES.Database == nil {
-		return nil
-	}
 	err = s.ES.delete(entity)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	err = s.UpdateSearch(id)
 	if err != nil {
 		return errgo.Mask(err)
 	}
