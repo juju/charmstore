@@ -271,6 +271,143 @@ func (s *APISuite) TestPutUploadParts(c *gc.C) {
 	})
 }
 
+func (s *APISuite) TestGetUploadInfoFailsWithNoMacaroon(c *gc.C) {
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:      s.noMacaroonSrv,
+		Method:       "GET",
+		URL:          storeURL("upload/someid"),
+		JSONBody:     params.Parts{},
+		ExpectStatus: http.StatusUnauthorized,
+		ExpectBody: params.Error{
+			Code:    params.ErrUnauthorized,
+			Message: "authentication failed: missing HTTP auth header",
+		},
+	})
+}
+
+func (s *APISuite) TestGetUploadInfoAfterUpload(c *gc.C) {
+	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
+		Handler: s.srv,
+		Method:  "POST",
+		Do:      bakeryDo(s.idmServer.Client("bob")),
+		URL:     storeURL("upload"),
+	})
+	var uploadResp params.NewUploadResponse
+	err := json.Unmarshal(resp.Body.Bytes(), &uploadResp)
+	c.Assert(err, gc.Equals, nil)
+
+	part := "0123456789"
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		Method:  "PUT",
+		Do:      bakeryDo(s.idmServer.Client("bob")),
+		URL:     storeURL("upload/" + uploadResp.UploadId + "/0?hash=" + hashOfString(part)),
+		Body:    strings.NewReader(part),
+	})
+
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		Method:  "PUT",
+		Do:      bakeryDo(s.idmServer.Client("bob")),
+		URL:     storeURL("upload/" + uploadResp.UploadId),
+		JSONBody: params.Parts{
+			Parts: []params.Part{{
+				Hash: hashOfString(part),
+			}},
+		},
+		ExpectBody: &params.FinishUploadResponse{
+			Hash: hashOfString(part),
+		},
+	})
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		Method:  "GET",
+		Do:      bakeryDo(s.idmServer.Client("bob")),
+		URL:     storeURL("upload/" + uploadResp.UploadId),
+		ExpectBody: &params.UploadInfoResponse{
+			Parts: params.Parts{
+				Parts: []params.Part{{
+					Hash:     hashOfString(part),
+					Complete: true,
+					Size:     10,
+				}},
+			},
+			Expires: uploadResp.Expires,
+		},
+	})
+}
+
+func (s *APISuite) TestGetUploadInfoBetweenPartUploads(c *gc.C) {
+	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
+		Handler: s.srv,
+		Do:      bakeryDo(s.idmServer.Client("bob")),
+		Method:  "POST",
+		URL:     storeURL("upload"),
+	})
+	var uploadResp params.NewUploadResponse
+	err := json.Unmarshal(resp.Body.Bytes(), &uploadResp)
+	c.Assert(err, gc.Equals, nil)
+
+	part1 := newDataSource(1, 5*1024*1024)
+	hash1, size1 := hashOf(part1)
+	part1.Seek(0, 0)
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:       s.srv,
+		Method:        "PUT",
+		Do:            bakeryDo(s.idmServer.Client("bob")),
+		ContentLength: size1,
+		URL:           storeURL("upload/" + uploadResp.UploadId + "/0?hash=" + hash1),
+		Body:          part1,
+	})
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		Method:  "GET",
+		Do:      bakeryDo(s.idmServer.Client("bob")),
+		URL:     storeURL("upload/" + uploadResp.UploadId),
+		ExpectBody: &params.UploadInfoResponse{
+			Parts: params.Parts{
+				Parts: []params.Part{{
+					Hash:     hash1,
+					Complete: true,
+					Size:     size1,
+				}},
+			},
+			Expires: uploadResp.Expires,
+		},
+	})
+	part2 := newDataSource(2, 5*1024*1024)
+	hash2, size2 := hashOf(part2)
+	part2.Seek(0, 0)
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:       s.srv,
+		Method:        "PUT",
+		Do:            bakeryDo(s.idmServer.Client("bob")),
+		ContentLength: size2,
+		URL:           storeURL("upload/" + uploadResp.UploadId + "/1?hash=" + hash2),
+		Body:          part2,
+	})
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		Method:  "GET",
+		Do:      bakeryDo(s.idmServer.Client("bob")),
+		URL:     storeURL("upload/" + uploadResp.UploadId),
+		ExpectBody: &params.UploadInfoResponse{
+			Parts: params.Parts{
+				Parts: []params.Part{{
+					Hash:     hash1,
+					Complete: true,
+					Size:     size1,
+				}, {
+					Hash:     hash2,
+					Complete: true,
+					Size:     size2,
+				}},
+			},
+			Expires: uploadResp.Expires,
+		},
+	})
+}
+
 var uploadPartErrorTests = []struct {
 	about           string
 	url             string
