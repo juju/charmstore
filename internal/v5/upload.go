@@ -61,7 +61,7 @@ func (h *ReqHandler) serveUploadId(w http.ResponseWriter, req *http.Request) err
 	}
 }
 
-// PUT /upload/upload-id/part-number
+// PUT /upload/upload-id/part-number or GET /upload/upload-id
 func (h *ReqHandler) serveUploadPart(w http.ResponseWriter, req *http.Request) error {
 	// Make sure we consume the full request body, before responding.
 	//
@@ -132,6 +132,31 @@ func (h *ReqHandler) serveUploadPart(w http.ResponseWriter, req *http.Request) e
 		default:
 			return errgo.WithCausef(nil, params.ErrNotFound, "")
 		}
+	case "GET":
+		elems := strings.Split(strings.TrimPrefix(req.URL.Path, "/"), "/")
+		if len(elems) != 1 {
+			return errgo.WithCausef(nil, params.ErrNotFound, "")
+		}
+		uploadId := elems[0]
+		uploadInfo, err := h.Store.BlobStore.UploadInfo(uploadId)
+		if err != nil {
+			return errgo.WithCausef(nil, params.ErrNotFound, "")
+		}
+		var parts params.Parts
+		parts.Parts = make([]params.Part, len(uploadInfo.Parts))
+		for i, part := range uploadInfo.Parts {
+			parts.Parts[i] = params.Part{
+				Complete: part.Complete,
+				Hash:     part.Hash,
+				Size:     part.Size,
+			}
+
+		}
+		return httprequest.WriteJSON(w, http.StatusOK, params.UploadInfoResponse{
+			Expires: uploadInfo.Expires,
+			Parts:   parts,
+		})
+		return nil
 	case "DELETE":
 		// TODO
 		return errgo.New("delete not yet implemented")
