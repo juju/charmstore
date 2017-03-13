@@ -135,12 +135,12 @@ func (h *ReqHandler) serveUploadPart(w http.ResponseWriter, req *http.Request) e
 	case "GET":
 		elems := strings.Split(strings.TrimPrefix(req.URL.Path, "/"), "/")
 		if len(elems) != 1 {
-			return badRequestf(nil, "unknown GET method called")
+			return errgo.WithCausef(nil, params.ErrNotFound, "")
 		}
 		uploadId := elems[0]
 		uploadInfo, err := h.Store.BlobStore.UploadInfo(uploadId)
 		if err != nil {
-			return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+			return errgo.WithCausef(nil, params.ErrNotFound, "")
 		}
 		var parts params.Parts
 		parts.Parts = make([]params.Part, len(uploadInfo.Parts))

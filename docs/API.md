@@ -1850,7 +1850,7 @@ the Revision, Fingerprint and Size fields will be -1, null and 0 respectively.
 ### Resources
 
 #### POST *id*/resource/*name*?[hash=*sha384*][&filename=*path*][&upload-id=*uploadid*]
-GET 
+ 
 Posting to the `resource` path uploads a resource (an arbitrary "blob"
 of data) associated with the charm with the given *id*, which must not
 be a bundle. The *sha384* parameter
@@ -2490,3 +2490,46 @@ type FinishUploadResponse struct {
 	Hash string
 }
 ```
+
+#### GET /upload/*uploadid*
+
+This endpoint retrieve an upload info from the given *uploadid* started with a POST /upload.
+If the upload is not found, this will results in a 404.
+
+
+The response holds a JSON object containing information about the upload.
+
+```go
+type UploadInfoResponse struct {
+	// Parts holds all the known parts of the upload.
+	// Parts that haven't been uploaded yet will have nil
+	// elements.
+	Parts Parts
+
+	// Expires holds when the upload will expire.
+	Expires time.Time
+}
+```
+
+Once an upload has been started, all its parts that have been uploaded will be describe 
+as well as the expiry time of this upload document.
+
+Example: `GET /v5/upload/1234
+
+```json
+{
+	Expires: "2017-02-28T12:46:25.878Z",
+	Parts: {Parts: [
+	  {
+        Hash: "8763245979",
+        Size: "52442880",
+        Complete: true
+	  } , {}, {
+        Hash: "4365432652435",
+        Size: "324434",
+        Complete: true
+	  }
+	]}
+}
+```
+

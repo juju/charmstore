@@ -408,6 +408,20 @@ func (s *APISuite) TestGetUploadInfoBetweenPartUploads(c *gc.C) {
 	})
 }
 
+func (s *APISuite) TestGetUploadInfoNotFound(c *gc.C) {
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:      s.srv,
+		Method:       "GET",
+		Do:           bakeryDo(s.idmServer.Client("bob")),
+		URL:          storeURL("upload/qazxsw"),
+		ExpectStatus: http.StatusNotFound,
+		ExpectBody: params.Error{
+			Code:    params.ErrNotFound,
+			Message: "not found",
+		},
+	})
+}
+
 var uploadPartErrorTests = []struct {
 	about           string
 	url             string
