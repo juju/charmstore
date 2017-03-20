@@ -2,7 +2,7 @@ github.com/ajstarks/svgo	git	89e3ac64b5b3e403a5e7c35ea4f98d45db7b4518	2014-10-04
 github.com/beorn7/perks	git	4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9	2016-08-04T10:47:26Z
 github.com/cloud-green/monitoring	git	666e3beca3cb4f6b5c8f176ba80daf2b3adbd84e	2017-11-27T13:22:20Z
 github.com/golang/protobuf	git	925541529c1fa6821df4e44ce2723319eb2be768	2018-01-25T21:43:03Z
-github.com/gorilla/handlers	git	a24b39a6a2c8a7af2fe664dd4573205c99904035	2015-04-12T18:40:04Z
+github.com/gorilla/handlers	git	13d73096a474cac93275c679c7b8a2dc17ddba82	2017-02-24T19:39:55Z
 github.com/juju/errors	git	c7d06af17c68cd34c835053720b21f6549d9b0ee	2017-07-03T01:00:42Z
 github.com/juju/gojsonpointer	git	afe8b77aa08f272b49e01b82de78510c11f61500	2015-02-04T19:46:29Z
 github.com/juju/gojsonreference	git	f0d24ac5ee330baa21721cdff56d45e4ee42628e	2015-02-04T19:46:33Z
@@ -22,7 +22,7 @@ github.com/juju/xml	git	eb759a627588d35166bc505fceb51b88500e291e	2015-04-13T13:1
 github.com/juju/zip	git	f6b1e93fa2e29a1d7d49b566b2b51efb060c982a	2016-02-05T10:52:21Z
 github.com/julienschmidt/httprouter	git	77a895ad01ebc98a4dc95d8355bc825ce80a56f6	2015-10-13T22:55:20Z
 github.com/matttproud/golang_protobuf_extensions	git	c12348ce28de40eed0136aa2b644d0ee0650e56c	2016-04-24T11:30:07Z
-github.com/prometheus/client_golang	git	c5b7fccd204277076155f10851dad72b76a49317	2016-08-17T15:48:24Z
+github.com/prometheus/client_golang	git	575f371f7862609249a1be4c9145f429fe065e32	2016-11-24T15:57:32Z
 github.com/prometheus/client_model	git	99fa1f4be8e564e8a6b613da7fa6f46c9edafc6c	2017-11-17T10:05:41Z
 github.com/prometheus/common	git	6fb6fce6f8b75884b92e1889c150403fc0872c5e	2018-02-28T09:25:48Z
 github.com/prometheus/procfs	git	d274e363d5759d1c916232217be421f1cc89c5fe	2018-02-28T15:07:32Z
@@ -34,14 +34,14 @@ gopkg.in/errgo.v1	git	442357a80af5c6bf9b6d51ae791a39c3421004f3	2016-12-22T12:58:
 gopkg.in/goose.v2	git	4dc44b23a313a8a3e4051e7ee568a954a8cb3385	2018-02-08T12:05:40Z
 gopkg.in/httprequest.v1	git	3531529dedf047a744dd77f5262515aefff8cd48	2018-03-19T12:54:57Z
 gopkg.in/juju/charm.v6	git	96786fc3f8695207515eb6be307ff37901a7254f	2018-01-19T23:10:43Z
-gopkg.in/juju/charmrepo.v3	git	7f799297ba8d526feb52630477bd44e71037f92e	2018-04-11T22:45:32Z
+gopkg.in/juju/charmrepo.v3	git	3d036d99fb5c12f98e017093a4a7c85433ac9578	2018-05-11T16:22:30Z
 gopkg.in/juju/jujusvg.v3	git	6f7342099e20c84f560bd9fc8afe96ff7486613e	2017-11-14T17:07:01Z
 gopkg.in/juju/names.v2	git	54f00845ae470a362430a966fe17f35f8784ac92	2017-11-13T11:20:47Z
 gopkg.in/juju/worker.v1	git	6965b9d826717287bb002e02d1fd4d079978083e	2017-03-08T00:24:58Z
 gopkg.in/macaroon-bakery.v2-unstable	git	5a131df02b2333d5d75c501743cbc2948ee9bbf0	2016-06-23T14:27:47Z
 gopkg.in/macaroon.v2-unstable	git	66ab28d0d56f39a383f7cf5cf3ac9a4e9ab32865	2018-03-09T13:12:17Z
 gopkg.in/mgo.v2	git	3f83fa5005286a7fe593b055f0d7771a7dce4655	2016-08-18T02:01:20Z
-gopkg.in/natefinch/lumberjack.v2	git	514cbda263a734ae8caac038dadf05f8f3f9f738	2016-01-25T11:17:49Z
+gopkg.in/natefinch/lumberjack.v2	git	df99d62fd42d8b3752c8a42c6723555372c02a03	2017-05-31T18:08:50Z
 gopkg.in/retry.v1	git	2d7c7c65cc71d024968d9ff4385d5e7ad3a83fcc	2018-01-16T15:34:15Z
 gopkg.in/tomb.v1	git	dd632973f1e7218eb1089048e0798ec9ae7dceb8	2014-10-24T13:56:13Z
 gopkg.in/tomb.v2	git	d5d1b5820637886def9eef33e03a27a9f166942c	2016-12-08T15:16:19Z
