@@ -2441,6 +2441,22 @@ type UploadInfoResponse struct {
 	// MaxParts holds the maximum number of parts.
 	MaxParts int
 }
+
+type Parts struct {
+	Parts []Part
+}
+
+type Part struct {
+	// Offset holds the offset relative to the start of the upload.
+	Offset int64
+	// Hash holds the SHA384 hash of the part.
+	Hash string
+	// Size holds the size of the part.
+	Size int64
+	// Complete holds whether the part has been
+	// successfully uploaded.
+	Complete bool
+}
 ```
 
 Once an upload has been started, all its parts should be uploaded
@@ -2461,13 +2477,13 @@ Example: `POST /v5/upload
 }
 ```
 
-#### PUT /upload/*uploadid*/*part*?hash=*sha384*
+#### PUT /upload/*uploadid*/*part*?hash=*sha384*&offset=*offset*
 
 This endpoint uploads a single part with the given part number *part*
 to the upload with the given *uploadid*. The hash parameter must specify
-the SHA384 hash of the uploaded part in hexadecimal format. The data
-is read from the request body. The request must specify the size of the
-data in its Content-Length header.
+the SHA384 hash of the uploaded part in hexadecimal format. The offset must 
+specify the current of the part. The data is read from the request body. 
+The request must specify the size of the data in its Content-Length header.
 
 #### PUT /upload/*uploadid*
 
@@ -2529,6 +2545,25 @@ type UploadInfoResponse struct {
 
 	// MaxParts holds the maximum number of parts.
 	MaxParts int
+}
+
+// Parts holds a list of all the parts that are required by a multipart
+// upload, as required by a PUT request to /upload/$upload-id.
+type Parts struct {
+	Parts []Part
+}
+
+// Part represents one part of a multipart blob.
+type Part struct {
+	// Offset holds the offset relative to the start of the upload.
+	Offset int64
+	// Hash holds the SHA384 hash of the part.
+	Hash string
+	// Size holds the size of the part.
+	Size int64
+	// Complete holds whether the part has been
+	// successfully uploaded.
+	Complete bool
 }
 ```
 
