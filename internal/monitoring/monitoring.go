@@ -3,6 +3,7 @@
 package monitoring
 
 import (
+	"github.com/cloud-green/monitoring"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -24,4 +25,5 @@ var (
 func init() {
 	prometheus.MustRegister(requestDuration)
 	prometheus.MustRegister(uploadProcessingDuration)
+	prometheus.MustRegister(monitoring.NewMgoStatsCollector("charmstore"))
 }
