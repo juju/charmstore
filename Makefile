@@ -105,7 +105,7 @@ sysdeps:
 ifeq ($(APT_BASED),0)
 ifeq ($(shell lsb_release -cs|sed -r 's/precise|quantal|raring/old/'),old)
 	@echo Adding PPAs for golang and mongodb
-	@sudo apt-add-repository --yes ppa:juju/golang
+	@sudo apt-add-repository --yes ppa:ubuntu-lxc/lxd-stable
 	@sudo apt-add-repository --yes ppa:juju/stable
 endif
 	@echo Installing dependencies
