@@ -51,6 +51,7 @@ var Series = map[string]SeriesInfo{
 	"xenial":  {true, Ubuntu, true, 1.1375},
 	"yakkety": {true, Ubuntu, true, 1.103},
 	"zesty":   {true, Ubuntu, true, 1.104},
+	"artful":  {true, Ubuntu, true, 1.105},
 
 	// Windows
 	"win2012hvr2": {true, Windows, true, 1.1},
