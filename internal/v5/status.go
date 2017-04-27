@@ -12,7 +12,6 @@ import (
 
 	"github.com/juju/utils/debugstatus"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 	"gopkg.in/mgo.v2/bson"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
@@ -29,16 +28,6 @@ func (h *ReqHandler) serveDebugStatus(_ http.Header, req *http.Request) (interfa
 		h.checkElasticSearch,
 		h.checkEntities,
 		h.checkBaseEntities,
-		h.checkLogs(
-			"ingestion", "Ingestion",
-			mongodoc.IngestionType,
-			params.IngestionStart, params.IngestionComplete,
-		),
-		h.checkLogs(
-			"legacy_statistics", "Legacy Statistics Load",
-			mongodoc.LegacyStatisticsType,
-			params.LegacyStatisticsImportStart, params.LegacyStatisticsImportComplete,
-		),
 	), nil
 }
 
@@ -103,24 +92,6 @@ func (h *ReqHandler) checkBaseEntities() (key string, result debugstatus.CheckRe
 	result.Value = fmt.Sprintf("count: %d", baseNum)
 	result.Passed = num >= baseNum
 	return resultKey, result
-}
-
-func (h *ReqHandler) checkLogs(
-	resultKey, resultName string,
-	logType mongodoc.LogType,
-	startPrefix, endPrefix string,
-) debugstatus.CheckerFunc {
-	return func() (key string, result debugstatus.CheckResult) {
-		result.Name = resultName
-		start, end, err := h.findTimesInLogs(logType, startPrefix, endPrefix)
-		if err != nil {
-			result.Value = err.Error()
-			return resultKey, result
-		}
-		result.Value = fmt.Sprintf("started: %s, completed: %s", start.Format(time.RFC3339), end.Format(time.RFC3339))
-		result.Passed = !(start.IsZero() || end.IsZero())
-		return resultKey, result
-	}
 }
 
 // findTimesInLogs goes through logs in reverse order finding when the start and
