@@ -338,7 +338,7 @@ For example, `missing:\*` will retrieve the counts for all operations of kind
 "missing", regardless of the series, name or user.
 
 If the list flag is specified, counts for all next level keys will be listed.
- For example, a query for `stats/counter/download:*?list=1&by=week` will show
+ For example, a query for `stats/counter/archive-download:*?list=1&by=week` will show
  all the download counts for each series for each week.
 
 If a date range is specified, the returned counts will be restricted to the
@@ -372,7 +372,7 @@ Example: `GET "stats/counter/missing:trusty:*"`
 ```
 
 Example:
-`GET stats/counter/download/archive-download:*?by=week&list=1&start=2014-03-01`
+`GET stats/counter/archive-download:*?by=week&list=1&start=2014-03-01`
 
 ```json
 [
