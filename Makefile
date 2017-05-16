@@ -55,8 +55,11 @@ check: $(VERSIONDEPS)
 install: $(VERSIONDEPS)
 	go install $(INSTALL_FLAGS) -v $(PROJECT)/...
 
+release: charmstore-$(VERSION).tar.xz
+
 clean:
 	go clean $(PROJECT)/...
+	-rm charmstore-*.tar.xz
 
 else
 
@@ -67,6 +70,9 @@ check:
 	$(error Cannot $@; $(CURDIR) is not on GOPATH)
 
 install:
+	$(error Cannot $@; $(CURDIR) is not on GOPATH)
+
+release:
 	$(error Cannot $@; $(CURDIR) is not on GOPATH)
 
 clean:
@@ -122,11 +128,20 @@ endif
 gopkg:
 	@echo $(PROJECT)
 
+# Build a release tarball
+charmstore-$(VERSION).tar.xz: $(VERSIONDEPS)
+	mkdir -p charmstore-$(VERSION)/bin
+	GOBIN=$(CURDIR)/charmstore-$(VERSION)/bin go install $(INSTALL_FLAGS) -v $(PROJECT)/...
+	mv charmstore-$(VERSION)/bin/charmd charmstore-$(VERSION)/bin/charmstore
+	tar cv charmstore-$(VERSION) | xz > $@
+	-rm -r charmstore-$(VERSION)
+
 help:
 	@echo -e 'Charmstore - list of make targets:\n'
 	@echo 'make - Build the package.'
 	@echo 'make check - Run tests.'
 	@echo 'make install - Install the package.'
+	@echo 'make release - Build a binary tarball of the package.'
 	@echo 'make server - Start the charmd server.'
 	@echo 'make clean - Remove object files from package source directories.'
 	@echo 'make sysdeps - Install the development environment system packages.'
@@ -136,4 +151,4 @@ help:
 	@echo 'make simplify - Format and simplify the source files.'
 	@echo 'make gopkg - Output the current gopkg repository path and version.'
 
-.PHONY: build check clean format gopkg help install simplify sysdeps FORCE
+.PHONY: build check clean format gopkg help install simplify sysdeps release FORCE
