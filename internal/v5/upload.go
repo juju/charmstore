@@ -48,7 +48,7 @@ func (h *ReqHandler) serveUploadId(w http.ResponseWriter, req *http.Request) err
 		if err != nil {
 			return errgo.Mask(err)
 		}
-		return httprequest.WriteJSON(w, http.StatusOK, &params.NewUploadResponse{
+		return httprequest.WriteJSON(w, http.StatusOK, &params.UploadInfoResponse{
 			UploadId: uploadId,
 			// Match mongo's behaviour so we return an accurate time.
 			Expires:     expireTime.Truncate(time.Millisecond),
@@ -114,6 +114,14 @@ func (h *ReqHandler) serveUploadPart(w http.ResponseWriter, req *http.Request) e
 			if hash == "" {
 				return badRequestf(nil, "hash parameter not specified")
 			}
+			offsetStr := req.Form.Get("offset")
+			if offsetStr == "" {
+				return badRequestf(nil, "offset parameter not specified")
+			}
+			offset, err := strconv.ParseInt(offsetStr, 10, 64)
+			if err != nil {
+				return badRequestf(nil, "offset parameter invalid")
+			}
 			if req.ContentLength == -1 {
 				return badRequestf(nil, "Content-Length not specified")
 			}
@@ -121,7 +129,7 @@ func (h *ReqHandler) serveUploadPart(w http.ResponseWriter, req *http.Request) e
 			if err != nil {
 				return badRequestf(nil, "bad part number %q", partNumberStr)
 			}
-			err = h.Store.BlobStore.PutPart(uploadId, partNumber, req.Body, req.ContentLength, hash)
+			err = h.Store.BlobStore.PutPart(uploadId, partNumber, req.Body, req.ContentLength, offset, hash)
 			if errgo.Cause(err) == blobstore.ErrBadParams {
 				return errgo.WithCausef(err, params.ErrBadRequest, "")
 			}
@@ -146,6 +154,7 @@ func (h *ReqHandler) serveUploadPart(w http.ResponseWriter, req *http.Request) e
 		parts.Parts = make([]params.Part, len(uploadInfo.Parts))
 		for i, part := range uploadInfo.Parts {
 			parts.Parts[i] = params.Part{
+				Offset:   part.Offset,
 				Complete: part.Complete,
 				Hash:     part.Hash,
 				Size:     part.Size,
@@ -153,8 +162,12 @@ func (h *ReqHandler) serveUploadPart(w http.ResponseWriter, req *http.Request) e
 
 		}
 		return httprequest.WriteJSON(w, http.StatusOK, params.UploadInfoResponse{
-			Expires: uploadInfo.Expires,
-			Parts:   parts,
+			UploadId:    uploadId,
+			Expires:     uploadInfo.Expires,
+			Parts:       parts,
+			MinPartSize: h.Store.BlobStore.MinPartSize,
+			MaxPartSize: h.Store.BlobStore.MaxPartSize,
+			MaxParts:    h.Store.BlobStore.MaxParts,
 		})
 		return nil
 	case "DELETE":

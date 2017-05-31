@@ -2417,12 +2417,17 @@ time.ParseDuration function (e.g. "8h", "5m3s").
 The response holds a JSON object containing information about the upload.
 
 ```go
-type NewUploadResponse struct {
+type UploadInfoResponse struct {
 	// UploadId holds the id of the upload.
 	UploadId string
 
-	// Expires holds when the upload id expires (encoded
-	// in RFC3339 format).
+	// Parts holds all the known parts of the upload.
+	// Parts that haven't been uploaded yet will have nil
+	// elements.
+	Parts Parts
+
+    // Expires holds when the upload id expires (encoded
+    // in RFC3339 format).
 	Expires time.Time
 
 	// MinPartSize holds the minimum size of a part that may
@@ -2435,6 +2440,22 @@ type NewUploadResponse struct {
 
 	// MaxParts holds the maximum number of parts.
 	MaxParts int
+}
+
+type Parts struct {
+	Parts []Part
+}
+
+type Part struct {
+	// Offset holds the offset relative to the start of the upload.
+	Offset int64
+	// Hash holds the SHA384 hash of the part.
+	Hash string
+	// Size holds the size of the part.
+	Size int64
+	// Complete holds whether the part has been
+	// successfully uploaded.
+	Complete bool
 }
 ```
 
@@ -2451,17 +2472,18 @@ Example: `POST /v5/upload
 	Expires: "2017-02-28T12:46:25.878Z",
 	MinPartSize: 5242880,
 	MaxPartSize: 4294967295,
-	MaxParts: 400
+	MaxParts: 400,
+	Parts: {Parts: []}
 }
 ```
 
-#### PUT /upload/*uploadid*/*part*?hash=*sha384*
+#### PUT /upload/*uploadid*/*part*?hash=*sha384*&offset=*offset*
 
 This endpoint uploads a single part with the given part number *part*
 to the upload with the given *uploadid*. The hash parameter must specify
-the SHA384 hash of the uploaded part in hexadecimal format. The data
-is read from the request body. The request must specify the size of the
-data in its Content-Length header.
+the SHA384 hash of the uploaded part in hexadecimal format. The offset must 
+specify the current of the part. The data is read from the request body. 
+The request must specify the size of the data in its Content-Length header.
 
 #### PUT /upload/*uploadid*
 
@@ -2501,13 +2523,47 @@ The response holds a JSON object containing information about the upload.
 
 ```go
 type UploadInfoResponse struct {
+	// UploadId holds the id of the upload.
+	UploadId string
+
 	// Parts holds all the known parts of the upload.
 	// Parts that haven't been uploaded yet will have nil
 	// elements.
 	Parts Parts
 
-	// Expires holds when the upload will expire.
+    // Expires holds when the upload id expires (encoded
+    // in RFC3339 format).
 	Expires time.Time
+
+	// MinPartSize holds the minimum size of a part that may
+	// be uploaded (not including the last part).
+	MinPartSize int64
+
+	// MaxPartSize holds the maximum size of a part that may
+	// be uploaded.
+	MaxPartSize int64
+
+	// MaxParts holds the maximum number of parts.
+	MaxParts int
+}
+
+// Parts holds a list of all the parts that are required by a multipart
+// upload, as required by a PUT request to /upload/$upload-id.
+type Parts struct {
+	Parts []Part
+}
+
+// Part represents one part of a multipart blob.
+type Part struct {
+	// Offset holds the offset relative to the start of the upload.
+	Offset int64
+	// Hash holds the SHA384 hash of the part.
+	Hash string
+	// Size holds the size of the part.
+	Size int64
+	// Complete holds whether the part has been
+	// successfully uploaded.
+	Complete bool
 }
 ```
 
@@ -2529,7 +2585,10 @@ Example: `GET /v5/upload/1234
         Size: "324434",
         Complete: true
 	  }
-	]}
+	]},
+	MinPartSize: 5242880,
+	MaxPartSize: 4294967295,
+	MaxParts: 400,
+	UploadId: "1234"
 }
 ```
-

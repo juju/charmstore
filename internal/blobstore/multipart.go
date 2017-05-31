@@ -69,6 +69,8 @@ type PartInfo struct {
 	// Complete holds whether the part has been
 	// successfully uploaded.
 	Complete bool
+	// Offset holds the offset relative to the start of the upload.
+	Offset int64
 }
 
 // UploadInfo holds information on a given upload.
@@ -128,7 +130,7 @@ func (s *Store) NewUpload(expires time.Time) (uploadId string, err error) {
 // If the upload id was not found (for example, because it's expired),
 // PutPart returns an error with an ErrNotFound cause.
 // If one of the parameters is badly formed, it returns an error with an ErrBadParams cause.
-func (s *Store) PutPart(uploadId string, part int, r io.Reader, size int64, hash string) error {
+func (s *Store) PutPart(uploadId string, part int, r io.Reader, size int64, offset int64, hash string) error {
 	if part < 0 {
 		return errgo.WithCausef(nil, ErrBadParams, "negative part number")
 	}
@@ -145,7 +147,7 @@ func (s *Store) PutPart(uploadId string, part int, r io.Reader, size int64, hash
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(ErrNotFound))
 	}
-	if err := s.checkPartSizes(udoc.Parts, part, size); err != nil {
+	if err := s.checkPartSizes(udoc.Parts, part, offset, size); err != nil {
 		return errgo.Mask(err)
 	}
 	partElem := fmt.Sprintf("parts.%d", part)
@@ -168,7 +170,7 @@ func (s *Store) PutPart(uploadId string, part int, r io.Reader, size int64, hash
 		// No part record. Make one, not marked as complete
 		// before we put the part so that RemoveExpiredParts
 		// knows to delete the part.
-		if err := s.initializePart(uploadId, part, hash, size); err != nil {
+		if err := s.initializePart(uploadId, part, offset, hash, size); err != nil {
 			return errgo.Mask(err)
 		}
 	}
@@ -183,6 +185,7 @@ func (s *Store) PutPart(uploadId string, part int, r io.Reader, size int64, hash
 	// complete. Note: we update the entire part rather than just
 	// setting $partElem.complete=true because of a bug in MongoDB
 	// 2.4 which fails in that case.
+
 	err = s.uploadc.UpdateId(uploadId, bson.D{{
 		"$set", bson.D{{
 			partElem,
@@ -190,6 +193,7 @@ func (s *Store) PutPart(uploadId string, part int, r io.Reader, size int64, hash
 				Hash:     hash,
 				Size:     size,
 				Complete: true,
+				Offset:   offset,
 			},
 		}},
 	}})
@@ -206,7 +210,7 @@ func (s *Store) PutPart(uploadId string, part int, r io.Reader, size int64, hash
 //
 // The part argument holds the part being uploaded,
 // or -1 if no part is currently being uploaded.
-func (s *Store) checkPartSizes(parts []*PartInfo, part int, size int64) error {
+func (s *Store) checkPartSizes(parts []*PartInfo, part int, offset, size int64) error {
 	if part == -1 {
 		// There's no current part, so pretend the last part
 		// is being uploaded so that we don't complain about
@@ -215,11 +219,36 @@ func (s *Store) checkPartSizes(parts []*PartInfo, part int, size int64) error {
 	} else if part < len(parts)-1 && size < s.MinPartSize {
 		return errgo.Newf("part too small (need at least %d bytes, got %d)", s.MinPartSize, size)
 	}
+	pos := int64(0)
 	for i, p := range parts {
 		if i != part && p != nil && p.Size < s.MinPartSize {
 			return errgo.Newf("part %d was too small (need at least %d bytes, got %d)", i, s.MinPartSize, p.Size)
 		}
+		if p == nil && i != part {
+			// Next position is unknown.
+			pos = -1
+			continue
+		}
+		partOffset := offset
+		partSize := size
+		if p != nil && (offset == -1 || i != part) {
+			partOffset = p.Offset
+			partSize = p.Size
+		}
+		if pos != -1 {
+			// Check the offset if the current position is known.
+			if partOffset != pos {
+				return errgo.Newf("part %d should start at %d not at %d", i, pos, partOffset)
+			}
+		}
+		pos = partOffset + partSize
 	}
+	if len(parts) == part && pos != -1 {
+		if offset != pos {
+			return errgo.Newf("part %d should start at %d not at %d", part, pos, offset)
+		}
+	}
+
 	return nil
 }
 
@@ -244,7 +273,7 @@ func uploadPartName(uploadId string, part int) string {
 }
 
 // initializePart creates the initial record for a part.
-func (s *Store) initializePart(uploadId string, part int, hash string, size int64) error {
+func (s *Store) initializePart(uploadId string, part int, offset int64, hash string, size int64) error {
 	partElem := fmt.Sprintf("parts.%d", part)
 	// Update the document if it's not been marked
 	// as complete (it has no hash) and the part entry hasn't been
@@ -260,8 +289,9 @@ func (s *Store) initializePart(uploadId string, part int, hash string, size int6
 	},
 		bson.D{{
 			"$set", bson.D{{partElem, PartInfo{
-				Hash: hash,
-				Size: size,
+				Hash:   hash,
+				Size:   size,
+				Offset: offset,
 			}}},
 		}},
 	)
@@ -301,7 +331,7 @@ func (s *Store) FinishUpload(uploadId string, parts []Part) (idx *mongodoc.Multi
 	// when the parts are being uploaded, we still need
 	// to check here in case several parts were uploaded
 	// concurrently and one or more was too small.
-	if err := s.checkPartSizes(udoc.Parts, -1, 0); err != nil {
+	if err := s.checkPartSizes(udoc.Parts, -1, -1, 0); err != nil {
 		return nil, "", errgo.Mask(err)
 	}
 	// Calculate the hash of the entire thing, which marks

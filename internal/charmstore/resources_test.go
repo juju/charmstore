@@ -311,11 +311,13 @@ func putMultipart(c *gc.C, bs *blobstore.Store, expires time.Time, contents ...s
 	c.Assert(err, gc.Equals, nil)
 
 	parts := make([]blobstore.Part, len(contents))
+	pos := int64(0)
 	for i, content := range contents {
 		hash := hashOfString(content)
-		err = bs.PutPart(id, i, strings.NewReader(content), int64(len(content)), hash)
+		err = bs.PutPart(id, i, strings.NewReader(content), int64(len(content)), pos, hash)
 		c.Assert(err, gc.Equals, nil)
 		parts[i].Hash = hash
+		pos += int64(len(content))
 	}
 	_, _, err = bs.FinishUpload(id, parts)
 	c.Assert(err, gc.Equals, nil)

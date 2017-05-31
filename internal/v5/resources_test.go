@@ -82,7 +82,7 @@ func (s *ResourceSuite) TestMultipartPost(c *gc.C) {
 		Method:  "POST",
 		URL:     storeURL("upload"),
 	})
-	var uploadIdResp params.NewUploadResponse
+	var uploadIdResp params.UploadInfoResponse
 	err := json.Unmarshal(resp.Body.Bytes(), &uploadIdResp)
 	c.Assert(err, gc.Equals, nil)
 	uploadId := uploadIdResp.UploadId
@@ -94,14 +94,16 @@ func (s *ResourceSuite) TestMultipartPost(c *gc.C) {
 	}
 	allContents := strings.Join(contents, "")
 
+	pos := int64(0)
 	for i, content := range contents {
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 			Handler: s.srv,
 			Method:  "PUT",
 			Do:      bakeryDo(s.idmServer.Client("bob")),
-			URL:     storeURL(fmt.Sprintf("upload/%s/%d?hash=%s", uploadId, i, hashOfString(content))),
+			URL:     storeURL(fmt.Sprintf("upload/%s/%d?hash=%s&offset=%d", uploadId, i, hashOfString(content), pos)),
 			Body:    strings.NewReader(content),
 		})
+		pos += int64(len(content))
 	}
 
 	// Finalize the upload.
