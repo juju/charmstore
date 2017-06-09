@@ -39,9 +39,17 @@ type Config struct {
 	SearchCacheMaxAge DurationString    `yaml:"search-cache-max-age,omitempty"`
 	Database          string            `yaml:"database,omitempty"`
 	AccessLog         string            `yaml:"access-log"`
-	MinUploadPartSize int64             `json:"min-upload-part-size"`
-	MaxUploadPartSize int64             `json:"max-upload-part-size"`
-	MaxUploadParts    int               `json:"max-upload-parts"`
+	MinUploadPartSize int64             `yaml:"min-upload-part-size"`
+	MaxUploadPartSize int64             `yaml:"max-upload-part-size"`
+	MaxUploadParts    int               `yaml:"max-upload-parts"`
+	BlobStore         string            `yaml:"blobstore"`
+	SwiftAuthURL      string            `yaml:"swift-auth-url"`
+	SwiftUsername     string            `yaml:"swift-username"`
+	SwiftSecret       string            `yaml:"swift-secret"`
+	SwiftBucket       string            `yaml:"swift-bucket"`
+	SwiftRegion       string            `yaml:"swift-region"`
+	SwiftTenant       string            `yaml:"swift-tenant"`
+	SwiftAuthMode     string            `yaml:"swift-authmode"`
 }
 
 func (c *Config) validate() error {

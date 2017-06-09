@@ -1,4 +1,4 @@
-// Copyright 2014 Canonical Ltd.
+// Copyright 2014-2017 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
 package blobstore // import "gopkg.in/juju/charmstore.v5-unstable/internal/blobstore"
@@ -8,7 +8,6 @@ import (
 	"hash"
 	"io"
 
-	"github.com/juju/blobstore"
 	"github.com/juju/errors"
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
@@ -30,11 +29,23 @@ func NewHash() hash.Hash {
 	return sha512.New384()
 }
 
+// ObjectStore represents an object store. Even juju/blobstore is used like an
+// object store.
+type ObjectStore interface {
+	// Get gets an object.
+	Get(container string, name string) (r ReadSeekCloser, size int64, err error)
+	// Put puts an object.
+	Put(container, name string, r io.Reader, size int64, hash string) error
+	// Remove removes an object.
+	Remove(container, name string) error
+}
+
 // Store stores data blobs in mongodb, de-duplicating by
 // blob hash.
 type Store struct {
-	uploadc *mgo.Collection
-	mstore  blobstore.ManagedStorage
+	uploadc   *mgo.Collection
+	ostore    ObjectStore
+	container string
 
 	// The following fields are given default values by
 	// New but may be changed away from the defaults
@@ -53,11 +64,11 @@ type Store struct {
 
 // New returns a new blob store that writes to the given database,
 // prefixing its collections with the given prefix.
-func New(db *mgo.Database, prefix string) *Store {
-	rs := blobstore.NewGridFS(db.Name, prefix, db.Session)
+func New(db *mgo.Database, prefix, container string, ostore ObjectStore) *Store {
 	return &Store{
 		uploadc:     db.C(prefix + ".upload"),
-		mstore:      blobstore.NewManagedStorage(db, rs),
+		ostore:      ostore,
+		container:   container,
 		MinPartSize: defaultMinPartSize,
 		MaxParts:    defaultMaxParts,
 		MaxPartSize: defaultMaxPartSize,
@@ -68,7 +79,7 @@ func New(db *mgo.Database, prefix string) *Store {
 // storage, with the provided name. The content should have the given
 // size and hash.
 func (s *Store) Put(r io.Reader, name string, size int64, hash string) error {
-	return s.mstore.PutForEnvironmentAndCheckHash("", name, r, size, hash)
+	return s.ostore.Put(s.container, name, r, size, hash)
 }
 
 // Open opens the entry with the given name. It returns an error
@@ -77,21 +88,18 @@ func (s *Store) Open(name string, index *mongodoc.MultipartIndex) (ReadSeekClose
 	if index != nil {
 		return newMultiReader(s, name, index)
 	}
-	r, length, err := s.mstore.GetForEnvironment("", name)
+	r, size, err := s.ostore.Get(s.container, name)
 	if err != nil {
-		if errors.IsNotFound(err) {
-			return nil, 0, errgo.WithCausef(err, ErrNotFound, "")
-		}
-		return nil, 0, errgo.Mask(err)
+		return nil, 0, errgo.Mask(err, errgo.Is(ErrNotFound))
 	}
-	return r.(ReadSeekCloser), length, nil
+	return r, size, nil
 }
 
 // Remove the given name from the Store.
 func (s *Store) Remove(name string, index *mongodoc.MultipartIndex) error {
-	err := s.mstore.RemoveForEnvironment("", name)
+	err := s.ostore.Remove(s.container, name)
 	if errors.IsNotFound(err) {
 		return errgo.WithCausef(err, ErrNotFound, "")
 	}
-	return errgo.Mask(err)
+	return err
 }

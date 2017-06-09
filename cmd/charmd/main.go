@@ -105,6 +105,12 @@ func serve(confPath string) error {
 		MaxUploadPartSize:       conf.MaxUploadPartSize,
 		MaxUploadParts:          conf.MaxUploadParts,
 		RunBlobStoreGC:          true,
+		SwiftAuthURL:            conf.SwiftAuthURL,
+		SwiftUsername:           conf.SwiftUsername,
+		SwiftSecret:             conf.SwiftSecret,
+		SwiftBucket:             conf.SwiftBucket,
+		SwiftRegion:             conf.SwiftRegion,
+		SwiftTenant:             conf.SwiftTenant,
 	}
 
 	if conf.AuditLogFile != "" {
