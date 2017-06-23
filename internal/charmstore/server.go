@@ -103,6 +103,30 @@ type ServerParams struct {
 	// RunBlobStoreGC holds whether the server will run
 	// the blobstore garbage collector worker.
 	RunBlobStoreGC bool
+
+	// BlobStore holds the type of blobstore to use.
+	BlobStore string `yaml:"blobstore"`
+
+	// SwiftAuthURL holds the swift auth url, equivalent to OS_AUTH_URL.
+	SwiftAuthURL string `yaml:"swift-auth-url"`
+
+	// SwiftUsername holds the swift username, equivalent to OS_USERNAME..
+	SwiftUsername string `yaml:"swift-username"`
+
+	// SwiftSecret holds the swift password, equivalent to OS_PASSWORD.
+	SwiftSecret string `yaml:"swift-secret"`
+
+	// SwiftBucket holds the swift bucket to use for blobs.
+	SwiftBucket string `yaml:"swift-bucket"`
+
+	// SwiftRegion holds the swift region to use for blobs.
+	SwiftRegion string `yaml:"swift-region"`
+
+	// SwiftTenant holds the swift tenant to use for connecting to swift.
+	SwiftTenant string `yaml:"swift-tenant"`
+
+	// SwiftAuthMode holds the swift auth mode to use for connecting to swift.
+	SwiftAuthMode string `yaml:"swift-authmode"`
 }
 
 const defaultRootKeyExpiryDuration = 24 * time.Hour

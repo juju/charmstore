@@ -1123,7 +1123,7 @@ func (s *StoreSuite) TestCollections(c *gc.C) {
 	}
 	// Check that all created collections are mentioned in Collections.
 	for _, name := range names {
-		if strings.HasPrefix(name, "system.") || otherCollections[name] {
+		if strings.HasPrefix(name, "system.") || strings.HasPrefix(name, "blobstore.") || otherCollections[name] {
 			continue
 		}
 		if name == "system.indexes" || name == "managedStoredResources" || name == "entitystore.files" {

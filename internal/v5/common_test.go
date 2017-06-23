@@ -15,6 +15,11 @@ import (
 	jujutesting "github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/goose.v2/client"
+	"gopkg.in/goose.v2/identity"
+	"gopkg.in/goose.v2/swift"
+	"gopkg.in/goose.v2/testing/httpsuite"
+	"gopkg.in/goose.v2/testservices/openstackservice"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
@@ -93,10 +98,15 @@ type commonSuite struct {
 	// maxMgoSessions specifies the value that will be given
 	// to config.MaxMgoSessions when calling charmstore.NewServer.
 	maxMgoSessions int
+
+	swift *swift.Client
+	httpsuite.HTTPSuite
+	openstack *openstackservice.Openstack
 }
 
 func (s *commonSuite) SetUpSuite(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpSuite(c)
+	s.HTTPSuite.SetUpSuite(c)
 	if s.enableES {
 		s.esSuite = new(storetesting.ElasticSearchSuite)
 		s.esSuite.SetUpSuite(c)
@@ -104,6 +114,7 @@ func (s *commonSuite) SetUpSuite(c *gc.C) {
 }
 
 func (s *commonSuite) TearDownSuite(c *gc.C) {
+	s.HTTPSuite.TearDownSuite(c)
 	if s.esSuite != nil {
 		s.esSuite.TearDownSuite(c)
 	}
@@ -121,6 +132,7 @@ func (s *commonSuite) SetUpTest(c *gc.C) {
 }
 
 func (s *commonSuite) TearDownTest(c *gc.C) {
+	s.openstack.Stop()
 	s.store.Pool().Close()
 	s.store.Close()
 	s.srv.Close()
@@ -141,12 +153,35 @@ func (s *commonSuite) TearDownTest(c *gc.C) {
 func (s *commonSuite) startServer(c *gc.C) {
 	// Disable group caching.
 	s.PatchValue(&v5.PermCacheExpiry, time.Duration(0))
+	// Set up an Openstack service.
+	cred := &identity.Credentials{
+		URL:        s.Server.URL,
+		User:       "fred",
+		Secrets:    "secret",
+		Region:     "heaven",
+		TenantName: "awesomo",
+	}
+	var logMsg []string
+	s.openstack, logMsg = openstackservice.New(cred,
+		identity.AuthUserPass, false)
+	for _, msg := range logMsg {
+		c.Logf(msg)
+	}
+	client := client.NewClient(cred, identity.AuthUserPass, nil)
+	s.swift = swift.New(client)
+	s.openstack.SetupHTTP(nil)
+	s.swift.CreateContainer("testc", swift.Private)
+
 	config := charmstore.ServerParams{
 		AuthUsername:      testUsername,
 		AuthPassword:      testPassword,
 		StatsCacheMaxAge:  time.Nanosecond,
 		MaxMgoSessions:    s.maxMgoSessions,
 		MinUploadPartSize: 10,
+		SwiftAuthURL:      s.openstack.URLs["identity"],
+		SwiftUsername:     "fred",
+		SwiftSecret:       "secret",
+		SwiftBucket:       "testc",
 	}
 	keyring := httpbakery.NewPublicKeyRing(nil, nil)
 	keyring.AllowInsecure()

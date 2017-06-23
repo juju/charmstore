@@ -16,6 +16,7 @@ import (
 	"github.com/juju/loggo"
 	"github.com/juju/utils/parallel"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/goose.v2/identity"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
@@ -76,6 +77,9 @@ type Pool struct {
 
 	// rootKeys holds the cache of macaroon root keys.
 	rootKeys *mgostorage.RootKeys
+
+	// objectstore holds the ObjectStore
+	objectstore blobstore.ObjectStore
 }
 
 // reqStoreCacheSize holds the maximum number of store
@@ -98,6 +102,29 @@ func NewPool(db *mgo.Database, si *SearchIndex, bakeryParams *bakery.NewServiceP
 	if config.StatsCacheMaxAge == 0 {
 		config.StatsCacheMaxAge = time.Hour
 	}
+	var objectstore blobstore.ObjectStore
+	if config.BlobStore == "swift" {
+
+		cred := &identity.Credentials{
+			URL:        config.SwiftAuthURL,
+			User:       config.SwiftUsername,
+			Secrets:    config.SwiftSecret,
+			Region:     config.SwiftRegion,
+			TenantName: config.SwiftTenant,
+		}
+		authmode := identity.AuthUserPass
+		switch config.SwiftAuthMode {
+		case "legacy":
+			authmode = identity.AuthLegacy
+		case "keypair":
+			authmode = identity.AuthKeyPair
+		case "authuserpassv3":
+			authmode = identity.AuthUserPassV3
+		}
+		objectstore = blobstore.NewSwiftStore(cred, authmode)
+	} else {
+		objectstore = blobstore.NewMongoStore(db, "entitystore")
+	}
 
 	p := &Pool{
 		db:          StoreDatabase{db}.copy(),
@@ -107,6 +134,7 @@ func NewPool(db *mgo.Database, si *SearchIndex, bakeryParams *bakery.NewServiceP
 		run:         parallel.NewRun(maxAsyncGoroutines),
 		auditLogger: config.AuditLogger,
 		rootKeys:    mgostorage.NewRootKeys(100),
+		objectstore: objectstore,
 	}
 	if config.MaxMgoSessions > 0 {
 		p.reqStoreC = make(chan *Store, config.MaxMgoSessions)
@@ -188,7 +216,7 @@ func (p *Pool) RequestStore() (*Store, error) {
 }
 
 func (p *Pool) newBlobStore(db StoreDatabase) *blobstore.Store {
-	bs := blobstore.New(db.Database, "entitystore")
+	bs := blobstore.New(db.Database, "entitystore", p.config.SwiftBucket, p.objectstore)
 	if p.config.MinUploadPartSize != 0 {
 		bs.MinPartSize = p.config.MinUploadPartSize
 	}

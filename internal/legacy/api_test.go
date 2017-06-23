@@ -18,6 +18,11 @@ import (
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/goose.v2/client"
+	"gopkg.in/goose.v2/identity"
+	"gopkg.in/goose.v2/swift"
+	"gopkg.in/goose.v2/testing/httpsuite"
+	"gopkg.in/goose.v2/testservices/openstackservice"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmrepo.v2-unstable"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
@@ -34,22 +39,57 @@ import (
 var serverParams = charmstore.ServerParams{
 	AuthUsername: "test-user",
 	AuthPassword: "test-password",
+	SwiftBucket:  "testbucket",
 }
 
 type APISuite struct {
 	jujutesting.IsolatedMgoSuite
 	srv   *charmstore.Server
 	store *charmstore.Store
+	httpsuite.HTTPSuite
+	openstack openstackservice.Openstack
 }
 
 var _ = gc.Suite(&APISuite{})
 
+func (s *APISuite) SetUpSuite(c *gc.C) {
+	s.IsolatedMgoSuite.SetUpSuite(c)
+	s.HTTPSuite.SetUpSuite(c)
+}
+
+func (s *APISuite) TearDownSuite(c *gc.C) {
+	s.HTTPSuite.TearDownSuite(c)
+	s.IsolatedMgoSuite.TearDownSuite(c)
+}
+
 func (s *APISuite) SetUpTest(c *gc.C) {
+	s.HTTPSuite.SetUpTest(c)
 	s.IsolatedMgoSuite.SetUpTest(c)
+	cred := &identity.Credentials{
+		URL:        s.Server.URL,
+		User:       "fred",
+		Secrets:    "scrt",
+		Region:     "heaven",
+		TenantName: "awesomo",
+	}
+	openstack, logMsg := openstackservice.New(cred, identity.AuthUserPass, false)
+	for _, msg := range logMsg {
+		c.Logf(msg)
+	}
+	openstack.SetupHTTP(nil)
+	s.openstack = *openstack
+	serverParams.SwiftUsername = cred.User
+	serverParams.SwiftSecret = cred.Secrets
+	serverParams.SwiftAuthURL = s.openstack.URLs["identity"]
+	client := client.NewClient(cred, identity.AuthUserPass, nil)
+	sw := swift.New(client)
+	sw.CreateContainer(serverParams.SwiftBucket, swift.Private)
 	s.srv, s.store = newServer(c, s.Session, serverParams)
 }
 
 func (s *APISuite) TearDownTest(c *gc.C) {
+	s.openstack.Stop()
+	s.HTTPSuite.TearDownTest(c)
 	s.store.Close()
 	s.store.Pool().Close()
 	s.srv.Close()

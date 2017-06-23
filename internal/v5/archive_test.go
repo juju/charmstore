@@ -1306,7 +1306,7 @@ func (s *ArchiveSuite) TestDeleteError(c *gc.C) {
 			Method:       "DELETE",
 			ExpectStatus: http.StatusInternalServerError,
 			ExpectBody: params.Error{
-				Message: `cannot delete "cs:~charmers/utopic/mysql-42": cannot remove blob no-such-name: resource at path "global/no-such-name" not found`,
+				Message: `cannot delete "cs:~charmers/utopic/mysql-42": cannot remove blob no-such-name: resource at path "environs/testc/no-such-name" not found`,
 			},
 		})
 	})
