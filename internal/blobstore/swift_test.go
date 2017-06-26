@@ -19,7 +19,6 @@ import (
 	"gopkg.in/goose.v2/client"
 	"gopkg.in/goose.v2/identity"
 	"gopkg.in/goose.v2/swift"
-	"gopkg.in/goose.v2/testing/httpsuite"
 	"gopkg.in/goose.v2/testservices/openstackservice"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/blobstore"
@@ -30,29 +29,25 @@ type SwiftStoreSuite struct {
 	jujutesting.IsolatedMgoSuite
 	store       *blobstore.Store
 	objectstore blobstore.ObjectStore
-	httpsuite.HTTPSuite
-	openstack *openstackservice.Openstack
+	openstack   *openstackservice.Openstack
 }
 
 var _ = gc.Suite(&SwiftStoreSuite{})
 
 func (s *SwiftStoreSuite) SetUpSuite(c *gc.C) {
 	c.Logf("Using identity and swift service test doubles")
-	s.HTTPSuite.SetUpSuite(c)
 	s.IsolatedMgoSuite.SetUpSuite(c)
 }
 
 func (s *SwiftStoreSuite) TearDownSuite(c *gc.C) {
 	s.IsolatedMgoSuite.TearDownSuite(c)
-	s.HTTPSuite.TearDownSuite(c)
 }
 
 func (s *SwiftStoreSuite) SetUpTest(c *gc.C) {
-	s.HTTPSuite.SetUpTest(c)
 	s.IsolatedMgoSuite.SetUpTest(c)
 	// Set up an Openstack service.
 	cred := &identity.Credentials{
-		URL:        s.Server.URL,
+		URL:        "http://0.1.2.3/",
 		User:       "fred",
 		Secrets:    "secret",
 		Region:     "some region",
@@ -82,7 +77,6 @@ func (s *SwiftStoreSuite) SetUpTest(c *gc.C) {
 }
 
 func (s *SwiftStoreSuite) TearDownTest(c *gc.C) {
-	s.HTTPSuite.TearDownTest(c)
 	s.openstack.Stop()
 	s.IsolatedMgoSuite.TearDownTest(c)
 }
