@@ -17,26 +17,88 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/goose.v2/client"
+	"gopkg.in/goose.v2/identity"
+	"gopkg.in/goose.v2/swift"
+	"gopkg.in/goose.v2/testservices/openstackservice"
+	"gopkg.in/mgo.v2"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/blobstore"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
 )
 
-type BlobStoreSuite struct {
-	jujutesting.IsolatedMgoSuite
-	store *blobstore.Store
+var _ = gc.Suite(&MongoStoreSuite{})
+
+type MongoStoreSuite struct {
+	blobStoreSuite
 }
 
-var _ = gc.Suite(&BlobStoreSuite{})
+func (s *MongoStoreSuite) SetUpTest(c *gc.C) {
+	s.blobStoreSuite.SetUpTest(c, func(db *mgo.Database) blobstore.ObjectStore {
+		return blobstore.NewMongoStore(db, "blobstore")
+	})
+}
 
-func (s *BlobStoreSuite) SetUpTest(c *gc.C) {
+type SwiftStoreSuite struct {
+	openstack *openstackservice.Openstack
+	blobStoreSuite
+}
+
+var _ = gc.Suite(&SwiftStoreSuite{})
+
+func (s *SwiftStoreSuite) SetUpTest(c *gc.C) {
+	// Set up an Openstack service.
+	cred := &identity.Credentials{
+		URL:        "http://0.1.2.3/",
+		User:       "fred",
+		Secrets:    "secret",
+		Region:     "some region",
+		TenantName: "tenant",
+	}
+	var logMsg []string
+	s.openstack, logMsg = openstackservice.New(cred, identity.AuthUserPass, false)
+	for _, msg := range logMsg {
+		c.Logf(msg)
+	}
+	s.openstack.SetupHTTP(nil)
+
+	cred2 := &identity.Credentials{
+		URL:        s.openstack.URLs["identity"],
+		User:       "fred",
+		Secrets:    "secret",
+		Region:     "some region",
+		TenantName: "tenant",
+	}
+
+	client := client.NewClient(cred, identity.AuthUserPass, nil)
+	sw := swift.New(client)
+	sw.CreateContainer("testc", swift.Private)
+
+	s.blobStoreSuite.SetUpTest(c, func(db *mgo.Database) blobstore.ObjectStore {
+		return blobstore.NewSwiftStore(cred2, identity.AuthUserPass, "testc")
+	})
+}
+
+func (s *SwiftStoreSuite) TearDownTest(c *gc.C) {
+	s.blobStoreSuite.TearDownTest(c)
+	s.openstack.Stop()
+}
+
+type blobStoreSuite struct {
+	jujutesting.IsolatedMgoSuite
+	store          *blobstore.Store
+	newObjectStore func(db *mgo.Database) blobstore.ObjectStore
+}
+
+func (s *blobStoreSuite) SetUpTest(c *gc.C, newObjectStore func(db *mgo.Database) blobstore.ObjectStore) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	db := s.Session.DB("db")
-	mstore := blobstore.NewMongoStore(db, "blobstore")
-	s.store = blobstore.New(db, "blobstore", mstore)
+	s.newObjectStore = newObjectStore
+	s.store = s.newBlobStore(s.Session)
+	blobstore.New(db, "blobstore", newObjectStore(db))
 }
 
-func (s *BlobStoreSuite) TestPutTwice(c *gc.C) {
+func (s *blobStoreSuite) TestPutTwice(c *gc.C) {
 	content := "some data"
 	err := s.store.Put(strings.NewReader(content), "x", int64(len(content)), hashOf(content))
 	c.Assert(err, gc.Equals, nil)
@@ -48,7 +110,7 @@ func (s *BlobStoreSuite) TestPutTwice(c *gc.C) {
 	s.assertBlobContent(c, "x", nil, content)
 }
 
-func (s *BlobStoreSuite) TestPut(c *gc.C) {
+func (s *blobStoreSuite) TestPut(c *gc.C) {
 	content := "some data"
 	err := s.store.Put(strings.NewReader(content), "x", int64(len(content)), hashOf(content))
 	c.Assert(err, gc.Equals, nil)
@@ -59,13 +121,13 @@ func (s *BlobStoreSuite) TestPut(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 }
 
-func (s *BlobStoreSuite) TestPutInvalidHash(c *gc.C) {
+func (s *blobStoreSuite) TestPutInvalidHash(c *gc.C) {
 	content := "some data"
 	err := s.store.Put(strings.NewReader(content), "x", int64(len(content)), hashOf("wrong"))
 	c.Assert(err, gc.ErrorMatches, "hash mismatch")
 }
 
-func (s *BlobStoreSuite) TestRemove(c *gc.C) {
+func (s *blobStoreSuite) TestRemove(c *gc.C) {
 	content := "some data"
 	err := s.store.Put(strings.NewReader(content), "x", int64(len(content)), hashOf(content))
 	c.Assert(err, gc.Equals, nil)
@@ -78,13 +140,13 @@ func (s *BlobStoreSuite) TestRemove(c *gc.C) {
 	s.assertBlobDoesNotExist(c, "x")
 }
 
-func (s *BlobStoreSuite) TestRemoveNonExistent(c *gc.C) {
+func (s *blobStoreSuite) TestRemoveNonExistent(c *gc.C) {
 	err := s.store.Remove("x", nil)
-	c.Check(err.Error(), jc.HasPrefix, `resource at path "global/x" not found`)
+	c.Check(err, gc.NotNil)
 	c.Check(errgo.Cause(err), gc.Equals, blobstore.ErrNotFound)
 }
 
-func (s *BlobStoreSuite) TestNewParts(c *gc.C) {
+func (s *blobStoreSuite) TestNewParts(c *gc.C) {
 	expires := time.Now().Add(time.Minute).UTC().Truncate(time.Millisecond)
 	id, err := s.store.NewUpload(expires)
 	c.Assert(err, gc.Equals, nil)
@@ -100,14 +162,14 @@ func (s *BlobStoreSuite) TestNewParts(c *gc.C) {
 	})
 }
 
-func (s *BlobStoreSuite) TestPutPartNegativePart(c *gc.C) {
+func (s *blobStoreSuite) TestPutPartNegativePart(c *gc.C) {
 	id := s.newUpload(c)
 
 	err := s.store.PutPart(id, -1, nil, 0, "")
 	c.Assert(err, gc.ErrorMatches, "negative part number")
 }
 
-func (s *BlobStoreSuite) TestPutPartNumberTooBig(c *gc.C) {
+func (s *blobStoreSuite) TestPutPartNumberTooBig(c *gc.C) {
 	s.store.MaxParts = 100
 
 	id := s.newUpload(c)
@@ -115,13 +177,13 @@ func (s *BlobStoreSuite) TestPutPartNumberTooBig(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `part number 100 too big \(maximum 99\)`)
 }
 
-func (s *BlobStoreSuite) TestPutPartSizeNonPositive(c *gc.C) {
+func (s *blobStoreSuite) TestPutPartSizeNonPositive(c *gc.C) {
 	id := s.newUpload(c)
 	err := s.store.PutPart(id, 0, strings.NewReader(""), 0, hashOf(""))
 	c.Assert(err, gc.ErrorMatches, `non-positive part 0 size 0`)
 }
 
-func (s *BlobStoreSuite) TestPutPartSizeTooBig(c *gc.C) {
+func (s *blobStoreSuite) TestPutPartSizeTooBig(c *gc.C) {
 	s.store.MaxPartSize = 5
 
 	id := s.newUpload(c)
@@ -129,7 +191,7 @@ func (s *BlobStoreSuite) TestPutPartSizeTooBig(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `part 0 too big \(maximum 5\)`)
 }
 
-func (s *BlobStoreSuite) TestPutPartSingle(c *gc.C) {
+func (s *blobStoreSuite) TestPutPartSingle(c *gc.C) {
 	id := s.newUpload(c)
 
 	content := "123456789 12345"
@@ -142,7 +204,7 @@ func (s *BlobStoreSuite) TestPutPartSingle(c *gc.C) {
 	c.Assert(hashOfReader(c, r), gc.Equals, hashOf(content))
 }
 
-func (s *BlobStoreSuite) TestPutPartAgain(c *gc.C) {
+func (s *blobStoreSuite) TestPutPartAgain(c *gc.C) {
 	id := s.newUpload(c)
 
 	content := "123456789 12345"
@@ -162,7 +224,7 @@ func (s *BlobStoreSuite) TestPutPartAgain(c *gc.C) {
 	c.Assert(hashOfReader(c, r), gc.Equals, hashOf(content))
 }
 
-func (s *BlobStoreSuite) TestPutPartAgainWithDifferentHash(c *gc.C) {
+func (s *blobStoreSuite) TestPutPartAgainWithDifferentHash(c *gc.C) {
 	id := s.newUpload(c)
 
 	content := "123456789 12345"
@@ -174,7 +236,7 @@ func (s *BlobStoreSuite) TestPutPartAgainWithDifferentHash(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `hash mismatch for already uploaded part`)
 }
 
-func (s *BlobStoreSuite) TestPutPartAgainWithSameHash(c *gc.C) {
+func (s *blobStoreSuite) TestPutPartAgainWithSameHash(c *gc.C) {
 	id := s.newUpload(c)
 
 	content := "123456789 12345"
@@ -185,7 +247,7 @@ func (s *BlobStoreSuite) TestPutPartAgainWithSameHash(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 }
 
-func (s *BlobStoreSuite) TestPutPartOutOfOrder(c *gc.C) {
+func (s *blobStoreSuite) TestPutPartOutOfOrder(c *gc.C) {
 	s.store.MinPartSize = 10
 	id := s.newUpload(c)
 
@@ -208,7 +270,7 @@ func (s *BlobStoreSuite) TestPutPartOutOfOrder(c *gc.C) {
 	c.Assert(hashOfReader(c, r), gc.Equals, hashOf(content1))
 }
 
-func (s *BlobStoreSuite) TestPutPartTooSmall(c *gc.C) {
+func (s *blobStoreSuite) TestPutPartTooSmall(c *gc.C) {
 	s.store.MinPartSize = 100
 	id := s.newUpload(c)
 
@@ -221,7 +283,7 @@ func (s *BlobStoreSuite) TestPutPartTooSmall(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `part 0 was too small \(need at least 100 bytes, got 26\)`)
 }
 
-func (s *BlobStoreSuite) TestPutPartTooSmallOutOfOrder(c *gc.C) {
+func (s *blobStoreSuite) TestPutPartTooSmallOutOfOrder(c *gc.C) {
 	s.store.MinPartSize = 100
 	id := s.newUpload(c)
 
@@ -234,7 +296,7 @@ func (s *BlobStoreSuite) TestPutPartTooSmallOutOfOrder(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `part too small \(need at least 100 bytes, got 20\)`)
 }
 
-func (s *BlobStoreSuite) TestPutPartSmallAtEnd(c *gc.C) {
+func (s *blobStoreSuite) TestPutPartSmallAtEnd(c *gc.C) {
 	s.store.MinPartSize = 10
 	id := s.newUpload(c)
 
@@ -247,7 +309,7 @@ func (s *BlobStoreSuite) TestPutPartSmallAtEnd(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `part 0 was too small \(need at least 10 bytes, got 4\)`)
 }
 
-func (s *BlobStoreSuite) TestPutPartConcurrent(c *gc.C) {
+func (s *blobStoreSuite) TestPutPartConcurrent(c *gc.C) {
 	id := s.newUpload(c)
 	var hash [3]string
 	const size = 5 * 1024 * 1024
@@ -260,7 +322,12 @@ func (s *BlobStoreSuite) TestPutPartConcurrent(c *gc.C) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			err := s.store.PutPart(id, i, newDataSource(int64(i+1), size), size, hash[i])
+			// Make a copy of the session so we get independent
+			// mongo sockets and more concurrency.
+			session := s.Session.Copy()
+			defer session.Close()
+			store := s.newBlobStore(session)
+			err := store.PutPart(id, i, newDataSource(int64(i+1), size), size, hash[i])
 			c.Check(err, gc.Equals, nil)
 		}()
 	}
@@ -273,13 +340,13 @@ func (s *BlobStoreSuite) TestPutPartConcurrent(c *gc.C) {
 	}
 }
 
-func (s *BlobStoreSuite) TestPutPartNotFound(c *gc.C) {
+func (s *blobStoreSuite) TestPutPartNotFound(c *gc.C) {
 	err := s.store.PutPart("unknownblob", 0, strings.NewReader("x"), 1, hashOf(""))
 	c.Assert(err, gc.ErrorMatches, `upload id "unknownblob" not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, blobstore.ErrNotFound)
 }
 
-func (s *BlobStoreSuite) TestFinishUploadMismatchedPartCount(c *gc.C) {
+func (s *blobStoreSuite) TestFinishUploadMismatchedPartCount(c *gc.C) {
 	s.store.MinPartSize = 10
 	id := s.newUpload(c)
 
@@ -299,7 +366,7 @@ func (s *BlobStoreSuite) TestFinishUploadMismatchedPartCount(c *gc.C) {
 	c.Assert(hash, gc.Equals, "")
 }
 
-func (s *BlobStoreSuite) TestFinishUploadMismatchedPartHash(c *gc.C) {
+func (s *blobStoreSuite) TestFinishUploadMismatchedPartHash(c *gc.C) {
 	s.store.MinPartSize = 10
 	id := s.newUpload(c)
 
@@ -321,7 +388,7 @@ func (s *BlobStoreSuite) TestFinishUploadMismatchedPartHash(c *gc.C) {
 	c.Assert(hash, gc.Equals, "")
 }
 
-func (s *BlobStoreSuite) TestFinishUploadPartNotUploaded(c *gc.C) {
+func (s *blobStoreSuite) TestFinishUploadPartNotUploaded(c *gc.C) {
 	s.store.MinPartSize = 10
 	id := s.newUpload(c)
 
@@ -339,13 +406,13 @@ func (s *BlobStoreSuite) TestFinishUploadPartNotUploaded(c *gc.C) {
 	c.Assert(hash, gc.Equals, "")
 }
 
-func (s *BlobStoreSuite) TestFinishUploadPartIncomplete(c *gc.C) {
+func (s *blobStoreSuite) TestFinishUploadPartIncomplete(c *gc.C) {
 	s.store.MinPartSize = 10
 	id := s.newUpload(c)
 
 	content0 := "123456789 123456789 "
-	err := s.store.PutPart(id, 0, strings.NewReader(""), int64(len(content0)), hashOf(content0))
-	c.Assert(err, gc.ErrorMatches, `cannot upload part ".+/0": hash mismatch`)
+	err := s.store.PutPart(id, 0, strings.NewReader("1"), int64(len(content0)), hashOf(content0))
+	c.Assert(err, gc.ErrorMatches, `cannot upload part ".+/0": (.|\n)*(hash mismatch|unexpected EOF)(.|\n)*`)
 
 	idx, hash, err := s.store.FinishUpload(id, []blobstore.Part{{
 		Hash: hashOf(content0),
@@ -355,7 +422,7 @@ func (s *BlobStoreSuite) TestFinishUploadPartIncomplete(c *gc.C) {
 	c.Assert(hash, gc.Equals, "")
 }
 
-func (s *BlobStoreSuite) TestFinishUploadCheckSizes(c *gc.C) {
+func (s *blobStoreSuite) TestFinishUploadCheckSizes(c *gc.C) {
 	s.store.MinPartSize = 50
 	id := s.newUpload(c)
 	content := "123456789 123456789 "
@@ -393,7 +460,7 @@ func (s *BlobStoreSuite) TestFinishUploadCheckSizes(c *gc.C) {
 	c.Assert(hash, gc.Equals, "")
 }
 
-func (s *BlobStoreSuite) TestFinishUploadSuccess(c *gc.C) {
+func (s *blobStoreSuite) TestFinishUploadSuccess(c *gc.C) {
 	s.store.MinPartSize = 10
 	id := s.newUpload(c)
 
@@ -420,7 +487,7 @@ func (s *BlobStoreSuite) TestFinishUploadSuccess(c *gc.C) {
 	})
 }
 
-func (s *BlobStoreSuite) TestFinishUploadSuccessOnePart(c *gc.C) {
+func (s *blobStoreSuite) TestFinishUploadSuccessOnePart(c *gc.C) {
 	id := s.newUpload(c)
 
 	content0 := "123456789 123456789 "
@@ -439,13 +506,13 @@ func (s *BlobStoreSuite) TestFinishUploadSuccessOnePart(c *gc.C) {
 	})
 }
 
-func (s *BlobStoreSuite) TestFinishUploadNotFound(c *gc.C) {
+func (s *blobStoreSuite) TestFinishUploadNotFound(c *gc.C) {
 	_, _, err := s.store.FinishUpload("not-an-id", nil)
 	c.Assert(err, gc.ErrorMatches, `upload id "not-an-id" not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, blobstore.ErrNotFound)
 }
 
-func (s *BlobStoreSuite) TestFinishUploadAgain(c *gc.C) {
+func (s *blobStoreSuite) TestFinishUploadAgain(c *gc.C) {
 	s.store.MinPartSize = 10
 	id := s.newUpload(c)
 
@@ -478,7 +545,7 @@ func (s *BlobStoreSuite) TestFinishUploadAgain(c *gc.C) {
 	})
 }
 
-func (s *BlobStoreSuite) TestFinishUploadCalledWhenCalculatingHash(c *gc.C) {
+func (s *blobStoreSuite) TestFinishUploadCalledWhenCalculatingHash(c *gc.C) {
 	s.store.MinPartSize = 10
 	id := s.newUpload(c)
 
@@ -525,7 +592,7 @@ func (s *BlobStoreSuite) TestFinishUploadCalledWhenCalculatingHash(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `upload expired or removed`)
 }
 
-func (s *BlobStoreSuite) TestRemoveUploadSuccessWithNoPart(c *gc.C) {
+func (s *blobStoreSuite) TestRemoveUploadSuccessWithNoPart(c *gc.C) {
 	s.store.MinPartSize = 10
 	expires := time.Now().Add(time.Minute).UTC().Truncate(time.Millisecond)
 	id, err := s.store.NewUpload(expires)
@@ -535,12 +602,12 @@ func (s *BlobStoreSuite) TestRemoveUploadSuccessWithNoPart(c *gc.C) {
 	s.assertUploadDoesNotExist(c, id)
 }
 
-func (s *BlobStoreSuite) TestRemoveUploadOnNonExistingUpload(c *gc.C) {
+func (s *blobStoreSuite) TestRemoveUploadOnNonExistingUpload(c *gc.C) {
 	err := s.store.RemoveUpload("something", isOwnedByNotCalled(c))
 	c.Assert(err, gc.Equals, nil)
 }
 
-func (s *BlobStoreSuite) TestRemoveUploadSuccessWithParts(c *gc.C) {
+func (s *blobStoreSuite) TestRemoveUploadSuccessWithParts(c *gc.C) {
 	s.store.MinPartSize = 10
 	expires := time.Now().Add(time.Minute).UTC().Truncate(time.Millisecond)
 	id, err := s.store.NewUpload(expires)
@@ -554,7 +621,7 @@ func (s *BlobStoreSuite) TestRemoveUploadSuccessWithParts(c *gc.C) {
 	s.assertBlobDoesNotExist(c, id+"/0")
 }
 
-func (s *BlobStoreSuite) TestSetOwner(c *gc.C) {
+func (s *blobStoreSuite) TestSetOwner(c *gc.C) {
 	s.store.MinPartSize = 10
 	expires := time.Now().Add(time.Minute).UTC().Truncate(time.Millisecond)
 	id, err := s.store.NewUpload(expires)
@@ -598,7 +665,7 @@ func (s *BlobStoreSuite) TestSetOwner(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `upload has been removed`)
 }
 
-func (s *BlobStoreSuite) TestRemoveFinishedUploadRemovesParts(c *gc.C) {
+func (s *blobStoreSuite) TestRemoveFinishedUploadRemovesParts(c *gc.C) {
 	s.store.MinPartSize = 10
 
 	id, err := s.store.NewUpload(time.Now().Add(time.Minute))
@@ -616,7 +683,7 @@ func (s *BlobStoreSuite) TestRemoveFinishedUploadRemovesParts(c *gc.C) {
 	s.assertBlobDoesNotExist(c, id+"/0")
 }
 
-func (s *BlobStoreSuite) TestRemoveOwnedBlobWithOwnershipCheckReturningTrue(c *gc.C) {
+func (s *blobStoreSuite) TestRemoveOwnedBlobWithOwnershipCheckReturningTrue(c *gc.C) {
 	s.store.MinPartSize = 10
 
 	content0 := "123456789 12345"
@@ -640,7 +707,7 @@ func (s *BlobStoreSuite) TestRemoveOwnedBlobWithOwnershipCheckReturningTrue(c *g
 	s.assertBlobContent(c, id, idx, content0+content1)
 }
 
-func (s *BlobStoreSuite) TestRemoveOwnedBlobWithOwnershipCheckReturningFalse(c *gc.C) {
+func (s *blobStoreSuite) TestRemoveOwnedBlobWithOwnershipCheckReturningFalse(c *gc.C) {
 	s.store.MinPartSize = 10
 
 	content0 := "123456789 12345"
@@ -665,7 +732,7 @@ func (s *BlobStoreSuite) TestRemoveOwnedBlobWithOwnershipCheckReturningFalse(c *
 	s.assertBlobDoesNotExist(c, id+"/1")
 }
 
-func (s *BlobStoreSuite) TestRemoveExpiredUploads(c *gc.C) {
+func (s *blobStoreSuite) TestRemoveExpiredUploads(c *gc.C) {
 	s.store.MinPartSize = 10
 
 	expireTimes := []time.Duration{-time.Minute, -time.Second, time.Minute, time.Hour}
@@ -698,7 +765,7 @@ func (s *BlobStoreSuite) TestRemoveExpiredUploads(c *gc.C) {
 	}
 }
 
-func (s *BlobStoreSuite) TestRemoveExpiredUploadsRemovesOrphanedBlobs(c *gc.C) {
+func (s *blobStoreSuite) TestRemoveExpiredUploadsRemovesOrphanedBlobs(c *gc.C) {
 	id, err := s.store.NewUpload(time.Now().Add(-time.Minute))
 	c.Assert(err, gc.Equals, nil)
 	content := "abcdefghiljklmnopqrstuvwxyz"
@@ -725,7 +792,7 @@ func (s *BlobStoreSuite) TestRemoveExpiredUploadsRemovesOrphanedBlobs(c *gc.C) {
 	s.assertBlobDoesNotExist(c, id+"/0")
 }
 
-func (s *BlobStoreSuite) TestRemoveExpiredUploadsDoesNotRemoveNonOrphanBlobs(c *gc.C) {
+func (s *blobStoreSuite) TestRemoveExpiredUploadsDoesNotRemoveNonOrphanBlobs(c *gc.C) {
 	id, err := s.store.NewUpload(time.Now().Add(-time.Minute))
 	c.Assert(err, gc.Equals, nil)
 	content := "abcdefghiljklmnopqrstuvwxyz"
@@ -752,12 +819,12 @@ func (s *BlobStoreSuite) TestRemoveExpiredUploadsDoesNotRemoveNonOrphanBlobs(c *
 	s.assertBlobContent(c, id, idx, content)
 }
 
-func (s *BlobStoreSuite) TestOpenEmptyMultipart(c *gc.C) {
+func (s *blobStoreSuite) TestOpenEmptyMultipart(c *gc.C) {
 	id, idx := s.putMultipart(c)
 	s.assertBlobContent(c, id, idx, "")
 }
 
-func (s *BlobStoreSuite) TestMultipartReadAll(c *gc.C) {
+func (s *blobStoreSuite) TestMultipartReadAll(c *gc.C) {
 	s.store.MinPartSize = 10
 	part0 := "123456789 12345"
 	part1 := "abcdefghijklmnopqrstuvwxyz"
@@ -766,7 +833,7 @@ func (s *BlobStoreSuite) TestMultipartReadAll(c *gc.C) {
 	s.assertBlobContent(c, id, idx, part0+part1+part2)
 }
 
-func (s *BlobStoreSuite) TestMultipartSmallReads(c *gc.C) {
+func (s *blobStoreSuite) TestMultipartSmallReads(c *gc.C) {
 	s.store.MinPartSize = 10
 	part0 := "123456789 12345"
 	part1 := "abcdefghijklmnopqrstuvwxyz"
@@ -780,14 +847,14 @@ func (s *BlobStoreSuite) TestMultipartSmallReads(c *gc.C) {
 	c.Assert(string(data), gc.Equals, part0+part1+part2)
 }
 
-func (s *BlobStoreSuite) TestMultipartSinglePart(c *gc.C) {
+func (s *blobStoreSuite) TestMultipartSinglePart(c *gc.C) {
 	s.store.MinPartSize = 10
 	part0 := "123456789 12345"
 	id, idx := s.putMultipart(c, part0)
 	s.assertBlobContent(c, id, idx, part0)
 }
 
-func (s *BlobStoreSuite) TestMultipartCloseWithoutReading(c *gc.C) {
+func (s *blobStoreSuite) TestMultipartCloseWithoutReading(c *gc.C) {
 	s.store.MinPartSize = 10
 	part0 := "123456789 12345"
 	part1 := "abcdefghijklmnopqrstuvwxyz"
@@ -798,7 +865,7 @@ func (s *BlobStoreSuite) TestMultipartCloseWithoutReading(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 }
 
-func (s *BlobStoreSuite) TestUploadInfo(c *gc.C) {
+func (s *blobStoreSuite) TestUploadInfo(c *gc.C) {
 	s.store.MinPartSize = 10
 	part0 := "123456789 12345"
 	part1 := "abcdefghijklmnopqrstuvwxyz"
@@ -879,7 +946,7 @@ var multipartSeekTests = []struct {
 	expect:        "123456789 ",
 }}
 
-func (s *BlobStoreSuite) TestMultipartSeek(c *gc.C) {
+func (s *blobStoreSuite) TestMultipartSeek(c *gc.C) {
 	s.store.MinPartSize = 10
 	part0 := "123456789 12345"
 	part1 := "abcdefghijklmnopqrstuvwxyz"
@@ -908,14 +975,14 @@ func (s *BlobStoreSuite) TestMultipartSeek(c *gc.C) {
 	}
 }
 
-func (s *BlobStoreSuite) putMultipart(c *gc.C, contents ...string) (string, *mongodoc.MultipartIndex) {
+func (s *blobStoreSuite) putMultipart(c *gc.C, contents ...string) (string, *mongodoc.MultipartIndex) {
 	id, idx := s.putMultipartNoRemove(c, contents...)
 	err := s.store.RemoveUpload(id, nil)
 	c.Assert(err, gc.Equals, nil)
 	return id, idx
 }
 
-func (s *BlobStoreSuite) putMultipartNoRemove(c *gc.C, contents ...string) (string, *mongodoc.MultipartIndex) {
+func (s *blobStoreSuite) putMultipartNoRemove(c *gc.C, contents ...string) (string, *mongodoc.MultipartIndex) {
 	expires := time.Now().Add(time.Minute)
 	id, err := s.store.NewUpload(expires)
 	c.Assert(err, gc.Equals, nil)
@@ -934,17 +1001,22 @@ func (s *BlobStoreSuite) putMultipartNoRemove(c *gc.C, contents ...string) (stri
 	return id, idx
 }
 
-func (s *BlobStoreSuite) assertUploadDoesNotExist(c *gc.C, id string) {
+func (s *blobStoreSuite) newBlobStore(session *mgo.Session) *blobstore.Store {
+	db := session.DB("db")
+	return blobstore.New(db, "blobstore", s.newObjectStore(db))
+}
+
+func (s *blobStoreSuite) assertUploadDoesNotExist(c *gc.C, id string) {
 	_, err := s.store.UploadInfo(id)
 	c.Assert(errgo.Cause(err), gc.Equals, blobstore.ErrNotFound)
 }
 
-func (s *BlobStoreSuite) assertBlobDoesNotExist(c *gc.C, name string) {
+func (s *blobStoreSuite) assertBlobDoesNotExist(c *gc.C, name string) {
 	_, _, err := s.store.Open(name, nil)
 	c.Assert(errgo.Cause(err), gc.Equals, blobstore.ErrNotFound)
 }
 
-func (s *BlobStoreSuite) assertBlobContent(c *gc.C, name string, idx *mongodoc.MultipartIndex, content string) {
+func (s *blobStoreSuite) assertBlobContent(c *gc.C, name string, idx *mongodoc.MultipartIndex, content string) {
 	r, size, err := s.store.Open(name, idx)
 	c.Assert(err, gc.Equals, nil)
 	defer r.Close()
@@ -956,7 +1028,7 @@ func (s *BlobStoreSuite) assertBlobContent(c *gc.C, name string, idx *mongodoc.M
 }
 
 // newUpload returns the id of a new upload instance.
-func (s *BlobStoreSuite) newUpload(c *gc.C) string {
+func (s *blobStoreSuite) newUpload(c *gc.C) string {
 	expires := time.Now().Add(time.Minute).UTC()
 	id, err := s.store.NewUpload(expires)
 	c.Assert(err, gc.Equals, nil)
