@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"strconv"
-	"strings"
 
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
@@ -18,22 +17,25 @@ import (
 )
 
 type swiftStore struct {
-	*swift.Client
+	client    *swift.Client
+	container string
 }
 
 // NewSwiftStore returns an ObjectStore which uses swift for its operations
 // with the given credentials and auth mode.
-func NewSwiftStore(cred *identity.Credentials, authmode identity.AuthMode) ObjectStore {
+func NewSwiftStore(cred *identity.Credentials, authmode identity.AuthMode, container string) ObjectStore {
 	c := client.NewClient(cred,
 		authmode,
-		&adaptedLogger{logger})
+		gooseLogger{},
+	)
 	return &swiftStore{
-		Client: swift.New(c),
+		client:    swift.New(c),
+		container: container,
 	}
 }
 
-func (s *swiftStore) Get(container, name string) (r ReadSeekCloser, size int64, err error) {
-	r2, headers, err := s.GetReadSeeker(container, name)
+func (s *swiftStore) Get(name string) (r ReadSeekCloser, size int64, err error) {
+	r2, headers, err := s.client.GetReadSeeker(s.container, name)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil, 0, errgo.WithCausef(err, ErrNotFound, "")
@@ -45,21 +47,17 @@ func (s *swiftStore) Get(container, name string) (r ReadSeekCloser, size int64, 
 	return r2.(ReadSeekCloser), size, err
 }
 
-func (s *swiftStore) Put(container, name string, r io.Reader, size int64, hash string) error {
+func (s *swiftStore) Put(name string, r io.Reader, size int64, hash string) error {
 	h := NewHash()
 	r2 := io.TeeReader(r, h)
-	err := s.PutReader(container, name, r2, size)
+	err := s.client.PutReader(s.container, name, r2, size)
 	if err != nil {
-		// Keep juju/bloblstore semantics here.
-		if strings.HasPrefix(err.(errors.Error).Cause().Error(), "failed reading the request data") {
-			return errgo.New("hash mismatch")
-		}
 		// TODO: investigate if PutReader can return err but the object still be
 		// written. Should there be cleanup here?
 		return err
 	}
 	if hash != fmt.Sprintf("%x", h.Sum(nil)) {
-		err := s.DeleteObject(container, name)
+		err := s.client.DeleteObject(s.container, name)
 		if err != nil {
 			logger.Errorf("could not delete object from container after a hash mismatch was detected: %v", err)
 		}
@@ -68,20 +66,20 @@ func (s *swiftStore) Put(container, name string, r io.Reader, size int64, hash s
 	return nil
 }
 
-func (s *swiftStore) Remove(container, name string) error {
-	err := s.DeleteObject(container, name)
+func (s *swiftStore) Remove(name string) error {
+	err := s.client.DeleteObject(s.container, name)
 	if err != nil && errors.IsNotFound(err) {
 		return errgo.WithCausef(err, ErrNotFound, "")
 	}
 	return err
 }
 
-// adaptedLogger allows goose to log, but the trace shows from here instead of
-// the correct place in goose. TODO: Patch goose to use loggo directly.
-type adaptedLogger struct {
-	loggo.Logger
-}
+// gooseLogger implements the logger interface required
+// by goose, using the loggo logger to do the actual
+// logging.
+// TODO: Patch goose to use loggo directly.
+type gooseLogger struct{}
 
-func (al *adaptedLogger) Printf(f string, a ...interface{}) {
-	al.LogCallf(2, loggo.DEBUG, f, a...)
+func (gooseLogger) Printf(f string, a ...interface{}) {
+	logger.LogCallf(2, loggo.DEBUG, f, a...)
 }

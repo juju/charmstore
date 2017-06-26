@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"testing"
 	"testing/iotest"
 	"time"
 
@@ -23,10 +22,6 @@ import (
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
 )
 
-func TestPackage(t *testing.T) {
-	jujutesting.MgoTestPackage(t, nil)
-}
-
 type BlobStoreSuite struct {
 	jujutesting.IsolatedMgoSuite
 	store *blobstore.Store
@@ -38,7 +33,7 @@ func (s *BlobStoreSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	db := s.Session.DB("db")
 	mstore := blobstore.NewMongoStore(db, "blobstore")
-	s.store = blobstore.New(db, "blobstore", "", mstore)
+	s.store = blobstore.New(db, "blobstore", mstore)
 }
 
 func (s *BlobStoreSuite) TestPutTwice(c *gc.C) {

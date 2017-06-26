@@ -73,12 +73,12 @@ func (s *SwiftStoreSuite) SetUpTest(c *gc.C) {
 		Region:     "some region",
 		TenantName: "tenant",
 	}
-	s.objectstore = blobstore.NewSwiftStore(cred2, identity.AuthUserPass)
+	s.objectstore = blobstore.NewSwiftStore(cred2, identity.AuthUserPass, "testc")
 
 	client := client.NewClient(cred, identity.AuthUserPass, nil)
 	sw := swift.New(client)
 	sw.CreateContainer("testc", swift.Private)
-	s.store = blobstore.New(s.Session.DB("db"), "blobstore", "testc", s.objectstore)
+	s.store = blobstore.New(s.Session.DB("db"), "blobstore", s.objectstore)
 }
 
 func (s *SwiftStoreSuite) TearDownTest(c *gc.C) {
@@ -315,7 +315,7 @@ func (s *SwiftStoreSuite) TestPutPartConcurrent(c *gc.C) {
 			// mongo sockets and more concurrency.
 			db := s.Session.Copy().DB("db")
 			defer db.Session.Close()
-			store := blobstore.New(db, "blobstore", "testc", s.objectstore)
+			store := blobstore.New(db, "blobstore", s.objectstore)
 			err := store.PutPart(id, i, newDataSource(int64(i+1), size), size, hash[i])
 			c.Check(err, gc.Equals, nil)
 		}()
@@ -401,7 +401,7 @@ func (s *SwiftStoreSuite) TestFinishUploadPartIncomplete(c *gc.C) {
 
 	content0 := "123456789 123456789 "
 	err := s.store.PutPart(id, 0, strings.NewReader(""), int64(len(content0)), hashOf(content0))
-	c.Assert(err, gc.ErrorMatches, `cannot upload part ".+/0": hash mismatch`)
+	c.Assert(err, gc.ErrorMatches, `cannot upload part \".*/0\": failed to PUT object .*/0 from container testc\ncaused by: failed reading the request data, read 0 of 20 bytes\ncaused by: EOF`)
 
 	idx, hash, err := s.store.FinishUpload(id, []blobstore.Part{{
 		Hash: hashOf(content0),
