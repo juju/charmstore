@@ -104,7 +104,6 @@ func NewPool(db *mgo.Database, si *SearchIndex, bakeryParams *bakery.NewServiceP
 	}
 	var objectstore blobstore.ObjectStore
 	if config.BlobStore == "swift" {
-
 		cred := &identity.Credentials{
 			URL:        config.SwiftAuthURL,
 			User:       config.SwiftUsername,
@@ -121,7 +120,7 @@ func NewPool(db *mgo.Database, si *SearchIndex, bakeryParams *bakery.NewServiceP
 		case "authuserpassv3":
 			authmode = identity.AuthUserPassV3
 		}
-		objectstore = blobstore.NewSwiftStore(cred, authmode)
+		objectstore = blobstore.NewSwiftStore(cred, authmode, config.SwiftBucket)
 	} else {
 		objectstore = blobstore.NewMongoStore(db, "entitystore")
 	}
@@ -216,7 +215,7 @@ func (p *Pool) RequestStore() (*Store, error) {
 }
 
 func (p *Pool) newBlobStore(db StoreDatabase) *blobstore.Store {
-	bs := blobstore.New(db.Database, "entitystore", p.config.SwiftBucket, p.objectstore)
+	bs := blobstore.New(db.Database, "entitystore", p.objectstore)
 	if p.config.MinUploadPartSize != 0 {
 		bs.MinPartSize = p.config.MinUploadPartSize
 	}

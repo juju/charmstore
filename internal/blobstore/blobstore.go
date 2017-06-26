@@ -33,19 +33,18 @@ func NewHash() hash.Hash {
 // object store.
 type ObjectStore interface {
 	// Get gets an object.
-	Get(container string, name string) (r ReadSeekCloser, size int64, err error)
+	Get(name string) (r ReadSeekCloser, size int64, err error)
 	// Put puts an object.
-	Put(container, name string, r io.Reader, size int64, hash string) error
+	Put(name string, r io.Reader, size int64, hash string) error
 	// Remove removes an object.
-	Remove(container, name string) error
+	Remove(name string) error
 }
 
 // Store stores data blobs in mongodb, de-duplicating by
 // blob hash.
 type Store struct {
-	uploadc   *mgo.Collection
-	ostore    ObjectStore
-	container string
+	uploadc *mgo.Collection
+	ostore  ObjectStore
 
 	// The following fields are given default values by
 	// New but may be changed away from the defaults
@@ -64,11 +63,10 @@ type Store struct {
 
 // New returns a new blob store that writes to the given database,
 // prefixing its collections with the given prefix.
-func New(db *mgo.Database, prefix, container string, ostore ObjectStore) *Store {
+func New(db *mgo.Database, prefix string, ostore ObjectStore) *Store {
 	return &Store{
 		uploadc:     db.C(prefix + ".upload"),
 		ostore:      ostore,
-		container:   container,
 		MinPartSize: defaultMinPartSize,
 		MaxParts:    defaultMaxParts,
 		MaxPartSize: defaultMaxPartSize,
@@ -79,7 +77,7 @@ func New(db *mgo.Database, prefix, container string, ostore ObjectStore) *Store 
 // storage, with the provided name. The content should have the given
 // size and hash.
 func (s *Store) Put(r io.Reader, name string, size int64, hash string) error {
-	return s.ostore.Put(s.container, name, r, size, hash)
+	return s.ostore.Put(name, r, size, hash)
 }
 
 // Open opens the entry with the given name. It returns an error
@@ -88,7 +86,7 @@ func (s *Store) Open(name string, index *mongodoc.MultipartIndex) (ReadSeekClose
 	if index != nil {
 		return newMultiReader(s, name, index)
 	}
-	r, size, err := s.ostore.Get(s.container, name)
+	r, size, err := s.ostore.Get(name)
 	if err != nil {
 		return nil, 0, errgo.Mask(err, errgo.Is(ErrNotFound))
 	}
@@ -97,7 +95,7 @@ func (s *Store) Open(name string, index *mongodoc.MultipartIndex) (ReadSeekClose
 
 // Remove the given name from the Store.
 func (s *Store) Remove(name string, index *mongodoc.MultipartIndex) error {
-	err := s.ostore.Remove(s.container, name)
+	err := s.ostore.Remove(name)
 	if errors.IsNotFound(err) {
 		return errgo.WithCausef(err, ErrNotFound, "")
 	}

@@ -26,8 +26,8 @@ func NewMongoStore(db *mgo.Database, prefix string) ObjectStore {
 	}
 }
 
-func (m *mongoStore) Get(container, name string) (ReadSeekCloser, int64, error) {
-	r, s, err := m.GetForEnvironment(container, name)
+func (m *mongoStore) Get(name string) (ReadSeekCloser, int64, error) {
+	r, s, err := m.GetForEnvironment("", name)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil, 0, errgo.WithCausef(err, ErrNotFound, "")
@@ -37,10 +37,10 @@ func (m *mongoStore) Get(container, name string) (ReadSeekCloser, int64, error) 
 	return r.(ReadSeekCloser), s, nil
 }
 
-func (m *mongoStore) Put(container, name string, r io.Reader, size int64, hash string) error {
-	return m.PutForEnvironmentAndCheckHash(container, name, r, size, hash)
+func (m *mongoStore) Put(name string, r io.Reader, size int64, hash string) error {
+	return m.PutForEnvironmentAndCheckHash("", name, r, size, hash)
 }
 
-func (m *mongoStore) Remove(container, name string) error {
-	return m.RemoveForEnvironment(container, name)
+func (m *mongoStore) Remove(name string) error {
+	return m.RemoveForEnvironment("", name)
 }
