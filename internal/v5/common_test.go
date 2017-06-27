@@ -28,6 +28,7 @@ import (
 	"gopkg.in/macaroon.v2-unstable"
 	"gopkg.in/mgo.v2"
 
+	"gopkg.in/juju/charmstore.v5-unstable/internal/blobstore"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
@@ -101,7 +102,8 @@ type commonSuite struct {
 
 	swift *swift.Client
 	httpsuite.HTTPSuite
-	openstack *openstackservice.Openstack
+	openstack     *openstackservice.Openstack
+	openstackCred *identity.Credentials
 }
 
 func (s *commonSuite) SetUpSuite(c *gc.C) {
@@ -154,7 +156,7 @@ func (s *commonSuite) startServer(c *gc.C) {
 	// Disable group caching.
 	s.PatchValue(&v5.PermCacheExpiry, time.Duration(0))
 	// Set up an Openstack service.
-	cred := &identity.Credentials{
+	s.openstackCred = &identity.Credentials{
 		URL:        s.Server.URL,
 		User:       "fred",
 		Secrets:    "secret",
@@ -162,12 +164,11 @@ func (s *commonSuite) startServer(c *gc.C) {
 		TenantName: "awesomo",
 	}
 	var logMsg []string
-	s.openstack, logMsg = openstackservice.New(cred,
-		identity.AuthUserPass, false)
+	s.openstack, logMsg = openstackservice.New(s.openstackCred, identity.AuthUserPass, false)
 	for _, msg := range logMsg {
 		c.Logf(msg)
 	}
-	client := client.NewClient(cred, identity.AuthUserPass, nil)
+	client := client.NewClient(s.openstackCred, identity.AuthUserPass, nil)
 	s.swift = swift.New(client)
 	s.openstack.SetupHTTP(nil)
 	s.swift.CreateContainer("testc", swift.Private)
@@ -178,10 +179,7 @@ func (s *commonSuite) startServer(c *gc.C) {
 		StatsCacheMaxAge:  time.Nanosecond,
 		MaxMgoSessions:    s.maxMgoSessions,
 		MinUploadPartSize: 10,
-		SwiftAuthURL:      s.openstack.URLs["identity"],
-		SwiftUsername:     "fred",
-		SwiftSecret:       "secret",
-		SwiftBucket:       "testc",
+		NewBlobBackend:    s.newBlobBackend,
 	}
 	keyring := httpbakery.NewPublicKeyRing(nil, nil)
 	keyring.AllowInsecure()
@@ -224,6 +222,10 @@ func (s *commonSuite) startServer(c *gc.C) {
 	}
 	s.noMacaroonSrvParams = config
 	s.store = s.srv.Pool().Store()
+}
+
+func (s *commonSuite) newBlobBackend(db *mgo.Database) blobstore.Backend {
+	return blobstore.NewSwiftBackend(s.openstackCred, identity.AuthUserPass, "testc")
 }
 
 func (s *commonSuite) addPublicCharmFromRepo(c *gc.C, charmName string, rurl *router.ResolvedURL) (*router.ResolvedURL, charm.Charm) {

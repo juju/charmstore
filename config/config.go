@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"gopkg.in/errgo.v1"
+	"gopkg.in/goose.v2/identity"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/yaml.v2"
 )
@@ -42,35 +43,79 @@ type Config struct {
 	MinUploadPartSize int64             `yaml:"min-upload-part-size"`
 	MaxUploadPartSize int64             `yaml:"max-upload-part-size"`
 	MaxUploadParts    int               `yaml:"max-upload-parts"`
-	BlobStore         string            `yaml:"blobstore"`
+	BlobStore         BlobStoreType     `yaml:"blobstore"`
 	SwiftAuthURL      string            `yaml:"swift-auth-url"`
 	SwiftUsername     string            `yaml:"swift-username"`
 	SwiftSecret       string            `yaml:"swift-secret"`
 	SwiftBucket       string            `yaml:"swift-bucket"`
 	SwiftRegion       string            `yaml:"swift-region"`
 	SwiftTenant       string            `yaml:"swift-tenant"`
-	SwiftAuthMode     string            `yaml:"swift-authmode"`
+	SwiftAuthMode     *SwiftAuthMode    `yaml:"swift-authmode"`
+}
+
+type BlobStoreType string
+
+const (
+	MongoDBBlobStore BlobStoreType = "mongodb"
+	SwiftBlobStore   BlobStoreType = "swift"
+)
+
+// SwiftAuthMode implements unmarshaling for
+// an identity.AuthMode.
+type SwiftAuthMode struct {
+	Mode identity.AuthMode
+}
+
+func (m *SwiftAuthMode) UnmarshalText(data []byte) error {
+	switch string(data) {
+	case "legacy":
+		m.Mode = identity.AuthLegacy
+	case "keypair":
+		m.Mode = identity.AuthKeyPair
+	case "authuserpassv3":
+		m.Mode = identity.AuthUserPassV3
+	case "userpass":
+		m.Mode = identity.AuthUserPass
+	default:
+		return errgo.Newf("unknown swift auth mode %q", data)
+	}
+	return nil
 }
 
 func (c *Config) validate() error {
 	var missing []string
-	if c.MongoURL == "" {
-		missing = append(missing, "mongo-url")
+	needString := func(name, val string) {
+		if val == "" {
+			missing = append(missing, name)
+		}
 	}
-	if c.APIAddr == "" {
-		missing = append(missing, "api-addr")
-	}
-	if c.AuthUsername == "" {
-		missing = append(missing, "auth-username")
-	}
+	needString("mongo-url", c.MongoURL)
+	needString("api-addr", c.APIAddr)
+	needString("auth-username", c.AuthUsername)
 	if strings.Contains(c.AuthUsername, ":") {
 		return fmt.Errorf("invalid user name %q (contains ':')", c.AuthUsername)
 	}
-	if c.AuthPassword == "" {
-		missing = append(missing, "auth-password")
+	needString("auth-password", c.AuthPassword)
+	if c.BlobStore == "" {
+		c.BlobStore = MongoDBBlobStore
+	}
+	switch c.BlobStore {
+	case SwiftBlobStore:
+		needString("swift-auth-url", c.SwiftAuthURL)
+		needString("swift-username", c.SwiftUsername)
+		needString("swift-secret", c.SwiftSecret)
+		needString("swift-bucket", c.SwiftBucket)
+		needString("swift-region", c.SwiftRegion)
+		needString("swift-tenant", c.SwiftTenant)
+		if c.SwiftAuthMode == nil {
+			missing = append(missing, "swift-auth-mode")
+		}
+	case MongoDBBlobStore:
+	default:
+		return errgo.Newf("invalid blob store type %q", c.BlobStore)
 	}
 	if len(missing) != 0 {
-		return fmt.Errorf("missing fields %s in config file", strings.Join(missing, ", "))
+		return errgo.Newf("missing fields %s in config file", strings.Join(missing, ", "))
 	}
 	return nil
 }

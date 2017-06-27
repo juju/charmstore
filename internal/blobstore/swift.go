@@ -39,7 +39,7 @@ func (s *swiftBackend) Get(name string) (r ReadSeekCloser, size int64, err error
 	r2, headers, err := s.client.GetReadSeeker(s.container, name)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return nil, 0, errgo.WithCausef(err, ErrNotFound, "")
+			return nil, 0, errgo.WithCausef(nil, ErrNotFound, "")
 		}
 		return nil, 0, errgo.Mask(err)
 	}
@@ -70,7 +70,7 @@ func (s *swiftBackend) Put(name string, r io.Reader, size int64, hash string) er
 func (s *swiftBackend) Remove(name string) error {
 	err := s.client.DeleteObject(s.container, name)
 	if err != nil && errors.IsNotFound(err) {
-		return errgo.WithCausef(err, ErrNotFound, "")
+		return errgo.WithCausef(nil, ErrNotFound, "")
 	}
 	return errgo.Mask(err)
 }
@@ -88,7 +88,7 @@ func (r swiftBackendReader) Read(buf []byte) (int, error) {
 		return n, err
 	}
 	if errors.IsNotFound(err) {
-		return n, errgo.WithCausef(err, ErrNotFound, "")
+		return n, errgo.WithCausef(nil, ErrNotFound, "")
 	}
 	return n, errgo.Mask(err)
 }

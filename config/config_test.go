@@ -12,6 +12,7 @@ import (
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/goose.v2/identity"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 
 	"gopkg.in/juju/charmstore.v5-unstable/config"
@@ -50,6 +51,14 @@ stats-cache-max-age: 1h
 search-cache-max-age: 15m
 request-timeout: 500ms
 max-mgo-sessions: 10
+blobstore: swift
+swift-auth-url: 'https://foo.com'
+swift-username: bob
+swift-secret: secret
+swift-bucket: bucket
+swift-region: somewhere
+swift-tenant: a-tenant
+swift-authmode: userpass
 `
 
 func (s *ConfigSuite) readConfig(c *gc.C, content string) (*config.Config, error) {
@@ -94,6 +103,14 @@ func (s *ConfigSuite) TestRead(c *gc.C) {
 		RequestTimeout:    config.DurationString{500 * time.Millisecond},
 		MaxMgoSessions:    10,
 		SearchCacheMaxAge: config.DurationString{15 * time.Minute},
+		BlobStore:         config.SwiftBlobStore,
+		SwiftAuthURL:      "https://foo.com",
+		SwiftUsername:     "bob",
+		SwiftSecret:       "secret",
+		SwiftBucket:       "bucket",
+		SwiftRegion:       "somewhere",
+		SwiftTenant:       "a-tenant",
+		SwiftAuthMode:     &config.SwiftAuthMode{identity.AuthUserPass},
 	})
 }
 
@@ -106,6 +123,10 @@ func (s *ConfigSuite) TestReadConfigError(c *gc.C) {
 func (s *ConfigSuite) TestValidateConfigError(c *gc.C) {
 	cfg, err := s.readConfig(c, "")
 	c.Assert(err, gc.ErrorMatches, "missing fields mongo-url, api-addr, auth-username, auth-password in config file")
+	c.Assert(cfg, gc.IsNil)
+
+	cfg, err = s.readConfig(c, "blobstore: swift\n")
+	c.Assert(err, gc.ErrorMatches, "missing fields mongo-url, api-addr, auth-username, auth-password, swift-auth-url, swift-username, swift-secret, swift-bucket, swift-region, swift-tenant, swift-auth-mode in config file")
 	c.Assert(cfg, gc.IsNil)
 }
 

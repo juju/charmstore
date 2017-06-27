@@ -16,7 +16,6 @@ import (
 	"github.com/juju/loggo"
 	"github.com/juju/utils/parallel"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/goose.v2/identity"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
@@ -77,9 +76,6 @@ type Pool struct {
 
 	// rootKeys holds the cache of macaroon root keys.
 	rootKeys *mgostorage.RootKeys
-
-	// blobBackend holds the backend storage used by the blobstore.
-	blobBackend blobstore.Backend
 }
 
 // reqStoreCacheSize holds the maximum number of store
@@ -102,27 +98,10 @@ func NewPool(db *mgo.Database, si *SearchIndex, bakeryParams *bakery.NewServiceP
 	if config.StatsCacheMaxAge == 0 {
 		config.StatsCacheMaxAge = time.Hour
 	}
-	var blobBackend blobstore.Backend
-	if config.BlobStore == "swift" {
-		cred := &identity.Credentials{
-			URL:        config.SwiftAuthURL,
-			User:       config.SwiftUsername,
-			Secrets:    config.SwiftSecret,
-			Region:     config.SwiftRegion,
-			TenantName: config.SwiftTenant,
+	if config.NewBlobBackend == nil {
+		config.NewBlobBackend = func(db *mgo.Database) blobstore.Backend {
+			return blobstore.NewMongoBackend(db, "entitystore")
 		}
-		authmode := identity.AuthUserPass
-		switch config.SwiftAuthMode {
-		case "legacy":
-			authmode = identity.AuthLegacy
-		case "keypair":
-			authmode = identity.AuthKeyPair
-		case "authuserpassv3":
-			authmode = identity.AuthUserPassV3
-		}
-		blobBackend = blobstore.NewSwiftBackend(cred, authmode, config.SwiftBucket)
-	} else {
-		blobBackend = blobstore.NewMongoBackend(db, "entitystore")
 	}
 
 	p := &Pool{
@@ -133,7 +112,6 @@ func NewPool(db *mgo.Database, si *SearchIndex, bakeryParams *bakery.NewServiceP
 		run:         parallel.NewRun(maxAsyncGoroutines),
 		auditLogger: config.AuditLogger,
 		rootKeys:    mgostorage.NewRootKeys(100),
-		blobBackend: blobBackend,
 	}
 	if config.MaxMgoSessions > 0 {
 		p.reqStoreC = make(chan *Store, config.MaxMgoSessions)
@@ -215,7 +193,8 @@ func (p *Pool) RequestStore() (*Store, error) {
 }
 
 func (p *Pool) newBlobStore(db StoreDatabase) *blobstore.Store {
-	bs := blobstore.New(db.Database, "entitystore", p.blobBackend)
+	backend := p.config.NewBlobBackend(db.Database)
+	bs := blobstore.New(db.Database, "entitystore", backend)
 	if p.config.MinUploadPartSize != 0 {
 		bs.MinPartSize = p.config.MinUploadPartSize
 	}

@@ -100,6 +100,12 @@ func (s *ServerSuite) TestNewServerWithVersions(c *gc.C) {
 }
 
 func (s *ServerSuite) TestNewServerWithConfig(c *gc.C) {
+	type serverConfig struct {
+		AuthUsername     string
+		AuthPassword     string
+		IdentityLocation string
+		RootKeyPolicy    mgostorage.Policy
+	}
 	params := ServerParams{
 		AuthUsername:     "test-user",
 		AuthPassword:     "test-password",
@@ -108,7 +114,12 @@ func (s *ServerSuite) TestNewServerWithConfig(c *gc.C) {
 	serveConfig := func(p *Pool, config ServerParams, _ string) (HTTPCloseHandler, error) {
 		return nopCloseHandler{
 			router.HandleJSON(func(_ http.Header, req *http.Request) (interface{}, error) {
-				return config, nil
+				return serverConfig{
+					AuthUsername:     config.AuthUsername,
+					AuthPassword:     config.AuthPassword,
+					IdentityLocation: config.IdentityLocation,
+					RootKeyPolicy:    config.RootKeyPolicy,
+				}, nil
 			}),
 		}, nil
 	}
@@ -124,7 +135,7 @@ func (s *ServerSuite) TestNewServerWithConfig(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler: h,
 		URL:     "/version1/some/path",
-		ExpectBody: ServerParams{
+		ExpectBody: serverConfig{
 			AuthUsername:     "test-user",
 			AuthPassword:     "test-password",
 			IdentityLocation: "http://0.1.2.3",
@@ -144,7 +155,10 @@ func (s *ServerSuite) TestNewServerWithElasticSearch(c *gc.C) {
 	serveConfig := func(p *Pool, config ServerParams, _ string) (HTTPCloseHandler, error) {
 		return nopCloseHandler{
 			router.HandleJSON(func(_ http.Header, req *http.Request) (interface{}, error) {
-				return config, nil
+				store := p.Store()
+				c.Check(store.ES, gc.NotNil)
+				store.Close()
+				return "ok", nil
 			}),
 		}, nil
 	}
@@ -159,16 +173,9 @@ func (s *ServerSuite) TestNewServerWithElasticSearch(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	defer h.Close()
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler: h,
-		URL:     "/version1/some/path",
-		ExpectBody: ServerParams{
-			AuthUsername:     "test-user",
-			AuthPassword:     "test-password",
-			IdentityLocation: "http://0.1.2.3",
-			RootKeyPolicy: mgostorage.Policy{
-				ExpiryDuration: defaultRootKeyExpiryDuration,
-			},
-		},
+		Handler:    h,
+		URL:        "/version1/some/path",
+		ExpectBody: "ok",
 	})
 }
 
