@@ -367,7 +367,7 @@ func (s *Store) copyBlob(w io.Writer, name string) error {
 	}
 	defer rc.Close()
 	if _, err := io.Copy(w, rc); err != nil {
-		if errgo.Cause(err) == mgo.ErrNotFound {
+		if errgo.Cause(err) == ErrNotFound {
 			return errgo.WithCausef(err, ErrNotFound, "error reading blob %q", name)
 		}
 		return errgo.Notef(err, "error reading blob %q", name)

@@ -34,8 +34,8 @@ type MongoStoreSuite struct {
 }
 
 func (s *MongoStoreSuite) SetUpTest(c *gc.C) {
-	s.blobStoreSuite.SetUpTest(c, func(db *mgo.Database) blobstore.ObjectStore {
-		return blobstore.NewMongoStore(db, "blobstore")
+	s.blobStoreSuite.SetUpTest(c, func(db *mgo.Database) blobstore.Backend {
+		return blobstore.NewMongoBackend(db, "blobstore")
 	})
 }
 
@@ -74,8 +74,8 @@ func (s *SwiftStoreSuite) SetUpTest(c *gc.C) {
 	sw := swift.New(client)
 	sw.CreateContainer("testc", swift.Private)
 
-	s.blobStoreSuite.SetUpTest(c, func(db *mgo.Database) blobstore.ObjectStore {
-		return blobstore.NewSwiftStore(cred2, identity.AuthUserPass, "testc")
+	s.blobStoreSuite.SetUpTest(c, func(db *mgo.Database) blobstore.Backend {
+		return blobstore.NewSwiftBackend(cred2, identity.AuthUserPass, "testc")
 	})
 }
 
@@ -86,16 +86,16 @@ func (s *SwiftStoreSuite) TearDownTest(c *gc.C) {
 
 type blobStoreSuite struct {
 	jujutesting.IsolatedMgoSuite
-	store          *blobstore.Store
-	newObjectStore func(db *mgo.Database) blobstore.ObjectStore
+	store      *blobstore.Store
+	newBackend func(db *mgo.Database) blobstore.Backend
 }
 
-func (s *blobStoreSuite) SetUpTest(c *gc.C, newObjectStore func(db *mgo.Database) blobstore.ObjectStore) {
+func (s *blobStoreSuite) SetUpTest(c *gc.C, newBackend func(db *mgo.Database) blobstore.Backend) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	db := s.Session.DB("db")
-	s.newObjectStore = newObjectStore
+	s.newBackend = newBackend
 	s.store = s.newBlobStore(s.Session)
-	blobstore.New(db, "blobstore", newObjectStore(db))
+	blobstore.New(db, "blobstore", newBackend(db))
 }
 
 func (s *blobStoreSuite) TestPutTwice(c *gc.C) {
@@ -559,7 +559,7 @@ func (s *blobStoreSuite) TestFinishUploadCalledWhenCalculatingHash(c *gc.C) {
 	err := s.store.PutPart(id, 0, strings.NewReader(content0), int64(len(content0)), hashOf(content0))
 	c.Assert(err, gc.Equals, nil)
 
-	const size1 = 2 * 1024 * 1024
+	const size1 = 20 * 1024 * 1024
 	hash1 := hashOfReader(c, newDataSource(1, size1))
 	err = s.store.PutPart(id, 1, newDataSource(1, size1), int64(size1), hash1)
 	c.Assert(err, gc.Equals, nil)
@@ -1003,7 +1003,7 @@ func (s *blobStoreSuite) putMultipartNoRemove(c *gc.C, contents ...string) (stri
 
 func (s *blobStoreSuite) newBlobStore(session *mgo.Session) *blobstore.Store {
 	db := session.DB("db")
-	return blobstore.New(db, "blobstore", s.newObjectStore(db))
+	return blobstore.New(db, "blobstore", s.newBackend(db))
 }
 
 func (s *blobStoreSuite) assertUploadDoesNotExist(c *gc.C, id string) {

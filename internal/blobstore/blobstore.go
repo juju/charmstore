@@ -29,14 +29,23 @@ func NewHash() hash.Hash {
 	return sha512.New384()
 }
 
-// ObjectStore represents an object store. Even juju/blobstore is used like an
-// object store.
-type ObjectStore interface {
-	// Get gets an object.
+// Backend represents the underlying data store used by blobstore.Store
+// to store blob data.
+type Backend interface {
+	// Get gets a reader for the object with the given name
+	// and its size. The returned reader should be closed after use.
+	// If the object doesn't exist, an error with an ErrNotFound
+	// cause should be returned.
+	// If the object is removed while reading, the read
+	// error's cause should be ErrNotFound.
 	Get(name string) (r ReadSeekCloser, size int64, err error)
-	// Put puts an object.
+
+	// Put puts an object by reading its data from the given reader.
+	// The data read from the reader should have the given
+	// size and hex-encoded SHA384 hash.
 	Put(name string, r io.Reader, size int64, hash string) error
-	// Remove removes an object.
+
+	// Remove removes the object with the given name.
 	Remove(name string) error
 }
 
@@ -44,7 +53,7 @@ type ObjectStore interface {
 // blob hash.
 type Store struct {
 	uploadc *mgo.Collection
-	ostore  ObjectStore
+	backend Backend
 
 	// The following fields are given default values by
 	// New but may be changed away from the defaults
@@ -63,10 +72,10 @@ type Store struct {
 
 // New returns a new blob store that writes to the given database,
 // prefixing its collections with the given prefix.
-func New(db *mgo.Database, prefix string, ostore ObjectStore) *Store {
+func New(db *mgo.Database, prefix string, backend Backend) *Store {
 	return &Store{
 		uploadc:     db.C(prefix + ".upload"),
-		ostore:      ostore,
+		backend:     backend,
 		MinPartSize: defaultMinPartSize,
 		MaxParts:    defaultMaxParts,
 		MaxPartSize: defaultMaxPartSize,
@@ -77,7 +86,7 @@ func New(db *mgo.Database, prefix string, ostore ObjectStore) *Store {
 // storage, with the provided name. The content should have the given
 // size and hash.
 func (s *Store) Put(r io.Reader, name string, size int64, hash string) error {
-	return s.ostore.Put(name, r, size, hash)
+	return s.backend.Put(name, r, size, hash)
 }
 
 // Open opens the entry with the given name. It returns an error
@@ -86,7 +95,7 @@ func (s *Store) Open(name string, index *mongodoc.MultipartIndex) (ReadSeekClose
 	if index != nil {
 		return newMultiReader(s, name, index)
 	}
-	r, size, err := s.ostore.Get(name)
+	r, size, err := s.backend.Get(name)
 	if err != nil {
 		return nil, 0, errgo.Mask(err, errgo.Is(ErrNotFound))
 	}
@@ -95,7 +104,7 @@ func (s *Store) Open(name string, index *mongodoc.MultipartIndex) (ReadSeekClose
 
 // Remove the given name from the Store.
 func (s *Store) Remove(name string, index *mongodoc.MultipartIndex) error {
-	err := s.ostore.Remove(name)
+	err := s.backend.Remove(name)
 	if errors.IsNotFound(err) {
 		return errgo.WithCausef(err, ErrNotFound, "")
 	}

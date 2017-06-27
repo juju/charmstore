@@ -16,25 +16,26 @@ import (
 	"gopkg.in/goose.v2/swift"
 )
 
-type swiftStore struct {
+type swiftBackend struct {
 	client    *swift.Client
 	container string
 }
 
-// NewSwiftStore returns an ObjectStore which uses swift for its operations
-// with the given credentials and auth mode.
-func NewSwiftStore(cred *identity.Credentials, authmode identity.AuthMode, container string) ObjectStore {
+// NewSwiftBackend returns a backend which uses OpenStack's Swift for
+// its operations with the given credentials and auth mode. It stores
+// all the data objects in the container with the given name.
+func NewSwiftBackend(cred *identity.Credentials, authmode identity.AuthMode, container string) Backend {
 	c := client.NewClient(cred,
 		authmode,
 		gooseLogger{},
 	)
-	return &swiftStore{
+	return &swiftBackend{
 		client:    swift.New(c),
 		container: container,
 	}
 }
 
-func (s *swiftStore) Get(name string) (r ReadSeekCloser, size int64, err error) {
+func (s *swiftBackend) Get(name string) (r ReadSeekCloser, size int64, err error) {
 	r2, headers, err := s.client.GetReadSeeker(s.container, name)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -44,17 +45,17 @@ func (s *swiftStore) Get(name string) (r ReadSeekCloser, size int64, err error) 
 	}
 	lengthstr := headers.Get("Content-Length")
 	size, err = strconv.ParseInt(lengthstr, 10, 64)
-	return r2.(ReadSeekCloser), size, err
+	return swiftBackendReader{r2.(ReadSeekCloser)}, size, err
 }
 
-func (s *swiftStore) Put(name string, r io.Reader, size int64, hash string) error {
+func (s *swiftBackend) Put(name string, r io.Reader, size int64, hash string) error {
 	h := NewHash()
 	r2 := io.TeeReader(r, h)
 	err := s.client.PutReader(s.container, name, r2, size)
 	if err != nil {
 		// TODO: investigate if PutReader can return err but the object still be
 		// written. Should there be cleanup here?
-		return err
+		return errgo.Mask(err)
 	}
 	if hash != fmt.Sprintf("%x", h.Sum(nil)) {
 		err := s.client.DeleteObject(s.container, name)
@@ -66,12 +67,30 @@ func (s *swiftStore) Put(name string, r io.Reader, size int64, hash string) erro
 	return nil
 }
 
-func (s *swiftStore) Remove(name string) error {
+func (s *swiftBackend) Remove(name string) error {
 	err := s.client.DeleteObject(s.container, name)
 	if err != nil && errors.IsNotFound(err) {
 		return errgo.WithCausef(err, ErrNotFound, "")
 	}
-	return err
+	return errgo.Mask(err)
+}
+
+// swiftBackendReader translates not-found errors as
+// produced by Swift into not-found errors as expected
+// by the Backend.Get interface contract.
+type swiftBackendReader struct {
+	ReadSeekCloser
+}
+
+func (r swiftBackendReader) Read(buf []byte) (int, error) {
+	n, err := r.ReadSeekCloser.Read(buf)
+	if err == nil || err == io.EOF {
+		return n, err
+	}
+	if errors.IsNotFound(err) {
+		return n, errgo.WithCausef(err, ErrNotFound, "")
+	}
+	return n, errgo.Mask(err)
 }
 
 // gooseLogger implements the logger interface required
