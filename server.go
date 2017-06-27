@@ -15,6 +15,7 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 
 	"gopkg.in/juju/charmstore.v5-unstable/elasticsearch"
+	"gopkg.in/juju/charmstore.v5-unstable/internal/blobstore"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/legacy"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/v4"
@@ -105,46 +106,25 @@ type ServerParams struct {
 
 	// MinUploadPartSize holds the minimum size of
 	// an upload part. If it's zero, a default value will be used.
-	MinUploadPartSize int64 `json:"min-upload-part-size"`
+	MinUploadPartSize int64
 
 	// MaxUploadPartSize holds the maximum size of
 	// an upload part. If it's zero, a default value will be used.
-	MaxUploadPartSize int64 `json:"max-upload-part-size"`
+	MaxUploadPartSize int64
 
 	// MaxUploadParts holds the maximum number of upload
 	// parts that can be uploaded in a single upload.
 	// If it's zero, a default value will be used.
-	MaxUploadParts int `json:"max-upload-parts"`
+	MaxUploadParts int
 
 	// RunBlobStoreGC holds whether the server will run
 	// the blobstore garbage collector worker.
 	RunBlobStoreGC bool
 
-	// BlobStore holds the type of blobstore to use. Defaults to gridfs via
-	// juju/blobstore. Other values are swift. Future values may be s3, azure,
-	// gcloud, ceph.
-	BlobStore string `yaml:"blobstore"`
-
-	// SwiftAuthURL holds the swift auth url, equivalent to OS_AUTH_URL.
-	SwiftAuthURL string `yaml:"swift-auth-url"`
-
-	// SwiftUsername holds the swift username, equivalent to OS_USERNAME..
-	SwiftUsername string `yaml:"swift-username"`
-
-	// SwiftSecret holds the swift password, equivalent to OS_PASSWORD.
-	SwiftSecret string `yaml:"swift-secret"`
-
-	// SwiftBucket holds the swift bucket to use for blobs.
-	SwiftBucket string `yaml:"swift-bucket"`
-
-	// SwiftRegion holds the swift region to use for blobs.
-	SwiftRegion string `yaml:"swift-region"`
-
-	// SwiftTenant holds the swift tenant to use for connecting to swift.
-	SwiftTenant string `yaml:"swift-tenant"`
-
-	// SwiftAuthMode holds the swift auth mode to use for connecting to swift.
-	SwiftAuthMode string `yaml:"swift-authmode"`
+	// NewBlobBackend returns a new blobstore backend
+	// that may use the given MongoDB database.
+	// If this is nil, a MongoDB backend will be used.
+	NewBlobBackend func(db *mgo.Database) blobstore.Backend
 }
 
 // NewServer returns a new handler that handles charm store requests and stores
