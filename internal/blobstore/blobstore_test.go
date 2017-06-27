@@ -34,8 +34,8 @@ type MongoStoreSuite struct {
 }
 
 func (s *MongoStoreSuite) SetUpTest(c *gc.C) {
-	s.blobStoreSuite.SetUpTest(c, func(db *mgo.Database) blobstore.ObjectStore {
-		return blobstore.NewMongoStore(db, "blobstore")
+	s.blobStoreSuite.SetUpTest(c, func(db *mgo.Database) blobstore.Backend {
+		return blobstore.NewMongoBackend(db, "blobstore")
 	})
 }
 
@@ -74,8 +74,8 @@ func (s *SwiftStoreSuite) SetUpTest(c *gc.C) {
 	sw := swift.New(client)
 	sw.CreateContainer("testc", swift.Private)
 
-	s.blobStoreSuite.SetUpTest(c, func(db *mgo.Database) blobstore.ObjectStore {
-		return blobstore.NewSwiftStore(cred2, identity.AuthUserPass, "testc")
+	s.blobStoreSuite.SetUpTest(c, func(db *mgo.Database) blobstore.Backend {
+		return blobstore.NewSwiftBackend(cred2, identity.AuthUserPass, "testc")
 	})
 }
 
@@ -87,15 +87,15 @@ func (s *SwiftStoreSuite) TearDownTest(c *gc.C) {
 type blobStoreSuite struct {
 	jujutesting.IsolatedMgoSuite
 	store          *blobstore.Store
-	newObjectStore func(db *mgo.Database) blobstore.ObjectStore
+	newBackend func(db *mgo.Database) blobstore.Backend
 }
 
-func (s *blobStoreSuite) SetUpTest(c *gc.C, newObjectStore func(db *mgo.Database) blobstore.ObjectStore) {
+func (s *blobStoreSuite) SetUpTest(c *gc.C, newBackend func(db *mgo.Database) blobstore.Backend) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	db := s.Session.DB("db")
-	s.newObjectStore = newObjectStore
+	s.newBackend = newBackend
 	s.store = s.newBlobStore(s.Session)
-	blobstore.New(db, "blobstore", newObjectStore(db))
+	blobstore.New(db, "blobstore", newBackend(db))
 }
 
 func (s *blobStoreSuite) TestPutTwice(c *gc.C) {
@@ -1003,7 +1003,7 @@ func (s *blobStoreSuite) putMultipartNoRemove(c *gc.C, contents ...string) (stri
 
 func (s *blobStoreSuite) newBlobStore(session *mgo.Session) *blobstore.Store {
 	db := session.DB("db")
-	return blobstore.New(db, "blobstore", s.newObjectStore(db))
+	return blobstore.New(db, "blobstore", s.newBackend(db))
 }
 
 func (s *blobStoreSuite) assertUploadDoesNotExist(c *gc.C, id string) {

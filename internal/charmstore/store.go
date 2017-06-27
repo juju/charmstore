@@ -78,8 +78,8 @@ type Pool struct {
 	// rootKeys holds the cache of macaroon root keys.
 	rootKeys *mgostorage.RootKeys
 
-	// objectstore holds the ObjectStore
-	objectstore blobstore.ObjectStore
+	// blobBackend holds the backend storage used by the blobstore.
+	blobBackend blobstore.Backend
 }
 
 // reqStoreCacheSize holds the maximum number of store
@@ -102,7 +102,7 @@ func NewPool(db *mgo.Database, si *SearchIndex, bakeryParams *bakery.NewServiceP
 	if config.StatsCacheMaxAge == 0 {
 		config.StatsCacheMaxAge = time.Hour
 	}
-	var objectstore blobstore.ObjectStore
+	var blobBackend blobstore.Backend
 	if config.BlobStore == "swift" {
 		cred := &identity.Credentials{
 			URL:        config.SwiftAuthURL,
@@ -120,9 +120,9 @@ func NewPool(db *mgo.Database, si *SearchIndex, bakeryParams *bakery.NewServiceP
 		case "authuserpassv3":
 			authmode = identity.AuthUserPassV3
 		}
-		objectstore = blobstore.NewSwiftStore(cred, authmode, config.SwiftBucket)
+		blobBackend = blobstore.NewSwiftBackend(cred, authmode, config.SwiftBucket)
 	} else {
-		objectstore = blobstore.NewMongoStore(db, "entitystore")
+		blobBackend = blobstore.NewMongoBackend(db, "entitystore")
 	}
 
 	p := &Pool{
@@ -133,7 +133,7 @@ func NewPool(db *mgo.Database, si *SearchIndex, bakeryParams *bakery.NewServiceP
 		run:         parallel.NewRun(maxAsyncGoroutines),
 		auditLogger: config.AuditLogger,
 		rootKeys:    mgostorage.NewRootKeys(100),
-		objectstore: objectstore,
+		blobBackend: blobBackend,
 	}
 	if config.MaxMgoSessions > 0 {
 		p.reqStoreC = make(chan *Store, config.MaxMgoSessions)
@@ -215,7 +215,7 @@ func (p *Pool) RequestStore() (*Store, error) {
 }
 
 func (p *Pool) newBlobStore(db StoreDatabase) *blobstore.Store {
-	bs := blobstore.New(db.Database, "entitystore", p.objectstore)
+	bs := blobstore.New(db.Database, "entitystore", p.blobBackend)
 	if p.config.MinUploadPartSize != 0 {
 		bs.MinPartSize = p.config.MinUploadPartSize
 	}

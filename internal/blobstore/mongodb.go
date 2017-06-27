@@ -12,21 +12,21 @@ import (
 	"gopkg.in/mgo.v2"
 )
 
-type mongoStore struct {
+type mongoBackend struct {
 	blobstore.ManagedStorage
 }
 
-// NewMongoStore returns an ObjectStore which uses mongodb gridfs for its
-// operations with the given database and gridfs prefix. This uses a
-// "ManagedStorage" layer on top of gridfs from github.com/juju/blobstore.
-func NewMongoStore(db *mgo.Database, prefix string) ObjectStore {
+// NewMongoBackend returns a backend implementation which stores
+// data in the given MongoDB database, using prefix as a prefix for
+// the collections created.
+func NewMongoBackend(db *mgo.Database, prefix string) Backend {
 	rs := blobstore.NewGridFS(db.Name, prefix, db.Session)
-	return &mongoStore{
+	return &mongoBackend{
 		ManagedStorage: blobstore.NewManagedStorage(db, rs),
 	}
 }
 
-func (m *mongoStore) Get(name string) (ReadSeekCloser, int64, error) {
+func (m *mongoBackend) Get(name string) (ReadSeekCloser, int64, error) {
 	r, s, err := m.GetForEnvironment("", name)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -37,10 +37,10 @@ func (m *mongoStore) Get(name string) (ReadSeekCloser, int64, error) {
 	return r.(ReadSeekCloser), s, nil
 }
 
-func (m *mongoStore) Put(name string, r io.Reader, size int64, hash string) error {
+func (m *mongoBackend) Put(name string, r io.Reader, size int64, hash string) error {
 	return m.PutForEnvironmentAndCheckHash("", name, r, size, hash)
 }
 
-func (m *mongoStore) Remove(name string) error {
+func (m *mongoBackend) Remove(name string) error {
 	return m.RemoveForEnvironment("", name)
 }
