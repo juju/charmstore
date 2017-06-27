@@ -27,14 +27,14 @@ func NewMongoBackend(db *mgo.Database, prefix string) Backend {
 }
 
 func (m *mongoBackend) Get(name string) (ReadSeekCloser, int64, error) {
-	r, s, err := m.GetForEnvironment("", name)
+	r, size, err := m.GetForEnvironment("", name)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil, 0, errgo.WithCausef(err, ErrNotFound, "")
 		}
 		return nil, 0, err
 	}
-	return r.(ReadSeekCloser), s, nil
+	return mongoBackendReader{r.(ReadSeekCloser)}, size, nil
 }
 
 func (m *mongoBackend) Put(name string, r io.Reader, size int64, hash string) error {
@@ -43,4 +43,22 @@ func (m *mongoBackend) Put(name string, r io.Reader, size int64, hash string) er
 
 func (m *mongoBackend) Remove(name string) error {
 	return m.RemoveForEnvironment("", name)
+}
+
+// mongoBackendReader translates not-found errors as
+// produced by mgo's GridFS into not-found errors as expected
+// by the Backend.Get interface contract.
+type mongoBackendReader struct {
+	ReadSeekCloser
+}
+
+func (r mongoBackendReader) Read(buf []byte) (int, error) {
+	n, err := r.ReadSeekCloser.Read(buf)
+	if err == nil || err == io.EOF {
+		return n, err
+	}
+	if errgo.Cause(err) == mgo.ErrNotFound {
+		return n, errgo.WithCausef(err, ErrNotFound, "")
+	}
+	return n, errgo.Mask(err)
 }

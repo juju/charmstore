@@ -34,6 +34,10 @@ func NewHash() hash.Hash {
 type Backend interface {
 	// Get gets a reader for the object with the given name
 	// and its size. The returned reader should be closed after use.
+	// If the object doesn't exist, an error with an ErrNotFound
+	// cause should be returned.
+	// If the object is removed while reading, the read
+	// error's cause should be ErrNotFound.
 	Get(name string) (r ReadSeekCloser, size int64, err error)
 
 	// Put puts an object by reading its data from the given reader.
@@ -49,7 +53,7 @@ type Backend interface {
 // blob hash.
 type Store struct {
 	uploadc *mgo.Collection
-	backend  Backend
+	backend Backend
 
 	// The following fields are given default values by
 	// New but may be changed away from the defaults
@@ -71,7 +75,7 @@ type Store struct {
 func New(db *mgo.Database, prefix string, backend Backend) *Store {
 	return &Store{
 		uploadc:     db.C(prefix + ".upload"),
-		backend:      backend,
+		backend:     backend,
 		MinPartSize: defaultMinPartSize,
 		MaxParts:    defaultMaxParts,
 		MaxPartSize: defaultMaxPartSize,

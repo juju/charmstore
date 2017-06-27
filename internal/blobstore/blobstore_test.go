@@ -86,7 +86,7 @@ func (s *SwiftStoreSuite) TearDownTest(c *gc.C) {
 
 type blobStoreSuite struct {
 	jujutesting.IsolatedMgoSuite
-	store          *blobstore.Store
+	store      *blobstore.Store
 	newBackend func(db *mgo.Database) blobstore.Backend
 }
 
@@ -559,7 +559,7 @@ func (s *blobStoreSuite) TestFinishUploadCalledWhenCalculatingHash(c *gc.C) {
 	err := s.store.PutPart(id, 0, strings.NewReader(content0), int64(len(content0)), hashOf(content0))
 	c.Assert(err, gc.Equals, nil)
 
-	const size1 = 2 * 1024 * 1024
+	const size1 = 20 * 1024 * 1024
 	hash1 := hashOfReader(c, newDataSource(1, size1))
 	err = s.store.PutPart(id, 1, newDataSource(1, size1), int64(size1), hash1)
 	c.Assert(err, gc.Equals, nil)
