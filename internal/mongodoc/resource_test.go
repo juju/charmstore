@@ -15,9 +15,7 @@ import (
 
 const fakeBlobHash = "0123456789abcdef0123456789abcdef0123456789abcdef"
 
-var (
-	_ = gc.Suite(&ResourceSuite{})
-)
+var _ = gc.Suite(&ResourceSuite{})
 
 type ResourceSuite struct{}
 
