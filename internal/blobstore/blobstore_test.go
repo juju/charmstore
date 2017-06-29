@@ -484,6 +484,10 @@ func (s *blobStoreSuite) TestFinishUploadSuccess(c *gc.C) {
 			uint32(len(content0)),
 			uint32(len(content1)),
 		},
+		Hashes: []string{
+			hashOf(content0),
+			hashOf(content1),
+		},
 	})
 }
 
@@ -502,6 +506,9 @@ func (s *blobStoreSuite) TestFinishUploadSuccessOnePart(c *gc.C) {
 	c.Assert(idx, jc.DeepEquals, &mongodoc.MultipartIndex{
 		Sizes: []uint32{
 			uint32(len(content0)),
+		},
+		Hashes: []string{
+			hashOf(content0),
 		},
 	})
 }
@@ -529,6 +536,9 @@ func (s *blobStoreSuite) TestFinishUploadAgain(c *gc.C) {
 		Sizes: []uint32{
 			uint32(len(content0)),
 		},
+		Hashes: []string{
+			hashOf(content0),
+		},
 	})
 
 	// We should get exactly the same thing if we call
@@ -541,6 +551,9 @@ func (s *blobStoreSuite) TestFinishUploadAgain(c *gc.C) {
 	c.Assert(idx, jc.DeepEquals, &mongodoc.MultipartIndex{
 		Sizes: []uint32{
 			uint32(len(content0)),
+		},
+		Hashes: []string{
+			hashOf(content0),
 		},
 	})
 }
