@@ -47,7 +47,8 @@ type Resource struct {
 
 // MultipartIndex holds the index of all the parts of a multipart blob.
 type MultipartIndex struct {
-	Sizes []uint32
+	Sizes  []uint32
+	Hashes Hashes
 }
 
 // Validate ensures that the doc is valid.

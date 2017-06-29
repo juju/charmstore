@@ -314,10 +314,12 @@ func (s *Store) FinishUpload(uploadId string, parts []Part) (idx *mongodoc.Multi
 		return nil, "", errgo.Mask(err)
 	}
 	idx = &mongodoc.MultipartIndex{
-		Sizes: make([]uint32, len(parts)),
+		Sizes:  make([]uint32, len(parts)),
+		Hashes: make(mongodoc.Hashes, len(parts)),
 	}
 	for i := range udoc.Parts {
 		idx.Sizes[i] = uint32(udoc.Parts[i].Size)
+		idx.Hashes[i] = udoc.Parts[i].Hash
 	}
 	return idx, hash, nil
 }
