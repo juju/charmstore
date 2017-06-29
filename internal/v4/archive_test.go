@@ -1089,7 +1089,7 @@ func (s *ArchiveSuite) TestDelete(c *gc.C) {
 
 	// Retrieve the corresponding entity.
 	var entity mongodoc.Entity
-	err = s.store.DB.Entities().FindId(&url.URL).Select(bson.D{{"blobname", 1}}).One(&entity)
+	err = s.store.DB.Entities().FindId(&url.URL).One(&entity)
 	c.Assert(err, gc.Equals, nil)
 
 	// V4 SPECIFIC

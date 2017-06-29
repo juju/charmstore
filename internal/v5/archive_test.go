@@ -1041,7 +1041,7 @@ func (s *commonArchiveSuite) assertUpload(c *gc.C, p uploadParams) (id *charm.UR
 
 	// Test that the expected entry has been created
 	// in the blob store.
-	r, _, err := s.store.BlobStore.Open(entity.BlobName, nil)
+	r, _, err := s.store.BlobStore.Open(entity.BlobHash, nil)
 	c.Assert(err, gc.Equals, nil)
 	r.Close()
 
@@ -1218,7 +1218,7 @@ func (s *ArchiveSuite) TestDelete(c *gc.C) {
 
 	// Retrieve the corresponding entity.
 	var entity mongodoc.Entity
-	err := s.store.DB.Entities().FindId(&id.URL).Select(bson.D{{"blobname", 1}}).One(&entity)
+	err := s.store.DB.Entities().FindId(&id.URL).Select(bson.D{{"blobhash", 1}}).One(&entity)
 	c.Assert(err, gc.Equals, nil)
 
 	s.doAsUser("charmers", func() {
@@ -1280,33 +1280,6 @@ func (s *ArchiveSuite) TestDeleteNotFound(c *gc.C) {
 			ExpectBody: params.Error{
 				Message: `no matching charm or bundle for cs:~charmers/utopic/no-such-0`,
 				Code:    params.ErrNotFound,
-			},
-		})
-	})
-}
-
-func (s *ArchiveSuite) TestDeleteError(c *gc.C) {
-	// Add a charm to the database (not including the archive).
-	id, _ := s.addPublicCharm(c, storetesting.NewCharm(nil), newResolvedURL("~charmers/utopic/mysql-42", -1))
-	// Add a second charm so that we're not deleting the last revision.
-	s.addPublicCharm(c, storetesting.NewCharm(nil), newResolvedURL("~charmers/utopic/mysql-43", -1))
-
-	err := s.store.DB.Entities().UpdateId(&id.URL, bson.M{
-		"$set": bson.M{
-			"blobname": "no-such-name",
-		},
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	s.doAsUser("charmers", func() {
-		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-			Handler:      s.srv,
-			Do:           bakeryDo(nil),
-			URL:          storeURL(id.URL.Path() + "/archive"),
-			Method:       "DELETE",
-			ExpectStatus: http.StatusInternalServerError,
-			ExpectBody: params.Error{
-				Message: `cannot delete "cs:~charmers/utopic/mysql-42": cannot remove blob no-such-name: blob not found`,
 			},
 		})
 	})

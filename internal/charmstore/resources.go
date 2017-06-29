@@ -150,8 +150,7 @@ func (s *Store) UploadResource(id *router.ResolvedURL, name string, blob io.Read
 	if !charmHasResource(entity.CharmMeta, name) {
 		return nil, errgo.Newf("charm does not have resource %q", name)
 	}
-	blobName, _, err := s.putArchive(blob, size, blobHash)
-	if err != nil {
+	if _, err := s.putArchive(blob, size, blobHash); err != nil {
 		return nil, errgo.Mask(err)
 	}
 	res, err := s.addResource(&mongodoc.Resource{
@@ -160,13 +159,9 @@ func (s *Store) UploadResource(id *router.ResolvedURL, name string, blob io.Read
 		Revision:   -1,
 		BlobHash:   blobHash,
 		Size:       size,
-		BlobName:   blobName,
 		UploadTime: time.Now().UTC(),
 	}, "")
 	if err != nil {
-		if err := s.BlobStore.Remove(blobName, nil); err != nil {
-			logger.Errorf("cannot remove blob %s after error: %v", blobName, err)
-		}
 		return nil, errgo.Mask(err)
 	}
 	return res, nil
@@ -201,7 +196,6 @@ func (s *Store) AddResourceWithUploadId(id *router.ResolvedURL, name string, upl
 		BlobHash:   info.Hash,
 		BlobIndex:  idx,
 		Size:       size,
-		BlobName:   uploadId,
 		UploadTime: time.Now().UTC(),
 	}, uploadId)
 	if err != nil {
@@ -235,15 +229,7 @@ func (s *Store) addResource(r *mongodoc.Resource, uploadId string) (*mongodoc.Re
 	}
 	err := s.DB.Resources().Insert(r)
 	if uploadId != "" {
-		// Remove the upload document because we're done with it now.
-		// If there was an error, we'll remove the upload parts too.
-		isOwnedBy := func(_, owner string) (bool, error) {
-			// If the insert completed successfully, it is now owned so
-			// we return true, otherwise it's orphaned and we return false
-			// so all the upload parts will be removed.
-			return err == nil, nil
-		}
-		if removeErr := s.BlobStore.RemoveUpload(uploadId, isOwnedBy); removeErr != nil {
+		if removeErr := s.BlobStore.RemoveUpload(uploadId); removeErr != nil {
 			// We can't remove the upload document, but we've
 			// still succeeded in doing what the user asked,
 			// so just log the error.
@@ -317,7 +303,7 @@ func charmHasResource(meta *charm.Meta, name string) bool {
 
 // OpenResourceBlob returns the blob associated with the given resource.
 func (s *Store) OpenResourceBlob(res *mongodoc.Resource) (*Blob, error) {
-	r, size, err := s.BlobStore.Open(res.BlobName, res.BlobIndex)
+	r, size, err := s.BlobStore.Open(res.BlobHash, res.BlobIndex)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot open archive data for %s resource %q", res.BaseURL, fmt.Sprintf("%s/%d", res.Name, res.Revision))
 	}

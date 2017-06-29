@@ -187,7 +187,7 @@ var uploadEntityErrorsTests = []struct {
 	about:       "hash mismatch",
 	url:         "~charmers/precise/wordpress-0",
 	upload:      storetesting.NewCharm(nil),
-	blobHash:    "blahblah",
+	blobHash:    hashOfString("foo"),
 	expectError: "cannot put archive blob: hash mismatch",
 	// It would be nice if this was:
 	// expectCause: params.ErrInvalidEntity,
@@ -397,7 +397,7 @@ func (s *AddEntitySuite) checkAddCharm(c *gc.C, ch charm.Charm, url *router.Reso
 	}))
 
 	// The charm archive has been properly added to the blob store.
-	r, obtainedSize, err := store.BlobStore.Open(doc.BlobName, nil)
+	r, obtainedSize, err := store.BlobStore.Open(hash, nil)
 	c.Assert(err, gc.Equals, nil)
 	defer r.Close()
 	c.Assert(obtainedSize, gc.Equals, size)
@@ -460,7 +460,7 @@ func (s *AddEntitySuite) checkAddBundle(c *gc.C, bundle charm.Bundle, url *route
 	}))
 
 	// The bundle archive has been properly added to the blob store.
-	r, obtainedSize, err := store.BlobStore.Open(doc.BlobName, nil)
+	r, obtainedSize, err := store.BlobStore.Open(hash, nil)
 	c.Assert(err, gc.Equals, nil)
 	defer r.Close()
 	c.Assert(obtainedSize, gc.Equals, size)
@@ -486,11 +486,6 @@ func assertBlobFields(c *gc.C, doc *mongodoc.Entity, url *router.ResolvedURL, ha
 	doc1 := *doc
 	doc = &doc1
 
-	// The blob name is random, but we check that it's
-	// in the correct format, and non-empty.
-	blobName := doc.BlobName
-	c.Assert(blobName, gc.Matches, "[0-9a-z]+")
-	doc.BlobName = ""
 	// The PreV5* fields are unpredictable, so zero them out
 	// for the purposes of comparison.
 	if doc.CharmMeta != nil && len(doc.CharmMeta.Series) > 0 {
@@ -502,6 +497,7 @@ func assertBlobFields(c *gc.C, doc *mongodoc.Entity, url *router.ResolvedURL, ha
 		c.Assert(doc.PreV5BlobHash, gc.Not(gc.Equals), hash)
 		c.Assert(doc.PreV5BlobHash256, gc.Not(gc.Equals), "")
 		c.Assert(doc.PreV5BlobHash256, gc.Not(gc.Equals), hash256)
+		c.Assert(doc.PreV5BlobExtraHash, gc.Not(gc.Equals), "")
 	} else if url.URL.Series == "bundle" && doc.PreV5BlobHash != doc.BlobHash {
 		// It's a bundle with a different PreV5BlobHash, check
 		// that all other fields are consistently different.
@@ -521,6 +517,7 @@ func assertBlobFields(c *gc.C, doc *mongodoc.Entity, url *router.ResolvedURL, ha
 	doc.PreV5BlobSize = 0
 	doc.PreV5BlobHash = ""
 	doc.PreV5BlobHash256 = ""
+	doc.PreV5BlobExtraHash = ""
 	return doc
 }
 

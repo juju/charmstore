@@ -1538,6 +1538,9 @@ func (s *APISuite) TestBundleArchiveReplacesApplicationsWithServices(c *gc.C) {
 			},
 		},
 	}), url, true)
+	entity, err := s.store.FindEntity(url, nil)
+	c.Assert(err, gc.IsNil)
+	c.Logf("entity has blobextrahash %v", entity.PreV5BlobExtraHash)
 	rr := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.srv,
 		URL:     storeURL("bundle/wordpress-simple/archive"),
@@ -1559,7 +1562,7 @@ func (s *APISuite) TestBundleArchiveReplacesApplicationsWithServices(c *gc.C) {
 		err = yaml.Unmarshal(metadata, &m)
 		c.Assert(err, gc.Equals, nil)
 		_, ok := m["services"]
-		c.Assert(ok, gc.Equals, true)
+		c.Assert(ok, gc.Equals, true, gc.Commentf("metadata %#v", m))
 		_, ok = m["applications"]
 		c.Assert(ok, gc.Equals, false)
 		defer rc.Close()
@@ -2805,11 +2808,11 @@ func entityGetter(get func(*mongodoc.Entity) interface{}) metaEndpointExpectedVa
 
 func zipGetter(get func(*zip.Reader) interface{}) metaEndpointExpectedValueGetter {
 	return func(store *charmstore.Store, url *router.ResolvedURL) (interface{}, error) {
-		doc, err := store.FindEntity(url, charmstore.FieldSelector("blobname"))
+		doc, err := store.FindEntity(url, charmstore.FieldSelector("blobhash"))
 		if err != nil {
 			return nil, errgo.Mask(err)
 		}
-		blob, size, err := store.BlobStore.Open(doc.BlobName, nil)
+		blob, size, err := store.BlobStore.Open(doc.BlobHash, nil)
 		if err != nil {
 			return nil, errgo.Mask(err)
 		}

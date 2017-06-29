@@ -52,6 +52,11 @@ type Entity struct {
 	// APIs. This will be the same as BlobHash for single-series charms.
 	PreV5BlobHash string
 
+	// PreV5BlobExtraHash holds the hash of the extra
+	// blob that's appended to the main blob. This is empty
+	// when PreV5BlobHash is the same as BlobHash.
+	PreV5BlobExtraHash string `bson:",omitempty"`
+
 	// PreV5BlobSize holds the size of the
 	// blob that will be served from the v4 and legacy
 	// APIs. This will be the same as Size for single-series charms.
@@ -75,12 +80,6 @@ type Entity struct {
 	// Size holds the size of the archive blob.
 	// TODO(rog) rename this to BlobSize.
 	Size int64
-
-	// BlobName holds the name that the archive blob is given in the blob store.
-	// For multi-series charms, there is also a second blob which
-	// stores a "zip-suffix" that overrides metadata.yaml.
-	// This is named BlobName + ".pre-v5-suffix".
-	BlobName string
 
 	UploadTime time.Time
 

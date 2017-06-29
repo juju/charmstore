@@ -4,6 +4,7 @@
 package charmstore // import "gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
 
 import (
+	"strings"
 	"time"
 
 	"github.com/juju/utils/parallel"
@@ -29,6 +30,7 @@ const (
 	migrationPublishedEntities       mongodoc.MigrationName = "include published status in a single entity field"
 	migrationCandidateBetaChannels   mongodoc.MigrationName = "populate candidate and beta channel ACLs"
 	migrationRevisionsCollection     mongodoc.MigrationName = "populate revisions collection"
+	migrationBlobRefs                mongodoc.MigrationName = "populate blobref table"
 )
 
 // migrations holds all the migration functions that are executed in the order
@@ -82,6 +84,9 @@ var migrations = []migration{{
 }, {
 	name:    migrationRevisionsCollection,
 	migrate: migrateRevisionsCollection,
+}, {
+	name:    migrationBlobRefs,
+	migrate: migrateBlobRefs,
 }}
 
 // migration holds a migration function with its corresponding name.
@@ -206,6 +211,168 @@ func migrateRevisionsCollection(db StoreDatabase) error {
 	}
 	if err := run.Wait(); err != nil {
 		return errgo.Mask(err)
+	}
+	return nil
+}
+
+// blobRefDoc holds a mapping from blob hash to
+// backend blob name.
+// This is duplicated from internal/blobstore.
+type blobRefDoc struct {
+	// Hash holds the hex-encoded hash of the blob.
+	Hash string `bson:"_id"`
+	// Name holds the name of the blob in the backend.
+	Name string `bson:"name"`
+	// PutTime stores the last time a new reference
+	// was made to the blob with Put.
+	PutTime time.Time
+}
+
+// legacyBlobstoreResourceDoc is the persistent representation of a Resource.
+// This is duplicated from github.com/juju/blobstore.
+type legacyBlobstoreResourceDoc struct {
+	Id string `bson:"_id"`
+	// Path is the storage path of the resource, which will be
+	// the empty string until the upload has been completed.
+	Path       string `bson:"path"`
+	SHA384Hash string `bson:"sha384hash"`
+	Length     int64  `bson:"length"`
+	RefCount   int64  `bson:"refcount"`
+}
+
+// legacyManagedResourceDoc is the persistent representation of a ManagedResource.
+// This is duplicated from github.com/juju/blobstore.
+type legacyManagedResourceDoc struct {
+	Id         string `bson:"_id"`
+	EnvUUID    string
+	User       string
+	Path       string
+	ResourceId string
+}
+
+func migrateBlobRefs(db StoreDatabase) error {
+	if err := createBlobRefsCollection(db); err != nil {
+		return errgo.Mask(err)
+	}
+	if err := updatePreV5BlobExtraHashes(db); err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
+type legacyEntity struct {
+	mongodoc.Entity `bson:",inline"`
+
+	// BlobName holds the name that the archive blob is given in the blob store.
+	// For multi-series charms, there is also a second blob which
+	// stores a "zip-suffix" that overrides metadata.yaml.
+	// This is named BlobName + ".pre-v5-suffix".
+	BlobName string `bson:",omitempty"`
+}
+
+// updatePreV5BlobExtraHashes updates the entity
+func updatePreV5BlobExtraHashes(db StoreDatabase) error {
+	managedResources := db.C("managedStoredResources")
+	iter := managedResources.Find(bson.D{{
+		"path", bson.D{{
+			"$regex", `.pre-v5-suffix$`,
+		}},
+	}}).Iter()
+	preV5BlobExtraHashes := make(map[string]string)
+	var doc legacyManagedResourceDoc
+	for iter.Next(&doc) {
+		path := strings.TrimPrefix(doc.Path, "global/")
+		preV5BlobExtraHashes[path] = doc.ResourceId
+	}
+	if err := iter.Err(); err != nil {
+		return errgo.Mask(err)
+	}
+	updater := parallel.NewRun(20)
+	entities := db.Entities()
+	iter = entities.Find(bson.D{{
+		"prev5blobextrahash", bson.D{{
+			"$exists", false,
+		}},
+	}}).Select(FieldSelector("prev5blobhash", "blobhash", "blobname")).Iter()
+	var entity legacyEntity
+	for iter.Next(&entity) {
+		if entity.PreV5BlobHash == entity.BlobHash {
+			continue
+		}
+		hash := preV5BlobExtraHashes[preV5CompatibilityBlobName(entity.BlobName)]
+		if hash == "" {
+			iter.Close()
+			return errgo.Newf("hash for pre-v5 blob for entity %q not found; name %q; hashes %q", entity.URL, preV5CompatibilityBlobName(entity.BlobName), preV5BlobExtraHashes)
+		}
+		updater.Do(func() error {
+			return entities.UpdateId(entity.URL, bson.D{{
+				"$set", bson.D{{
+					"prev5blobextrahash", hash,
+				}},
+			}, {
+				"$unset", bson.D{{
+					"blobname", nil,
+				}},
+			}})
+		})
+	}
+	if err := updater.Wait(); err != nil {
+		return errgo.Notef(err, "could not update entity")
+	}
+	if err := iter.Err(); err != nil {
+		return errgo.Mask(err)
+	}
+	if err := managedResources.DropCollection(); err != nil && !strings.Contains(err.Error(), "not found") {
+		return errgo.Notef(err, "cannot drop storedResources collection")
+	}
+	return nil
+}
+
+// preV5CompatibilityBlobName returns the name of the zip file suffix used
+// to overwrite the metadata.yaml file for pre-v5 compatibility purposes.
+func preV5CompatibilityBlobName(blobName string) string {
+	return blobName + ".pre-v5-suffix"
+}
+
+// createBlobRefsCollection populates the blobrefs collection
+// used by the blob store by getting all the blob names and
+// hashes from the legacy juju blobstore storedResources collection.
+// Note: this leaves the storedResources collection around, even
+// though it's no longer in use.
+func createBlobRefsCollection(db StoreDatabase) error {
+	storedResources := db.C("storedResources")
+	iter := storedResources.Find(nil).Iter()
+	inserter := db.C("entitystore.blobref").Bulk()
+	inserter.Unordered()
+	n := 0
+	var doc legacyBlobstoreResourceDoc
+	for iter.Next(&doc) {
+		if doc.Path == "" {
+			continue
+		}
+		inserter.Insert(&blobRefDoc{
+			Hash:    doc.SHA384Hash,
+			Name:    doc.Path,
+			PutTime: time.Now(),
+		})
+		if n++; n < 100 {
+			continue
+		}
+		if _, err := inserter.Run(); err != nil {
+			logger.Infof("bulk insert error (probably because of duplicate inserts)")
+		}
+		n = 0
+		inserter = db.Entities().Bulk()
+		inserter.Unordered()
+	}
+	if _, err := inserter.Run(); err != nil {
+		logger.Infof("bulk insert error (probably because of duplicate inserts)")
+	}
+	if err := iter.Err(); err != nil {
+		return errgo.Notef(err, "cannot iterate over all storedResources documents")
+	}
+	if err := storedResources.DropCollection(); err != nil && !strings.Contains(err.Error(), "not found") {
+		return errgo.Notef(err, "cannot drop storedResources collection")
 	}
 	return nil
 }

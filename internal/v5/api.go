@@ -238,13 +238,13 @@ func RouterHandlers(h *ReqHandler) *router.Handlers {
 		},
 		Id: map[string]router.IdHandler{
 			"archive":     h.serveArchive,
-			"archive/":    resolveId(authId(h.serveArchiveFile), "blobname", "blobhash"),
+			"archive/":    resolveId(authId(h.serveArchiveFile), "blobhash", "blobhash"),
 			"diagram.svg": resolveId(authId(h.serveDiagram), "bundledata"),
 			"expand-id":   resolveId(authId(h.serveExpandId)),
-			"icon.svg":    resolveId(authId(h.serveIcon), "contents", "blobname"),
+			"icon.svg":    resolveId(authId(h.serveIcon), "contents", "blobhash"),
 			"publish":     resolveId(h.servePublish),
 			"promulgate":  resolveId(h.servePromulgate),
-			"readme":      resolveId(authId(h.serveReadMe), "contents", "blobname"),
+			"readme":      resolveId(authId(h.serveReadMe), "contents", "blobhash"),
 			"resource/":   reqBodyReadHandler(resolveId(authId(h.serveResources), "charmmeta")),
 		},
 		Meta: map[string]router.BulkIncludeHandler{
@@ -287,7 +287,7 @@ func RouterHandlers(h *ReqHandler) *router.Handlers {
 			"id-user":          h.EntityHandler(h.metaIdUser, "_id"),
 			"id-revision":      h.EntityHandler(h.metaIdRevision, "_id"),
 			"id-series":        h.EntityHandler(h.metaIdSeries, "_id"),
-			"manifest":         h.EntityHandler(h.metaManifest, "blobname"),
+			"manifest":         h.EntityHandler(h.metaManifest, "blobhash"),
 			"owner":            h.EntityHandler(h.metaOwner, "_id"),
 			"perm":             h.puttableBaseEntityHandler(h.metaPerm, h.putMetaPerm, "channelacls"),
 			"perm/":            h.puttableBaseEntityHandler(h.metaPermWithKey, h.putMetaPermWithKey, "channelacls"),
@@ -667,7 +667,7 @@ func bundleCount(x *int) interface{} {
 // GET id/meta/manifest
 // https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetamanifest
 func (h *ReqHandler) metaManifest(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
-	r, size, err := h.Store.BlobStore.Open(entity.BlobName, nil)
+	r, size, err := h.Store.BlobStore.Open(entity.BlobHash, nil)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot open archive data for %s", id)
 	}
