@@ -1116,6 +1116,7 @@ func (s *StoreSuite) TestCollections(c *gc.C) {
 	otherCollections := map[string]bool{
 		"managedStoredResources": true,
 		"entitystore.chunks":     true,
+		"entitystore.blobref":    true,
 		"storedResources":        true,
 		"txns":                   true,
 		"txns.log":               true,
@@ -1171,7 +1172,7 @@ func (s *StoreSuite) TestOpenCachedBlobFileWithFoundContent(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	expectContent := string(data)
 
-	entity, err := store.FindEntity(url, FieldSelector("blobname", "contents"))
+	entity, err := store.FindEntity(url, FieldSelector("blobhash", "contents"))
 	c.Assert(err, gc.Equals, nil)
 
 	// Check that, when we open the file for the first time,
@@ -1187,7 +1188,7 @@ func (s *StoreSuite) TestOpenCachedBlobFileWithFoundContent(c *gc.C) {
 
 	// When retrieving the entity again, check that the Contents
 	// map has been set appropriately...
-	entity, err = store.FindEntity(url, FieldSelector("blobname", "contents"))
+	entity, err = store.FindEntity(url, FieldSelector("blobhash", "contents"))
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(entity.Contents, gc.HasLen, 1)
 	c.Assert(entity.Contents[mongodoc.FileIcon].IsValid(), gc.Equals, true)
@@ -1214,7 +1215,7 @@ func (s *StoreSuite) TestOpenCachedBlobFileWithNotFoundContent(c *gc.C) {
 	err := store.AddCharmWithArchive(url, wordpress)
 	c.Assert(err, gc.Equals, nil)
 
-	entity, err := store.FindEntity(url, FieldSelector("blobname", "contents"))
+	entity, err := store.FindEntity(url, FieldSelector("blobhash", "contents"))
 	c.Assert(err, gc.Equals, nil)
 
 	// Check that, when we open the file for the first time,
@@ -1228,7 +1229,7 @@ func (s *StoreSuite) TestOpenCachedBlobFileWithNotFoundContent(c *gc.C) {
 
 	// When retrieving the entity again, check that the Contents
 	// map has been set appropriately...
-	entity, err = store.FindEntity(url, FieldSelector("blobname", "contents"))
+	entity, err = store.FindEntity(url, FieldSelector("blobhash", "contents"))
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(entity.Contents, gc.DeepEquals, map[mongodoc.FileId]mongodoc.ZipFile{
 		mongodoc.FileIcon: {},
@@ -3176,7 +3177,7 @@ func (s *StoreSuite) TestCopyCopiesSessions(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	// Also check the blob store, as it has its own session reference.
-	r, _, err := store1.BlobStore.Open(entity.BlobName, nil)
+	r, _, err := store1.BlobStore.Open(entity.BlobHash, nil)
 	c.Assert(err, gc.Equals, nil)
 	r.Close()
 
@@ -4131,51 +4132,6 @@ func (s *StoreSuite) TestPublish(c *gc.C) {
 	}
 }
 
-func (s *StoreSuite) TestIsUploadOwnedBy(c *gc.C) {
-	store := s.newStore(c, false)
-	defer store.Close()
-	// This is a test of an internal method because
-	// the cases that isUploadOwnedBy are called
-	// are hard to stimulate in tests.
-
-	// First add a charm that has a resource.
-	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
-	meta := storetesting.MetaWithResources(nil, "someResource")
-	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
-	c.Assert(err, gc.Equals, nil)
-
-	contents := []string{
-		"123456789 123456789 ",
-		"abcdefghijklmnopqrstuvwyz",
-	}
-	uid := putMultipart(c, store.BlobStore, time.Time{}, contents...)
-
-	res, err := store.AddResourceWithUploadId(id, "someResource", uid)
-	c.Assert(err, gc.Equals, nil)
-
-	owner := resourceUploadOwner(res)
-	// isUploadOwnedBy should return true if called on the
-	// existing resource.
-	ok, err := store.isUploadOwnedBy(uid, owner)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(ok, gc.Equals, true)
-
-	// isUploadOwnedBy should return false with a different
-	// upload id.
-	ok, err = store.isUploadOwnedBy(uid+"x", owner)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(ok, gc.Equals, false)
-
-	// isUploadOwnedBy should return false when the resource
-	// document is removed.
-	_, err = store.DB.Resources().RemoveAll(nil)
-	c.Assert(err, gc.Equals, nil)
-
-	ok, err = store.isUploadOwnedBy(uid, owner)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(ok, gc.Equals, false)
-}
-
 func (s *StoreSuite) TestPublishWithFailedESInsert(c *gc.C) {
 	// Make an elastic search with a non-existent address,
 	// so that will try to add the charm there, but fail.
@@ -4209,20 +4165,15 @@ func (s *StoreSuite) TestDeleteEntity(c *gc.C) {
 	}))
 	c.Assert(err, gc.Equals, nil)
 
-	entity, err := store.FindEntity(url, nil)
-	c.Assert(err, gc.Equals, nil)
-
 	err = store.DeleteEntity(url)
 	c.Assert(err, gc.Equals, nil)
 
 	_, err = store.FindEntity(url, nil)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 
-	_, _, err = store.BlobStore.Open(entity.BlobName, nil)
-	c.Assert(errgo.Cause(err), gc.Equals, blobstore.ErrNotFound)
-
-	_, _, err = store.BlobStore.Open(preV5CompatibilityBlobName(entity.BlobName), nil)
-	c.Assert(errgo.Cause(err), gc.Equals, blobstore.ErrNotFound)
+	// TODO run blobstore garbage collection, then check
+	// that we can't open the blob or the pre-v5 compatibility
+	// blob.
 }
 
 func (s *StoreSuite) TestDeleteEntityWithOnlyOneRevision(c *gc.C) {

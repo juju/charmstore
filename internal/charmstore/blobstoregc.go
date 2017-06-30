@@ -41,7 +41,7 @@ func (gc *blobstoreGC) Wait() error {
 func (gc *blobstoreGC) run() error {
 	for {
 		store := gc.pool.Store()
-		err := store.BlobStore.RemoveExpiredUploads(store.isUploadOwnedBy)
+		err := store.BlobStore.RemoveExpiredUploads()
 		store.Close()
 		if err != nil {
 			logger.Errorf("blob garbage collection failed: %v", err)

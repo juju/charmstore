@@ -36,9 +36,9 @@ type Blob struct {
 var preV5ArchiveFields = []string{
 	"size",
 	"blobhash",
-	"blobname",
 	"prev5blobhash",
 	"prev5blobsize",
+	"prev5blobextrahash",
 }
 
 // OpenBlob returns the blob associated with the given URL.
@@ -58,19 +58,19 @@ func (s *Store) openBlob(id *router.ResolvedURL, preV5 bool) (*Blob, error) {
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	r, size, err := s.BlobStore.Open(entity.BlobName, nil)
+	r, size, err := s.BlobStore.Open(entity.BlobHash, nil)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot open archive data for %s", id)
 	}
 	hash := entity.BlobHash
 
-	if entity.PreV5BlobHash != entity.BlobHash && preV5 {
-		// The v5 blob is different so we open the blob suffix that
+	if preV5 && entity.PreV5BlobExtraHash != "" {
+		// There's a v5 blob so we open the blob suffix that
 		// contains the metadata hack.
-		r2, size2, err := s.BlobStore.Open(preV5CompatibilityBlobName(entity.BlobName), nil)
+		r2, size2, err := s.BlobStore.Open(entity.PreV5BlobExtraHash, nil)
 		if err != nil {
 			r.Close()
-			return nil, errgo.Notef(err, "cannot find pre-v5 hack blob")
+			return nil, errgo.Notef(err, "cannot find pre-v5 hack blob %q", entity.PreV5BlobExtraHash)
 		}
 		r = newMultiReadSeekCloser(r, r2)
 		size += size2
@@ -146,14 +146,14 @@ func (s *Store) OpenBlobFile(blob *Blob, filePath string) (io.ReadCloser, int64,
 // used to determine which file in the zip file to use. The result will
 // be cached for the next time.
 //
-// When retrieving the entity, at least the BlobName and
+// When retrieving the entity, at least the BlobHash and
 // Contents fields must be populated.
 func (s *Store) OpenCachedBlobFile(
 	entity *mongodoc.Entity,
 	fileId mongodoc.FileId,
 	isFile func(f *zip.File) bool,
 ) (_ io.ReadCloser, err error) {
-	if entity.BlobName == "" {
+	if entity.BlobHash == "" {
 		// We'd like to check that the Contents field was populated
 		// here but we can't because it doesn't necessarily
 		// exist in the entity.
@@ -163,7 +163,7 @@ func (s *Store) OpenCachedBlobFile(
 	if ok && !zipf.IsValid() {
 		return nil, errgo.WithCausef(nil, params.ErrNotFound, "")
 	}
-	blob, size, err := s.BlobStore.Open(entity.BlobName, nil)
+	blob, size, err := s.BlobStore.Open(entity.BlobHash, nil)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot open archive blob")
 	}

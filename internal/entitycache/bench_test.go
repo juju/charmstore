@@ -16,7 +16,7 @@ func BenchmarkSingleRequest(b *testing.B) {
 	entity := &mongodoc.Entity{
 		URL:      charm.MustParseURL("~bob/wordpress-1"),
 		BaseURL:  charm.MustParseURL("~bob/wordpress"),
-		BlobName: "w1",
+		BlobHash: "w1",
 	}
 	baseEntity := &mongodoc.BaseEntity{
 		URL:  charm.MustParseURL("~bob/wordpress"),

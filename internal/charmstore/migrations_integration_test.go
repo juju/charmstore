@@ -687,7 +687,6 @@ func checkEntityInvariants(c *gc.C, e *mongodoc.Entity, store *Store) {
 	c.Assert(e.BlobHash, gc.Not(gc.Equals), "")
 	c.Assert(e.BlobHash256, gc.Not(gc.Equals), "")
 	c.Assert(e.Size, gc.Not(gc.Equals), 0)
-	c.Assert(e.BlobName, gc.Not(gc.Equals), "")
 
 	if e.UploadTime.IsZero() {
 		c.Fatalf("zero upload time")

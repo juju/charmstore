@@ -38,7 +38,6 @@ func (s *resourceSuite) TestInsert(c *gc.C) {
 		Revision:   0,
 		BlobHash:   "123456",
 		Size:       1,
-		BlobName:   "res1",
 		UploadTime: time.Now().UTC(),
 	}
 
@@ -539,11 +538,11 @@ func (s *resourceSuite) TestOpenResourceBlob(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(string(data), gc.Equals, content)
 
-	// Change the blob name so that it's invalid so that we can
+	// Change the blob hash so that it's invalid so that we can
 	// check what happens then.
-	res.BlobName = res.BlobName[1:]
+	res.BlobHash = res.BlobHash[1:]
 	_, err = store.OpenResourceBlob(res)
-	c.Assert(err, gc.ErrorMatches, `cannot open archive data for cs:~charmers/wordpress resource "someResource/0": resource at path ".*" not found`)
+	c.Assert(err, gc.ErrorMatches, `cannot open archive data for cs:~charmers/wordpress resource "someResource/0": blob not found`)
 }
 
 // uploadResources uploads all the resources required by the given entity,
@@ -612,7 +611,6 @@ func checkResourceDocs(c *gc.C, store *Store, id *router.ResolvedURL, expectReso
 }
 
 func adjustExpectedResource(doc, expected *mongodoc.Resource) {
-	expected.BlobName = doc.BlobName
 	expected.UploadTime = doc.UploadTime
 }
 

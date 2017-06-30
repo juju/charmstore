@@ -3652,11 +3652,11 @@ func entityGetter(get func(*mongodoc.Entity) interface{}) metaEndpointExpectedVa
 
 func zipGetter(get func(*zip.Reader) interface{}) metaEndpointExpectedValueGetter {
 	return func(store *charmstore.Store, url *router.ResolvedURL) (interface{}, error) {
-		doc, err := store.FindEntity(url, charmstore.FieldSelector("blobname"))
+		doc, err := store.FindEntity(url, charmstore.FieldSelector("blobhash"))
 		if err != nil {
 			return nil, errgo.Mask(err)
 		}
-		blob, size, err := store.BlobStore.Open(doc.BlobName, nil)
+		blob, size, err := store.BlobStore.Open(doc.BlobHash, nil)
 		if err != nil {
 			return nil, errgo.Mask(err)
 		}

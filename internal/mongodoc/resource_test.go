@@ -8,7 +8,6 @@ import (
 
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6-unstable"
-	"gopkg.in/mgo.v2/bson"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
 )
@@ -31,7 +30,6 @@ var validateTests = []struct {
 		Revision:   1,
 		BlobHash:   fakeBlobHash,
 		Size:       12,
-		BlobName:   bson.NewObjectId().Hex(),
 		UploadTime: time.Now().UTC(),
 	},
 }, {
@@ -48,7 +46,6 @@ var validateTests = []struct {
 		Revision:   1,
 		BlobHash:   fakeBlobHash,
 		Size:       12,
-		BlobName:   bson.NewObjectId().Hex(),
 		UploadTime: time.Now().UTC(),
 	},
 	expectError: "missing charm URL",
@@ -60,7 +57,6 @@ var validateTests = []struct {
 		Revision:   1,
 		BlobHash:   fakeBlobHash,
 		Size:       12,
-		BlobName:   bson.NewObjectId().Hex(),
 		UploadTime: time.Now().UTC(),
 	},
 	expectError: `resolved charm URLs not supported \(got revision 1\)`,
@@ -72,7 +68,6 @@ var validateTests = []struct {
 		Revision:   1,
 		BlobHash:   fakeBlobHash,
 		Size:       12,
-		BlobName:   bson.NewObjectId().Hex(),
 		UploadTime: time.Now().UTC(),
 	},
 	expectError: `series should not be set \(got "trusty"\)`,
@@ -83,7 +78,6 @@ var validateTests = []struct {
 		Revision:   1,
 		BlobHash:   fakeBlobHash,
 		Size:       12,
-		BlobName:   bson.NewObjectId().Hex(),
 		UploadTime: time.Now().UTC(),
 	},
 	expectError: `missing name`,
@@ -95,7 +89,6 @@ var validateTests = []struct {
 		Revision:   -1,
 		BlobHash:   fakeBlobHash,
 		Size:       12,
-		BlobName:   bson.NewObjectId().Hex(),
 		UploadTime: time.Now().UTC(),
 	},
 	expectError: `got negative revision -1`,
@@ -106,7 +99,6 @@ var validateTests = []struct {
 		Name:       "spam",
 		Revision:   0,
 		Size:       12,
-		BlobName:   bson.NewObjectId().Hex(),
 		UploadTime: time.Now().UTC(),
 	},
 	expectError: `missing blob hash`,
@@ -118,21 +110,9 @@ var validateTests = []struct {
 		Revision:   0,
 		BlobHash:   fakeBlobHash,
 		Size:       -2,
-		BlobName:   bson.NewObjectId().Hex(),
 		UploadTime: time.Now().UTC(),
 	},
 	expectError: `got negative size -2`,
-}, {
-	about: "no blob name",
-	resource: &mongodoc.Resource{
-		BaseURL:    charm.MustParseURL("cs:spam"),
-		Name:       "spam",
-		Revision:   0,
-		BlobHash:   fakeBlobHash,
-		Size:       12,
-		UploadTime: time.Now().UTC(),
-	},
-	expectError: `missing blob name`,
 }, {
 	about: "bad time",
 	resource: &mongodoc.Resource{
@@ -141,7 +121,6 @@ var validateTests = []struct {
 		Revision: 0,
 		BlobHash: fakeBlobHash,
 		Size:     12,
-		BlobName: bson.NewObjectId().Hex(),
 	},
 	expectError: `missing upload timestamp`,
 }}

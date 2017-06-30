@@ -97,10 +97,12 @@ func (info *UploadInfo) Index() (*mongodoc.MultipartIndex, bool) {
 		return nil, false
 	}
 	idx := &mongodoc.MultipartIndex{
-		Sizes: make([]uint32, len(info.Parts)),
+		Sizes:  make([]uint32, len(info.Parts)),
+		Hashes: make(mongodoc.Hashes, len(info.Parts)),
 	}
 	for i, p := range info.Parts {
 		idx.Sizes[i] = uint32(p.Size)
+		idx.Hashes[i] = p.Hash
 	}
 	return idx, true
 }
@@ -174,9 +176,8 @@ func (s *Store) PutPart(uploadId string, part int, r io.Reader, size int64, hash
 	}
 	// The part record has been updated successfully, so
 	// we can actually upload the part now.
-	partName := uploadPartName(uploadId, part)
-	if err := s.Put(r, partName, size, hash); err != nil {
-		return errgo.Notef(err, "cannot upload part %q", partName)
+	if err := s.Put(r, hash, size); err != nil {
+		return errgo.Notef(err, "cannot upload part %q", hash)
 	}
 
 	// We've put the part document, so we can now mark the part as
@@ -199,13 +200,12 @@ func (s *Store) PutPart(uploadId string, part int, r io.Reader, size int64, hash
 	return nil
 }
 
-// checkPartSizes checks part sizes as much as we can.
-// As the last part is allowed to be small, we can
-// only check previously uploaded parts unless we're
-// uploading an out-of-order part.
+// checkPartSizes checks part sizes as much as we can. As the last part
+// is allowed to be small, we can only check previously uploaded parts
+// unless we're uploading an out-of-order part.
 //
-// The part argument holds the part being uploaded,
-// or -1 if no part is currently being uploaded.
+// The part argument holds the part being uploaded, or -1 if no part is
+// currently being uploaded.
 func (s *Store) checkPartSizes(parts []*PartInfo, part int, size int64) error {
 	if part == -1 {
 		// There's no current part, so pretend the last part
@@ -235,12 +235,6 @@ func (s *Store) UploadInfo(uploadId string) (UploadInfo, error) {
 		Expires: udoc.Expires,
 		Hash:    udoc.Hash,
 	}, nil
-}
-
-// uploadPartName returns the blob name of the part with the given
-// uploadId and part number.
-func uploadPartName(uploadId string, part int) string {
-	return fmt.Sprintf("%s/%d", uploadId, part)
 }
 
 // initializePart creates the initial record for a part.
@@ -317,9 +311,9 @@ func (s *Store) FinishUpload(uploadId string, parts []Part) (idx *mongodoc.Multi
 		Sizes:  make([]uint32, len(parts)),
 		Hashes: make(mongodoc.Hashes, len(parts)),
 	}
-	for i := range udoc.Parts {
-		idx.Sizes[i] = uint32(udoc.Parts[i].Size)
-		idx.Hashes[i] = udoc.Parts[i].Hash
+	for i, p := range udoc.Parts {
+		idx.Sizes[i] = uint32(p.Size)
+		idx.Hashes[i] = p.Hash
 	}
 	return idx, hash, nil
 }
@@ -341,7 +335,7 @@ func (s *Store) setUploadHash(uploadId string, udoc *uploadDoc) (string, error) 
 	} else {
 		h := NewHash()
 		for i := range udoc.Parts {
-			if err := s.copyBlob(h, uploadPartName(uploadId, i)); err != nil {
+			if err := s.copyBlob(h, udoc.Parts[i].Hash); err != nil {
 				return "", errgo.Mask(err, errgo.Is(ErrNotFound))
 			}
 		}
@@ -360,19 +354,16 @@ func (s *Store) setUploadHash(uploadId string, udoc *uploadDoc) (string, error) 
 	return hash, nil
 }
 
-// copyBlob copies the contents of blob with the given name
+// copyBlob copies the contents of blob with the given hash
 /// to the given Writer.
-func (s *Store) copyBlob(w io.Writer, name string) error {
-	rc, _, err := s.Open(name, nil)
+func (s *Store) copyBlob(w io.Writer, hash string) error {
+	rc, _, err := s.Open(hash, nil)
 	if err != nil {
-		return errgo.NoteMask(err, fmt.Sprintf("cannot open blob %q", name), errgo.Is(ErrNotFound))
+		return errgo.NoteMask(err, fmt.Sprintf("cannot open blob %q", hash), errgo.Is(ErrNotFound))
 	}
 	defer rc.Close()
 	if _, err := io.Copy(w, rc); err != nil {
-		if errgo.Cause(err) == ErrNotFound {
-			return errgo.WithCausef(err, ErrNotFound, "error reading blob %q", name)
-		}
-		return errgo.Notef(err, "error reading blob %q", name)
+		return errgo.NoteMask(err, fmt.Sprintf("error reading blob %q", hash), errgo.Is(ErrNotFound))
 	}
 	return nil
 }
@@ -424,22 +415,19 @@ func (s *Store) SetOwner(uploadId, owner string, expires time.Time) error {
 }
 
 // RemoveExpiredUploads deletes any multipart entries that have passed
-// their expiry date. If an expired upload is found with an owner, the
-// given isOwnedBy function is called with the upload id and its current
-// owner to make sure that it is not actually used - isOwnedBy should
-// report whether the owner actually retains a reference to the given upload.
-func (s *Store) RemoveExpiredUploads(isOwnedBy func(uploadId, owner string) (bool, error)) error {
-	return s.removeExpiredUploads(isOwnedBy, time.Now())
+// their expiry date.
+func (s *Store) RemoveExpiredUploads() error {
+	return s.removeExpiredUploads(time.Now())
 }
 
-func (s *Store) removeExpiredUploads(isOwnedBy func(uploadId, owner string) (bool, error), now time.Time) error {
+func (s *Store) removeExpiredUploads(now time.Time) error {
 	it := s.uploadc.Find(bson.D{
 		{"expires", bson.D{{"$lt", now}}},
 	}).Iter()
 	defer it.Close()
 	var udoc uploadDoc
 	for it.Next(&udoc) {
-		err := s.removeUpload(&udoc, isOwnedBy)
+		err := s.removeUpload(&udoc)
 		if err != nil && errgo.Cause(err) != errUploadInUse {
 			return errgo.Mask(err)
 		}
@@ -457,7 +445,7 @@ func (s *Store) removeExpiredUploads(isOwnedBy func(uploadId, owner string) (boo
 // to determine be sure that it is not actually used.
 // If isOwnedBy is nil, it is assumed to return true - i.e. the
 // document is owned.
-func (s *Store) RemoveUpload(uploadId string, isOwnedBy func(uploadId, owner string) (bool, error)) error {
+func (s *Store) RemoveUpload(uploadId string) error {
 	udoc, err := s.getUpload(uploadId)
 	if err != nil {
 		if errgo.Cause(err) == ErrNotFound {
@@ -465,35 +453,22 @@ func (s *Store) RemoveUpload(uploadId string, isOwnedBy func(uploadId, owner str
 		}
 		return errgo.Mask(err)
 	}
-	return s.removeUpload(udoc, isOwnedBy)
+	return s.removeUpload(udoc)
 }
 
-// removeUpload removes the upload document. It removes the parts
-// associated with it if they're not in use.
-func (s *Store) removeUpload(udoc *uploadDoc, isOwnedBy func(uploadId, owner string) (bool, error)) error {
+// removeUpload removes the upload document.
+func (s *Store) removeUpload(udoc *uploadDoc) error {
 	if udoc.Owner == "" {
 		return s.removeUnownedUpload(udoc)
 	}
-	owned := true
-	if isOwnedBy != nil {
-		owned1, err := isOwnedBy(udoc.Id, udoc.Owner)
-		if err != nil {
-			return errgo.Notef(err, "cannot check blob ownership")
-		}
-		owned = owned1
-	}
-	return s.removeOwnedUpload(udoc, !owned)
+	return s.removeOwnedUpload(udoc)
 }
 
 // removeOwnedUpload removes an upload that has a non-empty
-// owner field. If isOrphan is true, the upload's parts will be removed
-// too.
-func (s *Store) removeOwnedUpload(udoc *uploadDoc, isOrphan bool) error {
+// owner field.
+func (s *Store) removeOwnedUpload(udoc *uploadDoc) error {
 	if err := s.uploadc.RemoveId(udoc.Id); err != nil && err != mgo.ErrNotFound {
 		return errgo.Mask(err)
-	}
-	if isOrphan {
-		return s.removeParts(udoc)
 	}
 	return nil
 }
@@ -515,33 +490,11 @@ func (s *Store) removeUnownedUpload(udoc *uploadDoc) error {
 		{"owner", bson.D{{"$exists", false}}},
 	})
 	switch err {
-	case nil:
-		return s.removeParts(udoc)
 	case mgo.ErrNotFound:
 		// Someone called SetOwner concurrently.
 		return errUploadInUse
 	default:
 		return errgo.Mask(err)
-	}
-}
-
-func (s *Store) removeParts(udoc *uploadDoc) error {
-	var removeErr error
-	for i := range udoc.Parts {
-		name := uploadPartName(udoc.Id, i)
-		err := s.Remove(name, nil)
-		if err == nil || errgo.Cause(err) == ErrNotFound {
-			// The blob *shouldn't* have been removed, but it's
-			// probably best not to treat it as an error if it has.
-			continue
-		}
-		if removeErr == nil {
-			removeErr = err
-		}
-		logger.Errorf("cannot remove blob %q, leaving as garbage: %v", name, err)
-	}
-	if removeErr != nil {
-		return errgo.Notef(removeErr, "failed to remove some data, see log for details")
 	}
 	return nil
 }

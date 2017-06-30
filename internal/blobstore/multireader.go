@@ -24,12 +24,12 @@ type multiReader struct {
 	// store holds the underlying store.
 	store *Store
 
-	// blobPrefix holds the prefix of all the part names.
-	blobPrefix string
-
 	// endPos holds the absolute position of the end
 	// of each part.
 	endPos []int64
+
+	// hashes holds the hash of each part.
+	hashes []string
 
 	// size holds the size the entire multipart blob.
 	size int64
@@ -49,14 +49,17 @@ type multiReader struct {
 	pos int64
 }
 
-func newMultiReader(store *Store, blobPrefix string, idx *mongodoc.MultipartIndex) (ReadSeekCloser, int64, error) {
+func newMultiReader(store *Store, idx *mongodoc.MultipartIndex) (ReadSeekCloser, int64, error) {
+	if len(idx.Sizes) != len(idx.Hashes) {
+		return nil, 0, errgo.Newf("index size/length mismatch (database corruption?)")
+	}
 	switch len(idx.Sizes) {
 	case 0:
 		return emptyBlob{}, 0, nil
 	case 1:
 		// No point in going through the multireader logic if there's
 		// only one part.
-		return store.Open(uploadPartName(blobPrefix, 0), nil)
+		return store.Open(idx.Hashes[0], nil)
 	}
 	endPos := make([]int64, len(idx.Sizes))
 	p := int64(0)
@@ -65,10 +68,10 @@ func newMultiReader(store *Store, blobPrefix string, idx *mongodoc.MultipartInde
 		endPos[i] = p
 	}
 	return &multiReader{
-		store:      store,
-		blobPrefix: blobPrefix,
-		endPos:     endPos,
-		size:       p,
+		store:  store,
+		endPos: endPos,
+		hashes: idx.Hashes,
+		size:   p,
 	}, p, nil
 }
 
@@ -93,11 +96,11 @@ func (r *multiReader) Read(buf []byte) (int, error) {
 		// that ends after the current part. Note that because
 		// we know that 0 <= r.pos < r.size and the last element
 		// in r.endPos==r.size, we must end up with 0 <=
-		// r.rindex < len(r.endPost).
+		// r.rindex < len(r.endPos).
 		r.rindex = sort.Search(len(r.endPos), func(i int) bool {
 			return r.endPos[i] > r.pos
 		})
-		nr, _, err := r.store.Open(uploadPartName(r.blobPrefix, r.rindex), nil)
+		nr, _, err := r.store.Open(r.hashes[r.rindex], nil)
 		if err != nil {
 			return 0, errgo.Notef(err, "cannot open blob part")
 		}
@@ -115,7 +118,7 @@ func (r *multiReader) Read(buf []byte) (int, error) {
 	r.pos += int64(n)
 	r.rpos = r.pos
 	if err != nil {
-		return n, errgo.Notef(err, "error reading blob %q", uploadPartName(r.blobPrefix, r.rindex))
+		return n, errgo.Notef(err, "error reading blob %q", r.hashes[r.rindex])
 	}
 	return n, nil
 }

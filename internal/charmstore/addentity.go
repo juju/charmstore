@@ -38,9 +38,6 @@ type addParams struct {
 	// be promulgated.
 	url *router.ResolvedURL
 
-	// blobName holds the name of the entity's archive blob.
-	blobName string
-
 	// blobHash holds the hash of the entity's archive blob.
 	blobHash string
 
@@ -55,6 +52,10 @@ type addParams struct {
 	// preV5BlobSize holds the size of the entity's archive blob for
 	// pre-v5 compatibility purposes.
 	preV5BlobSize int64
+
+	// preV5BlobExtraHash holds the hash of the extra
+	// appended blob data for pre-v5 compatibility purposes.
+	preV5BlobExtraHash string
 
 	// blobHash256 holds the sha256 hash of the entity's archive blob.
 	blobHash256 string
@@ -128,13 +129,13 @@ func (s *Store) UploadEntity(url *router.ResolvedURL, blob io.Reader, blobHash s
 	if url.URL.Revision == -1 {
 		return errgo.WithCausef(nil, params.ErrEntityIdNotAllowed, "entity id does not specify revision")
 	}
-	blobName, blobHash256, err := s.putArchive(blob, size, blobHash)
+	blobHash256, err := s.putArchive(blob, size, blobHash)
 	if err != nil {
 		return errgo.Mask(err)
 	}
 	m_upload := monitoring.NewUploadProcessingDuration()
 	defer m_upload.ObserveMetric()
-	r, _, err := s.BlobStore.Open(blobName, nil)
+	r, _, err := s.BlobStore.Open(blobHash, nil)
 	if err != nil {
 		return errgo.Notef(err, "cannot open newly created blob")
 	}
@@ -142,10 +143,7 @@ func (s *Store) UploadEntity(url *router.ResolvedURL, blob io.Reader, blobHash s
 	if err := s.AddRevision(url); err != nil {
 		return errgo.Mask(err)
 	}
-	if err := s.addEntityFromReader(url, r, blobName, blobHash, blobHash256, size, chans); err != nil {
-		if err1 := s.BlobStore.Remove(blobName, nil); err1 != nil {
-			logger.Errorf("cannot remove blob %s after error: %v", blobName, err1)
-		}
+	if err := s.addEntityFromReader(url, r, blobHash, blobHash256, size, chans); err != nil {
 		return errgo.Mask(err,
 			errgo.Is(params.ErrDuplicateUpload),
 			errgo.Is(params.ErrEntityIdNotAllowed),
@@ -158,8 +156,7 @@ func (s *Store) UploadEntity(url *router.ResolvedURL, blob io.Reader, blobHash s
 // putArchive reads the charm or bundle archive from the given reader and
 // puts into the blob store. The archiveSize and hash must holds the length
 // of the blob content and its SHA384 hash respectively.
-func (s *Store) putArchive(blob io.Reader, blobSize int64, hash string) (blobName, blobHash256 string, err error) {
-	name := bson.NewObjectId().Hex()
+func (s *Store) putArchive(blob io.Reader, blobSize int64, hash string) (blobHash256 string, err error) {
 
 	// Calculate the SHA256 hash while uploading the blob in the blob store.
 	hash256 := sha256.New()
@@ -167,21 +164,20 @@ func (s *Store) putArchive(blob io.Reader, blobSize int64, hash string) (blobNam
 
 	// Upload the actual blob, and make sure that it is removed
 	// if we fail later.
-	err = s.BlobStore.Put(blob, name, blobSize, hash)
+	err = s.BlobStore.Put(blob, hash, blobSize)
 	if err != nil {
 		// TODO return error with ErrInvalidEntity cause when
 		// there's a hash or size mismatch.
-		return "", "", errgo.Notef(err, "cannot put archive blob")
+		return "", errgo.Notef(err, "cannot put archive blob")
 	}
-	return name, fmt.Sprintf("%x", hash256.Sum(nil)), nil
+	return fmt.Sprintf("%x", hash256.Sum(nil)), nil
 }
 
 // addEntityFromReader adds the entity represented by the contents
 // of the given reader, associating it with the given id.
-func (s *Store) addEntityFromReader(id *router.ResolvedURL, r io.ReadSeeker, blobName, hash, hash256 string, blobSize int64, chans []params.Channel) error {
+func (s *Store) addEntityFromReader(id *router.ResolvedURL, r io.ReadSeeker, hash, hash256 string, blobSize int64, chans []params.Channel) error {
 	p := addParams{
 		url:              id,
-		blobName:         blobName,
 		blobHash:         hash,
 		blobHash256:      hash256,
 		blobSize:         blobSize,
@@ -191,29 +187,21 @@ func (s *Store) addEntityFromReader(id *router.ResolvedURL, r io.ReadSeeker, blo
 		chans:            chans,
 	}
 	if id.URL.Series == "bundle" {
-		var addedCompat bool
 		b, err := s.newBundle(id, r, blobSize)
 		if err != nil {
 			return errgo.Mask(err, errgo.Is(params.ErrInvalidEntity), errgo.Is(params.ErrDuplicateUpload), errgo.Is(params.ErrEntityIdNotAllowed))
 		}
-		info, err := addPreV5BundleCompatibilityHackBlob(s.BlobStore, r, p.blobName, p.blobSize)
+		info, err := addPreV5BundleCompatibilityHackBlob(s.BlobStore, r, p.blobSize)
 		if err != nil && errgo.Cause(err) != errNoCompat {
 			return errgo.Notef(err, "cannot add pre-v5 compatibility blob")
 		}
 		if err == nil {
-			addedCompat = true
 			p.preV5BlobHash = info.hash
 			p.preV5BlobHash256 = info.hash256
 			p.preV5BlobSize = info.size
+			p.preV5BlobExtraHash = info.extraHash
 		}
 		err = s.addBundle(b, p)
-		if err != nil && addedCompat {
-			// We added a compatibility blob so we need to remove it.
-			compatBlobName := preV5CompatibilityBlobName(p.blobName)
-			if err1 := s.BlobStore.Remove(compatBlobName, nil); err1 != nil {
-				logger.Errorf("cannot remove blob %s after error: %v", compatBlobName, err1)
-			}
-		}
 		return errgo.Mask(err, errgo.Is(params.ErrDuplicateUpload), errgo.Is(params.ErrEntityIdNotAllowed))
 	}
 	ch, err := s.newCharm(id, r, blobSize)
@@ -225,22 +213,16 @@ func (s *Store) addEntityFromReader(id *router.ResolvedURL, r io.ReadSeeker, blo
 			return errgo.Notef(err, "cannot seek to start of archive")
 		}
 		logger.Infof("adding pre-v5 compat blob for %#v", id)
-		info, err := addPreV5CharmCompatibilityHackBlob(s.BlobStore, r, p.blobName, p.blobSize)
+		info, err := addPreV5CharmCompatibilityHackBlob(s.BlobStore, r, p.blobSize)
 		if err != nil {
 			return errgo.Notef(err, "cannot add pre-v5 compatibility blob")
 		}
 		p.preV5BlobHash = info.hash
 		p.preV5BlobHash256 = info.hash256
 		p.preV5BlobSize = info.size
+		p.preV5BlobExtraHash = info.extraHash
 	}
 	err = s.addCharm(ch, p)
-	if err != nil && len(ch.Meta().Series) > 0 {
-		// We added a compatibility blob so we need to remove it.
-		compatBlobName := preV5CompatibilityBlobName(p.blobName)
-		if err1 := s.BlobStore.Remove(compatBlobName, nil); err1 != nil {
-			logger.Errorf("cannot remove blob %s after error: %v", compatBlobName, err1)
-		}
-	}
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrDuplicateUpload), errgo.Is(params.ErrEntityIdNotAllowed))
 	}
@@ -251,6 +233,9 @@ type compatibilityHackBlobInfo struct {
 	hash    string
 	hash256 string
 	size    int64
+	// extraHash holds the hash of the extra blob data
+	// (not including the principal blob data).
+	extraHash string
 }
 
 // addPreV5CharmCompatibilityHackBlob adds a second blob to the blob store that
@@ -262,12 +247,12 @@ type compatibilityHackBlobInfo struct {
 // of the series field that holds a single string rather than a slice of string
 // so will fail when reading the new slice-of-string form, and we
 // don't want to change the field name from "series".
-func addPreV5CharmCompatibilityHackBlob(blobStore *blobstore.Store, r io.ReadSeeker, blobName string, blobSize int64) (*compatibilityHackBlobInfo, error) {
+func addPreV5CharmCompatibilityHackBlob(blobStore *blobstore.Store, r io.ReadSeeker, blobSize int64) (*compatibilityHackBlobInfo, error) {
 	data, err := updateZipFile(r, blobSize, "metadata.yaml", removeSeriesField)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	info, err := addCompatibilityHackBlob(blobStore, r, preV5CompatibilityBlobName(blobName), blobSize, data)
+	info, err := addCompatibilityHackBlob(blobStore, r, blobSize, data)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -302,13 +287,13 @@ var errNoCompat = errgo.New("no compatibility blob required")
 // applications field rather than a services field. This updates those
 // bundles to be compatible with the older version of juju that cannot
 // parse an applications field.
-func addPreV5BundleCompatibilityHackBlob(blobStore *blobstore.Store, r io.ReadSeeker, blobName string, blobSize int64) (*compatibilityHackBlobInfo, error) {
+func addPreV5BundleCompatibilityHackBlob(blobStore *blobstore.Store, r io.ReadSeeker, blobSize int64) (*compatibilityHackBlobInfo, error) {
 	r.Seek(0, 0)
 	data, err := updateZipFile(r, blobSize, "bundle.yaml", applicationsToServices)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(errNoCompat))
 	}
-	info, err := addCompatibilityHackBlob(blobStore, r, preV5CompatibilityBlobName(blobName), blobSize, data)
+	info, err := addCompatibilityHackBlob(blobStore, r, blobSize, data)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -339,14 +324,13 @@ func applicationsToServices(r io.Reader) ([]byte, error) {
 // addCompatibilityHackBlob adds a new blob to blobStore containing
 // appendData. It then calculates the size, sha256 & sha384 of the
 // combined contents of r and appendData and returns these values.
-func addCompatibilityHackBlob(blobStore *blobstore.Store, r io.ReadSeeker, blobName string, blobSize int64, appendData []byte) (*compatibilityHackBlobInfo, error) {
-	sha384sum := sha512.Sum384(appendData)
+func addCompatibilityHackBlob(blobStore *blobstore.Store, r io.ReadSeeker, blobSize int64, appendData []byte) (*compatibilityHackBlobInfo, error) {
+	sha384sum := fmt.Sprintf("%x", sha512.Sum384(appendData))
 
 	if err := blobStore.Put(
 		bytes.NewReader(appendData),
-		blobName,
+		sha384sum,
 		int64(len(appendData)),
-		fmt.Sprintf("%x", sha384sum[:]),
 	); err != nil {
 		return nil, errgo.Notef(err, "cannot put archive blob")
 	}
@@ -362,9 +346,10 @@ func addCompatibilityHackBlob(blobStore *blobstore.Store, r io.ReadSeeker, blobN
 	}
 	hashw.Write(appendData)
 	return &compatibilityHackBlobInfo{
-		size:    blobSize + int64(len(appendData)),
-		hash256: fmt.Sprintf("%x", sha256w.Sum(nil)),
-		hash:    fmt.Sprintf("%x", sha384w.Sum(nil)),
+		extraHash: sha384sum,
+		size:      blobSize + int64(len(appendData)),
+		hash256:   fmt.Sprintf("%x", sha256w.Sum(nil)),
+		hash:      fmt.Sprintf("%x", sha384w.Sum(nil)),
 	}, nil
 }
 
@@ -412,12 +397,6 @@ func updateZipFile(r io.ReadSeeker, size int64, filename string, updatef func(io
 		return nil, errgo.Notef(err, "cannot close zip file")
 	}
 	return appendedBlob.Bytes(), nil
-}
-
-// preV5CompatibilityBlobName returns the name of the zip file suffix used
-// to overwrite the metadata.yaml file for pre-v5 compatibility purposes.
-func preV5CompatibilityBlobName(blobName string) string {
-	return blobName + ".pre-v5-suffix"
 }
 
 // newCharm returns a new charm implementation from the archive blob
@@ -519,10 +498,10 @@ func (s *Store) addCharm(c charm.Charm, p addParams) (err error) {
 		PromulgatedURL:          p.url.PromulgatedURL(),
 		BlobHash:                p.blobHash,
 		BlobHash256:             p.blobHash256,
-		BlobName:                p.blobName,
 		PreV5BlobSize:           p.preV5BlobSize,
 		PreV5BlobHash:           p.preV5BlobHash,
 		PreV5BlobHash256:        p.preV5BlobHash256,
+		PreV5BlobExtraHash:      p.preV5BlobExtraHash,
 		Size:                    p.blobSize,
 		UploadTime:              time.Now(),
 		CharmMeta:               c.Meta(),
@@ -587,10 +566,10 @@ func (s *Store) addBundle(b charm.Bundle, p addParams) error {
 		URL:                &p.url.URL,
 		BlobHash:           p.blobHash,
 		BlobHash256:        p.blobHash256,
-		BlobName:           p.blobName,
 		PreV5BlobSize:      p.preV5BlobSize,
 		PreV5BlobHash:      p.preV5BlobHash,
 		PreV5BlobHash256:   p.preV5BlobHash256,
+		PreV5BlobExtraHash: p.preV5BlobExtraHash,
 		Size:               p.blobSize,
 		UploadTime:         time.Now(),
 		BundleData:         bundleData,
