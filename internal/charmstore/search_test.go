@@ -14,6 +14,7 @@ import (
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 
+	"gopkg.in/juju/charmstore.v5-unstable/elasticsearch"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
@@ -329,6 +330,19 @@ func (s *StoreSearchSuite) TestExportSearchDocument(c *gc.C) {
 	err = s.store.ES.GetDocument(s.TestIndex, typeName, s.store.ES.getID(entity.URL), &actual)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(string(actual), jc.JSONEquals, doc)
+}
+
+func (s *StoreSearchSuite) TestDeleteDocument(c *gc.C) {
+	var entity *mongodoc.Entity
+	var actual json.RawMessage
+	err := s.store.DB.Entities().FindId("cs:~charmers/precise/wordpress-23").One(&entity)
+	c.Assert(err, gc.Equals, nil)
+	err = s.store.ES.GetDocument(s.TestIndex, typeName, s.store.ES.getID(entity.URL), &actual)
+	c.Assert(err, gc.Equals, nil)
+	err = s.store.ES.delete(entity)
+	c.Assert(err, gc.Equals, nil)
+	err = s.store.ES.GetDocument(s.TestIndex, typeName, s.store.ES.getID(entity.URL), &actual)
+	c.Assert(err, gc.Equals, elasticsearch.ErrNotFound)
 }
 
 var searchTests = []struct {
