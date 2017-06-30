@@ -4161,8 +4161,12 @@ func (s *StoreSuite) TestDeleteEntity(c *gc.C) {
 	url1 := *url
 	url1.URL.Revision = 13
 	err = store.AddCharmWithArchive(&url1, storetesting.NewCharm(&charm.Meta{
-		Series: []string{"precise"},
+		Summary: "another piece of content",
+		Series:  []string{"precise"},
 	}))
+	c.Assert(err, gc.Equals, nil)
+
+	entity, err := store.FindEntity(url, nil)
 	c.Assert(err, gc.Equals, nil)
 
 	err = store.DeleteEntity(url)
@@ -4171,9 +4175,17 @@ func (s *StoreSuite) TestDeleteEntity(c *gc.C) {
 	_, err = store.FindEntity(url, nil)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 
-	// TODO run blobstore garbage collection, then check
-	// that we can't open the blob or the pre-v5 compatibility
-	// blob.
+	// Run blobstore garbage collection and check that
+	// the blob and the pre-v5 compatibility blob have been
+	// removed.
+	err = store.BlobStoreGC(time.Now())
+	c.Assert(err, gc.Equals, nil)
+
+	_, _, err = store.BlobStore.Open(entity.BlobHash, nil)
+	c.Assert(errgo.Cause(err), gc.Equals, blobstore.ErrNotFound)
+
+	_, _, err = store.BlobStore.Open(entity.PreV5BlobExtraHash, nil)
+	c.Assert(errgo.Cause(err), gc.Equals, blobstore.ErrNotFound)
 }
 
 func (s *StoreSuite) TestDeleteEntityWithOnlyOneRevision(c *gc.C) {
@@ -4212,6 +4224,127 @@ func (s *StoreSuite) TestDeleteEntityWithPublishedRevision(c *gc.C) {
 	// Check that it really hasn't been deleted.
 	_, err = store.FindEntity(url, nil)
 	c.Assert(err, gc.Equals, nil)
+}
+
+func (s *StoreSuite) TestGC(c *gc.C) {
+	store := s.newStore(c, false)
+	defer store.Close()
+
+	// Add some charms and resources.
+
+	id1 := router.MustNewResolvedURL("~charmers/precise/wordpress-1", -1)
+	err := store.AddCharmWithArchive(id1, storetesting.NewCharm(&charm.Meta{
+		Summary: "charm that will be deleted",
+		Series:  []string{"precise", "trusty"},
+	}))
+	c.Assert(err, gc.Equals, nil)
+
+	id2 := router.MustNewResolvedURL("~charmers/precise/wordpress-2", -1)
+	err = store.AddCharmWithArchive(id2, storetesting.NewCharm(&charm.Meta{
+		Summary: "charm that will not be deleted",
+		Series:  []string{"precise", "trusty"},
+	}))
+	c.Assert(err, gc.Equals, nil)
+
+	id3 := MustParseResolvedURL("cs:~charmers/precise/withresource-1")
+	err = store.AddCharmWithArchive(id3, storetesting.NewCharm(storetesting.MetaWithResources(nil, "someResource")))
+	c.Assert(err, gc.Equals, nil)
+	contents := []string{
+		"123456789 123456789 ",
+		"abcdefghijklmnopqrstuvxwyz",
+	}
+	uid := putMultipart(c, store.BlobStore, time.Time{}, contents...)
+	_, err = store.AddResourceWithUploadId(id3, "someResource", uid)
+	c.Assert(err, gc.Equals, nil)
+
+	contents = []string{
+		"123456789 123456789 ",
+		"ABCDEFGHIJKLMNOPQURSTUVWXYZ",
+	}
+	uid = putMultipart(c, store.BlobStore, time.Time{}, contents...)
+	resource2, err := store.AddResourceWithUploadId(id3, "someResource", uid)
+	c.Assert(err, gc.Equals, nil)
+
+	type blobInfo struct {
+		hash  string
+		about string
+		keep  bool
+	}
+	var blobs []blobInfo
+
+	for _, id := range []*router.ResolvedURL{
+		id1,
+		id2,
+		id3,
+	} {
+		{
+			entity, err := store.FindEntity(id, nil)
+			c.Assert(err, gc.Equals, nil)
+			willKeep := id != id1
+			blobs = append(blobs, blobInfo{
+				hash:  entity.BlobHash,
+				about: fmt.Sprintf("%s main blob", id),
+				keep:  willKeep,
+			})
+			if entity.PreV5BlobExtraHash != "" {
+				blobs = append(blobs, blobInfo{
+					hash:  entity.PreV5BlobExtraHash,
+					about: fmt.Sprintf("%s extra blob", id),
+					keep:  willKeep,
+				})
+			}
+		}
+	}
+	blobs = append(blobs, blobInfo{
+		hash:  hashOfString("123456789 123456789 "),
+		about: fmt.Sprintf("content 123456789 123456789 "),
+		keep:  true,
+	})
+	blobs = append(blobs, blobInfo{
+		hash:  hashOfString("abcdefghijklmnopqrstuvxwyz"),
+		about: fmt.Sprintf("content abcdefghijklmnopqrstuvxwyz"),
+		keep:  true,
+	})
+	blobs = append(blobs, blobInfo{
+		hash:  hashOfString("ABCDEFGHIJKLMNOPQURSTUVWXYZ"),
+		about: fmt.Sprintf("content ABCDEFGHIJKLMNOPQURSTUVWXYZ"),
+		keep:  false,
+	})
+
+	// First sanity-check we can get all the blobs.
+	for _, info := range blobs {
+		r, _, err := store.BlobStore.Open(info.hash, nil)
+		c.Assert(err, gc.Equals, nil, gc.Commentf("%s", info.about))
+		r.Close()
+	}
+
+	// Then remove an entity and a resource.
+	err = store.DeleteEntity(id1)
+	c.Assert(err, gc.Equals, nil)
+	err = store.DB.Resources().Remove(bson.D{{
+		"baseurl", resource2.BaseURL,
+	}, {
+		"name", resource2.Name,
+	}, {
+		"revision", resource2.Revision,
+	}})
+	c.Assert(err, gc.Equals, nil)
+
+	// Run the garbage collector and check that
+	// the correct blobs have been removed.
+
+	err = store.BlobStoreGC(time.Now())
+	c.Assert(err, gc.Equals, nil)
+
+	for _, info := range blobs {
+		r, _, err := store.BlobStore.Open(info.hash, nil)
+		if info.keep {
+			c.Assert(err, gc.Equals, nil, gc.Commentf("%s", info.about))
+			r.Close()
+		} else {
+			c.Assert(errgo.Cause(err), gc.Equals, blobstore.ErrNotFound, gc.Commentf("%s", info.about))
+		}
+	}
 }
 
 func urlStrings(urls []*charm.URL) []string {

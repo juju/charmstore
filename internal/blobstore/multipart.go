@@ -223,6 +223,25 @@ func (s *Store) checkPartSizes(parts []*PartInfo, part int, size int64) error {
 	return nil
 }
 
+// addUploadRefs adds to refs any hash references held
+// by the uploads collection.
+func (s *Store) addUploadRefs(refs *Refs) error {
+	var uploadDoc uploadDoc
+	iter := s.uploadc.Find(nil).Iter()
+	for iter.Next(&uploadDoc) {
+		refs.Add(uploadDoc.Hash)
+		for _, part := range uploadDoc.Parts {
+			if part != nil {
+				refs.Add(part.Hash)
+			}
+		}
+	}
+	if err := iter.Err(); err != nil {
+		return errgo.Notef(err, "cannot iterate through uploads")
+	}
+	return nil
+}
+
 // UploadInfo returns information on a given upload. It returns
 // ErrNotFound if the upload has been deleted.
 func (s *Store) UploadInfo(uploadId string) (UploadInfo, error) {

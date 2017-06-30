@@ -5,6 +5,7 @@ package blobstore // import "gopkg.in/juju/charmstore.v5-unstable/internal/blobs
 
 import (
 	"crypto/sha512"
+	"encoding/hex"
 	"fmt"
 	"hash"
 	"io"
@@ -31,6 +32,8 @@ type ReadSeekCloser interface {
 func NewHash() hash.Hash {
 	return sha512.New384()
 }
+
+const hashSize = sha512.Size384
 
 // Backend represents the underlying data store used by blobstore.Store
 // to store blob data.
@@ -105,7 +108,7 @@ var uuidGen = fastuuid.MustNewGenerator()
 // hash, and size from the given reader into blob
 // storage.
 func (s *Store) Put(r io.Reader, hash string, size int64) error {
-	if len(hash) != sha512.Size384*2 {
+	if len(hash) != hashSize*2 {
 		return errgo.Newf("implausible hash %q", hash)
 	}
 	_, err := s.blobRef(hash)
@@ -191,6 +194,95 @@ func (s *Store) Open(hash string, index *mongodoc.MultipartIndex) (ReadSeekClose
 	return r, size, nil
 }
 
+// GC runs the garbage collector, deleting all blobs not present in refs
+// that have not been Put since the given time.
+// Note that it also adds any internal blobs held by
+// in-progress uploads to refs.
+func (s *Store) GC(refs *Refs, before time.Time) error {
+	if err := s.addUploadRefs(refs); err != nil {
+		return errgo.Mask(err)
+	}
+	iter := s.blobRefc.Find(bson.D{{"puttime", bson.D{{"$lte", before}}}}).
+		Select(bson.D{{"name", 1}}).
+		Batch(5000).
+		Iter()
+	var doc blobRefDoc
+	for iter.Next(&doc) {
+		if refs.contains(doc.Hash) {
+			continue
+		}
+		// Blob not found in refs, which means it's garbage
+		// and should be collected right now.
+		if err := s.blobRefc.Remove(bson.D{{
+			"puttime", bson.D{{"$lte", before}},
+		}, {
+			"name", doc.Name,
+		}}); err != nil {
+			if err == mgo.ErrNotFound {
+				// It's either been removed already
+				// or it's just been referenced again
+				// and its PutTime field updated.
+				// In both cases, we don't need to
+				// remove the blob.
+				continue
+			}
+			return errgo.Notef(err, "cannot remove blobref entry")
+		}
+		if err := s.backend.Remove(doc.Name); err != nil {
+			logger.Errorf("cannot remove garbage blob %q from backend (hash %q)", doc.Name, doc.Hash)
+		}
+		logger.Infof("removed garbage blob %q; hash %s", doc.Name, doc.Hash)
+	}
+	if err := iter.Close(); err != nil {
+		return errgo.Notef(err, "cannot iterate over blobrefs")
+	}
+	return nil
+}
+
+// Refs holds information about the existence of
+// a set of blob hashes.
+type Refs struct {
+	// TODO this implementation is good enough for up to a million
+	// or so hashes (at the time of writing the number is ~45000),
+	// but beyond that we might need to reconsider. One initial
+	// mitigation without loss of precision would be to limit the
+	// number of bytes used for each entry (even 4 or 8 bytes may be
+	// sufficient, with a probe to check for false positives).
+	refs map[[hashSize]byte]struct{}
+}
+
+// NewRefs returns a new Refs instance,
+// using n as a hint for the number of references
+// that will be added (the final number does not
+// need to match this).
+func NewRefs(n int) *Refs {
+	return &Refs{
+		refs: make(map[[hashSize]byte]struct{}, n),
+	}
+}
+
+// Add records that the given hash is referenced.
+// It ignores the hash if it's invalid.
+func (r *Refs) Add(hash string) {
+	data, ok := decodeHash(hash)
+	if !ok {
+		return
+	}
+	r.refs[data] = struct{}{}
+}
+
+// contains reports whether the given hash has been
+// added to r.
+func (r *Refs) contains(hash string) bool {
+	data, ok := decodeHash(hash)
+	if !ok {
+		panic("invalid hash")
+		return false
+	}
+	_, ok = r.refs[data]
+	return ok
+}
+
 func (s *Store) updatePutTime(hash string) error {
 	return s.blobRefc.UpdateId(hash, bson.D{{
 		"$set", bson.D{{
@@ -208,4 +300,17 @@ func (s *Store) blobRef(hash string) (*blobRefDoc, error) {
 		return nil, errgo.Mask(err)
 	}
 	return &r, nil
+}
+
+// decodeHash decodes the hex-encoded hash
+// and reports whether it has decoded successfully.
+func decodeHash(hash string) ([hashSize]byte, bool) {
+	if len(hash) != hashSize*2 {
+		return [hashSize]byte{}, false
+	}
+	var data [48]byte
+	if _, err := hex.Decode(data[:], []byte(hash)); err != nil {
+		return [hashSize]byte{}, false
+	}
+	return data, true
 }

@@ -426,6 +426,60 @@ func (s *Store) ensureIndexes() error {
 	return nil
 }
 
+// BlobStoreGC runs the blobstore garbage collector,
+// deleting all blobs that have not been referenced since
+// the given time.
+func (s *Store) BlobStoreGC(before time.Time) error {
+	// Get entity counts so we can make an approximate
+	// measure of hash count.
+	entityCount, err := s.DB.Entities().Count()
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	resourceCount, err := s.DB.Resources().Count()
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	// Assume non-multipart resources, v5 entities that need conversion,
+	// and a 20% duplication rate,
+	estimatedRefCount := (entityCount*2 + resourceCount) * 4 / 5
+
+	refs := blobstore.NewRefs(estimatedRefCount)
+	iter := s.DB.Entities().Find(nil).Select(FieldSelector(
+		"prev5blobextrahash",
+		"blobhash",
+	)).Iter()
+	var entity mongodoc.Entity
+	for iter.Next(&entity) {
+		refs.Add(entity.PreV5BlobExtraHash)
+		refs.Add(entity.BlobHash)
+	}
+	if err := iter.Err(); err != nil {
+		return errgo.Mask(err)
+	}
+	iter = s.DB.Resources().Find(nil).Select(FieldSelector(
+		"blobhash",
+		"blobindex",
+	)).Iter()
+	var resource mongodoc.Resource
+	for iter.Next(&resource) {
+		if resource.BlobIndex == nil {
+			refs.Add(resource.BlobHash)
+			continue
+		}
+		for _, hash := range resource.BlobIndex.Hashes {
+			refs.Add(hash)
+		}
+	}
+	if err := iter.Err(); err != nil {
+		return errgo.Mask(err)
+	}
+	if err := s.BlobStore.GC(refs, before); err != nil {
+		return errgo.Notef(err, "blobstore GC failed")
+	}
+	return nil
+}
+
 // AddAudit adds the given entry to the audit log.
 func (s *Store) AddAudit(entry audit.Entry) {
 	s.addAuditAtTime(entry, time.Now())

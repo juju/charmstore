@@ -28,7 +28,7 @@ func (m *mongoBackend) Get(name string) (ReadSeekCloser, int64, error) {
 	f, err := m.fs.Open(name)
 	if err != nil {
 		if err == mgo.ErrNotFound {
-			return nil, 0, errgo.WithCausef(err, ErrNotFound, "")
+			return nil, 0, errgo.WithCausef(err, ErrNotFound, "backend blob not found")
 		}
 		return nil, 0, errgo.Mask(err)
 	}
