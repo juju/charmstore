@@ -29,6 +29,7 @@ func NewSwiftBackend(cred *identity.Credentials, authmode identity.AuthMode, con
 		authmode,
 		gooseLogger{},
 	)
+	c.SetRequiredServiceTypes([]string{"object-store"})
 	return &swiftBackend{
 		client:    swift.New(c),
 		container: container,
