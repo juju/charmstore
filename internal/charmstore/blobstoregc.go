@@ -44,10 +44,12 @@ func (gc *blobstoreGC) Wait() error {
 func (gc *blobstoreGC) run() error {
 	for {
 		gcDuration := monitoring.NewBlobstoreGCDuration()
+		logger.Infof("starting blobstore garbage collection")
 		if err := gc.doGC(); err != nil {
 			// Note: don't log the duration when there's an error.
 			logger.Errorf("%v", err)
 		} else {
+			logger.Infof("completed blobstore garbage collection")
 			gcDuration.Done()
 		}
 		select {
