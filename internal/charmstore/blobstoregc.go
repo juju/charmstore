@@ -8,6 +8,8 @@ import (
 
 	"gopkg.in/errgo.v1"
 	tomb "gopkg.in/tomb.v2"
+
+	"gopkg.in/juju/charmstore.v5-unstable/internal/monitoring"
 )
 
 var gcInterval = time.Hour
@@ -41,8 +43,12 @@ func (gc *blobstoreGC) Wait() error {
 
 func (gc *blobstoreGC) run() error {
 	for {
+		gcDuration := monitoring.NewBlobstoreGCDuration()
 		if err := gc.doGC(); err != nil {
+			// Note: don't log the duration when there's an error.
 			logger.Errorf("%v", err)
+		} else {
+			gcDuration.Done()
 		}
 		select {
 		case <-gc.tomb.Dying():
