@@ -5,6 +5,7 @@ package charmstore // import "gopkg.in/juju/charmstore.v5-unstable/internal/char
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/juju/testing/httptesting"
@@ -199,6 +200,11 @@ func (s *ServerSuite) TestServerStartsBlobstoreGC(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	uploadIds[uploadId1] = 1
 
+	// Create an entry in the blob store that is out of date.
+	outOfDateBlob := "some stuff"
+	err = store.BlobStore.PutAtTime(strings.NewReader(outOfDateBlob), hashOfString(outOfDateBlob), int64(len(outOfDateBlob)), time.Now().Add(-31*time.Minute))
+	c.Assert(err, gc.Equals, nil)
+
 	// We'd like to create an owned upload that's owned by
 	// a resource, but that involves a bunch of duplicated
 	// logic (we'd need to insert the resource doc manually)
@@ -223,7 +229,8 @@ func (s *ServerSuite) TestServerStartsBlobstoreGC(c *gc.C) {
 		Total: 1 * time.Second,
 		Delay: 50 * time.Millisecond,
 	}
-	for a := attempt.Start(nil); len(uploadIds) > 0 && a.Next(); {
+	blobDeleted := false
+	for a := attempt.Start(nil); (len(uploadIds) > 0 || !blobDeleted) && a.Next(); {
 		for id := range uploadIds {
 			_, err := store.BlobStore.UploadInfo(id)
 			if err != nil {
@@ -231,10 +238,25 @@ func (s *ServerSuite) TestServerStartsBlobstoreGC(c *gc.C) {
 				delete(uploadIds, id)
 			}
 		}
+		if !blobDeleted {
+			r, _, err := store.BlobStore.Open(hashOfString(outOfDateBlob), nil)
+			if errgo.Cause(err) == blobstore.ErrNotFound {
+				blobDeleted = true
+			} else {
+				r.Close()
+			}
+		}
 	}
 	if len(uploadIds) > 0 {
-		c.Fatalf("not all uploads removed; remaining: %v", uploadIds)
+		c.Errorf("not all uploads removed; remaining: %v", uploadIds)
 	}
+	if !blobDeleted {
+		c.Errorf("out of date blob not deleted")
+	}
+	// The upload blob, being more recent, should not have been deleted.
+	r, _, err := store.BlobStore.Open(hashOfString("abcdefghijklmnopqrstuvwxy"), nil)
+	c.Assert(err, gc.Equals, nil)
+	r.Close()
 }
 
 func assertServesVersion(c *gc.C, h http.Handler, vers string) {

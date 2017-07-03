@@ -108,6 +108,13 @@ var uuidGen = fastuuid.MustNewGenerator()
 // hash, and size from the given reader into blob
 // storage.
 func (s *Store) Put(r io.Reader, hash string, size int64) error {
+	return s.PutAtTime(r, hash, size, time.Now())
+}
+
+// PutAtTime is like Put but puts the content as
+// if the current time is now. This should be
+// used for testing purposes only.
+func (s *Store) PutAtTime(r io.Reader, hash string, size int64, now time.Time) error {
 	if len(hash) != hashSize*2 {
 		return errgo.Newf("implausible hash %q", hash)
 	}
@@ -124,7 +131,7 @@ func (s *Store) Put(r io.Reader, hash string, size int64) error {
 		// that would otherwise be garbage collected, even when
 		// they only have the hash but not the content, but
 		// the utility of that as an attack vector seems very limited.
-		err := s.updatePutTime(hash)
+		err := s.updatePutTime(hash, now)
 		if err == nil {
 			// Check that the content actually matches its
 			// purported hash.
@@ -159,7 +166,7 @@ func (s *Store) Put(r io.Reader, hash string, size int64) error {
 	err = s.blobRefc.Insert(&blobRefDoc{
 		Hash:    hash,
 		Name:    name,
-		PutTime: time.Now(),
+		PutTime: now,
 	})
 	if err == nil {
 		return nil
@@ -283,10 +290,10 @@ func (r *Refs) contains(hash string) bool {
 	return ok
 }
 
-func (s *Store) updatePutTime(hash string) error {
+func (s *Store) updatePutTime(hash string, now time.Time) error {
 	return s.blobRefc.UpdateId(hash, bson.D{{
 		"$set", bson.D{{
-			"puttime", time.Now(),
+			"puttime", now,
 		}},
 	}})
 }
