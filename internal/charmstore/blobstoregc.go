@@ -6,10 +6,13 @@ package charmstore
 import (
 	"time"
 
+	"gopkg.in/errgo.v1"
 	tomb "gopkg.in/tomb.v2"
+
+	"gopkg.in/juju/charmstore.v5-unstable/internal/monitoring"
 )
 
-var gcInterval = 5 * time.Minute
+var gcInterval = time.Hour
 
 // blobstoreGC implements the worker that runs the blobstore
 // garbage collector.
@@ -40,11 +43,12 @@ func (gc *blobstoreGC) Wait() error {
 
 func (gc *blobstoreGC) run() error {
 	for {
-		store := gc.pool.Store()
-		err := store.BlobStore.RemoveExpiredUploads()
-		store.Close()
-		if err != nil {
-			logger.Errorf("blob garbage collection failed: %v", err)
+		gcDuration := monitoring.NewBlobstoreGCDuration()
+		if err := gc.doGC(); err != nil {
+			// Note: don't log the duration when there's an error.
+			logger.Errorf("%v", err)
+		} else {
+			gcDuration.Done()
 		}
 		select {
 		case <-gc.tomb.Dying():
@@ -52,4 +56,18 @@ func (gc *blobstoreGC) run() error {
 		case <-time.After(gcInterval):
 		}
 	}
+}
+
+func (gc *blobstoreGC) doGC() error {
+	store := gc.pool.Store()
+	defer store.Close()
+	err := store.BlobStore.RemoveExpiredUploads()
+	if err != nil {
+		return errgo.Notef(err, "expired-upload garbage collection failed")
+	}
+	err = store.BlobStoreGC(time.Now().Add(-30 * time.Minute))
+	if err != nil {
+		return errgo.Notef(err, "blob garbage collection failed")
+	}
+	return nil
 }

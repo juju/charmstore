@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/juju/idmclient"
+	"github.com/juju/loggo"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
@@ -19,6 +20,7 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/macaroon.v2-unstable"
+	"gopkg.in/mgo.v2/bson"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
@@ -254,51 +256,52 @@ func (s *ListSuite) TestMetadataFields(c *gc.C) {
 	}
 }
 
-// TODO reenable this when blobstore garbage collection is implemented.
-//func (s *ListSuite) TestListIncludeError(c *gc.C) {
-//	// Perform a list for all charms, including the
-//	// manifest, which will try to retrieve all charm
-//	// blobs.
-//	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
-//		Handler: s.srv,
-//		URL:     storeURL("list?type=charm&include=manifest"),
-//	})
-//	c.Assert(rec.Code, gc.Equals, http.StatusOK)
-//	var resp params.ListResponse
-//	err := json.Unmarshal(rec.Body.Bytes(), &resp)
-//	// cs:riak will not be found because it is not visible to "everyone".
-//	c.Assert(resp.Results, gc.HasLen, len(exportTestCharms)-1)
-//
-//	// Now remove one of the blobs. The list should still
-//	// work, but only return a single result.
-//	entity, err := s.store.FindEntity(newResolvedURL("~charmers/precise/wordpress-23", 23), nil)
-//	c.Assert(err, gc.Equals, nil)
-//	err = s.store.BlobStore.Remove(entity.BlobName, nil)
-//	c.Assert(err, gc.Equals, nil)
-//
-//	// Now list again - we should get one result less
-//	// (and the error will be logged).
-//
-//	// Register a logger that so that we can check the logging output.
-//	// It will be automatically removed later because IsolatedMgoESSuite
-//	// uses LoggingSuite.
-//	var tw loggo.TestWriter
-//	err = loggo.RegisterWriter("test-log", &tw)
-//	c.Assert(err, gc.Equals, nil)
-//
-//	rec = httptesting.DoRequest(c, httptesting.DoRequestParams{
-//		Handler: s.srv,
-//		URL:     storeURL("list?type=charm&include=manifest"),
-//	})
-//	c.Assert(rec.Code, gc.Equals, http.StatusOK)
-//	resp = params.ListResponse{}
-//	err = json.Unmarshal(rec.Body.Bytes(), &resp)
-//	// cs:riak will not be found because it is not visible to "everyone".
-//	// cs:wordpress will not be found because it has no manifest.
-//	c.Assert(resp.Results, gc.HasLen, len(exportTestCharms)-2)
-//
-//	c.Assert(tw.Log(), jc.LogMatches, []string{"cannot retrieve metadata for cs:precise/wordpress-23: cannot open archive data for cs:precise/wordpress-23: .*"})
-//}
+func (s *ListSuite) TestListIncludeError(c *gc.C) {
+	// Perform a list for all charms, including the
+	// manifest, which will try to retrieve all charm
+	// blobs.
+	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
+		Handler: s.srv,
+		URL:     storeURL("list?type=charm&include=manifest"),
+	})
+	c.Assert(rec.Code, gc.Equals, http.StatusOK)
+	var resp params.ListResponse
+	err := json.Unmarshal(rec.Body.Bytes(), &resp)
+	// cs:riak will not be found because it is not visible to "everyone".
+	c.Assert(resp.Results, gc.HasLen, len(exportTestCharms)-1)
+
+	// Now update the entity to hold an invalid hash.
+	// The list should still work, but only return a single result.
+	err = s.store.UpdateEntity(newResolvedURL("~charmers/precise/wordpress-23", 23), bson.D{{
+		"$set", bson.D{{
+			"blobhash", hashOfString("nope"),
+		}},
+	}})
+	c.Assert(err, gc.Equals, nil)
+
+	// Now list again - we should get one result less
+	// (and the error will be logged).
+
+	// Register a logger that so that we can check the logging output.
+	// It will be automatically removed later because IsolatedMgoESSuite
+	// uses LoggingSuite.
+	var tw loggo.TestWriter
+	err = loggo.RegisterWriter("test-log", &tw)
+	c.Assert(err, gc.Equals, nil)
+
+	rec = httptesting.DoRequest(c, httptesting.DoRequestParams{
+		Handler: s.srv,
+		URL:     storeURL("list?type=charm&include=manifest"),
+	})
+	c.Assert(rec.Code, gc.Equals, http.StatusOK)
+	resp = params.ListResponse{}
+	err = json.Unmarshal(rec.Body.Bytes(), &resp)
+	// cs:riak will not be found because it is not visible to "everyone".
+	// cs:wordpress will not be found because it has no manifest.
+	c.Assert(resp.Results, gc.HasLen, len(exportTestCharms)-2)
+
+	c.Assert(tw.Log(), jc.LogMatches, []string{"cannot retrieve metadata for cs:precise/wordpress-23: cannot open archive data for cs:precise/wordpress-23: .*"})
+}
 
 func (s *ListSuite) TestSortingList(c *gc.C) {
 	tests := []struct {

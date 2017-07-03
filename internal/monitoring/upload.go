@@ -4,21 +4,41 @@ package monitoring
 
 import (
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
-// UploadProcessingDuration represents a monitoring duration.
-type UploadProcessingDuration struct {
+// NewUploadProcessingDuration returns a new
+// Duration to be used for measuring the time taken
+// to process an upload.
+func NewUploadProcessingDuration() *Duration {
+	return newDuration(uploadProcessingDuration)
+}
+
+// NewBlobstoreGCDuration returns a new
+// Duration to be used for measuring the time taken
+// to run the blobstore garbage collector.
+func NewBlobstoreGCDuration() *Duration {
+	return newDuration(blobstoreGCDuration)
+}
+
+// Duration represents a time duration to be montored.
+// The duration starts when the Duration is created
+// and finishes when Done is called.
+type Duration struct {
+	metric    prometheus.Summary
 	startTime time.Time
 }
 
-// Return a new UploadProcessingDuration with its start time set to now.
-func NewUploadProcessingDuration() *UploadProcessingDuration {
-	return &UploadProcessingDuration{
-		startTime: time.Now(),
-	}
+// Done observes the duration as a metric.
+// It should only be called once.
+func (d *Duration) Done() {
+	d.metric.Observe(float64(time.Since(d.startTime)) / float64(time.Microsecond))
 }
 
-// ObserveMetric observes this metric.
-func (r *UploadProcessingDuration) ObserveMetric() {
-	uploadProcessingDuration.Observe(float64(time.Since(r.startTime)) / float64(time.Microsecond))
+func newDuration(metric prometheus.Summary) *Duration {
+	return &Duration{
+		metric:    metric,
+		startTime: time.Now(),
+	}
 }

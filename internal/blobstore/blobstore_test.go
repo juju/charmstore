@@ -118,6 +118,32 @@ func (s *blobStoreSuite) TestPut(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 }
 
+func (s *blobStoreSuite) TestGC(c *gc.C) {
+	const N = 10
+	for i := 0; i < N; i++ {
+		content := fmt.Sprint(i)
+		err := s.store.Put(strings.NewReader(content), hashOf(content), int64(len(content)))
+		c.Assert(err, gc.Equals, nil)
+	}
+	refs := blobstore.NewRefs(0)
+	refs.Add(hashOf("2"))
+	refs.Add(hashOf("5"))
+	err := s.store.GC(refs, time.Now())
+	c.Assert(err, gc.Equals, nil)
+
+	s.assertBlobContent(c, nil, "2")
+	s.assertBlobContent(c, nil, "5")
+
+	for i := 0; i < N; i++ {
+		content := fmt.Sprint(i)
+		if i == 2 || i == 5 {
+			s.assertBlobContent(c, nil, content)
+		} else {
+			s.assertBlobDoesNotExist(c, content)
+		}
+	}
+}
+
 func (s *blobStoreSuite) TestPutInvalidHash(c *gc.C) {
 	content := "some data"
 	err := s.store.Put(strings.NewReader(content), hashOf("wrong"), int64(len(content)))
@@ -663,7 +689,10 @@ func (s *blobStoreSuite) TestRemoveUploadSuccessWithParts(c *gc.C) {
 	err = s.store.RemoveUpload(id)
 	c.Assert(err, gc.Equals, nil)
 	s.assertUploadDoesNotExist(c, id)
-	// TODO garbage collect and check that blob is removed.
+
+	err = s.store.GC(blobstore.NewRefs(0), time.Now())
+	c.Assert(err, gc.Equals, nil)
+	s.assertBlobDoesNotExist(c, content)
 }
 
 func (s *blobStoreSuite) TestSetOwner(c *gc.C) {
@@ -725,7 +754,12 @@ func (s *blobStoreSuite) TestRemoveFinishedUploadRemovesParts(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	s.assertUploadDoesNotExist(c, id)
-	s.assertBlobDoesNotExist(c, id+"/0")
+
+	// The blob will exist but will be removed after a
+	// garbage collection.
+	err = s.store.GC(blobstore.NewRefs(0), time.Now())
+	c.Assert(err, gc.Equals, nil)
+	s.assertBlobDoesNotExist(c, content)
 }
 
 func (s *blobStoreSuite) TestRemoveExpiredUploads(c *gc.C) {
@@ -733,10 +767,10 @@ func (s *blobStoreSuite) TestRemoveExpiredUploads(c *gc.C) {
 
 	expireTimes := []time.Duration{-time.Minute, -time.Second, time.Minute, time.Hour}
 	ids := make([]string, len(expireTimes))
-	content := "123456789 12345"
 	for i, dt := range expireTimes {
 		id, err := s.store.NewUpload(time.Now().Add(dt))
 		c.Assert(err, gc.Equals, nil)
+		content := fmt.Sprintf("%15d", i)
 		err = s.store.PutPart(id, 0, strings.NewReader(content), int64(len(content)), hashOf(content))
 		c.Assert(err, gc.Equals, nil)
 		_, _, err = s.store.FinishUpload(id, []blobstore.Part{{Hash: hashOf(content)}})
@@ -746,10 +780,17 @@ func (s *blobStoreSuite) TestRemoveExpiredUploads(c *gc.C) {
 
 	err := s.store.RemoveExpiredUploads()
 	c.Assert(err, gc.Equals, nil)
+
+	// Garbage collect all blobs (those still referenced
+	// by the uploads collection won't be collected).
+	err = s.store.GC(blobstore.NewRefs(0), time.Now())
+	c.Assert(err, gc.Equals, nil)
+
 	for i, id := range ids {
+		content := fmt.Sprintf("%15d", i)
 		if expireTimes[i] < 0 {
 			s.assertUploadDoesNotExist(c, id)
-			s.assertBlobDoesNotExist(c, id+"/0")
+			s.assertBlobDoesNotExist(c, content)
 		} else {
 			_, _, err = s.store.FinishUpload(id, []blobstore.Part{{Hash: hashOf(content)}})
 			c.Assert(err, gc.Equals, nil)
@@ -950,9 +991,9 @@ func (s *blobStoreSuite) assertUploadDoesNotExist(c *gc.C, id string) {
 	c.Assert(errgo.Cause(err), gc.Equals, blobstore.ErrNotFound)
 }
 
-func (s *blobStoreSuite) assertBlobDoesNotExist(c *gc.C, name string) {
-	_, _, err := s.store.Open(name, nil)
-	c.Assert(errgo.Cause(err), gc.Equals, blobstore.ErrNotFound)
+func (s *blobStoreSuite) assertBlobDoesNotExist(c *gc.C, content string) {
+	_, _, err := s.store.Open(hashOf(content), nil)
+	c.Assert(errgo.Cause(err), gc.Equals, blobstore.ErrNotFound, gc.Commentf("content %q, hash %s", content, hashOf(content)))
 }
 
 func (s *blobStoreSuite) assertBlobContent(c *gc.C, idx *mongodoc.MultipartIndex, content string) {

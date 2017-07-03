@@ -133,8 +133,8 @@ func (s *Store) UploadEntity(url *router.ResolvedURL, blob io.Reader, blobHash s
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	m_upload := monitoring.NewUploadProcessingDuration()
-	defer m_upload.ObserveMetric()
+	uploadDuration := monitoring.NewUploadProcessingDuration()
+	defer uploadDuration.Done()
 	r, _, err := s.BlobStore.Open(blobHash, nil)
 	if err != nil {
 		return errgo.Notef(err, "cannot open newly created blob")
