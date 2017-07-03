@@ -27,6 +27,7 @@ import (
 	"gopkg.in/juju/charmstore.v5-unstable/internal/blobstore"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/cache"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5-unstable/internal/monitoring"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
 )
 
@@ -448,6 +449,7 @@ func (s *Store) BlobStoreGC(before time.Time) error {
 	iter := s.DB.Entities().Find(nil).Select(FieldSelector(
 		"prev5blobextrahash",
 		"blobhash",
+		"size",
 	)).Iter()
 	var entity mongodoc.Entity
 	for iter.Next(&entity) {
@@ -474,9 +476,11 @@ func (s *Store) BlobStoreGC(before time.Time) error {
 	if err := iter.Err(); err != nil {
 		return errgo.Mask(err)
 	}
-	if err := s.BlobStore.GC(refs, before); err != nil {
+	stats, err := s.BlobStore.GC(refs, before)
+	if err != nil {
 		return errgo.Notef(err, "blobstore GC failed")
 	}
+	monitoring.SetBlobStoreStats(stats)
 	return nil
 }
 

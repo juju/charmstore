@@ -226,6 +226,8 @@ type blobRefDoc struct {
 	// PutTime stores the last time a new reference
 	// was made to the blob with Put.
 	PutTime time.Time
+	// Size holds the size of the blob.
+	Size int64 `bson:"size"`
 }
 
 // legacyBlobstoreResourceDoc is the persistent representation of a Resource.
@@ -354,6 +356,7 @@ func createBlobRefsCollection(db StoreDatabase) error {
 			Hash:    doc.SHA384Hash,
 			Name:    doc.Path,
 			PutTime: time.Now(),
+			Size:    doc.Length,
 		})
 		if n++; n < 100 {
 			continue

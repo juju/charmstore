@@ -18,6 +18,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5-unstable/internal/monitoring"
 )
 
 var logger = loggo.GetLogger("charmstore.internal.blobstore")
@@ -61,10 +62,16 @@ type blobRefDoc struct {
 	// Hash holds the hex-encoded hash of the blob.
 	Hash string `bson:"_id"`
 	// Name holds the name of the blob in the backend.
-	Name string `bson:"name"`
+	Name string
 	// PutTime stores the last time a new reference
 	// was made to the blob with Put.
 	PutTime time.Time
+	// Size holds the size of the blob.
+	Size int64 `bson:"size"`
+
+	// TODO store the kind of object that
+	// caused the reference to be created
+	// so that we can report it as a statistic?
 }
 
 // Store stores data blobs in mongodb, de-duplicating by
@@ -167,6 +174,7 @@ func (s *Store) PutAtTime(r io.Reader, hash string, size int64, now time.Time) e
 		Hash:    hash,
 		Name:    name,
 		PutTime: now,
+		Size:    size,
 	})
 	if err == nil {
 		return nil
@@ -205,17 +213,27 @@ func (s *Store) Open(hash string, index *mongodoc.MultipartIndex) (ReadSeekClose
 // that have not been Put since the given time.
 // Note that it also adds any internal blobs held by
 // in-progress uploads to refs.
-func (s *Store) GC(refs *Refs, before time.Time) error {
+func (s *Store) GC(refs *Refs, before time.Time) (monitoring.BlobStats, error) {
+	fail := func(err error) (monitoring.BlobStats, error) {
+		return monitoring.BlobStats{}, err
+	}
+	var stats monitoring.BlobStats
+	totalSize := int64(0)
 	if err := s.addUploadRefs(refs); err != nil {
-		return errgo.Mask(err)
+		return fail(errgo.Mask(err))
 	}
 	iter := s.blobRefc.Find(bson.D{{"puttime", bson.D{{"$lte", before}}}}).
-		Select(bson.D{{"name", 1}}).
+		Select(bson.D{{"name", 1}, {"size", 1}}).
 		Batch(5000).
 		Iter()
 	var doc blobRefDoc
 	for iter.Next(&doc) {
 		if refs.contains(doc.Hash) {
+			totalSize += doc.Size
+			stats.Count++
+			if doc.Size > stats.MaxSize {
+				stats.MaxSize = doc.Size
+			}
 			continue
 		}
 		// Blob not found in refs, which means it's garbage
@@ -233,17 +251,20 @@ func (s *Store) GC(refs *Refs, before time.Time) error {
 				// remove the blob.
 				continue
 			}
-			return errgo.Notef(err, "cannot remove blobref entry")
+			return fail(errgo.Notef(err, "cannot remove blobref entry"))
 		}
 		if err := s.backend.Remove(doc.Name); err != nil {
 			logger.Errorf("cannot remove garbage blob %q from backend (hash %q)", doc.Name, doc.Hash)
 		}
 		logger.Infof("removed garbage blob %q; hash %s", doc.Name, doc.Hash)
 	}
-	if err := iter.Close(); err != nil {
-		return errgo.Notef(err, "cannot iterate over blobrefs")
+	if stats.Count > 0 {
+		stats.MeanSize = totalSize / int64(stats.Count)
 	}
-	return nil
+	if err := iter.Close(); err != nil {
+		return fail(errgo.Notef(err, "cannot iterate over blobrefs"))
+	}
+	return stats, nil
 }
 
 // Refs holds information about the existence of

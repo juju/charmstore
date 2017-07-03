@@ -25,6 +25,7 @@ import (
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/blobstore"
 	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5-unstable/internal/monitoring"
 )
 
 var _ = gc.Suite(&MongoStoreSuite{})
@@ -119,27 +120,33 @@ func (s *blobStoreSuite) TestPut(c *gc.C) {
 }
 
 func (s *blobStoreSuite) TestGC(c *gc.C) {
+	content := func(i int) string {
+		return strings.Repeat("0", i)
+	}
 	const N = 10
 	for i := 0; i < N; i++ {
-		content := fmt.Sprint(i)
-		err := s.store.Put(strings.NewReader(content), hashOf(content), int64(len(content)))
+		err := s.store.Put(strings.NewReader(content(i)), hashOf(content(i)), int64(len(content(i))))
 		c.Assert(err, gc.Equals, nil)
 	}
 	refs := blobstore.NewRefs(0)
-	refs.Add(hashOf("2"))
-	refs.Add(hashOf("5"))
-	err := s.store.GC(refs, time.Now())
+	refs.Add(hashOf(content(2)))
+	refs.Add(hashOf(content(5)))
+	stats, err := s.store.GC(refs, time.Now())
 	c.Assert(err, gc.Equals, nil)
+	c.Assert(stats, jc.DeepEquals, monitoring.BlobStats{
+		Count:    2,
+		MaxSize:  5,
+		MeanSize: (2 + 5) / 2,
+	})
 
-	s.assertBlobContent(c, nil, "2")
-	s.assertBlobContent(c, nil, "5")
+	s.assertBlobContent(c, nil, content(2))
+	s.assertBlobContent(c, nil, content(5))
 
 	for i := 0; i < N; i++ {
-		content := fmt.Sprint(i)
 		if i == 2 || i == 5 {
-			s.assertBlobContent(c, nil, content)
+			s.assertBlobContent(c, nil, content(i))
 		} else {
-			s.assertBlobDoesNotExist(c, content)
+			s.assertBlobDoesNotExist(c, content(i))
 		}
 	}
 }
@@ -690,7 +697,7 @@ func (s *blobStoreSuite) TestRemoveUploadSuccessWithParts(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	s.assertUploadDoesNotExist(c, id)
 
-	err = s.store.GC(blobstore.NewRefs(0), time.Now())
+	_, err = s.store.GC(blobstore.NewRefs(0), time.Now())
 	c.Assert(err, gc.Equals, nil)
 	s.assertBlobDoesNotExist(c, content)
 }
@@ -757,7 +764,7 @@ func (s *blobStoreSuite) TestRemoveFinishedUploadRemovesParts(c *gc.C) {
 
 	// The blob will exist but will be removed after a
 	// garbage collection.
-	err = s.store.GC(blobstore.NewRefs(0), time.Now())
+	_, err = s.store.GC(blobstore.NewRefs(0), time.Now())
 	c.Assert(err, gc.Equals, nil)
 	s.assertBlobDoesNotExist(c, content)
 }
@@ -783,7 +790,7 @@ func (s *blobStoreSuite) TestRemoveExpiredUploads(c *gc.C) {
 
 	// Garbage collect all blobs (those still referenced
 	// by the uploads collection won't be collected).
-	err = s.store.GC(blobstore.NewRefs(0), time.Now())
+	_, err = s.store.GC(blobstore.NewRefs(0), time.Now())
 	c.Assert(err, gc.Equals, nil)
 
 	for i, id := range ids {
