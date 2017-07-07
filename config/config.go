@@ -45,6 +45,7 @@ type Config struct {
 	MaxUploadParts    int               `yaml:"max-upload-parts"`
 	BlobStore         BlobStoreType     `yaml:"blobstore"`
 	SwiftAuthURL      string            `yaml:"swift-auth-url"`
+	SwiftEndpointURL  string            `yaml:"swift-endpoint-url"`
 	SwiftUsername     string            `yaml:"swift-username"`
 	SwiftSecret       string            `yaml:"swift-secret"`
 	SwiftBucket       string            `yaml:"swift-bucket"`
