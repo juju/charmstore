@@ -325,7 +325,7 @@ func updatePreV5BlobExtraHashes(db StoreDatabase) error {
 		return errgo.Mask(err)
 	}
 	if err := managedResources.DropCollection(); err != nil && !strings.Contains(err.Error(), "not found") {
-		return errgo.Notef(err, "cannot drop storedResources collection")
+		return errgo.Notef(err, "cannot drop managedResources collection")
 	}
 	return nil
 }
@@ -365,7 +365,7 @@ func createBlobRefsCollection(db StoreDatabase) error {
 			logger.Infof("bulk insert error (probably because of duplicate inserts)")
 		}
 		n = 0
-		inserter = db.Entities().Bulk()
+		inserter = db.C("entitystore.blobref").Bulk()
 		inserter.Unordered()
 	}
 	if _, err := inserter.Run(); err != nil {
