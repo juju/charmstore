@@ -324,9 +324,6 @@ func updatePreV5BlobExtraHashes(db StoreDatabase) error {
 	if err := iter.Err(); err != nil {
 		return errgo.Mask(err)
 	}
-	if err := managedResources.DropCollection(); err != nil && !strings.Contains(err.Error(), "not found") {
-		return errgo.Notef(err, "cannot drop storedResources collection")
-	}
 	return nil
 }
 
@@ -344,38 +341,24 @@ func preV5CompatibilityBlobName(blobName string) string {
 func createBlobRefsCollection(db StoreDatabase) error {
 	storedResources := db.C("storedResources")
 	iter := storedResources.Find(nil).Iter()
-	inserter := db.C("entitystore.blobref").Bulk()
-	inserter.Unordered()
-	n := 0
+	blobRefCollection := db.C("entitystore.blobref")
 	var doc legacyBlobstoreResourceDoc
 	for iter.Next(&doc) {
 		if doc.Path == "" {
 			continue
 		}
-		inserter.Insert(&blobRefDoc{
+		_, err := blobRefCollection.Upsert(bson.D{{"_id", doc.SHA384Hash}}, &blobRefDoc{
 			Hash:    doc.SHA384Hash,
 			Name:    doc.Path,
 			PutTime: time.Now(),
 			Size:    doc.Length,
 		})
-		if n++; n < 100 {
-			continue
+		if err != nil {
+			return errgo.Notef(err, "cannot upsert hash: %s", doc.SHA384Hash)
 		}
-		if _, err := inserter.Run(); err != nil {
-			logger.Infof("bulk insert error (probably because of duplicate inserts)")
-		}
-		n = 0
-		inserter = db.Entities().Bulk()
-		inserter.Unordered()
-	}
-	if _, err := inserter.Run(); err != nil {
-		logger.Infof("bulk insert error (probably because of duplicate inserts)")
 	}
 	if err := iter.Err(); err != nil {
 		return errgo.Notef(err, "cannot iterate over all storedResources documents")
-	}
-	if err := storedResources.DropCollection(); err != nil && !strings.Contains(err.Error(), "not found") {
-		return errgo.Notef(err, "cannot drop storedResources collection")
 	}
 	return nil
 }
