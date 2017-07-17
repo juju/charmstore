@@ -73,7 +73,7 @@ func (m *SwiftAuthMode) UnmarshalText(data []byte) error {
 		m.Mode = identity.AuthLegacy
 	case "keypair":
 		m.Mode = identity.AuthKeyPair
-	case "authuserpassv3":
+	case "userpassv3":
 		m.Mode = identity.AuthUserPassV3
 	case "userpass":
 		m.Mode = identity.AuthUserPass

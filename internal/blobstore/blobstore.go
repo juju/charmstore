@@ -304,7 +304,6 @@ func (r *Refs) Add(hash string) {
 func (r *Refs) contains(hash string) bool {
 	data, ok := decodeHash(hash)
 	if !ok {
-		panic("invalid hash")
 		return false
 	}
 	_, ok = r.refs[data]
@@ -334,10 +333,12 @@ func (s *Store) blobRef(hash string) (*blobRefDoc, error) {
 // and reports whether it has decoded successfully.
 func decodeHash(hash string) ([hashSize]byte, bool) {
 	if len(hash) != hashSize*2 {
+		logger.Debugf("invalid length for hash %q (%d)", hash, len(hash))
 		return [hashSize]byte{}, false
 	}
 	var data [48]byte
 	if _, err := hex.Decode(data[:], []byte(hash)); err != nil {
+		logger.Debugf("error decoding hash %q: %s", hash, err)
 		return [hashSize]byte{}, false
 	}
 	return data, true
