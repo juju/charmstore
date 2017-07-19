@@ -292,8 +292,9 @@ func NewRefs(n int) *Refs {
 // Add records that the given hash is referenced.
 // It ignores the hash if it's invalid.
 func (r *Refs) Add(hash string) {
-	data, ok := decodeHash(hash)
-	if !ok {
+	data, err := decodeHash(hash)
+	if err != nil {
+		logger.Errorf("cannot add bad hash %q: %v", hash, err)
 		return
 	}
 	r.refs[data] = struct{}{}
@@ -302,11 +303,12 @@ func (r *Refs) Add(hash string) {
 // contains reports whether the given hash has been
 // added to r.
 func (r *Refs) contains(hash string) bool {
-	data, ok := decodeHash(hash)
-	if !ok {
+	data, err := decodeHash(hash)
+	if err != nil {
+		logger.Errorf("cannot check bad hash %q: %v", hash, err)
 		return false
 	}
-	_, ok = r.refs[data]
+	_, ok := r.refs[data]
 	return ok
 }
 
@@ -331,15 +333,13 @@ func (s *Store) blobRef(hash string) (*blobRefDoc, error) {
 
 // decodeHash decodes the hex-encoded hash
 // and reports whether it has decoded successfully.
-func decodeHash(hash string) ([hashSize]byte, bool) {
+func decodeHash(hash string) ([hashSize]byte, error) {
 	if len(hash) != hashSize*2 {
-		logger.Debugf("invalid length for hash %q (%d)", hash, len(hash))
-		return [hashSize]byte{}, false
+		return [hashSize]byte{}, errgo.Newf("invalid length for hash")
 	}
 	var data [48]byte
 	if _, err := hex.Decode(data[:], []byte(hash)); err != nil {
-		logger.Debugf("error decoding hash %q: %s", hash, err)
-		return [hashSize]byte{}, false
+		return [hashSize]byte{}, errgo.Newf("cannot decode: %v", err)
 	}
-	return data, true
+	return data, nil
 }
