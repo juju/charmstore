@@ -431,6 +431,9 @@ func (s *Store) ensureIndexes() error {
 // deleting all blobs that have not been referenced since
 // the given time.
 func (s *Store) BlobStoreGC(before time.Time) error {
+	// BEWARE: if this code does not add all the relevant blob
+	// hashes, they will be removed by the garbage collector!
+
 	// Get entity counts so we can make an approximate
 	// measure of hash count.
 	entityCount, err := s.DB.Entities().Count()
@@ -453,7 +456,9 @@ func (s *Store) BlobStoreGC(before time.Time) error {
 	)).Iter()
 	var entity mongodoc.Entity
 	for iter.Next(&entity) {
-		refs.Add(entity.PreV5BlobExtraHash)
+		if entity.PreV5BlobExtraHash != "" {
+			refs.Add(entity.PreV5BlobExtraHash)
+		}
 		refs.Add(entity.BlobHash)
 	}
 	if err := iter.Err(); err != nil {

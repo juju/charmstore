@@ -302,12 +302,15 @@ func updatePreV5BlobExtraHashes(db StoreDatabase) error {
 			continue
 		}
 		hash := preV5BlobExtraHashes[preV5CompatibilityBlobName(entity.BlobName)]
+		logger.Infof("creating prev5blobhash for %s (%s)", entity.URL, hash)
 		if hash == "" {
 			iter.Close()
 			return errgo.Newf("hash for pre-v5 blob for entity %q not found; name %q; hashes %q", entity.URL, preV5CompatibilityBlobName(entity.BlobName), preV5BlobExtraHashes)
 		}
+		// Save the URL because we are accessing it concurrently.
+		entityURL := entity.URL
 		updater.Do(func() error {
-			return entities.UpdateId(entity.URL, bson.D{{
+			err := entities.UpdateId(entityURL, bson.D{{
 				"$set", bson.D{{
 					"prev5blobextrahash", hash,
 				}},
@@ -316,10 +319,15 @@ func updatePreV5BlobExtraHashes(db StoreDatabase) error {
 					"blobname", nil,
 				}},
 			}})
+			if err != nil {
+				logger.Errorf("cannot update %s: %v", entityURL, err)
+				return err
+			}
+			return nil
 		})
 	}
 	if err := updater.Wait(); err != nil {
-		return errgo.Notef(err, "could not update entity")
+		return errgo.Notef(err, "could not update %d entities", len(err.(parallel.Errors)))
 	}
 	if err := iter.Err(); err != nil {
 		return errgo.Mask(err)
