@@ -351,12 +351,12 @@ func createBlobRefsCollection(db StoreDatabase) error {
 	iter := storedResources.Find(nil).Iter()
 	blobRefCollection := db.C("entitystore.blobref")
 	var doc legacyBlobstoreResourceDoc
-	logger.Debugf("start adding blobrefs")
+	logger.Infof("start adding blobrefs")
 	for iter.Next(&doc) {
 		if doc.Path == "" {
 			continue
 		}
-		logger.Debugf("adding %s (%s)", doc.Path, doc.SHA384Hash)
+		logger.Infof("adding %s (%s)", doc.Path, doc.SHA384Hash)
 		_, err := blobRefCollection.Upsert(bson.D{{"_id", doc.SHA384Hash}}, &blobRefDoc{
 			Hash:    doc.SHA384Hash,
 			Name:    doc.Path,
@@ -370,6 +370,6 @@ func createBlobRefsCollection(db StoreDatabase) error {
 	if err := iter.Err(); err != nil {
 		return errgo.Notef(err, "cannot iterate over all storedResources documents")
 	}
-	logger.Debugf("finished adding blobrefs")
+	logger.Infof("finished adding blobrefs")
 	return nil
 }
