@@ -63,6 +63,7 @@ var Series = map[string]SeriesInfo{
 	"win81":       {true, Windows, true, 1.1},
 	"win10":       {true, Windows, true, 1.1},
 	"win2016":     {true, Windows, true, 1.1},
+	"win2016hv":   {true, Windows, true, 1.1},
 	"win2016nano": {true, Windows, true, 1.1},
 
 	// Centos
