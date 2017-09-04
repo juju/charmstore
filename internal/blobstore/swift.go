@@ -37,7 +37,7 @@ func NewSwiftBackend(cred *identity.Credentials, authmode identity.AuthMode, con
 }
 
 func (s *swiftBackend) Get(name string) (r ReadSeekCloser, size int64, err error) {
-	r2, headers, err := s.client.GetReadSeeker(s.container, name)
+	r2, headers, err := s.client.OpenObject(s.container, name, 1000*1024)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil, 0, errgo.WithCausef(nil, ErrNotFound, "")

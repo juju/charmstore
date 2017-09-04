@@ -32,7 +32,7 @@ golang.org/x/crypto	git	aedad9a179ec1ea11b7064c57cbc6dc30d7724ec	2015-08-30T18:0
 golang.org/x/net	git	ea47fc708ee3e20177f3ca3716217c4ab75942cb	2015-08-29T23:03:18Z
 gopkg.in/check.v1	git	4f90aeace3a26ad7021961c297b22c42160c7b25	2016-01-05T16:49:36Z
 gopkg.in/errgo.v1	git	442357a80af5c6bf9b6d51ae791a39c3421004f3	2016-12-22T12:58:16Z
-gopkg.in/goose.v2	git	5acf2c9d31aa50192d54b85a0e827ef21128740d	2017-07-05T15:10:43Z
+gopkg.in/goose.v2	git	455416024500800de8dadbcacfa22681b6bb818d	2017-09-04T09:17:38Z
 gopkg.in/juju/charm.v6-unstable	git	25231c01229677e02c5ea0e0ef1c89ee14a200ad	2017-02-22T13:11:15Z
 gopkg.in/juju/charmrepo.v2-unstable	git	2426290a14b0cfaddf38e4cc0dcecdf866e300eb	2017-03-10T20:02:09Z
 gopkg.in/juju/jujusvg.v2	git	d82160011935ef79fc7aca84aba2c6f74700fe75	2016-06-09T10:52:15Z
