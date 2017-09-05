@@ -37,7 +37,9 @@ func NewSwiftBackend(cred *identity.Credentials, authmode identity.AuthMode, con
 }
 
 func (s *swiftBackend) Get(name string) (r ReadSeekCloser, size int64, err error) {
-	r2, headers, err := s.client.OpenObject(s.container, name, 1000*1024)
+	// Use infinite read-ahead here as the goose implementation of
+	// byte range handling seems to differ from swift's.
+	r2, headers, err := s.client.OpenObject(s.container, name, -1)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil, 0, errgo.WithCausef(nil, ErrNotFound, "")
