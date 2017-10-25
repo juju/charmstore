@@ -797,7 +797,8 @@ var seriesScore = map[string]int{
 	"wily":    6,
 	"yakkety": 7,
 	"zesty":   8,
-	"artful":  0, // TODO(mhilton) make this higher when artful is released
+	"artful":  9,
+	"bionic":  0, // TODO make this higher when bionic is released
 
 	// When we find a multi-series charm (no series) we
 	// will always choose it in preference to a series-specific
