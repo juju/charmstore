@@ -52,6 +52,7 @@ var Series = map[string]SeriesInfo{
 	"yakkety": {true, Ubuntu, true, 1.103},
 	"zesty":   {true, Ubuntu, true, 1.104},
 	"artful":  {true, Ubuntu, true, 1.105},
+	"bionic":  {true, Ubuntu, true, 0}, // TODO 1.15 when released
 
 	// Windows
 	"win2012hvr2": {true, Windows, true, 1.1},
