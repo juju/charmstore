@@ -12,7 +12,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/mgo.v2/bson"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
 )
 
 type HashSuite struct{}

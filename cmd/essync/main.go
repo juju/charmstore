@@ -1,7 +1,7 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package main // import "gopkg.in/juju/charmstore.v5-unstable/cmd/essync"
+package main
 
 import (
 	"flag"
@@ -13,9 +13,9 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2"
 
-	"gopkg.in/juju/charmstore.v5-unstable/config"
-	"gopkg.in/juju/charmstore.v5-unstable/elasticsearch"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
+	"gopkg.in/juju/charmstore.v5/config"
+	"gopkg.in/juju/charmstore.v5/elasticsearch"
+	"gopkg.in/juju/charmstore.v5/internal/charmstore"
 )
 
 var logger = loggo.GetLogger("essync")

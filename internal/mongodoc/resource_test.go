@@ -7,9 +7,9 @@ import (
 	"time"
 
 	gc "gopkg.in/check.v1"
-	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/juju/charm.v6"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
 )
 
 const fakeBlobHash = "0123456789abcdef0123456789abcdef0123456789abcdef"

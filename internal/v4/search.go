@@ -1,12 +1,12 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package v4 // import "gopkg.in/juju/charmstore.v5-unstable/internal/v4"
+package v4
 
 import (
 	"net/http"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/v5"
+	"gopkg.in/juju/charmstore.v5/internal/v5"
 )
 
 const maxConcurrency = 20

@@ -1,13 +1,13 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package elasticsearch_test // import "gopkg.in/juju/charmstore.v5-unstable/elasticsearch"
+package elasticsearch_test
 
 import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
-	. "gopkg.in/juju/charmstore.v5-unstable/elasticsearch"
+	. "gopkg.in/juju/charmstore.v5/elasticsearch"
 )
 
 type QuerySuite struct{}

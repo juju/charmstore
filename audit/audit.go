@@ -6,7 +6,7 @@ package audit
 import (
 	"time"
 
-	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/juju/charm.v6"
 )
 
 // Operation represents the type of an entry.

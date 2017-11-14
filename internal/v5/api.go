@@ -1,7 +1,7 @@
 // Copyright 2014-2016 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package v5 // import "gopkg.in/juju/charmstore.v5-unstable/internal/v5"
+package v5
 
 import (
 	"archive/zip"
@@ -20,8 +20,8 @@ import (
 	"github.com/juju/loggo"
 	"github.com/juju/mempool"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charm.v6-unstable"
-	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
+	"gopkg.in/juju/charm.v6"
+	"gopkg.in/juju/charmrepo.v2/csclient/params"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgostorage"
@@ -30,12 +30,12 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
-	"gopkg.in/juju/charmstore.v5-unstable/audit"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/cache"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/entitycache"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
+	"gopkg.in/juju/charmstore.v5/audit"
+	"gopkg.in/juju/charmstore.v5/internal/cache"
+	"gopkg.in/juju/charmstore.v5/internal/charmstore"
+	"gopkg.in/juju/charmstore.v5/internal/entitycache"
+	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5/internal/router"
 )
 
 // SetAuthCookie holds the parameters used to make a set-auth-cookie request
@@ -765,7 +765,6 @@ func (h *ReqHandler) metaTags(entity *mongodoc.Entity, id *router.ResolvedURL, p
 // GET id/meta/stats/
 // https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetastats
 func (h *ReqHandler) metaStats(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
-
 	// Retrieve the aggregated downloads count for the specific revision.
 	refresh, err := router.ParseBool(flags.Get("refresh"))
 	if err != nil {

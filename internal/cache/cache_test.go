@@ -11,7 +11,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/cache"
+	"gopkg.in/juju/charmstore.v5/internal/cache"
 )
 
 type suite struct{}

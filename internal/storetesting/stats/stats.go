@@ -1,15 +1,15 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package stats // import "gopkg.in/juju/charmstore.v5-unstable/internal/storetesting/stats"
+package stats
 
 import (
 	"time"
 
 	gc "gopkg.in/check.v1"
-	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/juju/charm.v6"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
+	"gopkg.in/juju/charmstore.v5/internal/charmstore"
 )
 
 // CheckCounterSum checks that statistics are properly collected.

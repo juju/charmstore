@@ -1,7 +1,7 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package charmstore_test // import "gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
+package charmstore_test
 
 import (
 	"archive/zip"
@@ -14,8 +14,8 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5/internal/charmstore"
+	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
 )
 
 type zipSuite struct {

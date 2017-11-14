@@ -1,4 +1,4 @@
-package v5 // import "gopkg.in/juju/charmstore.v5-unstable/internal/v5"
+package v5
 
 import (
 	"net/http"
@@ -8,7 +8,7 @@ import (
 
 	"github.com/juju/httpprof"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
+	"gopkg.in/juju/charmstore.v5/internal/router"
 )
 
 type pprofHandler struct {

@@ -24,7 +24,7 @@ import (
 	"gopkg.in/goose.v2/swift"
 	"gopkg.in/mgo.v2"
 
-	"gopkg.in/juju/charmstore.v5-unstable/config"
+	"gopkg.in/juju/charmstore.v5/config"
 )
 
 var (

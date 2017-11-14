@@ -1,7 +1,7 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package charmstore // import "gopkg.in/juju/charmstore.v5-unstable"
+package charmstore
 
 import (
 	"fmt"
@@ -14,12 +14,12 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/natefinch/lumberjack.v2"
 
-	"gopkg.in/juju/charmstore.v5-unstable/elasticsearch"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/blobstore"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/legacy"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/v4"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/v5"
+	"gopkg.in/juju/charmstore.v5/elasticsearch"
+	"gopkg.in/juju/charmstore.v5/internal/blobstore"
+	"gopkg.in/juju/charmstore.v5/internal/charmstore"
+	"gopkg.in/juju/charmstore.v5/internal/legacy"
+	"gopkg.in/juju/charmstore.v5/internal/v4"
+	"gopkg.in/juju/charmstore.v5/internal/v5"
 )
 
 // Versions of the API that can be served.

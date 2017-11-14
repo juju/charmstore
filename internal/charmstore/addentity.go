@@ -1,7 +1,7 @@
 // Copyright 2016 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package charmstore // import "gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
+package charmstore
 
 import (
 	"archive/zip"
@@ -17,17 +17,17 @@ import (
 
 	jujuzip "github.com/juju/zip"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charm.v6-unstable"
-	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
+	"gopkg.in/juju/charm.v6"
+	"gopkg.in/juju/charmrepo.v2/csclient/params"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"gopkg.in/yaml.v2"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/blobstore"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/monitoring"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/series"
+	"gopkg.in/juju/charmstore.v5/internal/blobstore"
+	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5/internal/monitoring"
+	"gopkg.in/juju/charmstore.v5/internal/router"
+	"gopkg.in/juju/charmstore.v5/internal/series"
 )
 
 // addParams holds parameters held in common between the
@@ -157,7 +157,6 @@ func (s *Store) UploadEntity(url *router.ResolvedURL, blob io.Reader, blobHash s
 // puts into the blob store. The archiveSize and hash must holds the length
 // of the blob content and its SHA384 hash respectively.
 func (s *Store) putArchive(blob io.Reader, blobSize int64, hash string) (blobHash256 string, err error) {
-
 	// Calculate the SHA256 hash while uploading the blob in the blob store.
 	hash256 := sha256.New()
 	blob = io.TeeReader(blob, hash256)

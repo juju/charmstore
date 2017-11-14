@@ -27,8 +27,8 @@ import (
 	"gopkg.in/tomb.v2"
 	"gopkg.in/yaml.v2"
 
-	"gopkg.in/juju/charmstore.v5-unstable/config"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/blobstore"
+	"gopkg.in/juju/charmstore.v5/config"
+	"gopkg.in/juju/charmstore.v5/internal/blobstore"
 )
 
 // historicalDBName holds the name of the juju database

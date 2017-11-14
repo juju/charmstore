@@ -9,7 +9,7 @@ import (
 	"gopkg.in/errgo.v1"
 	tomb "gopkg.in/tomb.v2"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/monitoring"
+	"gopkg.in/juju/charmstore.v5/internal/monitoring"
 )
 
 var gcInterval = time.Hour

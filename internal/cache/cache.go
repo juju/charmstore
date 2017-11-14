@@ -1,7 +1,7 @@
 // Copyright 2015 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package cache // import "gopkg.in/juju/charmstore.v5-unstable/internal/cache"
+package cache
 
 import (
 	"math/rand"

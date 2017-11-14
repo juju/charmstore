@@ -1,7 +1,7 @@
 // Copyright 2012, 2013, 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package main // import "gopkg.in/juju/charmstore.v5-unstable/cmd/charmd"
+package main
 
 import (
 	"flag"
@@ -19,10 +19,10 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/natefinch/lumberjack.v2"
 
-	"gopkg.in/juju/charmstore.v5-unstable"
-	"gopkg.in/juju/charmstore.v5-unstable/config"
-	"gopkg.in/juju/charmstore.v5-unstable/elasticsearch"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/blobstore"
+	"gopkg.in/juju/charmstore.v5"
+	"gopkg.in/juju/charmstore.v5/config"
+	"gopkg.in/juju/charmstore.v5/elasticsearch"
+	"gopkg.in/juju/charmstore.v5/internal/blobstore"
 )
 
 var (
