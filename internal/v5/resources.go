@@ -1,7 +1,7 @@
 // Copyright 2016 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package v5 // import "gopkg.in/juju/charmstore.v5-unstable/internal/v5"
+package v5 // import "gopkg.in/juju/charmstore.v5/internal/v5"
 
 import (
 	"encoding/hex"
@@ -13,19 +13,19 @@ import (
 
 	"github.com/juju/httprequest"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charm.v6-unstable/resource"
-	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
+	"gopkg.in/juju/charm.v6/resource"
+	"gopkg.in/juju/charmrepo.v2/csclient/params"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
+	"gopkg.in/juju/charmstore.v5/internal/charmstore"
+	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5/internal/router"
 )
 
 // POST id/resource/name
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#post-idresourcesname
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#post-idresourcesname
 //
 // GET  id/resource/name[/revision]
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idresourcesnamerevision
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idresourcesnamerevision
 func (h *ReqHandler) serveResources(id *router.ResolvedURL, w http.ResponseWriter, req *http.Request) error {
 	// Resources are "published" using "POST id/publish" so we don't
 	// support PUT here.
@@ -120,7 +120,7 @@ func (h *ReqHandler) serveUploadResource(id *router.ResolvedURL, w http.Response
 }
 
 // GET id/meta/resource
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetaresources
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetaresources
 func (h *ReqHandler) metaResources(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	if entity.URL.Series == "bundle" {
 		return nil, nil
@@ -145,7 +145,7 @@ func (h *ReqHandler) metaResources(entity *mongodoc.Entity, id *router.ResolvedU
 }
 
 // GET id/meta/resource/*name*[/*revision]
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetaresourcesnamerevision
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetaresourcesnamerevision
 func (h *ReqHandler) metaResourcesSingle(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	data, err := h.metaResourcesSingle0(entity, id, path, flags, req)
 	if err != nil {

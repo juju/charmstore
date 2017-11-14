@@ -1,17 +1,17 @@
 // Copyright 2016 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package v4 // import "gopkg.in/juju/charmstore.v5-unstable/internal/v4"
+package v4 // import "gopkg.in/juju/charmstore.v5/internal/v4"
 
 import (
 	"net/http"
 
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charm.v6-unstable"
-	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
+	"gopkg.in/juju/charm.v6"
+	"gopkg.in/juju/charmrepo.v2/csclient/params"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/v5"
+	"gopkg.in/juju/charmstore.v5/internal/router"
+	"gopkg.in/juju/charmstore.v5/internal/v5"
 )
 
 // serveArchive returns a handler for /archive that falls back to v5ServeArchive

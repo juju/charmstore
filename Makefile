@@ -4,7 +4,7 @@ ifndef GOPATH
 $(warning You need to set up a GOPATH.)
 endif
 
-PROJECT := gopkg.in/juju/charmstore.v5-unstable
+PROJECT := gopkg.in/juju/charmstore.v5
 PROJECT_DIR := $(shell go list -e -f '{{.Dir}}' $(PROJECT))
 
 GIT_COMMIT := $(shell git rev-parse --verify HEAD)

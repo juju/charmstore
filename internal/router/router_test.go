@@ -1,7 +1,7 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package router // import "gopkg.in/juju/charmstore.v5-unstable/internal/router"
+package router
 
 import (
 	"bytes"
@@ -21,11 +21,11 @@ import (
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charm.v6-unstable"
-	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
+	"gopkg.in/juju/charm.v6"
+	"gopkg.in/juju/charmrepo.v2/csclient/params"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
-	"gopkg.in/juju/charmstore.v5-unstable/audit"
+	"gopkg.in/juju/charmstore.v5/audit"
 )
 
 type RouterSuite struct {

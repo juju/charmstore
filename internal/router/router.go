@@ -3,7 +3,7 @@
 
 // The router package implements an HTTP request router for charm store
 // HTTP requests.
-package router // import "gopkg.in/juju/charmstore.v5-unstable/internal/router"
+package router // import "gopkg.in/juju/charmstore.v5/internal/router"
 
 import (
 	"encoding/json"
@@ -18,12 +18,12 @@ import (
 	"github.com/juju/httprequest"
 	"github.com/juju/utils/parallel"
 	"gopkg.in/errgo.v1"
-	charm "gopkg.in/juju/charm.v6-unstable"
-	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
+	charm "gopkg.in/juju/charm.v6"
+	"gopkg.in/juju/charmrepo.v2/csclient/params"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/monitoring"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/series"
+	"gopkg.in/juju/charmstore.v5/internal/monitoring"
+	"gopkg.in/juju/charmstore.v5/internal/series"
 )
 
 // Implementation note on error handling:

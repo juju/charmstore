@@ -27,8 +27,8 @@ import (
 	"gopkg.in/tomb.v2"
 	"gopkg.in/yaml.v2"
 
-	"gopkg.in/juju/charmstore.v5-unstable/config"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/blobstore"
+	"gopkg.in/juju/charmstore.v5/config"
+	"gopkg.in/juju/charmstore.v5/internal/blobstore"
 )
 
 // historicalDBName holds the name of the juju database
@@ -229,8 +229,6 @@ func writeVCSStatus(zw *zip.Writer, vcsStatus string) error {
 	return nil
 }
 
-const defaultCharmStoreRepo = "gopkg.in/juju/charmstore.v5-unstable"
-
 // versionSpec specifies a version of the charm store to run
 // and a function that will apply some updates to that
 // version.
@@ -249,9 +247,6 @@ var bogusPublicKey bakery.PublicKey
 // runVersion runs the charm store at the given version
 // and applies the associated updates.
 func runMigrationVersion(db *mgo.Database, vc versionSpec) error {
-	if vc.pkg == "" {
-		vc.pkg = defaultCharmStoreRepo
-	}
 	csv, err := runCharmStoreVersion(vc.pkg, vc.version, &config.Config{
 		MongoURL:          jujutesting.MgoServer.Addr(),
 		AuthUsername:      "admin",

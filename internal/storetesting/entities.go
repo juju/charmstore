@@ -1,16 +1,16 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package storetesting // import "gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
+package storetesting // import "gopkg.in/juju/charmstore.v5/internal/storetesting"
 
 import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/juju/charm.v6-unstable"
-	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
+	"gopkg.in/juju/charm.v6"
+	"gopkg.in/juju/charmrepo.v2/csclient/params"
 	"gopkg.in/mgo.v2"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
 )
 
 // EntityBuilder provides a convenient way to describe a mongodoc.Entity

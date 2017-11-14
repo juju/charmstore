@@ -1,12 +1,12 @@
 // Copyright 2015 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package audit
+package audit // import "gopkg.in/juju/charmstore.v5/audit"
 
 import (
 	"time"
 
-	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/juju/charm.v6"
 )
 
 // Operation represents the type of an entry.

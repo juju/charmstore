@@ -1,7 +1,7 @@
 // Copyright 2014-2017 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package blobstore // import "gopkg.in/juju/charmstore.v5-unstable/internal/blobstore"
+package blobstore // import "gopkg.in/juju/charmstore.v5/internal/blobstore"
 
 import (
 	"crypto/sha512"
@@ -17,8 +17,8 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/monitoring"
+	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5/internal/monitoring"
 )
 
 var logger = loggo.GetLogger("charmstore.internal.blobstore")

@@ -1,7 +1,7 @@
 // Copyright 2014-2017 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package main
+package main // import "gopkg.in/juju/charmstore.v5/cmd/charmdelete"
 
 import (
 	"flag"
@@ -14,10 +14,10 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
-	"gopkg.in/juju/charmstore.v5-unstable/config"
-	"gopkg.in/juju/charmstore.v5-unstable/elasticsearch"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5/config"
+	"gopkg.in/juju/charmstore.v5/elasticsearch"
+	"gopkg.in/juju/charmstore.v5/internal/charmstore"
+	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
 )
 
 var logger = loggo.GetLogger("charmdelete")

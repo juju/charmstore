@@ -14,13 +14,13 @@ import (
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/juju/charm.v6-unstable"
-	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
+	"gopkg.in/juju/charm.v6"
+	"gopkg.in/juju/charmrepo.v2/csclient/params"
 	"gopkg.in/mgo.v2/bson"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/blobstore"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
+	"gopkg.in/juju/charmstore.v5/internal/blobstore"
+	"gopkg.in/juju/charmstore.v5/internal/router"
+	"gopkg.in/juju/charmstore.v5/internal/storetesting"
 )
 
 // Define fake blob attributes to be used in tests.

@@ -1,7 +1,7 @@
 // Copyright 2012, 2013, 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package config_test // import "gopkg.in/juju/charmstore.v5-unstable/config"
+package config_test
 
 import (
 	"io/ioutil"
@@ -15,7 +15,7 @@ import (
 	"gopkg.in/goose.v2/identity"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 
-	"gopkg.in/juju/charmstore.v5-unstable/config"
+	"gopkg.in/juju/charmstore.v5/config"
 )
 
 func TestPackage(t *testing.T) {

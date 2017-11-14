@@ -1,7 +1,7 @@
 // Copyright 2017 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package mongodoc
+package mongodoc // import "gopkg.in/juju/charmstore.v5/internal/mongodoc"
 
 import (
 	"crypto/sha512"

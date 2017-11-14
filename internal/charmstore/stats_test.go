@@ -1,7 +1,7 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package charmstore_test // import "gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
+package charmstore_test
 
 import (
 	"strconv"
@@ -11,13 +11,13 @@ import (
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/juju/charm.v6-unstable"
-	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
+	"gopkg.in/juju/charm.v6"
+	"gopkg.in/juju/charmrepo.v2/csclient/params"
 	"gopkg.in/mgo.v2/bson"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
+	"gopkg.in/juju/charmstore.v5/internal/charmstore"
+	"gopkg.in/juju/charmstore.v5/internal/router"
+	"gopkg.in/juju/charmstore.v5/internal/storetesting"
 )
 
 type StatsSuite struct {

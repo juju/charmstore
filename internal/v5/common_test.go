@@ -20,19 +20,19 @@ import (
 	"gopkg.in/goose.v2/swift"
 	"gopkg.in/goose.v2/testing/httpsuite"
 	"gopkg.in/goose.v2/testservices/openstackservice"
-	"gopkg.in/juju/charm.v6-unstable"
-	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
+	"gopkg.in/juju/charm.v6"
+	"gopkg.in/juju/charmrepo.v2/csclient/params"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakerytest"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/macaroon.v2-unstable"
 	"gopkg.in/mgo.v2"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/blobstore"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/v5"
+	"gopkg.in/juju/charmstore.v5/internal/blobstore"
+	"gopkg.in/juju/charmstore.v5/internal/charmstore"
+	"gopkg.in/juju/charmstore.v5/internal/router"
+	"gopkg.in/juju/charmstore.v5/internal/storetesting"
+	"gopkg.in/juju/charmstore.v5/internal/v5"
 )
 
 var mgoLogger = loggo.GetLogger("mgo")

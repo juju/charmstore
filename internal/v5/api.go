@@ -1,7 +1,7 @@
 // Copyright 2014-2016 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package v5 // import "gopkg.in/juju/charmstore.v5-unstable/internal/v5"
+package v5 // import "gopkg.in/juju/charmstore.v5/internal/v5"
 
 import (
 	"archive/zip"
@@ -20,8 +20,8 @@ import (
 	"github.com/juju/loggo"
 	"github.com/juju/mempool"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charm.v6-unstable"
-	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
+	"gopkg.in/juju/charm.v6"
+	"gopkg.in/juju/charmrepo.v2/csclient/params"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgostorage"
@@ -30,12 +30,12 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
-	"gopkg.in/juju/charmstore.v5-unstable/audit"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/cache"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/entitycache"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
+	"gopkg.in/juju/charmstore.v5/audit"
+	"gopkg.in/juju/charmstore.v5/internal/cache"
+	"gopkg.in/juju/charmstore.v5/internal/charmstore"
+	"gopkg.in/juju/charmstore.v5/internal/entitycache"
+	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5/internal/router"
 )
 
 // SetAuthCookie holds the parameters used to make a set-auth-cookie request
@@ -575,7 +575,7 @@ func (h *ReqHandler) entityQuery(id *router.ResolvedURL, selector map[string]int
 var errNotImplemented = errgo.Newf("method not implemented")
 
 // GET /debug
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-debug
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-debug
 func (h *ReqHandler) serveDebug(w http.ResponseWriter, req *http.Request) {
 	router.WriteError(w, errNotImplemented)
 }
@@ -626,31 +626,31 @@ func badRequestf(underlying error, f string, a ...interface{}) error {
 }
 
 // GET id/meta/charm-metadata
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetacharm-metadata
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetacharm-metadata
 func (h *ReqHandler) metaCharmMetadata(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	return entity.CharmMeta, nil
 }
 
 // GET id/meta/charm-metrics
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetacharm-metrics
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetacharm-metrics
 func (h *ReqHandler) metaCharmMetrics(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	return entity.CharmMetrics, nil
 }
 
 // GET id/meta/bundle-metadata
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetabundle-metadata
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetabundle-metadata
 func (h *ReqHandler) metaBundleMetadata(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	return entity.BundleData, nil
 }
 
 // GET id/meta/bundle-unit-count
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetabundle-unit-count
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetabundle-unit-count
 func (h *ReqHandler) metaBundleUnitCount(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	return bundleCount(entity.BundleUnitCount), nil
 }
 
 // GET id/meta/bundle-machine-count
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetabundle-machine-count
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetabundle-machine-count
 func (h *ReqHandler) metaBundleMachineCount(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	return bundleCount(entity.BundleMachineCount), nil
 }
@@ -665,7 +665,7 @@ func bundleCount(x *int) interface{} {
 }
 
 // GET id/meta/manifest
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetamanifest
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetamanifest
 func (h *ReqHandler) metaManifest(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	r, size, err := h.Store.BlobStore.Open(entity.BlobHash, nil)
 	if err != nil {
@@ -692,19 +692,19 @@ func (h *ReqHandler) metaManifest(entity *mongodoc.Entity, id *router.ResolvedUR
 }
 
 // GET id/meta/charm-actions
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetacharm-actions
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetacharm-actions
 func (h *ReqHandler) metaCharmActions(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	return entity.CharmActions, nil
 }
 
 // GET id/meta/charm-config
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetacharm-config
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetacharm-config
 func (h *ReqHandler) metaCharmConfig(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	return entity.CharmConfig, nil
 }
 
 // GET id/meta/terms
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetaterms
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetaterms
 func (h *ReqHandler) metaTerms(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	if entity.URL.Series == "bundle" {
 		return nil, nil
@@ -721,7 +721,7 @@ func (h *ReqHandler) metaColor(id *router.ResolvedURL, path string, flags url.Va
 }
 
 // GET id/meta/archive-size
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetaarchive-size
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetaarchive-size
 func (h *ReqHandler) metaArchiveSize(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	return &params.ArchiveSizeResponse{
 		Size: entity.Size,
@@ -729,7 +729,7 @@ func (h *ReqHandler) metaArchiveSize(entity *mongodoc.Entity, id *router.Resolve
 }
 
 // GET id/meta/hash
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetahash
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetahash
 func (h *ReqHandler) metaHash(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	return &params.HashResponse{
 		Sum: entity.BlobHash,
@@ -737,7 +737,7 @@ func (h *ReqHandler) metaHash(entity *mongodoc.Entity, id *router.ResolvedURL, p
 }
 
 // GET id/meta/hash256
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetahash256
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetahash256
 func (h *ReqHandler) metaHash256(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	return &params.HashResponse{
 		Sum: entity.BlobHash256,
@@ -745,7 +745,7 @@ func (h *ReqHandler) metaHash256(entity *mongodoc.Entity, id *router.ResolvedURL
 }
 
 // GET id/meta/tags
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetatags
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetatags
 func (h *ReqHandler) metaTags(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	var tags []string
 	switch {
@@ -763,9 +763,8 @@ func (h *ReqHandler) metaTags(entity *mongodoc.Entity, id *router.ResolvedURL, p
 }
 
 // GET id/meta/stats/
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetastats
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetastats
 func (h *ReqHandler) metaStats(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
-
 	// Retrieve the aggregated downloads count for the specific revision.
 	refresh, err := router.ParseBool(flags.Get("refresh"))
 	if err != nil {
@@ -814,7 +813,7 @@ func (h *ReqHandler) metaStats(entity *mongodoc.Entity, id *router.ResolvedURL, 
 }
 
 // GET id/meta/revision-info
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetarevision-info
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetarevision-info
 func (h *ReqHandler) metaRevisionInfo(id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	searchURL := id.PreferredURL()
 	searchURL.Revision = -1
@@ -852,7 +851,7 @@ func (h *ReqHandler) metaRevisionInfo(id *router.ResolvedURL, path string, flags
 }
 
 // GET id/meta/id-user
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetaid-user
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetaid-user
 func (h *ReqHandler) metaIdUser(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	return params.IdUserResponse{
 		User: id.PreferredURL().User,
@@ -860,7 +859,7 @@ func (h *ReqHandler) metaIdUser(entity *mongodoc.Entity, id *router.ResolvedURL,
 }
 
 // GET id/meta/owner
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetaowner
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetaowner
 func (h *ReqHandler) metaOwner(_ *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	return params.IdUserResponse{
 		User: id.URL.User,
@@ -868,7 +867,7 @@ func (h *ReqHandler) metaOwner(_ *mongodoc.Entity, id *router.ResolvedURL, path 
 }
 
 // GET id/meta/id-series
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetaid-series
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetaid-series
 func (h *ReqHandler) metaIdSeries(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	return params.IdSeriesResponse{
 		Series: id.PreferredURL().Series,
@@ -876,7 +875,7 @@ func (h *ReqHandler) metaIdSeries(entity *mongodoc.Entity, id *router.ResolvedUR
 }
 
 // GET id/meta/id
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetaid
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetaid
 func (h *ReqHandler) metaId(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	u := id.PreferredURL()
 	return params.IdResponse{
@@ -889,7 +888,7 @@ func (h *ReqHandler) metaId(entity *mongodoc.Entity, id *router.ResolvedURL, pat
 }
 
 // GET id/meta/id-name
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetaid-name
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetaid-name
 func (h *ReqHandler) metaIdName(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	return params.IdNameResponse{
 		Name: id.URL.Name,
@@ -897,7 +896,7 @@ func (h *ReqHandler) metaIdName(entity *mongodoc.Entity, id *router.ResolvedURL,
 }
 
 // GET id/meta/id-revision
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetaid-revision
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetaid-revision
 func (h *ReqHandler) metaIdRevision(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	return params.IdRevisionResponse{
 		Revision: id.PreferredURL().Revision,
@@ -905,7 +904,7 @@ func (h *ReqHandler) metaIdRevision(entity *mongodoc.Entity, id *router.Resolved
 }
 
 // GET id/meta/supported-series
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetasupported-series
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetasupported-series
 func (h *ReqHandler) metaSupportedSeries(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	if entity.URL.Series == "bundle" {
 		return nil, nil
@@ -916,7 +915,7 @@ func (h *ReqHandler) metaSupportedSeries(entity *mongodoc.Entity, id *router.Res
 }
 
 // GET id/meta/extra-info
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetaextra-info
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetaextra-info
 func (h *ReqHandler) metaExtraInfo(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	// The extra-info is stored in mongo as simple byte
 	// slices, so convert the values to json.RawMessages
@@ -930,7 +929,7 @@ func (h *ReqHandler) metaExtraInfo(entity *mongodoc.Entity, id *router.ResolvedU
 }
 
 // GET id/meta/extra-info/key
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetaextra-infokey
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetaextra-infokey
 func (h *ReqHandler) metaExtraInfoWithKey(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	path = strings.TrimPrefix(path, "/")
 	var data json.RawMessage = entity.ExtraInfo[path]
@@ -941,7 +940,7 @@ func (h *ReqHandler) metaExtraInfoWithKey(entity *mongodoc.Entity, id *router.Re
 }
 
 // PUT id/meta/extra-info
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#put-idmetaextra-info
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#put-idmetaextra-info
 func (h *ReqHandler) putMetaExtraInfo(id *router.ResolvedURL, path string, val *json.RawMessage, updater *router.FieldUpdater, req *http.Request) error {
 	var fields map[string]*json.RawMessage
 	if err := json.Unmarshal(*val, &fields); err != nil {
@@ -966,7 +965,7 @@ func (h *ReqHandler) putMetaExtraInfo(id *router.ResolvedURL, path string, val *
 var nullBytes = []byte("null")
 
 // PUT id/meta/extra-info/key
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#put-idmetaextra-infokey
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#put-idmetaextra-infokey
 func (h *ReqHandler) putMetaExtraInfoWithKey(id *router.ResolvedURL, path string, val *json.RawMessage, updater *router.FieldUpdater, req *http.Request) error {
 	key := strings.TrimPrefix(path, "/")
 	if err := checkExtraInfoKey(key, "extra-info"); err != nil {
@@ -983,7 +982,7 @@ func (h *ReqHandler) putMetaExtraInfoWithKey(id *router.ResolvedURL, path string
 }
 
 // GET id/meta/common-info
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetacommon-info
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetacommon-info
 func (h *ReqHandler) metaCommonInfo(entity *mongodoc.BaseEntity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	// The common-info is stored in mongo as simple byte
 	// slices, so convert the values to json.RawMessages
@@ -997,7 +996,7 @@ func (h *ReqHandler) metaCommonInfo(entity *mongodoc.BaseEntity, id *router.Reso
 }
 
 // GET id/meta/common-info/key
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetacommon-infokey
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetacommon-infokey
 func (h *ReqHandler) metaCommonInfoWithKey(entity *mongodoc.BaseEntity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	path = strings.TrimPrefix(path, "/")
 	var data json.RawMessage = entity.CommonInfo[path]
@@ -1008,7 +1007,7 @@ func (h *ReqHandler) metaCommonInfoWithKey(entity *mongodoc.BaseEntity, id *rout
 }
 
 // PUT id/meta/common-info
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#put-idmetacommon-info
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#put-idmetacommon-info
 func (h *ReqHandler) putMetaCommonInfo(id *router.ResolvedURL, path string, val *json.RawMessage, updater *router.FieldUpdater, req *http.Request) error {
 	var fields map[string]*json.RawMessage
 	if err := json.Unmarshal(*val, &fields); err != nil {
@@ -1031,7 +1030,7 @@ func (h *ReqHandler) putMetaCommonInfo(id *router.ResolvedURL, path string, val 
 }
 
 // PUT id/meta/common-info/key
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#put-idmetacommon-infokey
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#put-idmetacommon-infokey
 func (h *ReqHandler) putMetaCommonInfoWithKey(id *router.ResolvedURL, path string, val *json.RawMessage, updater *router.FieldUpdater, req *http.Request) error {
 	key := strings.TrimPrefix(path, "/")
 	if err := checkExtraInfoKey(key, "common-info"); err != nil {
@@ -1055,7 +1054,7 @@ func checkExtraInfoKey(key string, field string) error {
 }
 
 // GET id/meta/perm
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetaperm
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetaperm
 func (h *ReqHandler) metaPerm(entity *mongodoc.BaseEntity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	ch, err := h.entityChannel(id)
 	if err != nil {
@@ -1069,7 +1068,7 @@ func (h *ReqHandler) metaPerm(entity *mongodoc.BaseEntity, id *router.ResolvedUR
 }
 
 // PUT id/meta/perm
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#put-idmeta
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#put-idmeta
 func (h *ReqHandler) putMetaPerm(id *router.ResolvedURL, path string, val *json.RawMessage, updater *router.FieldUpdater, req *http.Request) error {
 	var perms params.PermRequest
 	if err := json.Unmarshal(*val, &perms); err != nil {
@@ -1099,7 +1098,7 @@ func (h *ReqHandler) putMetaPerm(id *router.ResolvedURL, path string, val *json.
 }
 
 // GET id/meta/promulgated
-// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetapromulgated
+// See https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetapromulgated
 func (h *ReqHandler) metaPromulgated(entity *mongodoc.BaseEntity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	return params.PromulgatedResponse{
 		Promulgated: bool(entity.Promulgated),
@@ -1107,7 +1106,7 @@ func (h *ReqHandler) metaPromulgated(entity *mongodoc.BaseEntity, id *router.Res
 }
 
 // GET id/meta/can-ingest
-// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetacan-ingest
+// See https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetacan-ingest
 func (h *ReqHandler) metaCanIngest(entity *mongodoc.BaseEntity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	return params.CanIngestResponse{
 		CanIngest: !entity.NoIngest,
@@ -1115,7 +1114,7 @@ func (h *ReqHandler) metaCanIngest(entity *mongodoc.BaseEntity, id *router.Resol
 }
 
 // GET id/meta/can-write
-// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetacan-write
+// See https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetacan-write
 func (h *ReqHandler) metaCanWrite(entity *mongodoc.BaseEntity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	err := h.AuthorizeEntityForOp(id, req, OpWrite)
 	if err != nil && errgo.Cause(err) != params.ErrUnauthorized {
@@ -1127,7 +1126,7 @@ func (h *ReqHandler) metaCanWrite(entity *mongodoc.BaseEntity, id *router.Resolv
 }
 
 // GET id/meta/perm/key
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetapermkey
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetapermkey
 func (h *ReqHandler) metaPermWithKey(entity *mongodoc.BaseEntity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	ch, err := h.entityChannel(id)
 	if err != nil {
@@ -1144,7 +1143,7 @@ func (h *ReqHandler) metaPermWithKey(entity *mongodoc.BaseEntity, id *router.Res
 }
 
 // PUT id/meta/perm/key
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#put-idmetapermkey
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#put-idmetapermkey
 func (h *ReqHandler) putMetaPermWithKey(id *router.ResolvedURL, path string, val *json.RawMessage, updater *router.FieldUpdater, req *http.Request) error {
 	ch, err := h.entityChannel(id)
 	if err != nil {
@@ -1179,7 +1178,7 @@ func (h *ReqHandler) putMetaPermWithKey(id *router.ResolvedURL, path string, val
 }
 
 // GET id/meta/published
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetapublished
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetapublished
 func (h *ReqHandler) metaPublished(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	baseEntity, err := h.Cache.BaseEntity(entity.URL, charmstore.FieldSelector("channelentities"))
 	if err != nil {
@@ -1215,7 +1214,7 @@ func (h *ReqHandler) metaPublished(entity *mongodoc.Entity, id *router.ResolvedU
 }
 
 // GET id/meta/archive-upload-time
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetaarchive-upload-time
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetaarchive-upload-time
 func (h *ReqHandler) metaArchiveUploadTime(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
 	return &params.ArchiveUploadTimeResponse{
 		UploadTime: entity.UploadTime.UTC(),
@@ -1223,7 +1222,7 @@ func (h *ReqHandler) metaArchiveUploadTime(entity *mongodoc.Entity, id *router.R
 }
 
 // GET changes/published[?limit=$count][&start=$fromdate][&stop=$todate]
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-changespublished
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-changespublished
 func (h *ReqHandler) serveChangesPublished(_ http.Header, r *http.Request) (interface{}, error) {
 	start, stop, err := parseDateRange(r.Form)
 	if err != nil {
@@ -1284,7 +1283,7 @@ func (h *ReqHandler) serveChangesPublished(_ http.Header, r *http.Request) (inte
 }
 
 // GET /macaroon
-// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-macaroon
+// See https://github.com/juju/charmstore/blob/v5/docs/API.md#get-macaroon
 // Return a macaroon that will enable access to that can be checked by just
 // knowing the user's name.
 func (h *ReqHandler) serveMacaroon(_ http.Header, _ *http.Request) (interface{}, error) {
@@ -1292,7 +1291,7 @@ func (h *ReqHandler) serveMacaroon(_ http.Header, _ *http.Request) (interface{},
 }
 
 // GET /delegatable-macaroon
-// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-delegatable-macaroon
+// See https://github.com/juju/charmstore/blob/v5/docs/API.md#get-delegatable-macaroon
 func (h *ReqHandler) serveDelegatableMacaroon(_ http.Header, req *http.Request) (interface{}, error) {
 	values, err := url.ParseQuery(req.URL.RawQuery)
 	if err != nil {
@@ -1384,7 +1383,7 @@ func (h *ReqHandler) serveDelegatableMacaroon(_ http.Header, req *http.Request) 
 }
 
 // GET /whoami
-// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#whoami
+// See https://github.com/juju/charmstore/blob/v5/docs/API.md#whoami
 func (h *ReqHandler) serveWhoAmI(_ http.Header, req *http.Request) (interface{}, error) {
 	auth, err := h.Authenticate(req)
 	if err != nil {
@@ -1404,7 +1403,7 @@ func (h *ReqHandler) serveWhoAmI(_ http.Header, req *http.Request) (interface{},
 }
 
 // PUT id/promulgate
-// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#put-idpromulgate
+// See https://github.com/juju/charmstore/blob/v5/docs/API.md#put-idpromulgate
 func (h *ReqHandler) servePromulgate(id *router.ResolvedURL, w http.ResponseWriter, req *http.Request) error {
 	// Note: the promulgator must be in the promulgators group but
 	// doesn't need write access to the entity.
@@ -1462,7 +1461,7 @@ func (h *ReqHandler) servePromulgate(id *router.ResolvedURL, w http.ResponseWrit
 }
 
 // PUT id/publish
-// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#put-idpublish
+// See https://github.com/juju/charmstore/blob/v5/docs/API.md#put-idpublish
 func (h *ReqHandler) servePublish(id *router.ResolvedURL, w http.ResponseWriter, req *http.Request) error {
 	// Perform basic validation of the request.
 	if req.Method != "PUT" {

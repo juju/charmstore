@@ -3,10 +3,10 @@ package entitycache_test
 import (
 	"testing"
 
-	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/juju/charm.v6"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/entitycache"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5/internal/entitycache"
+	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
 )
 
 func BenchmarkSingleRequest(b *testing.B) {

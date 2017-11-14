@@ -1,7 +1,7 @@
 // Copyright 2015 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package charmstore // import "gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
+package charmstore
 
 import (
 	"errors"
@@ -9,10 +9,10 @@ import (
 
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
+	"gopkg.in/juju/charmrepo.v2/csclient/params"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
-	appver "gopkg.in/juju/charmstore.v5-unstable/version"
+	"gopkg.in/juju/charmstore.v5/internal/router"
+	appver "gopkg.in/juju/charmstore.v5/version"
 )
 
 type debugSuite struct{}

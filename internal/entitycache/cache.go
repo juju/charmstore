@@ -1,17 +1,17 @@
 // Package entitycache provides a cache of charmstore entities and
 // base-entities, designed to be used for individual charmstore API
 // requests.
-package entitycache
+package entitycache // import "gopkg.in/juju/charmstore.v5/internal/entitycache"
 
 import (
 	"sync"
 
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charm.v6-unstable"
-	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
+	"gopkg.in/juju/charm.v6"
+	"gopkg.in/juju/charmrepo.v2/csclient/params"
 	"gopkg.in/mgo.v2"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
 )
 
 // TODO it might be better to represent the field selection with

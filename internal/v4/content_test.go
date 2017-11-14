@@ -16,11 +16,11 @@ import (
 	"github.com/juju/testing/httptesting"
 	"github.com/juju/xml"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/juju/charm.v6-unstable"
-	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
+	"gopkg.in/juju/charm.v6"
+	"gopkg.in/juju/charmrepo.v2/csclient/params"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/v5"
+	"gopkg.in/juju/charmstore.v5/internal/storetesting"
+	"gopkg.in/juju/charmstore.v5/internal/v5"
 )
 
 var serveDiagramErrorsTests = []struct {

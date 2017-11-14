@@ -5,7 +5,7 @@
 // entities.  This command is intended to be run on the production db and then
 // discarded.  The first time this command is executed, all the entities are
 // updated.  Subsequent runs migrate missing destination blobs.
-package main
+package main // import "gopkg.in/juju/charmstore.v5/cmd/migrateblobs"
 
 import (
 	"flag"
@@ -24,7 +24,7 @@ import (
 	"gopkg.in/goose.v2/swift"
 	"gopkg.in/mgo.v2"
 
-	"gopkg.in/juju/charmstore.v5-unstable/config"
+	"gopkg.in/juju/charmstore.v5/config"
 )
 
 var (

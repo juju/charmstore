@@ -1,14 +1,14 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package mongodoc // import "gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
+package mongodoc // import "gopkg.in/juju/charmstore.v5/internal/mongodoc"
 
 import (
 	"time"
 
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charm.v6-unstable"
-	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
+	"gopkg.in/juju/charm.v6"
+	"gopkg.in/juju/charmrepo.v2/csclient/params"
 	"gopkg.in/mgo.v2/bson"
 )
 
