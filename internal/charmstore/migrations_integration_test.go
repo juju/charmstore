@@ -9,13 +9,13 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charm.v6-unstable"
-	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
+	"gopkg.in/juju/charm.v6"
+	"gopkg.in/juju/charmrepo.v2/csclient/params"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
+	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5/internal/storetesting"
 )
 
 type migrationsIntegrationSuite struct {
@@ -54,6 +54,7 @@ func (s *migrationsIntegrationSuite) dump(c *gc.C) {
 
 var migrationHistory = []versionSpec{{
 	version: "4.1.5",
+	pkg:     "gopkg.in/juju/charmstore.v5-unstable",
 	update: func(db *mgo.Database, csv *charmStoreVersion) error {
 		err := csv.Upload("v4", []uploadSpec{{
 			id:            "~charmers/precise/promulgated-0",
@@ -104,6 +105,7 @@ var migrationHistory = []versionSpec{{
 	// Multi-series charms.
 	// Development channel + ACLs
 	version: "4.3.0",
+	pkg:     "gopkg.in/juju/charmstore.v5-unstable",
 	update: func(db *mgo.Database, csv *charmStoreVersion) error {
 		err := csv.Upload("v4", []uploadSpec{{
 			// Uploads to ~charmers/multiseries-0
@@ -148,6 +150,7 @@ var migrationHistory = []versionSpec{{
 	// Fix bogus promulgated URL.
 	// V4 multi-series compatibility (this didn't work).
 	version: "4.4.3",
+	pkg:     "gopkg.in/juju/charmstore.v5-unstable",
 	update: func(db *mgo.Database, csv *charmStoreVersion) error {
 		err := csv.Upload("v5", []uploadSpec{{
 			// Uploads to ~charmers/multiseries-1
@@ -184,6 +187,7 @@ var migrationHistory = []versionSpec{{
 	// Create Charm 5 with 1 revisions no extrainfo legacy download stats
 	// Check the results in increase by 10 for all revision when legacy is set.
 	version: "4.5.3",
+	pkg:     "gopkg.in/juju/charmstore.v5-unstable",
 	update: func(db *mgo.Database, csv *charmStoreVersion) error {
 		err := csv.Upload("v5", []uploadSpec{{
 			id:     "~charmers/trusty/legacystats-setonlast-0",
@@ -249,6 +253,7 @@ var migrationHistory = []versionSpec{{
 	// and replace them with a single "published" map.
 	// Populate base entity ACLs for the candidate and beta channels.
 	version: "4.5.6",
+	pkg:     "gopkg.in/juju/charmstore.v5-unstable",
 	update: func(db *mgo.Database, csv *charmStoreVersion) error {
 		err := csv.Upload("v5", []uploadSpec{{
 			id:     "~charmers/trusty/different-acls-0",
@@ -279,6 +284,7 @@ var migrationHistory = []versionSpec{{
 	// Add support for new channels: stable, candidate, beta and edge.
 	// Add zesty to series.
 	version: "4.5.9",
+	pkg:     "gopkg.in/juju/charmstore.v5-unstable",
 	update: func(db *mgo.Database, csv *charmStoreVersion) error {
 		// TODO add charm that's published to new channels.
 		err := csv.Upload("v5", []uploadSpec{{

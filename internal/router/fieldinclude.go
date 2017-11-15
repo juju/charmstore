@@ -1,7 +1,7 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package router // import "gopkg.in/juju/charmstore.v5-unstable/internal/router"
+package router // import "gopkg.in/juju/charmstore.v5/internal/router"
 
 import (
 	"encoding/json"
@@ -10,7 +10,7 @@ import (
 
 	"gopkg.in/errgo.v1"
 
-	"gopkg.in/juju/charmstore.v5-unstable/audit"
+	"gopkg.in/juju/charmstore.v5/audit"
 )
 
 // A FieldQueryFunc is used to retrieve a metadata document for the given URL,

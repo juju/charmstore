@@ -1,7 +1,7 @@
 // Copyright 2015 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package version
+package version // import "gopkg.in/juju/charmstore.v5/version"
 
 // Version describes the current version of the code being run.
 type Version struct {

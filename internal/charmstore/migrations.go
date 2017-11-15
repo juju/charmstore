@@ -1,7 +1,7 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package charmstore // import "gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
+package charmstore // import "gopkg.in/juju/charmstore.v5/internal/charmstore"
 
 import (
 	"strings"
@@ -9,11 +9,11 @@ import (
 
 	"github.com/juju/utils/parallel"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/juju/charm.v6"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
 )
 
 const (

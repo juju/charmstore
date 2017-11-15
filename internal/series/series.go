@@ -3,7 +3,7 @@
 
 // Package series holds information about series supported in the
 // charmstore.
-package series // import "gopkg.in/juju/charmstore.v5-unstable/internal/series"
+package series // import "gopkg.in/juju/charmstore.v5/internal/series"
 
 // Distribution represents a distribution supported by the charmstore.
 // Every series will belong to a distribution.

@@ -1,7 +1,7 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package storetesting // import "gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
+package storetesting // import "gopkg.in/juju/charmstore.v5/internal/storetesting"
 
 import (
 	"archive/zip"
@@ -11,12 +11,12 @@ import (
 	"strings"
 
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charm.v6-unstable"
-	"gopkg.in/juju/charm.v6-unstable/resource"
-	"gopkg.in/juju/charmrepo.v2-unstable/testing"
+	"gopkg.in/juju/charm.v6"
+	"gopkg.in/juju/charm.v6/resource"
+	"gopkg.in/juju/charmrepo.v2/testing"
 	"gopkg.in/yaml.v2"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/blobstore"
+	"gopkg.in/juju/charmstore.v5/internal/blobstore"
 )
 
 // Charms holds the testing charm repository.

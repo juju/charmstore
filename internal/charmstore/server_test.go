@@ -1,7 +1,7 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package charmstore // import "gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
+package charmstore
 
 import (
 	"net/http"
@@ -11,15 +11,15 @@ import (
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/juju/charm.v6"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgostorage"
 	"gopkg.in/retry.v1"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/blobstore"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
+	"gopkg.in/juju/charmstore.v5/internal/blobstore"
+	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5/internal/router"
+	"gopkg.in/juju/charmstore.v5/internal/storetesting"
 )
 
 var serverParams = ServerParams{

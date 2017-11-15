@@ -1,7 +1,7 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package storetesting // import "gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
+package storetesting // import "gopkg.in/juju/charmstore.v5/internal/storetesting"
 
 import (
 	"os"
@@ -10,7 +10,7 @@ import (
 	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
 
-	"gopkg.in/juju/charmstore.v5-unstable/elasticsearch"
+	"gopkg.in/juju/charmstore.v5/elasticsearch"
 )
 
 // ElasticSearchSuite defines a test suite that connects to an

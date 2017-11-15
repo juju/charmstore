@@ -1,7 +1,7 @@
 // Copyright 2017 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package blobstore
+package blobstore // import "gopkg.in/juju/charmstore.v5/internal/blobstore"
 
 import (
 	"io"
@@ -9,7 +9,7 @@ import (
 
 	"gopkg.in/errgo.v1"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
 )
 
 // TODO use equivalent constants in io package when we can use more

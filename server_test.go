@@ -1,7 +1,7 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package charmstore_test // import "gopkg.in/juju/charmstore.v5-unstable"
+package charmstore_test
 
 import (
 	"fmt"
@@ -11,10 +11,10 @@ import (
 	jujutesting "github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
+	"gopkg.in/juju/charmrepo.v2/csclient/params"
 
-	"gopkg.in/juju/charmstore.v5-unstable"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/storetesting"
+	"gopkg.in/juju/charmstore.v5"
+	"gopkg.in/juju/charmstore.v5/internal/storetesting"
 )
 
 // These tests are copied (almost) verbatim from internal/charmstore/server_test.go

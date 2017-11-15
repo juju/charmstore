@@ -1,7 +1,7 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package charmstore // import "gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
+package charmstore
 
 import (
 	"net/http"
@@ -12,7 +12,7 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
 )
 
 type migrationsSuite struct {

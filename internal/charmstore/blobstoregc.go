@@ -1,7 +1,7 @@
 // Copyright 2017 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package charmstore
+package charmstore // import "gopkg.in/juju/charmstore.v5/internal/charmstore"
 
 import (
 	"time"
@@ -9,7 +9,7 @@ import (
 	"gopkg.in/errgo.v1"
 	tomb "gopkg.in/tomb.v2"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/monitoring"
+	"gopkg.in/juju/charmstore.v5/internal/monitoring"
 )
 
 var gcInterval = time.Hour

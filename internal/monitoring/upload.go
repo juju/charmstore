@@ -1,6 +1,6 @@
 // Copyright 2016 Canonical Ltd.
 
-package monitoring
+package monitoring // import "gopkg.in/juju/charmstore.v5/internal/monitoring"
 
 import (
 	"time"

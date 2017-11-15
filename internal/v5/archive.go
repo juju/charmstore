@@ -1,7 +1,7 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package v5 // import "gopkg.in/juju/charmstore.v5-unstable/internal/v5"
+package v5 // import "gopkg.in/juju/charmstore.v5/internal/v5"
 
 import (
 	stdzip "archive/zip"
@@ -16,23 +16,23 @@ import (
 
 	"github.com/juju/httprequest"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charm.v6-unstable"
-	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
+	"gopkg.in/juju/charm.v6"
+	"gopkg.in/juju/charmrepo.v2/csclient/params"
 	"gopkg.in/mgo.v2/bson"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/mongodoc"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
+	"gopkg.in/juju/charmstore.v5/internal/charmstore"
+	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5/internal/router"
 )
 
 // GET id/archive
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idarchive
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idarchive
 //
 // POST id/archive?hash=sha384hash
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#post-idarchive
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#post-idarchive
 //
 // DELETE id/archive
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#delete-idarchive
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#delete-idarchive
 //
 // PUT id/archive?hash=sha384hash
 // This is like POST except that it puts the archive to a known revision
@@ -317,7 +317,7 @@ func (h *ReqHandler) latestRevisionInfo(id *charm.URL) (*router.ResolvedURL, str
 }
 
 // GET id/archive/path
-// https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idarchivepath
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idarchivepath
 func (h *ReqHandler) serveArchiveFile(id *router.ResolvedURL, w http.ResponseWriter, req *http.Request) error {
 	blob, err := h.Store.OpenBlob(id)
 	if err != nil {

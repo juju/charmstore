@@ -1,7 +1,7 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package router // import "gopkg.in/juju/charmstore.v5-unstable/internal/router"
+package router // import "gopkg.in/juju/charmstore.v5/internal/router"
 
 import (
 	"encoding/json"
@@ -14,7 +14,7 @@ import (
 	"github.com/juju/httprequest"
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
+	"gopkg.in/juju/charmrepo.v2/csclient/params"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 )
 

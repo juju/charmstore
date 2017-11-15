@@ -4,7 +4,7 @@
 // This is the internal version of the charmstore package.
 // It exposes details to the various API packages
 // that we do not wish to expose to the world at large.
-package charmstore // import "gopkg.in/juju/charmstore.v5-unstable/internal/charmstore"
+package charmstore // import "gopkg.in/juju/charmstore.v5/internal/charmstore"
 
 import (
 	"net/http"
@@ -19,9 +19,9 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/natefinch/lumberjack.v2"
 
-	"gopkg.in/juju/charmstore.v5-unstable/internal/blobstore"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/monitoring"
-	"gopkg.in/juju/charmstore.v5-unstable/internal/router"
+	"gopkg.in/juju/charmstore.v5/internal/blobstore"
+	"gopkg.in/juju/charmstore.v5/internal/monitoring"
+	"gopkg.in/juju/charmstore.v5/internal/router"
 )
 
 // NewAPIHandlerFunc is a function that returns a new API handler that uses
