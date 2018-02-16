@@ -15,11 +15,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juju/httprequest"
 	"github.com/juju/idmclient"
 	"github.com/juju/loggo"
 	"github.com/juju/mempool"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/httprequest.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
@@ -322,7 +323,7 @@ func newReqHandler() *ReqHandler {
 func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	rh, err := h.NewReqHandler(req)
 	if err != nil {
-		router.WriteError(w, err)
+		router.WriteError(context.TODO(), w, err)
 		return
 	}
 	defer rh.Close()
@@ -577,7 +578,7 @@ var errNotImplemented = errgo.Newf("method not implemented")
 // GET /debug
 // https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-debug
 func (h *ReqHandler) serveDebug(w http.ResponseWriter, req *http.Request) {
-	router.WriteError(w, errNotImplemented)
+	router.WriteError(context.TODO(), w, errNotImplemented)
 }
 
 // GET id/expand-id

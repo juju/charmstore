@@ -14,8 +14,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/juju/httprequest"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/httprequest.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 	"gopkg.in/mgo.v2/bson"

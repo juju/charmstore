@@ -11,9 +11,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/juju/httprequest"
 	"github.com/juju/loggo"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/httprequest.v1"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 )
@@ -60,10 +61,12 @@ func HandleErrors(h ErrorHandler) http.Handler {
 	})
 }
 
-var errorToResp httprequest.ErrorMapper = func(err error) (int, interface{}) {
-	status, body := errorToResp1(err)
-	logger.Infof("error response %d; %s", status, errgo.Details(err))
-	return status, body
+var errorToResp = httprequest.Server{
+	ErrorMapper: func(ctx context.Context, err error) (int, interface{}) {
+		status, body := errorToResp1(err)
+		logger.Infof("error response %d; %s", status, errgo.Details(err))
+		return status, body
+	},
 }
 
 func errorToResp1(err error) (int, interface{}) {
@@ -164,7 +167,7 @@ func (mux *ServeMux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	h, pattern := mux.Handler(req)
 	if pattern == "" {
-		WriteError(w, errgo.WithCausef(nil, params.ErrNotFound, "no handler for %q", req.URL.Path))
+		WriteError(context.TODO(), w, errgo.WithCausef(nil, params.ErrNotFound, "no handler for %q", req.URL.Path))
 		return
 	}
 	h.ServeHTTP(w, req)
