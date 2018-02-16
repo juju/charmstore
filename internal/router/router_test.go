@@ -18,6 +18,7 @@ import (
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
@@ -2178,7 +2179,7 @@ func (s *RouterSuite) TestWriteJSON(c *gc.C) {
 
 func (s *RouterSuite) TestWriteError(c *gc.C) {
 	rec := httptest.NewRecorder()
-	WriteError(rec, errgo.Newf("an error"))
+	WriteError(context.TODO(), rec, errgo.Newf("an error"))
 	var errResp params.Error
 	err := json.Unmarshal(rec.Body.Bytes(), &errResp)
 	c.Assert(err, gc.Equals, nil)
@@ -2190,7 +2191,7 @@ func (s *RouterSuite) TestWriteError(c *gc.C) {
 		Message: "a message",
 		Code:    "some code",
 	}
-	WriteError(rec, &errResp0)
+	WriteError(context.TODO(), rec, &errResp0)
 	var errResp1 params.Error
 	err = json.Unmarshal(rec.Body.Bytes(), &errResp1)
 	c.Assert(err, gc.Equals, nil)
