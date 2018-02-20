@@ -15,9 +15,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/juju/httprequest"
 	"github.com/juju/utils/parallel"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/httprequest.v1"
 	charm "gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
@@ -303,7 +304,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	if err := req.ParseForm(); err != nil {
-		WriteError(w, errgo.Notef(err, "cannot parse form"))
+		WriteError(context.TODO(), w, errgo.Notef(err, "cannot parse form"))
 		return
 	}
 	r.handler.ServeHTTP(w, req)

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/juju/utils/debugstatus"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2/bson"
 
@@ -22,6 +23,7 @@ import (
 func (h *ReqHandler) serveDebugStatus(_ http.Header, req *http.Request) (interface{}, error) {
 	h.Store.SetReconnectTimeout(500 * time.Millisecond)
 	return debugstatus.Check(
+		context.TODO(),
 		debugstatus.ServerStartTime,
 		debugstatus.Connection(h.Store.DB.Session),
 		debugstatus.MongoCollections(h.Store.DB),
@@ -31,7 +33,7 @@ func (h *ReqHandler) serveDebugStatus(_ http.Header, req *http.Request) (interfa
 	), nil
 }
 
-func (h *ReqHandler) checkElasticSearch() (key string, result debugstatus.CheckResult) {
+func (h *ReqHandler) checkElasticSearch(context.Context) (key string, result debugstatus.CheckResult) {
 	key = "elasticsearch"
 	result.Name = "Elastic search is running"
 	if h.Store.ES == nil || h.Store.ES.Database == nil {
@@ -49,7 +51,7 @@ func (h *ReqHandler) checkElasticSearch() (key string, result debugstatus.CheckR
 	return key, result
 }
 
-func (h *ReqHandler) checkEntities() (key string, result debugstatus.CheckResult) {
+func (h *ReqHandler) checkEntities(context.Context) (key string, result debugstatus.CheckResult) {
 	result.Name = "Entities in charm store"
 	charms, err := h.Store.DB.Entities().Find(bson.D{{"series", bson.D{{"$ne", "bundle"}}}}).Count()
 	if err != nil {
@@ -71,7 +73,7 @@ func (h *ReqHandler) checkEntities() (key string, result debugstatus.CheckResult
 	return "entities", result
 }
 
-func (h *ReqHandler) checkBaseEntities() (key string, result debugstatus.CheckResult) {
+func (h *ReqHandler) checkBaseEntities(context.Context) (key string, result debugstatus.CheckResult) {
 	resultKey := "base_entities"
 	result.Name = "Base entities in charm store"
 

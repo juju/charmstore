@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juju/httprequest"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/httprequest.v1"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 
 	"gopkg.in/juju/charmstore.v5-unstable/internal/blobstore"
