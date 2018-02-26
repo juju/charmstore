@@ -3121,7 +3121,7 @@ var publishErrorsTests = []struct {
 	expectStatus: http.StatusBadRequest,
 	expectBody: params.Error{
 		Code:    params.ErrBadRequest,
-		Message: `cannot unmarshal publish request body: cannot unmarshal into field: unexpected content type text/invalid; want application/json; content: "{\"Channels\":[\"edge\"]}"`,
+		Message: `cannot unmarshal publish request body: cannot unmarshal into field PublishRequest: unexpected content type text/invalid; want application/json; content: "{\"Channels\":[\"edge\"]}"`,
 	},
 }, {
 	about:        "invalid body",
@@ -3131,7 +3131,7 @@ var publishErrorsTests = []struct {
 	expectStatus: http.StatusBadRequest,
 	expectBody: params.Error{
 		Code:    params.ErrBadRequest,
-		Message: "cannot unmarshal publish request body: cannot unmarshal into field: cannot unmarshal request body: invalid character 'b' looking for beginning of value",
+		Message: "cannot unmarshal publish request body: cannot unmarshal into field PublishRequest: cannot unmarshal request body: invalid character 'b' looking for beginning of value",
 	},
 }, {
 	about:        "entity to be published not found",

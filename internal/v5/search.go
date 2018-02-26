@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 
 	"github.com/juju/utils/parallel"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charmrepo.v2/csclient/params"
 
@@ -104,7 +105,7 @@ func (h *ReqHandler) addMetaData(results []*mongodoc.Entity, include []string, r
 // GET search/interesting[?limit=limit][&include=meta]
 // https://github.com/juju/charmstore/blob/v4/docs/API.md#get-searchinteresting
 func (h *ReqHandler) serveSearchInteresting(w http.ResponseWriter, req *http.Request) {
-	router.WriteError(w, errNotImplemented)
+	router.WriteError(context.TODO(), w, errNotImplemented)
 }
 
 // ParseSearchParms extracts the search paramaters from the request
