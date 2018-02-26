@@ -73,6 +73,7 @@ import (
 	"time"
 
 	"github.com/juju/mempool"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6"
 	"gopkg.in/juju/charmrepo.v2"
@@ -117,7 +118,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	req.ParseForm()
 	rh, err := h.newReqHandler()
 	if err != nil {
-		router.WriteError(w, err)
+		router.WriteError(context.TODO(), w, err)
 		return
 	}
 	defer rh.close()

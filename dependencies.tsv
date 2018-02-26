@@ -15,7 +15,7 @@ github.com/juju/mempool	git	24974d6c264fe5a29716e7d56ea24c4bd904b7cc	2016-02-05T
 github.com/juju/retry	git	62c62032529169c7ec02fa48f93349604c345e1f	2015-10-29T02:48:21Z
 github.com/juju/schema	git	1e25943f8c6fd6815282d6f1ac87091d21e14e19	2016-03-01T11:16:46Z
 github.com/juju/testing	git	b8689951f6db31943dd8c3d540b8c4dd368cf850	2016-10-31T10:37:13Z
-github.com/juju/utils	git	9b65c33e54c793d74a4ed99c15111c44faddb8e4	2017-10-25T16:38:56Z
+github.com/juju/utils	git	1d3aa4661175bbdb5ded53d2b86b6106bbdc0a4f	2018-02-07T01:23:44Z
 github.com/juju/version	git	ef897ad7f130870348ce306f61332f5335355063	2015-11-27T20:34:00Z
 github.com/juju/webbrowser	git	54b8c57083b4afb7dc75da7f13e2967b2606a507	2016-03-09T14:36:29Z
 github.com/juju/xml	git	eb759a627588d35166bc505fceb51b88500e291e	2015-04-13T13:11:21Z
@@ -33,6 +33,7 @@ golang.org/x/sys	git	7a6e5648d140666db5d920909e082ca00a87ba2c	2017-02-01T05:12:4
 gopkg.in/check.v1	git	4f90aeace3a26ad7021961c297b22c42160c7b25	2016-01-05T16:49:36Z
 gopkg.in/errgo.v1	git	442357a80af5c6bf9b6d51ae791a39c3421004f3	2016-12-22T12:58:16Z
 gopkg.in/goose.v2	git	455416024500800de8dadbcacfa22681b6bb818d	2017-09-04T09:17:38Z
+gopkg.in/httprequest.v1	git	35158f716c228fdf58b5a5b80cf331302d10160a	2017-11-03T09:19:05Z
 gopkg.in/juju/charm.v6	git	e03b52c17fcc23dd3154fdda6cbd357c6ded1f01	2017-11-14T08:45:40Z
 gopkg.in/juju/charmrepo.v2	git	653bbd81990d2d7d48e0fb931a3b0f52c694572f	2017-11-14T18:40:45Z
 gopkg.in/juju/jujusvg.v3	git	6f7342099e20c84f560bd9fc8afe96ff7486613e	2017-11-14T17:07:01Z

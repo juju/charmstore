@@ -7,6 +7,7 @@ import (
 	"text/template"
 
 	"github.com/juju/httpprof"
+	"golang.org/x/net/context"
 
 	"gopkg.in/juju/charmstore.v5/internal/router"
 )
@@ -34,7 +35,7 @@ func newPprofHandler(auth adminAuthenticator) http.Handler {
 
 func (h *pprofHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if err := h.auth.authenticateAdmin(req); err != nil {
-		router.WriteError(w, err)
+		router.WriteError(context.TODO(), w, err)
 		return
 	}
 	h.mux.ServeHTTP(w, req)

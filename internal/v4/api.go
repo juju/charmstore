@@ -8,10 +8,11 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/juju/httprequest"
 	"github.com/juju/loggo"
 	"github.com/juju/mempool"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/httprequest.v1"
 	"gopkg.in/juju/charm.v6"
 	"gopkg.in/juju/charmrepo.v2/csclient/params"
 	"gopkg.in/mgo.v2"
@@ -56,7 +57,7 @@ func New(pool *charmstore.Pool, config charmstore.ServerParams, rootPath string)
 func (h Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	rh, err := h.NewReqHandler(req)
 	if err != nil {
-		router.WriteError(w, err)
+		router.WriteError(context.TODO(), w, err)
 		return
 	}
 	defer rh.Close()
