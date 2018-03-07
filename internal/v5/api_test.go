@@ -3476,7 +3476,7 @@ var debugPprofTests = []struct {
 	match: "(?s)goroutine [0-9]+.*",
 }, {
 	path:  "debug/pprof/cmdline",
-	match: ".+charmstore.+",
+	match: ".+",
 }}
 
 func (s *APISuite) TestDebugPprof(c *gc.C) {

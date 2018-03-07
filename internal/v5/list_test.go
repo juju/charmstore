@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
-	"sort"
 	"strings"
 
 	"github.com/juju/idmclient"
@@ -22,6 +21,7 @@ import (
 	"gopkg.in/macaroon.v2-unstable"
 	"gopkg.in/mgo.v2/bson"
 
+	"gopkg.in/juju/charmstore.v5/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5/internal/router"
 	"gopkg.in/juju/charmstore.v5/internal/storetesting"
 )
@@ -50,10 +50,6 @@ func (s *ListSuite) SetUpSuite(c *gc.C) {
 
 func (s *ListSuite) SetUpTest(c *gc.C) {
 	s.commonSuite.SetUpTest(c)
-	s.addCharmsToStore(c)
-	// hide the riak charm
-	err := s.store.SetPerms(charm.MustParseURL("cs:~charmers/riak"), "stable.read", "charmers", "test-user")
-	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *ListSuite) addCharmsToStore(c *gc.C) {
@@ -63,6 +59,9 @@ func (s *ListSuite) addCharmsToStore(c *gc.C) {
 	for name, id := range exportListTestBundles {
 		s.addPublicBundle(c, getListBundle(name), id, false)
 	}
+	// hide the riak charm
+	err := s.store.SetPerms(charm.MustParseURL("cs:~charmers/riak"), "stable.read", "charmers", "test-user")
+	c.Assert(err, gc.Equals, nil)
 }
 
 func getListCharm(name string) *storetesting.Charm {
@@ -83,62 +82,63 @@ func (s *ListSuite) TestSuccessfulList(c *gc.C) {
 	tests := []struct {
 		about   string
 		query   string
-		results []*router.ResolvedURL
+		results []string
 	}{{
 		about: "bare list",
 		query: "",
-		results: []*router.ResolvedURL{
-			exportTestBundles["wordpress-simple"],
-			exportTestCharms["wordpress"],
-			exportTestCharms["varnish"],
-			exportTestCharms["mysql"],
+		results: []string{
+			"cs:bundle/wordpress-simple-4",
+			"cs:precise/wordpress-23",
+			"cs:trusty/mysql-7",
+			"cs:~foo/trusty/varnish-1",
 		},
 	}, {
 		about: "name filter list",
 		query: "name=mysql",
-		results: []*router.ResolvedURL{
-			exportTestCharms["mysql"],
+		results: []string{
+			"cs:trusty/mysql-7",
 		},
 	}, {
 		about: "owner filter list",
 		query: "owner=foo",
-		results: []*router.ResolvedURL{
-			exportTestCharms["varnish"],
+		results: []string{
+			"cs:~foo/trusty/varnish-1",
 		},
 	}, {
 		about: "series filter list",
 		query: "series=trusty",
-		results: []*router.ResolvedURL{
-			exportTestCharms["varnish"],
-			exportTestCharms["mysql"],
+		results: []string{
+			"cs:trusty/mysql-7",
+			"cs:~foo/trusty/varnish-1",
 		},
 	}, {
 		about: "type filter list",
 		query: "type=bundle",
-		results: []*router.ResolvedURL{
-			exportTestBundles["wordpress-simple"],
+		results: []string{
+			"cs:bundle/wordpress-simple-4",
 		},
 	}, {
 		about: "promulgated",
 		query: "promulgated=1",
-		results: []*router.ResolvedURL{
-			exportTestBundles["wordpress-simple"],
-			exportTestCharms["wordpress"],
-			exportTestCharms["mysql"],
+		results: []string{
+			"cs:bundle/wordpress-simple-4",
+			"cs:precise/wordpress-23",
+			"cs:trusty/mysql-7",
 		},
 	}, {
 		about: "not promulgated",
 		query: "promulgated=0",
-		results: []*router.ResolvedURL{
-			exportTestCharms["varnish"],
+		results: []string{
+			"cs:~foo/trusty/varnish-1",
 		},
 	}, {
 		about: "promulgated with owner",
 		query: "promulgated=1&owner=openstack-charmers",
-		results: []*router.ResolvedURL{
-			exportTestCharms["mysql"],
+		results: []string{
+			"cs:trusty/mysql-7",
 		},
 	}}
+	s.addCharmsToStore(c)
 	for i, test := range tests {
 		c.Logf("test %d. %s", i, test.about)
 		rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
@@ -148,11 +148,7 @@ func (s *ListSuite) TestSuccessfulList(c *gc.C) {
 		var sr params.ListResponse
 		err := json.Unmarshal(rec.Body.Bytes(), &sr)
 		c.Assert(err, gc.Equals, nil)
-		c.Assert(sr.Results, gc.HasLen, len(test.results))
-		c.Logf("results: %s", rec.Body.Bytes())
-		for i := range test.results {
-			c.Assert(sr.Results[i].Id.String(), gc.Equals, test.results[i].PreferredURL().String(), gc.Commentf("element %d"))
-		}
+		assertListResult(c, sr, test.results)
 	}
 }
 
@@ -205,12 +201,12 @@ func (s *ListSuite) TestMetadataFields(c *gc.C) {
 				Provides: map[string][]params.EntityResult{
 					"mysql": {
 						{
-							Id: exportTestCharms["mysql"].PreferredURL(),
+							Id: charm.MustParseURL("cs:trusty/mysql-7"),
 						},
 					},
 					"varnish": {
 						{
-							Id: exportTestCharms["varnish"].PreferredURL(),
+							Id: charm.MustParseURL("cs:~foo/trusty/varnish-1"),
 						},
 					},
 				},
@@ -224,12 +220,12 @@ func (s *ListSuite) TestMetadataFields(c *gc.C) {
 				Provides: map[string][]params.EntityResult{
 					"mysql": {
 						{
-							Id: exportTestCharms["mysql"].PreferredURL(),
+							Id: charm.MustParseURL("cs:trusty/mysql-7"),
 						},
 					},
 					"varnish": {
 						{
-							Id: exportTestCharms["varnish"].PreferredURL(),
+							Id: charm.MustParseURL("cs:~foo/trusty/varnish-1"),
 						},
 					},
 				},
@@ -237,6 +233,7 @@ func (s *ListSuite) TestMetadataFields(c *gc.C) {
 			"charm-config": getListCharm("wordpress").Config(),
 		},
 	}}
+	s.addCharmsToStore(c)
 	for i, test := range tests {
 		c.Logf("test %d. %s", i, test.about)
 		rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
@@ -257,6 +254,7 @@ func (s *ListSuite) TestMetadataFields(c *gc.C) {
 }
 
 func (s *ListSuite) TestListIncludeError(c *gc.C) {
+	s.addCharmsToStore(c)
 	// Perform a list for all charms, including the
 	// manifest, which will try to retrieve all charm
 	// blobs.
@@ -268,7 +266,7 @@ func (s *ListSuite) TestListIncludeError(c *gc.C) {
 	var resp params.ListResponse
 	err := json.Unmarshal(rec.Body.Bytes(), &resp)
 	// cs:riak will not be found because it is not visible to "everyone".
-	c.Assert(resp.Results, gc.HasLen, len(exportTestCharms)-1)
+	c.Assert(resp.Results, gc.HasLen, len(exportListTestCharms)-1)
 
 	// Now update the entity to hold an invalid hash.
 	// The list should still work, but only return a single result.
@@ -298,7 +296,7 @@ func (s *ListSuite) TestListIncludeError(c *gc.C) {
 	err = json.Unmarshal(rec.Body.Bytes(), &resp)
 	// cs:riak will not be found because it is not visible to "everyone".
 	// cs:wordpress will not be found because it has no manifest.
-	c.Assert(resp.Results, gc.HasLen, len(exportTestCharms)-2)
+	c.Assert(resp.Results, gc.HasLen, len(exportListTestCharms)-2)
 
 	c.Assert(tw.Log(), jc.LogMatches, []string{"cannot retrieve metadata for cs:precise/wordpress-23: cannot open archive data for cs:precise/wordpress-23: .*"})
 }
@@ -307,62 +305,63 @@ func (s *ListSuite) TestSortingList(c *gc.C) {
 	tests := []struct {
 		about   string
 		query   string
-		results []*router.ResolvedURL
+		results []string
 	}{{
 		about: "name ascending",
 		query: "sort=name",
-		results: []*router.ResolvedURL{
-			exportTestCharms["mysql"],
-			exportTestCharms["varnish"],
-			exportTestCharms["wordpress"],
-			exportTestBundles["wordpress-simple"],
+		results: []string{
+			"cs:trusty/mysql-7",
+			"cs:~foo/trusty/varnish-1",
+			"cs:precise/wordpress-23",
+			"cs:bundle/wordpress-simple-4",
 		},
 	}, {
 		about: "name descending",
 		query: "sort=-name",
-		results: []*router.ResolvedURL{
-			exportTestBundles["wordpress-simple"],
-			exportTestCharms["wordpress"],
-			exportTestCharms["varnish"],
-			exportTestCharms["mysql"],
+		results: []string{
+			"cs:bundle/wordpress-simple-4",
+			"cs:precise/wordpress-23",
+			"cs:~foo/trusty/varnish-1",
+			"cs:trusty/mysql-7",
 		},
 	}, {
 		about: "series ascending",
 		query: "sort=series,name",
-		results: []*router.ResolvedURL{
-			exportTestBundles["wordpress-simple"],
-			exportTestCharms["wordpress"],
-			exportTestCharms["mysql"],
-			exportTestCharms["varnish"],
+		results: []string{
+			"cs:bundle/wordpress-simple-4",
+			"cs:precise/wordpress-23",
+			"cs:trusty/mysql-7",
+			"cs:~foo/trusty/varnish-1",
 		},
 	}, {
 		about: "series descending",
 		query: "sort=-series&sort=name",
-		results: []*router.ResolvedURL{
-			exportTestCharms["mysql"],
-			exportTestCharms["varnish"],
-			exportTestCharms["wordpress"],
-			exportTestBundles["wordpress-simple"],
+		results: []string{
+			"cs:trusty/mysql-7",
+			"cs:~foo/trusty/varnish-1",
+			"cs:precise/wordpress-23",
+			"cs:bundle/wordpress-simple-4",
 		},
 	}, {
 		about: "owner ascending",
 		query: "sort=owner,name",
-		results: []*router.ResolvedURL{
-			exportTestCharms["wordpress"],
-			exportTestBundles["wordpress-simple"],
-			exportTestCharms["varnish"],
-			exportTestCharms["mysql"],
+		results: []string{
+			"cs:trusty/mysql-7",
+			"cs:precise/wordpress-23",
+			"cs:bundle/wordpress-simple-4",
+			"cs:~foo/trusty/varnish-1",
 		},
 	}, {
 		about: "owner descending",
 		query: "sort=-owner&sort=name",
-		results: []*router.ResolvedURL{
-			exportTestCharms["mysql"],
-			exportTestCharms["varnish"],
-			exportTestCharms["wordpress"],
-			exportTestBundles["wordpress-simple"],
+		results: []string{
+			"cs:~foo/trusty/varnish-1",
+			"cs:trusty/mysql-7",
+			"cs:precise/wordpress-23",
+			"cs:bundle/wordpress-simple-4",
 		},
 	}}
+	s.addCharmsToStore(c)
 	for i, test := range tests {
 		c.Logf("test %d. %s", i, test.about)
 		rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
@@ -374,9 +373,7 @@ func (s *ListSuite) TestSortingList(c *gc.C) {
 		c.Assert(err, gc.Equals, nil)
 		c.Assert(sr.Results, gc.HasLen, len(test.results), gc.Commentf("expected %#v", test.results))
 		c.Logf("results: %s", rec.Body.Bytes())
-		for i := range test.results {
-			c.Assert(sr.Results[i].Id.String(), gc.Equals, test.results[i].PreferredURL().String(), gc.Commentf("element %d"))
-		}
+		assertListResult(c, sr, test.results)
 	}
 }
 
@@ -393,14 +390,15 @@ func (s *ListSuite) TestSortUnsupportedListField(c *gc.C) {
 }
 
 func (s *ListSuite) TestGetLatestRevisionOnly(c *gc.C) {
+	s.addCharmsToStore(c)
 	id := newResolvedURL("cs:~charmers/precise/wordpress-24", 24)
 	s.addPublicCharm(c, getListCharm("wordpress"), id)
 
-	testresults := []*router.ResolvedURL{
-		exportTestBundles["wordpress-simple"],
-		id,
-		exportTestCharms["varnish"],
-		exportTestCharms["mysql"],
+	wantResults := []string{
+		"cs:bundle/wordpress-simple-4",
+		"cs:precise/wordpress-24",
+		"cs:trusty/mysql-7",
+		"cs:~foo/trusty/varnish-1",
 	}
 
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
@@ -410,17 +408,13 @@ func (s *ListSuite) TestGetLatestRevisionOnly(c *gc.C) {
 	var sr params.ListResponse
 	err := json.Unmarshal(rec.Body.Bytes(), &sr)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(sr.Results, gc.HasLen, 4, gc.Commentf("expected %#v", testresults))
-	c.Logf("results: %s", rec.Body.Bytes())
-	for i := range testresults {
-		c.Assert(sr.Results[i].Id.String(), gc.Equals, testresults[i].PreferredURL().String(), gc.Commentf("element %d"))
-	}
+	assertListResult(c, sr, wantResults)
 
-	testresults = []*router.ResolvedURL{
-		exportTestCharms["mysql"],
-		exportTestCharms["varnish"],
-		id,
-		exportTestBundles["wordpress-simple"],
+	wantResults = []string{
+		"cs:trusty/mysql-7",
+		"cs:~foo/trusty/varnish-1",
+		"cs:precise/wordpress-24",
+		"cs:bundle/wordpress-simple-4",
 	}
 	rec = httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.srv,
@@ -428,11 +422,7 @@ func (s *ListSuite) TestGetLatestRevisionOnly(c *gc.C) {
 	})
 	err = json.Unmarshal(rec.Body.Bytes(), &sr)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(sr.Results, gc.HasLen, 4, gc.Commentf("expected %#v", testresults))
-	c.Logf("results: %s", rec.Body.Bytes())
-	for i := range testresults {
-		c.Assert(sr.Results[i].Id.String(), gc.Equals, testresults[i].PreferredURL().String(), gc.Commentf("element %d"))
-	}
+	assertListResult(c, sr, wantResults)
 }
 
 func (s *ListSuite) assertPut(c *gc.C, url string, val interface{}) {
@@ -454,6 +444,8 @@ func (s *ListSuite) assertPut(c *gc.C, url string, val interface{}) {
 }
 
 func (s *ListSuite) TestListWithAdminCredentials(c *gc.C) {
+	s.addCharmsToStore(c)
+
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler:  s.srv,
 		URL:      storeURL("list"),
@@ -461,40 +453,160 @@ func (s *ListSuite) TestListWithAdminCredentials(c *gc.C) {
 		Password: testPassword,
 	})
 	c.Assert(rec.Code, gc.Equals, http.StatusOK)
-	expected := []*router.ResolvedURL{
-		exportTestCharms["mysql"],
-		exportTestCharms["wordpress"],
-		exportTestCharms["riak"],
-		exportTestCharms["varnish"],
-		exportTestBundles["wordpress-simple"],
+	expected := []string{
+		"cs:bundle/wordpress-simple-4",
+		"cs:precise/wordpress-23",
+		"cs:trusty/mysql-7",
+		"cs:trusty/riak-67",
+		"cs:~foo/trusty/varnish-1",
 	}
 	var sr params.ListResponse
 	err := json.Unmarshal(rec.Body.Bytes(), &sr)
 	c.Assert(err, gc.Equals, nil)
-	assertListResultSet(c, sr, expected)
+	assertListResult(c, sr, expected)
 }
 
 func (s *ListSuite) TestListWithUserMacaroon(c *gc.C) {
+	s.addCharmsToStore(c)
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.srv,
 		URL:     storeURL("list"),
 		Do:      bakeryDo(s.login("test-user")),
 	})
 	c.Assert(rec.Code, gc.Equals, http.StatusOK)
-	expected := []*router.ResolvedURL{
-		exportTestCharms["mysql"],
-		exportTestCharms["wordpress"],
-		exportTestCharms["riak"],
-		exportTestCharms["varnish"],
-		exportTestBundles["wordpress-simple"],
+	expected := []string{
+		"cs:bundle/wordpress-simple-4",
+		"cs:precise/wordpress-23",
+		"cs:trusty/mysql-7",
+		"cs:trusty/riak-67",
+		"cs:~foo/trusty/varnish-1",
 	}
 	var sr params.ListResponse
 	err := json.Unmarshal(rec.Body.Bytes(), &sr)
 	c.Assert(err, gc.Equals, nil)
-	assertListResultSet(c, sr, expected)
+	for i, r := range sr.Results {
+		c.Logf("result %d: %v", i, r.Id)
+	}
+	assertListResult(c, sr, expected)
+}
+
+type listWithChannelsTest struct {
+	about         string
+	charms        []listCharm
+	perms         []charmPerms
+	expectResults []string
+}
+
+type listCharm struct {
+	id       string
+	channels []params.Channel
+}
+
+type charmPerms struct {
+	url            string
+	publicChannels []params.Channel
+}
+
+func (t listWithChannelsTest) test(c *gc.C, store *charmstore.Store, srv *charmstore.Server) {
+	// Remove all entities from the store so that we start with a clean slate.
+	_, err := store.DB.Entities().RemoveAll(nil)
+	c.Assert(err, gc.Equals, nil)
+	_, err = store.DB.BaseEntities().RemoveAll(nil)
+	c.Assert(err, gc.Equals, nil)
+
+	for _, charmSpec := range t.charms {
+		id := newResolvedURL(charmSpec.id, -1)
+		meta := new(charm.Meta)
+		if id.URL.Series == "" {
+			meta.Series = []string{"quantal"}
+		}
+		ch := storetesting.NewCharm(meta)
+		err := store.AddCharmWithArchive(id, ch)
+		c.Assert(err, gc.Equals, nil)
+		if len(charmSpec.channels) > 0 {
+			err = store.Publish(id, nil, charmSpec.channels...)
+			c.Assert(err, gc.Equals, nil)
+		}
+	}
+	for _, permSpec := range t.perms {
+		url := charm.MustParseURL(permSpec.url)
+		for _, channel := range permSpec.publicChannels {
+			err := store.SetPerms(url, string(channel)+".read", params.Everyone)
+			c.Assert(err, gc.Equals, nil)
+		}
+	}
+	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
+		Handler: srv,
+		URL:     storeURL("list"),
+	})
+	c.Assert(rec.Code, gc.Equals, http.StatusOK)
+	var sr params.ListResponse
+	err = json.Unmarshal(rec.Body.Bytes(), &sr)
+	c.Assert(err, gc.Equals, nil)
+	for i, r := range sr.Results {
+		c.Logf("result %d: %v", i, r.Id)
+	}
+	assertListResult(c, sr, t.expectResults)
+}
+
+var listWithChannelsTests = []listWithChannelsTest{{
+	about: "a later unpublished revision should not override an earlier published revision",
+	charms: []listCharm{{
+		id:       "cs:~bob/foo-1",
+		channels: []params.Channel{params.StableChannel},
+	}, {
+		id: "cs:~bob/foo-2",
+	}},
+	perms: []charmPerms{{
+		url:            "cs:~bob/foo",
+		publicChannels: []params.Channel{params.StableChannel},
+	}},
+	expectResults: []string{"cs:~bob/foo-1"},
+}, {
+	about: "only the latest revision should be returned",
+	charms: []listCharm{{
+		id:       "cs:~bob/foo-1",
+		channels: []params.Channel{params.StableChannel},
+	}, {
+		id:       "cs:~bob/foo-2",
+		channels: []params.Channel{params.CandidateChannel},
+	}},
+	perms: []charmPerms{{
+		url:            "cs:~bob/foo",
+		publicChannels: []params.Channel{params.CandidateChannel, params.StableChannel},
+	}},
+	expectResults: []string{"cs:~bob/foo-2"},
+}, {
+	about: "sort by series",
+	charms: []listCharm{{
+		id:       "cs:~bob/quantal/foo-1",
+		channels: []params.Channel{params.StableChannel},
+	}, {
+		id:       "cs:~bob/precise/foo-2",
+		channels: []params.Channel{params.CandidateChannel},
+	}, {
+		id:       "cs:~bob/xenial/foo-3",
+		channels: []params.Channel{params.EdgeChannel},
+	}, {
+		id:       "cs:~bob/xenial/foo-4",
+		channels: []params.Channel{params.EdgeChannel},
+	}},
+	perms: []charmPerms{{
+		url:            "cs:~bob/foo",
+		publicChannels: []params.Channel{params.EdgeChannel, params.CandidateChannel, params.StableChannel},
+	}},
+	expectResults: []string{"cs:~bob/precise/foo-2", "cs:~bob/quantal/foo-1", "cs:~bob/xenial/foo-4"},
+}}
+
+func (s *ListSuite) TestListWithChannels(c *gc.C) {
+	for i, test := range listWithChannelsTests {
+		c.Logf("%d: %s", i, test.about)
+		test.test(c, s.store, s.srv)
+	}
 }
 
 func (s *ListSuite) TestSearchWithBadAdminCredentialsAndACookie(c *gc.C) {
+	s.addCharmsToStore(c)
 	m, err := s.store.Bakery.NewMacaroon([]checkers.Caveat{
 		idmclient.UserDeclaration("test-user"),
 	})
@@ -509,31 +621,22 @@ func (s *ListSuite) TestSearchWithBadAdminCredentialsAndACookie(c *gc.C) {
 		Password: "bad-password",
 	})
 	c.Assert(rec.Code, gc.Equals, http.StatusOK)
-	expected := []*router.ResolvedURL{
-		exportTestCharms["mysql"],
-		exportTestCharms["wordpress"],
-		exportTestCharms["varnish"],
-		exportTestBundles["wordpress-simple"],
+	expected := []string{
+		"cs:bundle/wordpress-simple-4",
+		"cs:precise/wordpress-23",
+		"cs:trusty/mysql-7",
+		"cs:~foo/trusty/varnish-1",
 	}
 	var sr params.ListResponse
 	err = json.Unmarshal(rec.Body.Bytes(), &sr)
 	c.Assert(err, gc.Equals, nil)
-	assertListResultSet(c, sr, expected)
+	assertListResult(c, sr, expected)
 }
 
-func assertListResultSet(c *gc.C, sr params.ListResponse, expected []*router.ResolvedURL) {
-	sort.Sort(listResultById(sr.Results))
-	sort.Sort(resolvedURLByPreferredURL(expected))
-	c.Assert(sr.Results, gc.HasLen, len(expected), gc.Commentf("expected %#v", expected))
-	for i := range expected {
-		c.Assert(sr.Results[i].Id.String(), gc.Equals, expected[i].PreferredURL().String(), gc.Commentf("element %d"))
+func assertListResult(c *gc.C, got params.ListResponse, want []string) {
+	gotStrs := make([]string, len(got.Results))
+	for i, r := range got.Results {
+		gotStrs[i] = r.Id.String()
 	}
-}
-
-type listResultById []params.EntityResult
-
-func (s listResultById) Len() int      { return len(s) }
-func (s listResultById) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
-func (s listResultById) Less(i, j int) bool {
-	return s[i].Id.String() < s[j].Id.String()
+	c.Assert(gotStrs, jc.DeepEquals, want)
 }
