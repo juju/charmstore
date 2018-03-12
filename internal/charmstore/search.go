@@ -458,7 +458,7 @@ type SearchParams struct {
 	// charms.
 	Admin bool
 	// Sort the returned items.
-	sort []sortParam
+	Sort []SortParam
 	// ExpandedMultiSeries returns a number of entries for
 	// multi-series charms, one for each entity.
 	ExpandedMultiSeries bool
@@ -474,16 +474,16 @@ var allowedSortFields = map[string]bool{
 func (sp *SearchParams) ParseSortFields(f ...string) error {
 	for _, s := range f {
 		for _, s := range strings.Split(s, ",") {
-			var sort sortParam
+			var sort SortParam
 			if strings.HasPrefix(s, "-") {
-				sort.Order = sortDescending
+				sort.Descending = true
 				s = s[1:]
 			}
 			if !allowedSortFields[s] {
 				return errgo.Newf("unrecognized sort parameter %q", s)
 			}
 			sort.Field = s
-			sp.sort = append(sp.sort, sort)
+			sp.Sort = append(sp.Sort, sort)
 		}
 	}
 
@@ -493,15 +493,10 @@ func (sp *SearchParams) ParseSortFields(f ...string) error {
 // sortOrder defines the order in which a field should be sorted.
 type sortOrder int
 
-const (
-	sortAscending sortOrder = iota
-	sortDescending
-)
-
-// sortParam represents a field and direction on which results should be sorted.
-type sortParam struct {
-	Field string
-	Order sortOrder
+// SortParam represents a field and direction on which results should be sorted.
+type SortParam struct {
+	Field      string
+	Descending bool
 }
 
 // SearchResult represents the result of performing a search. The entites
@@ -593,7 +588,7 @@ func createSearchDSL(sp SearchParams) elasticsearch.QueryDSL {
 	}
 
 	// Sorting
-	for _, s := range sp.sort {
+	for _, s := range sp.Sort {
 		qdsl.Sort = append(qdsl.Sort, createElasticSort(s))
 	}
 
@@ -808,12 +803,12 @@ var sortESFields = map[string]string{
 }
 
 // createSort creates an elasticsearch.Sort query parameter out of a Sort parameter.
-func createElasticSort(s sortParam) elasticsearch.Sort {
+func createElasticSort(s SortParam) elasticsearch.Sort {
 	sort := elasticsearch.Sort{
 		Field: sortESFields[s.Field],
 		Order: elasticsearch.Ascending,
 	}
-	if s.Order == sortDescending {
+	if s.Descending {
 		sort.Order = elasticsearch.Descending
 	}
 	return sort

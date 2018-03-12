@@ -79,9 +79,9 @@ type Charm struct {
 
 var _ charm.Charm = (*Charm)(nil)
 
-// NewCharm returns a charm implementation
-// that contains the given charm metadata.
-// All charm.Charm methods other than Meta will return empty values.
+// NewCharm returns a charm implementation that contains the given charm
+// metadata. All charm.Charm methods other than Meta will return empty
+// values. If meta is nil, new(charm.Meta) will be used.
 func NewCharm(meta *charm.Meta) *Charm {
 	if meta == nil {
 		meta = new(charm.Meta)

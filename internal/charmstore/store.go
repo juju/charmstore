@@ -1483,18 +1483,18 @@ var listFilters = map[string]string{
 	"promulgated": "promulgated-revision",
 }
 
-func prepareList(sp SearchParams) (filters map[string]interface{}, sort bson.D, err error) {
+func prepareList(sp SearchParams) (filters map[string]interface{}, err error) {
 	if len(sp.Text) > 0 {
-		return nil, nil, errgo.New("text not allowed")
+		return nil, errgo.New("text not allowed")
 	}
 	if sp.Limit > 0 {
-		return nil, nil, errgo.New("limit not allowed")
+		return nil, errgo.New("limit not allowed")
 	}
 	if sp.Skip > 0 {
-		return nil, nil, errgo.New("skip not allowed")
+		return nil, errgo.New("skip not allowed")
 	}
 	if sp.AutoComplete {
-		return nil, nil, errgo.New("autocomplete not allowed")
+		return nil, errgo.New("autocomplete not allowed")
 	}
 
 	filters = make(map[string]interface{})
@@ -1519,44 +1519,10 @@ func prepareList(sp SearchParams) (filters map[string]interface{}, sort bson.D, 
 				filters["promulgated-revision"] = map[string]interface{}{"$lt": 0}
 			}
 		default:
-			return nil, nil, errgo.Newf("filter %q not allowed", k)
+			return nil, errgo.Newf("filter %q not allowed", k)
 		}
 	}
-
-	sort, err = createMongoSort(sp)
-	if err != nil {
-		return nil, nil, errgo.Newf("invalid parameters: %s", err)
-	}
-	return filters, sort, nil
-}
-
-// sortFields contains a mapping from api fieldnames to the entity fields to search.
-var sortMongoFields = map[string]string{
-	"name":   "name",
-	"owner":  "user",
-	"series": "series",
-}
-
-// createMongoSort creates a sort query parameters for mongo out of a Sort parameter.
-func createMongoSort(sp SearchParams) (bson.D, error) {
-	if len(sp.sort) == 0 {
-		return bson.D{{
-			"_id", 1,
-		}}, nil
-	}
-	sort := make(bson.D, len(sp.sort))
-	for i, s := range sp.sort {
-		field := sortMongoFields[s.Field]
-		if field == "" {
-			return nil, errgo.Newf("sort %q not allowed", s.Field)
-		}
-		order := 1
-		if s.Order == sortDescending {
-			order = -1
-		}
-		sort[i] = bson.DocElem{field, order}
-	}
-	return sort, nil
+	return filters, nil
 }
 
 // ListQuery holds a list query from which an iterator
@@ -1568,19 +1534,52 @@ type ListQuery struct {
 }
 
 // ListQuery lists entities in the store that conform to the
-// given search paramerters. It returns a ListQuery
+// given search parameters. It returns a ListQuery
 // that can be used to iterate through the list.
+//
+// Sort criteria in the search parameters are ignored - the
+// results are returned in arbitrary order.
 func (store *Store) ListQuery(sp SearchParams) (*ListQuery, error) {
-	filters, sort, err := prepareList(sp)
+	filters, err := prepareList(sp)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
 	return &ListQuery{
 		store:   store,
 		filters: filters,
-		sort:    sort,
 	}, nil
 }
+
+// listIterGroupIDSpec holds the part of the list aggregration pipeline
+// that determines the _id field used for grouping.
+// The _id result holds the base URL, the series,
+// and the combination of channels that the entity has been
+// published to.
+var listIterGroupIDSpec = func() bson.Raw {
+	concat := []interface{}{
+		"$baseurl",
+		" ",
+		"$series",
+	}
+	for i, c := range params.OrderedChannels {
+		concat = append(concat, bson.D{{
+			"$cond", []interface{}{
+				"$published." + string(c),
+				fmt.Sprint(".", i),
+				"",
+			},
+		}})
+	}
+	data, err := bson.Marshal(bson.D{{"$concat", concat}})
+	if err != nil {
+		panic(err)
+	}
+	var raw bson.Raw
+	if err := bson.Unmarshal(data, &raw); err != nil {
+		panic(err)
+	}
+	return raw
+}()
 
 func (lq *ListQuery) Iter(fields map[string]int) *mgo.Iter {
 	qfields := FieldSelector(
@@ -1598,15 +1597,7 @@ func (lq *ListQuery) Iter(fields map[string]int) *mgo.Iter {
 	delete(qfields, "url")
 
 	group := make(bson.D, 0, 2+len(qfields))
-	group = append(group, bson.DocElem{"_id", bson.D{{
-		"$concat", []interface{}{
-			"$baseurl",
-			"$series",
-			bson.D{{
-				"$cond", []string{"$published.edge", "true", "false"},
-			}},
-		},
-	}}})
+	group = append(group, bson.DocElem{"_id", listIterGroupIDSpec})
 	group = append(group, bson.DocElem{"url", bson.D{{"$last", "$_id"}}})
 	for field := range qfields {
 		group = append(group, bson.DocElem{field, bson.D{{"$last", "$" + field}}})
@@ -1618,14 +1609,12 @@ func (lq *ListQuery) Iter(fields map[string]int) *mgo.Iter {
 		project = append(project, bson.DocElem{f, "$" + f})
 	}
 
-	q := []bson.D{
+	return lq.store.DB.Entities().Pipe([]bson.D{
 		{{"$match", lq.filters}},
 		{{"$sort", bson.D{{"revision", 1}}}},
 		{{"$group", group}},
 		{{"$project", project}},
-		{{"$sort", lq.sort}},
-	}
-	return lq.store.DB.Entities().Pipe(q).Iter()
+	}).Iter()
 }
 
 // SynchroniseElasticsearch creates new indexes in elasticsearch
