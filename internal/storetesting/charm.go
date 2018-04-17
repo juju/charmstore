@@ -13,7 +13,7 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6"
 	"gopkg.in/juju/charm.v6/resource"
-	"gopkg.in/juju/charmrepo.v2/testing"
+	"gopkg.in/juju/charmrepo.v3/testing"
 	"gopkg.in/yaml.v2"
 
 	"gopkg.in/juju/charmstore.v5/internal/blobstore"
