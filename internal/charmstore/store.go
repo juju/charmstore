@@ -789,6 +789,7 @@ var seriesScore = map[string]int{
 	"precise": 1001,
 	"trusty":  1002,
 	"xenial":  1003,
+	"bionic":  1004,
 	"quantal": 1,
 	"raring":  2,
 	"saucy":   3,
@@ -798,7 +799,6 @@ var seriesScore = map[string]int{
 	"yakkety": 7,
 	"zesty":   8,
 	"artful":  9,
-	"bionic":  0, // TODO make this higher when bionic is released
 
 	// When we find a multi-series charm (no series) we
 	// will always choose it in preference to a series-specific

@@ -49,10 +49,10 @@ var Series = map[string]SeriesInfo{
 	"vivid":   {true, Ubuntu, false, 0},
 	"wily":    {true, Ubuntu, false, 1.102},
 	"xenial":  {true, Ubuntu, true, 1.1375},
-	"yakkety": {true, Ubuntu, true, 1.103},
-	"zesty":   {true, Ubuntu, true, 1.104},
+	"yakkety": {true, Ubuntu, false, 0},
+	"zesty":   {true, Ubuntu, false, 0},
 	"artful":  {true, Ubuntu, true, 1.105},
-	"bionic":  {true, Ubuntu, true, 0}, // TODO 1.15 when released
+	"bionic":  {true, Ubuntu, true, 1.15},
 
 	// Windows
 	"win2012hvr2": {true, Windows, true, 1.1},
