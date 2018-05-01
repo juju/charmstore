@@ -10,7 +10,7 @@ import (
 
 	"gopkg.in/errgo.v1"
 	charm "gopkg.in/juju/charm.v6"
-	"gopkg.in/juju/charmrepo.v2/csclient/params"
+	"gopkg.in/juju/charmrepo.v3/csclient/params"
 
 	"gopkg.in/juju/charmstore.v5/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5/internal/entitycache"

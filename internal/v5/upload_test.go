@@ -14,7 +14,7 @@ import (
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/juju/charmrepo.v2/csclient/params"
+	"gopkg.in/juju/charmrepo.v3/csclient/params"
 )
 
 func (s *APISuite) TestPostUploadFailsWithNoMacaroon(c *gc.C) {
