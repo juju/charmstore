@@ -23,8 +23,8 @@ import (
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6"
-	"gopkg.in/juju/charmrepo.v2/csclient/params"
-	charmtesting "gopkg.in/juju/charmrepo.v2/testing"
+	"gopkg.in/juju/charmrepo.v3/csclient/params"
+	charmtesting "gopkg.in/juju/charmrepo.v3/testing"
 	"gopkg.in/mgo.v2/bson"
 
 	"gopkg.in/juju/charmstore.v5/internal/blobstore"
