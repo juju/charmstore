@@ -799,6 +799,7 @@ var seriesScore = map[string]int{
 	"yakkety": 7,
 	"zesty":   8,
 	"artful":  9,
+	"cosmic":  0, // TODO: make this higher when cosmic is released
 
 	// When we find a multi-series charm (no series) we
 	// will always choose it in preference to a series-specific
