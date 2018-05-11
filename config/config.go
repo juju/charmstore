@@ -52,6 +52,7 @@ type Config struct {
 	SwiftRegion       string            `yaml:"swift-region"`
 	SwiftTenant       string            `yaml:"swift-tenant"`
 	SwiftAuthMode     *SwiftAuthMode    `yaml:"swift-authmode"`
+	LoggingConfig     string            `yaml:"logging-config"`
 }
 
 type BlobStoreType string
