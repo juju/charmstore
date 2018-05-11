@@ -40,25 +40,32 @@ func main() {
 	if flag.NArg() != 1 {
 		flag.Usage()
 	}
+	fmt.Fprintf(os.Stderr, "START\n")
 	if *loggingConfig != "" {
 		if err := loggo.ConfigureLoggers(*loggingConfig); err != nil {
-			fmt.Fprintf(os.Stderr, "cannot configure loggers: %v", err)
-			os.Exit(1)
+			fmt.Fprintf(os.Stderr, "STOP: cannot configure loggers: %s\n", err)
+			os.Exit(2)
 		}
 	}
-	if err := serve(flag.Arg(0)); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
+	logger.Infof("reading configuration")
+	conf, err := config.Read(flag.Arg(0))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "STOP: %s\n", err)
+		os.Exit(2)
+	}
+	if *loggingConfig == "" && conf.LoggingConfig != "" {
+		if err := loggo.ConfigureLoggers(conf.LoggingConfig); err != nil {
+			fmt.Fprintf(os.Stderr, "STOP: cannot configure loggers: %s\n", err)
+			os.Exit(2)
+		}
+	}
+	if err := serve(conf); err != nil {
+		fmt.Fprintf(os.Stderr, "STOP: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func serve(confPath string) error {
-	logger.Infof("reading configuration")
-	conf, err := config.Read(confPath)
-	if err != nil {
-		return errgo.Notef(err, "cannot read config file %q", confPath)
-	}
-
+func serve(conf *config.Config) error {
 	logger.Infof("connecting to mongo")
 	session, err := mgo.Dial(conf.MongoURL)
 	if err != nil {

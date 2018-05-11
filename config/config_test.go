@@ -59,6 +59,7 @@ swift-bucket: bucket
 swift-region: somewhere
 swift-tenant: a-tenant
 swift-authmode: userpass
+logging-config: INFO
 `
 
 func (s *ConfigSuite) readConfig(c *gc.C, content string) (*config.Config, error) {
@@ -111,6 +112,7 @@ func (s *ConfigSuite) TestRead(c *gc.C) {
 		SwiftRegion:       "somewhere",
 		SwiftTenant:       "a-tenant",
 		SwiftAuthMode:     &config.SwiftAuthMode{identity.AuthUserPass},
+		LoggingConfig:     "INFO",
 	})
 }
 
