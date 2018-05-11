@@ -38,7 +38,7 @@ func (s *APISuite) TestPostUpload(c *gc.C) {
 		Do:      bakeryDo(s.idmServer.Client("bob")),
 		URL:     storeURL("upload?expires=2m"),
 	})
-	var uploadResp params.NewUploadResponse
+	var uploadResp params.UploadInfoResponse
 	err := json.Unmarshal(resp.Body.Bytes(), &uploadResp)
 	c.Assert(err, gc.Equals, nil)
 
@@ -52,7 +52,7 @@ func (s *APISuite) TestPostUpload(c *gc.C) {
 	if got, want := expires, now.Add(2*time.Minute+5*time.Second); got.After(want) {
 		c.Errorf("expires too late, got %v, want %v", got, want)
 	}
-	c.Assert(uploadResp, jc.DeepEquals, params.NewUploadResponse{
+	c.Assert(uploadResp, jc.DeepEquals, params.UploadInfoResponse{
 		UploadId:    uploadId,
 		Expires:     expires,
 		MinPartSize: s.store.BlobStore.MinPartSize,
@@ -75,7 +75,7 @@ func (s *APISuite) TestPostUploadMaxExpiry(c *gc.C) {
 		Do:      bakeryDo(s.idmServer.Client("bob")),
 		URL:     storeURL("upload?expires=27h"),
 	})
-	var uploadResp params.NewUploadResponse
+	var uploadResp params.UploadInfoResponse
 	err := json.Unmarshal(resp.Body.Bytes(), &uploadResp)
 	c.Assert(err, gc.Equals, nil)
 	info, err := s.store.BlobStore.UploadInfo(uploadResp.UploadId)
@@ -112,7 +112,7 @@ func (s *APISuite) TestPostUploadNoExpiry(c *gc.C) {
 		Method:  "POST",
 		URL:     storeURL("upload"),
 	})
-	var uploadResp params.NewUploadResponse
+	var uploadResp params.UploadInfoResponse
 	err := json.Unmarshal(resp.Body.Bytes(), &uploadResp)
 	c.Assert(err, gc.Equals, nil)
 	info, err := s.store.BlobStore.UploadInfo(uploadResp.UploadId)
@@ -148,7 +148,7 @@ func (s *APISuite) TestPutUploadNoParts(c *gc.C) {
 		Do:      bakeryDo(s.idmServer.Client("bob")),
 		URL:     storeURL("upload"),
 	})
-	var uploadResp params.NewUploadResponse
+	var uploadResp params.UploadInfoResponse
 	err := json.Unmarshal(resp.Body.Bytes(), &uploadResp)
 	c.Assert(err, gc.Equals, nil)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -185,7 +185,7 @@ func (s *APISuite) TestPutUploadOnePart(c *gc.C) {
 		Do:      bakeryDo(s.idmServer.Client("bob")),
 		URL:     storeURL("upload"),
 	})
-	var uploadResp params.NewUploadResponse
+	var uploadResp params.UploadInfoResponse
 	err := json.Unmarshal(resp.Body.Bytes(), &uploadResp)
 	c.Assert(err, gc.Equals, nil)
 
@@ -194,7 +194,7 @@ func (s *APISuite) TestPutUploadOnePart(c *gc.C) {
 		Handler: s.srv,
 		Method:  "PUT",
 		Do:      bakeryDo(s.idmServer.Client("bob")),
-		URL:     storeURL("upload/" + uploadResp.UploadId + "/0?hash=" + hashOfString(part)),
+		URL:     storeURL("upload/" + uploadResp.UploadId + "/0?hash=" + hashOfString(part) + "&offset=0"),
 		Body:    strings.NewReader(part),
 	})
 
@@ -221,7 +221,7 @@ func (s *APISuite) TestPutUploadParts(c *gc.C) {
 		Method:  "POST",
 		URL:     storeURL("upload"),
 	})
-	var uploadResp params.NewUploadResponse
+	var uploadResp params.UploadInfoResponse
 	err := json.Unmarshal(resp.Body.Bytes(), &uploadResp)
 	c.Assert(err, gc.Equals, nil)
 
@@ -233,7 +233,7 @@ func (s *APISuite) TestPutUploadParts(c *gc.C) {
 		Method:        "PUT",
 		Do:            bakeryDo(s.idmServer.Client("bob")),
 		ContentLength: size1,
-		URL:           storeURL("upload/" + uploadResp.UploadId + "/0?hash=" + hash1),
+		URL:           storeURL("upload/" + uploadResp.UploadId + "/0?hash=" + hash1 + "&offset=0"),
 		Body:          part1,
 	})
 	part2 := newDataSource(2, 5*1024*1024)
@@ -244,7 +244,7 @@ func (s *APISuite) TestPutUploadParts(c *gc.C) {
 		Method:        "PUT",
 		Do:            bakeryDo(s.idmServer.Client("bob")),
 		ContentLength: size2,
-		URL:           storeURL("upload/" + uploadResp.UploadId + "/1?hash=" + hash2),
+		URL:           storeURL("upload/" + uploadResp.UploadId + "/1?hash=" + hash2 + "&offset=5242880"),
 		Body:          part2,
 	})
 
@@ -292,7 +292,7 @@ func (s *APISuite) TestGetUploadInfoAfterUpload(c *gc.C) {
 		Do:      bakeryDo(s.idmServer.Client("bob")),
 		URL:     storeURL("upload"),
 	})
-	var uploadResp params.NewUploadResponse
+	var uploadResp params.UploadInfoResponse
 	err := json.Unmarshal(resp.Body.Bytes(), &uploadResp)
 	c.Assert(err, gc.Equals, nil)
 
@@ -301,7 +301,7 @@ func (s *APISuite) TestGetUploadInfoAfterUpload(c *gc.C) {
 		Handler: s.srv,
 		Method:  "PUT",
 		Do:      bakeryDo(s.idmServer.Client("bob")),
-		URL:     storeURL("upload/" + uploadResp.UploadId + "/0?hash=" + hashOfString(part)),
+		URL:     storeURL("upload/" + uploadResp.UploadId + "/0?hash=" + hashOfString(part) + "&offset=0"),
 		Body:    strings.NewReader(part),
 	})
 
@@ -332,7 +332,11 @@ func (s *APISuite) TestGetUploadInfoAfterUpload(c *gc.C) {
 					Size:     10,
 				}},
 			},
-			Expires: uploadResp.Expires,
+			UploadId:    uploadResp.UploadId,
+			Expires:     uploadResp.Expires,
+			MinPartSize: 10,
+			MaxPartSize: 4294967295,
+			MaxParts:    400,
 		},
 	})
 }
@@ -344,7 +348,7 @@ func (s *APISuite) TestGetUploadInfoBetweenPartUploads(c *gc.C) {
 		Method:  "POST",
 		URL:     storeURL("upload"),
 	})
-	var uploadResp params.NewUploadResponse
+	var uploadResp params.UploadInfoResponse
 	err := json.Unmarshal(resp.Body.Bytes(), &uploadResp)
 	c.Assert(err, gc.Equals, nil)
 
@@ -356,7 +360,7 @@ func (s *APISuite) TestGetUploadInfoBetweenPartUploads(c *gc.C) {
 		Method:        "PUT",
 		Do:            bakeryDo(s.idmServer.Client("bob")),
 		ContentLength: size1,
-		URL:           storeURL("upload/" + uploadResp.UploadId + "/0?hash=" + hash1),
+		URL:           storeURL("upload/" + uploadResp.UploadId + "/0?hash=" + hash1 + "&offset=0"),
 		Body:          part1,
 	})
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -372,7 +376,11 @@ func (s *APISuite) TestGetUploadInfoBetweenPartUploads(c *gc.C) {
 					Size:     size1,
 				}},
 			},
-			Expires: uploadResp.Expires,
+			UploadId:    uploadResp.UploadId,
+			Expires:     uploadResp.Expires,
+			MinPartSize: 10,
+			MaxPartSize: 4294967295,
+			MaxParts:    400,
 		},
 	})
 	part2 := newDataSource(2, 5*1024*1024)
@@ -383,7 +391,7 @@ func (s *APISuite) TestGetUploadInfoBetweenPartUploads(c *gc.C) {
 		Method:        "PUT",
 		Do:            bakeryDo(s.idmServer.Client("bob")),
 		ContentLength: size2,
-		URL:           storeURL("upload/" + uploadResp.UploadId + "/1?hash=" + hash2),
+		URL:           storeURL("upload/" + uploadResp.UploadId + "/1?hash=" + hash2 + "&offset=5242880"),
 		Body:          part2,
 	})
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -397,13 +405,19 @@ func (s *APISuite) TestGetUploadInfoBetweenPartUploads(c *gc.C) {
 					Hash:     hash1,
 					Complete: true,
 					Size:     size1,
+					Offset:   0,
 				}, {
 					Hash:     hash2,
 					Complete: true,
 					Size:     size2,
+					Offset:   size1,
 				}},
 			},
-			Expires: uploadResp.Expires,
+			UploadId:    uploadResp.UploadId,
+			Expires:     uploadResp.Expires,
+			MinPartSize: 10,
+			MaxPartSize: 4294967295,
+			MaxParts:    400,
 		},
 	})
 }
@@ -438,20 +452,27 @@ var uploadPartErrorTests = []struct {
 	expectStatus: http.StatusBadRequest,
 }, {
 	about:           "missing content length",
-	url:             storeURL("upload/someUploadId/0?hash=something"),
+	url:             storeURL("upload/someUploadId/0?hash=something&offset=0"),
 	noContentLength: true,
 	expectError:     "Content-Length not specified",
 	expectCode:      params.ErrBadRequest,
 	expectStatus:    http.StatusBadRequest,
 }, {
+	about:           "bad offset",
+	url:             storeURL("upload/someUploadId/0?hash=something&offset=blah"),
+	noContentLength: false,
+	expectError:     "offset parameter invalid",
+	expectCode:      params.ErrBadRequest,
+	expectStatus:    http.StatusBadRequest,
+}, {
 	about:        "negative part number",
-	url:          storeURL("upload/someUploadId/-1?hash=something"),
+	url:          storeURL("upload/someUploadId/-1?hash=something&offset=0"),
 	expectError:  "negative part number",
 	expectCode:   params.ErrBadRequest,
 	expectStatus: http.StatusBadRequest,
 }, {
 	about:        "bad part number",
-	url:          storeURL("upload/someUploadId/x?hash=something"),
+	url:          storeURL("upload/someUploadId/x?hash=something&offset=0"),
 	expectError:  `bad part number "x"`,
 	expectCode:   params.ErrBadRequest,
 	expectStatus: http.StatusBadRequest,
@@ -469,7 +490,7 @@ var uploadPartErrorTests = []struct {
 	expectStatus: http.StatusNotFound,
 }, {
 	about:        "missing part number",
-	url:          storeURL("upload/someUploadId/?hash=something"),
+	url:          storeURL("upload/someUploadId/?hash=something&offset=0"),
 	expectError:  `bad part number ""`,
 	expectCode:   params.ErrBadRequest,
 	expectStatus: http.StatusBadRequest,

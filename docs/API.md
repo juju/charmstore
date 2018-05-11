@@ -2417,9 +2417,14 @@ time.ParseDuration function (e.g. "8h", "5m3s").
 The response holds a JSON object containing information about the upload.
 
 ```go
-type NewUploadResponse struct {
+type UploadInfoResponse struct {
 	// UploadId holds the id of the upload.
 	UploadId string
+
+	// Parts holds all the known parts of the upload.
+	// Parts that haven't been uploaded yet will have nil
+	// elements.
+	Parts Parts
 
 	// Expires holds when the upload id expires (encoded
 	// in RFC3339 format).
@@ -2451,7 +2456,8 @@ Example: `POST /v5/upload
 	Expires: "2017-02-28T12:46:25.878Z",
 	MinPartSize: 5242880,
 	MaxPartSize: 4294967295,
-	MaxParts: 400
+	MaxParts: 400,
+	Parts: {Parts: []}
 }
 ```
 
@@ -2501,13 +2507,28 @@ The response holds a JSON object containing information about the upload.
 
 ```go
 type UploadInfoResponse struct {
+	// UploadId holds the id of the upload.
+	UploadId string
+
 	// Parts holds all the known parts of the upload.
 	// Parts that haven't been uploaded yet will have nil
 	// elements.
 	Parts Parts
 
-	// Expires holds when the upload will expire.
+    // Expires holds when the upload id expires (encoded
+    // in RFC3339 format).
 	Expires time.Time
+
+	// MinPartSize holds the minimum size of a part that may
+	// be uploaded (not including the last part).
+	MinPartSize int64
+
+	// MaxPartSize holds the maximum size of a part that may
+	// be uploaded.
+	MaxPartSize int64
+
+	// MaxParts holds the maximum number of parts.
+	MaxParts int
 }
 ```
 
@@ -2529,7 +2550,10 @@ Example: `GET /v5/upload/1234
         Size: "324434",
         Complete: true
 	  }
-	]}
+	]},
+	MinPartSize: 5242880,
+	MaxPartSize: 4294967295,
+	MaxParts: 400,
+	UploadId: "1234"
 }
 ```
-

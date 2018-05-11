@@ -458,7 +458,7 @@ var routerGetTests = []struct {
 			"foo": testMetaHandler(0),
 		},
 	},
-	urlStr: "/precise/wordpress-42/meta/foo",
+	urlStr:                    "/precise/wordpress-42/meta/foo",
 	expectWillIncludeMetadata: []string{"foo"},
 	expectStatus:              http.StatusOK,
 	expectBody: &metaHandlerTestResp{
@@ -472,7 +472,7 @@ var routerGetTests = []struct {
 			"foo/": testMetaHandler(0),
 		},
 	},
-	urlStr: "/precise/wordpress-42/meta/foo/bar/baz",
+	urlStr:                    "/precise/wordpress-42/meta/foo/bar/baz",
 	expectWillIncludeMetadata: []string{"foo/bar/baz"},
 	expectStatus:              http.StatusOK,
 	expectBody: metaHandlerTestResp{
@@ -487,7 +487,7 @@ var routerGetTests = []struct {
 			"foo": testMetaHandler(0),
 		},
 	},
-	urlStr: "/precise/wordpress-42/meta/foo?one=a&two=b&one=c",
+	urlStr:                    "/precise/wordpress-42/meta/foo?one=a&two=b&one=c",
 	expectWillIncludeMetadata: []string{"foo"},
 	expectStatus:              http.StatusOK,
 	expectBody: metaHandlerTestResp{
@@ -499,8 +499,8 @@ var routerGetTests = []struct {
 	},
 	monitorKind: "meta",
 }, {
-	about:  "meta handler that's not found",
-	urlStr: "/precise/wordpress-42/meta/foo",
+	about:                     "meta handler that's not found",
+	urlStr:                    "/precise/wordpress-42/meta/foo",
 	expectWillIncludeMetadata: []string{"foo"},
 	expectStatus:              http.StatusNotFound,
 	expectBody: params.Error{
@@ -509,8 +509,8 @@ var routerGetTests = []struct {
 	},
 	monitorKind: "meta",
 }, {
-	about:  "meta sub-handler that's not found",
-	urlStr: "/precise/wordpress-42/meta/foo/bar",
+	about:                     "meta sub-handler that's not found",
+	urlStr:                    "/precise/wordpress-42/meta/foo/bar",
 	expectWillIncludeMetadata: []string{"foo/bar"},
 	expectStatus:              http.StatusNotFound,
 	expectBody: params.Error{
@@ -525,7 +525,7 @@ var routerGetTests = []struct {
 			"foo": constMetaHandler(nil),
 		},
 	},
-	urlStr: "/precise/wordpress-42/meta/foo",
+	urlStr:                    "/precise/wordpress-42/meta/foo",
 	expectWillIncludeMetadata: []string{"foo"},
 	expectStatus:              http.StatusNotFound,
 	expectBody: params.Error{
@@ -540,7 +540,7 @@ var routerGetTests = []struct {
 			"foo": constMetaHandler((*struct{})(nil)),
 		},
 	},
-	urlStr: "/precise/wordpress-42/meta/foo",
+	urlStr:                    "/precise/wordpress-42/meta/foo",
 	expectWillIncludeMetadata: []string{"foo"},
 	expectStatus:              http.StatusNotFound,
 	expectBody: params.Error{

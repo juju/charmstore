@@ -232,7 +232,7 @@ func (s *blobStoreSuite) TestNewParts(c *gc.C) {
 func (s *blobStoreSuite) TestPutPartNegativePart(c *gc.C) {
 	id := s.newUpload(c)
 
-	err := s.store.PutPart(id, -1, nil, 0, "")
+	err := s.store.PutPart(id, -1, nil, 0, 0, "")
 	c.Assert(err, gc.ErrorMatches, "negative part number")
 }
 
@@ -240,13 +240,13 @@ func (s *blobStoreSuite) TestPutPartNumberTooBig(c *gc.C) {
 	s.store.MaxParts = 100
 
 	id := s.newUpload(c)
-	err := s.store.PutPart(id, 100, nil, 0, "")
+	err := s.store.PutPart(id, 100, nil, 0, 0, "")
 	c.Assert(err, gc.ErrorMatches, `part number 100 too big \(maximum 99\)`)
 }
 
 func (s *blobStoreSuite) TestPutPartSizeNonPositive(c *gc.C) {
 	id := s.newUpload(c)
-	err := s.store.PutPart(id, 0, strings.NewReader(""), 0, hashOf(""))
+	err := s.store.PutPart(id, 0, strings.NewReader(""), 0, 0, hashOf(""))
 	c.Assert(err, gc.ErrorMatches, `non-positive part 0 size 0`)
 }
 
@@ -254,7 +254,7 @@ func (s *blobStoreSuite) TestPutPartSizeTooBig(c *gc.C) {
 	s.store.MaxPartSize = 5
 
 	id := s.newUpload(c)
-	err := s.store.PutPart(id, 0, strings.NewReader(""), 20, hashOf(""))
+	err := s.store.PutPart(id, 0, strings.NewReader(""), 20, 0, hashOf(""))
 	c.Assert(err, gc.ErrorMatches, `part 0 too big \(maximum 5\)`)
 }
 
@@ -262,7 +262,7 @@ func (s *blobStoreSuite) TestPutPartSingle(c *gc.C) {
 	id := s.newUpload(c)
 
 	content := "123456789 12345"
-	err := s.store.PutPart(id, 0, strings.NewReader(content), int64(len(content)), hashOf(content))
+	err := s.store.PutPart(id, 0, strings.NewReader(content), int64(len(content)), 0, hashOf(content))
 	c.Assert(err, gc.Equals, nil)
 
 	r, size, err := s.store.Open(hashOf(content), nil)
@@ -278,11 +278,11 @@ func (s *blobStoreSuite) TestPutPartAgain(c *gc.C) {
 
 	// Perform a Put with mismatching content. This should leave the part in progress
 	// but not completed.
-	err := s.store.PutPart(id, 0, strings.NewReader("something different"), int64(len(content)), hashOf(content))
+	err := s.store.PutPart(id, 0, strings.NewReader("something different"), int64(len(content)), 0, hashOf(content))
 	c.Assert(err, gc.ErrorMatches, `cannot upload part ".+": hash mismatch`)
 
 	// Try again with the correct content this time.
-	err = s.store.PutPart(id, 0, strings.NewReader(content), int64(len(content)), hashOf(content))
+	err = s.store.PutPart(id, 0, strings.NewReader(content), int64(len(content)), 0, hashOf(content))
 	c.Assert(err, gc.Equals, nil)
 
 	r, size, err := s.store.Open(hashOf(content), nil)
@@ -295,11 +295,11 @@ func (s *blobStoreSuite) TestPutPartAgainWithDifferentHash(c *gc.C) {
 	id := s.newUpload(c)
 
 	content := "123456789 12345"
-	err := s.store.PutPart(id, 0, strings.NewReader(content), int64(len(content)), hashOf(content))
+	err := s.store.PutPart(id, 0, strings.NewReader(content), int64(len(content)), 0, hashOf(content))
 	c.Assert(err, gc.Equals, nil)
 
 	content1 := "abcdefghijklmnopqrstuvwxyz"
-	err = s.store.PutPart(id, 0, strings.NewReader(content1), int64(len(content1)), hashOf(content1))
+	err = s.store.PutPart(id, 0, strings.NewReader(content1), int64(len(content1)), 0, hashOf(content1))
 	c.Assert(err, gc.ErrorMatches, `hash mismatch for already uploaded part`)
 }
 
@@ -307,10 +307,10 @@ func (s *blobStoreSuite) TestPutPartAgainWithSameHash(c *gc.C) {
 	id := s.newUpload(c)
 
 	content := "123456789 12345"
-	err := s.store.PutPart(id, 0, strings.NewReader(content), int64(len(content)), hashOf(content))
+	err := s.store.PutPart(id, 0, strings.NewReader(content), int64(len(content)), 0, hashOf(content))
 	c.Assert(err, gc.Equals, nil)
 
-	err = s.store.PutPart(id, 0, strings.NewReader(content), int64(len(content)), hashOf(content))
+	err = s.store.PutPart(id, 0, strings.NewReader(content), int64(len(content)), 0, hashOf(content))
 	c.Assert(err, gc.Equals, nil)
 }
 
@@ -319,11 +319,11 @@ func (s *blobStoreSuite) TestPutPartOutOfOrder(c *gc.C) {
 	id := s.newUpload(c)
 
 	content1 := "123456789 123456789 "
-	err := s.store.PutPart(id, 1, strings.NewReader(content1), int64(len(content1)), hashOf(content1))
+	err := s.store.PutPart(id, 1, strings.NewReader(content1), int64(len(content1)), 26, hashOf(content1))
 	c.Assert(err, gc.Equals, nil)
 
 	content0 := "abcdefghijklmnopqrstuvwxyz"
-	err = s.store.PutPart(id, 0, strings.NewReader(content0), int64(len(content0)), hashOf(content0))
+	err = s.store.PutPart(id, 0, strings.NewReader(content0), int64(len(content0)), 0, hashOf(content0))
 	c.Assert(err, gc.Equals, nil)
 
 	r, size, err := s.store.Open(hashOf(content0), nil)
@@ -342,12 +342,12 @@ func (s *blobStoreSuite) TestPutPartTooSmall(c *gc.C) {
 	id := s.newUpload(c)
 
 	content0 := "abcdefghijklmnopqrstuvwxyz"
-	err := s.store.PutPart(id, 0, strings.NewReader(content0), int64(len(content0)), hashOf(content0))
+	err := s.store.PutPart(id, 0, strings.NewReader(content0), int64(len(content0)), 0, hashOf(content0))
 	c.Assert(err, gc.Equals, nil)
 
 	content1 := "123456789 123456789 "
-	err = s.store.PutPart(id, 1, strings.NewReader(content1), int64(len(content1)), hashOf(content1))
-	c.Assert(err, gc.ErrorMatches, `part 0 was too small \(need at least 100 bytes, got 26\)`)
+	err = s.store.PutPart(id, 1, strings.NewReader(content1), int64(len(content1)), 26, hashOf(content1))
+	c.Assert(err, gc.ErrorMatches, `part 0 too small \(need at least 100 bytes, got 26\)`)
 }
 
 func (s *blobStoreSuite) TestPutPartTooSmallOutOfOrder(c *gc.C) {
@@ -355,12 +355,12 @@ func (s *blobStoreSuite) TestPutPartTooSmallOutOfOrder(c *gc.C) {
 	id := s.newUpload(c)
 
 	content1 := "abcdefghijklmnopqrstuvwxyz"
-	err := s.store.PutPart(id, 1, strings.NewReader(content1), int64(len(content1)), hashOf(content1))
+	err := s.store.PutPart(id, 1, strings.NewReader(content1), int64(len(content1)), 1, hashOf(content1))
 	c.Assert(err, gc.Equals, nil)
 
 	content0 := "123456789 123456789 "
-	err = s.store.PutPart(id, 0, strings.NewReader(content0), int64(len(content0)), hashOf(content0))
-	c.Assert(err, gc.ErrorMatches, `part too small \(need at least 100 bytes, got 20\)`)
+	err = s.store.PutPart(id, 0, strings.NewReader(content0), int64(len(content0)), 26, hashOf(content0))
+	c.Assert(err, gc.ErrorMatches, `part 0 too small \(need at least 100 bytes, got 20\)`)
 }
 
 func (s *blobStoreSuite) TestPutPartSmallAtEnd(c *gc.C) {
@@ -368,12 +368,12 @@ func (s *blobStoreSuite) TestPutPartSmallAtEnd(c *gc.C) {
 	id := s.newUpload(c)
 
 	content0 := "1234"
-	err := s.store.PutPart(id, 0, strings.NewReader(content0), int64(len(content0)), hashOf(content0))
+	err := s.store.PutPart(id, 0, strings.NewReader(content0), int64(len(content0)), 0, hashOf(content0))
 	c.Assert(err, gc.Equals, nil)
 
 	content1 := "abc"
-	err = s.store.PutPart(id, 1, strings.NewReader(content1), int64(len(content1)), hashOf(content1))
-	c.Assert(err, gc.ErrorMatches, `part 0 was too small \(need at least 10 bytes, got 4\)`)
+	err = s.store.PutPart(id, 1, strings.NewReader(content1), int64(len(content1)), 4, hashOf(content1))
+	c.Assert(err, gc.ErrorMatches, `part 0 too small \(need at least 10 bytes, got 4\)`)
 }
 
 func (s *blobStoreSuite) TestPutPartConcurrent(c *gc.C) {
@@ -394,7 +394,7 @@ func (s *blobStoreSuite) TestPutPartConcurrent(c *gc.C) {
 			session := s.Session.Copy()
 			defer session.Close()
 			store := s.newBlobStore(session)
-			err := store.PutPart(id, i, newDataSource(int64(i+1), size), size, hash[i])
+			err := store.PutPart(id, i, newDataSource(int64(i+1), size), size, int64(i)*size, hash[i])
 			c.Check(err, gc.Equals, nil)
 		}()
 	}
@@ -408,7 +408,7 @@ func (s *blobStoreSuite) TestPutPartConcurrent(c *gc.C) {
 }
 
 func (s *blobStoreSuite) TestPutPartNotFound(c *gc.C) {
-	err := s.store.PutPart("unknownblob", 0, strings.NewReader("x"), 1, hashOf(""))
+	err := s.store.PutPart("unknownblob", 0, strings.NewReader("x"), 1, 0, hashOf(""))
 	c.Assert(err, gc.ErrorMatches, `upload id "unknownblob" not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, blobstore.ErrNotFound)
 }
@@ -418,11 +418,11 @@ func (s *blobStoreSuite) TestFinishUploadMismatchedPartCount(c *gc.C) {
 	id := s.newUpload(c)
 
 	content0 := "123456789 123456789 "
-	err := s.store.PutPart(id, 0, strings.NewReader(content0), int64(len(content0)), hashOf(content0))
+	err := s.store.PutPart(id, 0, strings.NewReader(content0), int64(len(content0)), 0, hashOf(content0))
 	c.Assert(err, gc.Equals, nil)
 
 	content1 := "abcdefghijklmnopqrstuvwxyz"
-	err = s.store.PutPart(id, 1, strings.NewReader(content1), int64(len(content1)), hashOf(content1))
+	err = s.store.PutPart(id, 1, strings.NewReader(content1), int64(len(content1)), 20, hashOf(content1))
 	c.Assert(err, gc.Equals, nil)
 
 	idx, hash, err := s.store.FinishUpload(id, []blobstore.Part{{
@@ -438,11 +438,11 @@ func (s *blobStoreSuite) TestFinishUploadMismatchedPartHash(c *gc.C) {
 	id := s.newUpload(c)
 
 	content0 := "123456789 123456789 "
-	err := s.store.PutPart(id, 0, strings.NewReader(content0), int64(len(content0)), hashOf(content0))
+	err := s.store.PutPart(id, 0, strings.NewReader(content0), int64(len(content0)), 0, hashOf(content0))
 	c.Assert(err, gc.Equals, nil)
 
 	content1 := "abcdefghijklmnopqrstuvwxyz"
-	err = s.store.PutPart(id, 1, strings.NewReader(content1), int64(len(content1)), hashOf(content1))
+	err = s.store.PutPart(id, 1, strings.NewReader(content1), int64(len(content1)), 20, hashOf(content1))
 	c.Assert(err, gc.Equals, nil)
 
 	idx, hash, err := s.store.FinishUpload(id, []blobstore.Part{{
@@ -460,7 +460,7 @@ func (s *blobStoreSuite) TestFinishUploadPartNotUploaded(c *gc.C) {
 	id := s.newUpload(c)
 
 	content1 := "123456789 123456789 "
-	err := s.store.PutPart(id, 1, strings.NewReader(content1), int64(len(content1)), hashOf(content1))
+	err := s.store.PutPart(id, 1, strings.NewReader(content1), int64(len(content1)), 26, hashOf(content1))
 	c.Assert(err, gc.Equals, nil)
 
 	idx, hash, err := s.store.FinishUpload(id, []blobstore.Part{{
@@ -478,7 +478,7 @@ func (s *blobStoreSuite) TestFinishUploadPartIncomplete(c *gc.C) {
 	id := s.newUpload(c)
 
 	content0 := "123456789 123456789 "
-	err := s.store.PutPart(id, 0, strings.NewReader("1"), int64(len(content0)), hashOf(content0))
+	err := s.store.PutPart(id, 0, strings.NewReader("1"), int64(len(content0)), 0, hashOf(content0))
 	c.Assert(err, gc.ErrorMatches, `cannot upload part "[a-z0-9]+": (.|\n)*(hash mismatch|unexpected EOF)(.|\n)*`)
 
 	idx, hash, err := s.store.FinishUpload(id, []blobstore.Part{{
@@ -498,7 +498,7 @@ func (s *blobStoreSuite) TestFinishUploadCheckSizes(c *gc.C) {
 	for i := 0; i < 2; i++ {
 		i := i
 		go func() {
-			err := s.store.PutPart(id, i, strings.NewReader(content), int64(len(content)), hashOf(content))
+			err := s.store.PutPart(id, i, strings.NewReader(content), int64(len(content)), int64(len(content)*i), hashOf(content))
 			done <- err
 		}()
 	}
@@ -522,7 +522,7 @@ func (s *blobStoreSuite) TestFinishUploadCheckSizes(c *gc.C) {
 	}, {
 		Hash: hashOf(content),
 	}})
-	c.Assert(err, gc.ErrorMatches, `part 0 was too small \(need at least 50 bytes, got 20\)`)
+	c.Assert(err, gc.ErrorMatches, `part 0 too small \(need at least 50 bytes, got 20\)`)
 	c.Assert(idx, gc.IsNil)
 	c.Assert(hash, gc.Equals, "")
 }
@@ -532,11 +532,11 @@ func (s *blobStoreSuite) TestFinishUploadSuccess(c *gc.C) {
 	id := s.newUpload(c)
 
 	content0 := "123456789 123456789 "
-	err := s.store.PutPart(id, 0, strings.NewReader(content0), int64(len(content0)), hashOf(content0))
+	err := s.store.PutPart(id, 0, strings.NewReader(content0), int64(len(content0)), 0, hashOf(content0))
 	c.Assert(err, gc.Equals, nil)
 
 	content1 := "abcdefghijklmnopqrstuvwxyz"
-	err = s.store.PutPart(id, 1, strings.NewReader(content1), int64(len(content1)), hashOf(content1))
+	err = s.store.PutPart(id, 1, strings.NewReader(content1), int64(len(content1)), 20, hashOf(content1))
 	c.Assert(err, gc.Equals, nil)
 
 	idx, hash, err := s.store.FinishUpload(id, []blobstore.Part{{
@@ -558,11 +558,37 @@ func (s *blobStoreSuite) TestFinishUploadSuccess(c *gc.C) {
 	})
 }
 
+func (s *blobStoreSuite) TestPutPartWithWrongOffset(c *gc.C) {
+	s.store.MinPartSize = 10
+	id := s.newUpload(c)
+
+	content0 := "123456789 123456789 "
+	err := s.store.PutPart(id, 0, strings.NewReader(content0), int64(len(content0)), 0, hashOf(content0))
+	c.Assert(err, gc.Equals, nil)
+
+	content1 := "abcdefghijklmnopqrstuvwxyz"
+	err = s.store.PutPart(id, 1, strings.NewReader(content1), int64(len(content1)), 22, hashOf(content1))
+	c.Assert(err, gc.ErrorMatches, "part 1 should start at 20 not at 22")
+}
+
+func (s *blobStoreSuite) TestPutPartWithWrongOffsetOutOfOrder(c *gc.C) {
+	s.store.MinPartSize = 10
+	id := s.newUpload(c)
+
+	content1 := "abcdefghijklmnopqrstuvwxyz"
+	err := s.store.PutPart(id, 1, strings.NewReader(content1), int64(len(content1)), 22, hashOf(content1))
+	c.Assert(err, gc.Equals, nil)
+
+	content0 := "123456789 123456789 "
+	err = s.store.PutPart(id, 0, strings.NewReader(content0), int64(len(content0)), 0, hashOf(content0))
+	c.Assert(err, gc.ErrorMatches, "part 1 should start at 20 not at 22")
+}
+
 func (s *blobStoreSuite) TestFinishUploadSuccessOnePart(c *gc.C) {
 	id := s.newUpload(c)
 
 	content0 := "123456789 123456789 "
-	err := s.store.PutPart(id, 0, strings.NewReader(content0), int64(len(content0)), hashOf(content0))
+	err := s.store.PutPart(id, 0, strings.NewReader(content0), int64(len(content0)), 0, hashOf(content0))
 	c.Assert(err, gc.Equals, nil)
 
 	idx, hash, err := s.store.FinishUpload(id, []blobstore.Part{{
@@ -591,7 +617,7 @@ func (s *blobStoreSuite) TestFinishUploadAgain(c *gc.C) {
 	id := s.newUpload(c)
 
 	content0 := "123456789 123456789 "
-	err := s.store.PutPart(id, 0, strings.NewReader(content0), int64(len(content0)), hashOf(content0))
+	err := s.store.PutPart(id, 0, strings.NewReader(content0), int64(len(content0)), 0, hashOf(content0))
 	c.Assert(err, gc.Equals, nil)
 
 	idx, hash, err := s.store.FinishUpload(id, []blobstore.Part{{
@@ -636,12 +662,12 @@ func (s *blobStoreSuite) TestFinishUploadCalledWhenCalculatingHash(c *gc.C) {
 	// that we'll be able to remove the upload entry before
 	// FinishUpload has finished calculating the hash.
 	content0 := "123456789 123456789 "
-	err := s.store.PutPart(id, 0, strings.NewReader(content0), int64(len(content0)), hashOf(content0))
+	err := s.store.PutPart(id, 0, strings.NewReader(content0), int64(len(content0)), 0, hashOf(content0))
 	c.Assert(err, gc.Equals, nil)
 
 	const size1 = 20 * 1024 * 1024
 	hash1 := hashOfReader(c, newDataSource(1, size1))
-	err = s.store.PutPart(id, 1, newDataSource(1, size1), int64(size1), hash1)
+	err = s.store.PutPart(id, 1, newDataSource(1, size1), int64(size1), 20, hash1)
 	c.Assert(err, gc.Equals, nil)
 
 	done := make(chan error)
@@ -691,7 +717,7 @@ func (s *blobStoreSuite) TestRemoveUploadSuccessWithParts(c *gc.C) {
 	id, err := s.store.NewUpload(expires)
 	c.Assert(err, gc.Equals, nil)
 	content := "123456789 12345"
-	err = s.store.PutPart(id, 0, strings.NewReader(content), int64(len(content)), hashOf(content))
+	err = s.store.PutPart(id, 0, strings.NewReader(content), int64(len(content)), 0, hashOf(content))
 	c.Assert(err, gc.Equals, nil)
 	err = s.store.RemoveUpload(id)
 	c.Assert(err, gc.Equals, nil)
@@ -708,7 +734,7 @@ func (s *blobStoreSuite) TestSetOwner(c *gc.C) {
 	id, err := s.store.NewUpload(expires)
 	c.Assert(err, gc.Equals, nil)
 	content := "123456789 12345"
-	err = s.store.PutPart(id, 0, strings.NewReader(content), int64(len(content)), hashOf(content))
+	err = s.store.PutPart(id, 0, strings.NewReader(content), int64(len(content)), 0, hashOf(content))
 	c.Assert(err, gc.Equals, nil)
 
 	// Check that we can't call SetOwner on an incomplete upload.
@@ -752,7 +778,7 @@ func (s *blobStoreSuite) TestRemoveFinishedUploadRemovesParts(c *gc.C) {
 	id, err := s.store.NewUpload(time.Now().Add(time.Minute))
 	c.Assert(err, gc.Equals, nil)
 	content := "123456789 12345"
-	err = s.store.PutPart(id, 0, strings.NewReader(content), int64(len(content)), hashOf(content))
+	err = s.store.PutPart(id, 0, strings.NewReader(content), int64(len(content)), 0, hashOf(content))
 	c.Assert(err, gc.Equals, nil)
 	_, _, err = s.store.FinishUpload(id, []blobstore.Part{{Hash: hashOf(content)}})
 	c.Assert(err, gc.Equals, nil)
@@ -778,7 +804,7 @@ func (s *blobStoreSuite) TestRemoveExpiredUploads(c *gc.C) {
 		id, err := s.store.NewUpload(time.Now().Add(dt))
 		c.Assert(err, gc.Equals, nil)
 		content := fmt.Sprintf("%15d", i)
-		err = s.store.PutPart(id, 0, strings.NewReader(content), int64(len(content)), hashOf(content))
+		err = s.store.PutPart(id, 0, strings.NewReader(content), int64(len(content)), 0, hashOf(content))
 		c.Assert(err, gc.Equals, nil)
 		_, _, err = s.store.FinishUpload(id, []blobstore.Part{{Hash: hashOf(content)}})
 		c.Assert(err, gc.Equals, nil)
@@ -869,14 +895,17 @@ func (s *blobStoreSuite) TestUploadInfo(c *gc.C) {
 			Hash:     hashOf(part0),
 			Size:     int64(len(part0)),
 			Complete: true,
+			Offset:   0,
 		}, {
 			Hash:     hashOf(part1),
 			Size:     int64(len(part1)),
 			Complete: true,
+			Offset:   int64(len(part0)),
 		}, {
 			Hash:     hashOf(part2),
 			Size:     int64(len(part2)),
 			Complete: true,
+			Offset:   int64(len(part1)) + int64(len(part0)),
 		}},
 		Hash: hashOf(part0 + part1 + part2),
 	})
@@ -975,11 +1004,13 @@ func (s *blobStoreSuite) putMultipartNoRemove(c *gc.C, contents ...string) (stri
 	c.Assert(err, gc.Equals, nil)
 
 	parts := make([]blobstore.Part, len(contents))
+	pos := int64(0)
 	for i, content := range contents {
 		hash := hashOf(content)
-		err = s.store.PutPart(id, i, strings.NewReader(content), int64(len(content)), hash)
+		err = s.store.PutPart(id, i, strings.NewReader(content), int64(len(content)), pos, hash)
 		c.Assert(err, gc.Equals, nil)
 		parts[i].Hash = hash
+		pos += int64(len(content))
 	}
 	idx, _, err := s.store.FinishUpload(id, parts)
 	c.Assert(err, gc.Equals, nil)
