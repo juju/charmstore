@@ -130,11 +130,10 @@ gopkg:
 
 # Build a release tarball
 charmstore-$(VERSION).tar.xz: $(VERSIONDEPS)
-	mkdir -p charmstore-$(VERSION)/bin
-	GOBIN=$(CURDIR)/charmstore-$(VERSION)/bin go install $(INSTALL_FLAGS) -v $(PROJECT)/...
-	mv charmstore-$(VERSION)/bin/charmd charmstore-$(VERSION)/bin/charmstore
-	tar cv charmstore-$(VERSION) | xz > $@
-	-rm -r charmstore-$(VERSION)
+	mkdir -p charmstore-release/bin
+	GOBIN=$(CURDIR)/charmstore-release/bin go install $(INSTALL_FLAGS) -v $(PROJECT)/...
+	tar cv -C charmstore-release . | xz > $@
+	-rm -r charmstore-release
 
 help:
 	@echo -e 'Charmstore - list of make targets:\n'
