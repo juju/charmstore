@@ -157,13 +157,14 @@ func (h *ReqHandler) serveUploadPart(w http.ResponseWriter, req *http.Request) e
 		var parts params.Parts
 		parts.Parts = make([]params.Part, len(uploadInfo.Parts))
 		for i, part := range uploadInfo.Parts {
-			parts.Parts[i] = params.Part{
-				Offset:   part.Offset,
-				Complete: part.Complete,
-				Hash:     part.Hash,
-				Size:     part.Size,
+			if part != nil {
+				parts.Parts[i] = params.Part{
+					Offset:   part.Offset,
+					Complete: part.Complete,
+					Hash:     part.Hash,
+					Size:     part.Size,
+				}
 			}
-
 		}
 		return httprequest.WriteJSON(w, http.StatusOK, params.UploadInfoResponse{
 			UploadId:    uploadId,
