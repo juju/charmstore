@@ -2511,8 +2511,7 @@ type UploadInfoResponse struct {
 	UploadId string
 
 	// Parts holds all the known parts of the upload.
-	// Parts that haven't been uploaded yet will have nil
-	// elements.
+	// Parts that haven't been uploaded yet will have all fields zero (not present).
 	Parts Parts
 
     // Expires holds when the upload id expires (encoded

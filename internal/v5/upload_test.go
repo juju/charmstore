@@ -5,6 +5,7 @@ package v5_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -352,16 +353,16 @@ func (s *APISuite) TestGetUploadInfoBetweenPartUploads(c *gc.C) {
 	err := json.Unmarshal(resp.Body.Bytes(), &uploadResp)
 	c.Assert(err, gc.Equals, nil)
 
-	part1 := newDataSource(1, 5*1024*1024)
-	hash1, size1 := hashOf(part1)
-	part1.Seek(0, 0)
+	part0 := newDataSource(0, 5*1024*1024)
+	hash0, size0 := hashOf(part0)
+	part0.Seek(0, 0)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:       s.srv,
 		Method:        "PUT",
 		Do:            bakeryDo(s.idmServer.Client("bob")),
-		ContentLength: size1,
-		URL:           storeURL("upload/" + uploadResp.UploadId + "/0?hash=" + hash1 + "&offset=0"),
-		Body:          part1,
+		ContentLength: size0,
+		URL:           storeURL("upload/" + uploadResp.UploadId + "/0?hash=" + hash0 + "&offset=0"),
+		Body:          part0,
 	})
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler: s.srv,
@@ -371,9 +372,9 @@ func (s *APISuite) TestGetUploadInfoBetweenPartUploads(c *gc.C) {
 		ExpectBody: &params.UploadInfoResponse{
 			Parts: params.Parts{
 				Parts: []params.Part{{
-					Hash:     hash1,
+					Hash:     hash0,
 					Complete: true,
-					Size:     size1,
+					Size:     size0,
 				}},
 			},
 			UploadId:    uploadResp.UploadId,
@@ -391,7 +392,7 @@ func (s *APISuite) TestGetUploadInfoBetweenPartUploads(c *gc.C) {
 		Method:        "PUT",
 		Do:            bakeryDo(s.idmServer.Client("bob")),
 		ContentLength: size2,
-		URL:           storeURL("upload/" + uploadResp.UploadId + "/1?hash=" + hash2 + "&offset=5242880"),
+		URL:           storeURL(fmt.Sprintf("upload/%s/2?hash=%s&offset=%d", uploadResp.UploadId, hash2, 10*1024*1024)),
 		Body:          part2,
 	})
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -402,15 +403,15 @@ func (s *APISuite) TestGetUploadInfoBetweenPartUploads(c *gc.C) {
 		ExpectBody: &params.UploadInfoResponse{
 			Parts: params.Parts{
 				Parts: []params.Part{{
-					Hash:     hash1,
+					Hash:     hash0,
 					Complete: true,
-					Size:     size1,
+					Size:     size0,
 					Offset:   0,
-				}, {
+				}, {}, {
 					Hash:     hash2,
 					Complete: true,
 					Size:     size2,
-					Offset:   size1,
+					Offset:   10 * 1024 * 1024,
 				}},
 			},
 			UploadId:    uploadResp.UploadId,
