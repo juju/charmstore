@@ -10,9 +10,10 @@ package series // import "gopkg.in/juju/charmstore.v5/internal/series"
 type Distribution string
 
 const (
-	Ubuntu  Distribution = "ubuntu"
-	CentOS  Distribution = "centos"
-	Windows Distribution = "windows"
+	Ubuntu     Distribution = "ubuntu"
+	CentOS     Distribution = "centos"
+	Windows    Distribution = "windows"
+	Kubernetes Distribution = "kubernetes"
 )
 
 // SeriesInfo contains the information the charmstore knows about a
@@ -24,7 +25,7 @@ type SeriesInfo struct {
 	// Distribution holds the Distribution this series belongs to.
 	Distribution Distribution
 
-	// SearchIndex holds wether charms in this series should be added
+	// SearchIndex holds whether charms in this series should be added
 	// to the search index.
 	SearchIndex bool
 
@@ -70,4 +71,7 @@ var Series = map[string]SeriesInfo{
 
 	// Centos
 	"centos7": {true, CentOS, true, 1.1},
+
+	// Kubernetes
+	"kubernetes": {true, Kubernetes, false, 0},
 }
