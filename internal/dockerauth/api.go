@@ -4,11 +4,22 @@
 package dockerauth
 
 import (
+	"crypto/rsa"
 	"fmt"
+	"net/http"
 	"strings"
+	"time"
 
+	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/juju/loggo"
+	"github.com/julienschmidt/httprouter"
+	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
+	httprequest "gopkg.in/httprequest.v1"
+	"gopkg.in/juju/charmstore.v5/internal/charmstore"
 )
+
+var logger = loggo.GetLogger("charmstore.internal.dockerauth")
 
 // parseResourceAccess parses the requested access for a single resource
 // from a scope. This is parsed as a resourcescope from the grammer
@@ -70,4 +81,89 @@ func (e *ScopeParseError) Error() string {
 		errs[i] = err.Error()
 	}
 	return fmt.Sprintf("[%s]", strings.Join(errs, ", "))
+}
+
+type Handler struct {
+	Key        *rsa.PrivateKey
+	TokenValid time.Duration
+	Location   string
+}
+
+type tokenRequest struct {
+	httprequest.Route `httprequest:"GET /docker-registry/token"`
+	Scope             string `httprequest:"scope,form"`
+	Service           string `httprequest:"service,form"`
+}
+
+type tokenResponse struct {
+	Token     string    `json:"token"`
+	ExpiresIn int       `json:"expires_in"`
+	IssuedAt  time.Time `json:"issued_at"`
+}
+
+type dockerRegistryClaims struct {
+	jwt.StandardClaims
+	Access []ResourceAccessRights `json:"access"`
+}
+
+func (h *Handler) Token(p httprequest.Params, req *tokenRequest) (*tokenResponse, error) {
+	ras, err := ParseScope(req.Scope)
+	if err != nil {
+		logger.Infof("Invalid scope: %s", err)
+	}
+	issuedAt := time.Now()
+	expiresAt := issuedAt.Add(h.TokenValid)
+	claims := dockerRegistryClaims{
+		StandardClaims: jwt.StandardClaims{
+			Audience:  req.Service,
+			ExpiresAt: expiresAt.Unix(),
+			IssuedAt:  issuedAt.Unix(),
+			NotBefore: issuedAt.Unix(),
+			Issuer:    h.Location,
+		},
+		Access: ras,
+	}
+	tok, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(h.Key)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return &tokenResponse{
+		Token:     tok,
+		ExpiresIn: int(h.TokenValid / time.Second),
+		IssuedAt:  issuedAt,
+	}, nil
+}
+
+func (h *Handler) handler(p httprequest.Params) (*Handler, context.Context, error) {
+	return h, p.Context, nil
+}
+
+func NewAPIHandler(_ *charmstore.Pool, p *charmstore.ServerParams, absPath string) (charmstore.HTTPCloseHandler, error) {
+	h := &Handler{
+		Location:   "charmstore",
+		TokenValid: 120 * time.Second,
+		Key:        p.DockerRegistryAuthorizerKey,
+	}
+	r := httprouter.New()
+	srv := httprequest.Server{
+		ErrorMapper: errorMapper,
+	}
+	httprequest.AddHandlers(r, srv.Handlers(func(p httprequest.Params) (*Handler, context.Context, error) {
+		return h, p.Context, nil
+	}))
+	return server{
+		Handler: r,
+	}, nil
+}
+
+type server struct {
+	http.Handler
+}
+
+func (server) Close() {}
+
+func errorMapper(ctx context.Context, err error) (httpStatus int, errorBody interface{}) {
+	return http.StatusInternalServerError, &httprequest.RemoteError{
+		Message: err.Error(),
+	}
 }

@@ -4,9 +4,17 @@
 package dockerauth_test
 
 import (
-	jc "github.com/juju/testing/checkers"
-	gc "gopkg.in/check.v1"
+	"crypto/rand"
+	"crypto/rsa"
+	"net/http/httptest"
 
+	jwt "github.com/dgrijalva/jwt-go"
+	jc "github.com/juju/testing/checkers"
+	"golang.org/x/net/context"
+	gc "gopkg.in/check.v1"
+	httprequest "gopkg.in/httprequest.v1"
+
+	"gopkg.in/juju/charmstore.v5/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5/internal/dockerauth"
 )
 
@@ -64,4 +72,37 @@ func (s *APISuite) TestParseScope(c *gc.C) {
 			c.Assert(err, gc.ErrorMatches, test.expectError)
 		}
 	}
+}
+
+func (s *APISuite) TestToken(c *gc.C) {
+	key, err := rsa.GenerateKey(rand.Reader, 512)
+	c.Assert(err, gc.Equals, nil)
+	hnd, err := dockerauth.NewAPIHandler(nil, &charmstore.ServerParams{
+		DockerRegistryAuthorizerKey: key,
+	}, "")
+	c.Assert(err, gc.Equals, nil)
+	srv := httptest.NewServer(hnd)
+	defer srv.Close()
+
+	client := httprequest.Client{
+		BaseURL: srv.URL,
+	}
+	var resp dockerauth.TokenResponse
+	err = client.Get(context.Background(), "/docker-registry/token?service=myregistry&scope=repository:myrepo:pull", &resp)
+	c.Assert(err, gc.Equals, nil)
+	tok, err := jwt.Parse(resp.Token, func(_ *jwt.Token) (interface{}, error) {
+		return key.Public(), nil
+	})
+	c.Assert(err, gc.Equals, nil)
+	claims, ok := tok.Claims.(jwt.MapClaims)
+	c.Assert(ok, gc.Equals, true)
+	c.Assert(claims["access"], jc.DeepEquals, []interface{}{
+		map[string]interface{}{
+			"type": "repository",
+			"name": "myrepo",
+			"actions": []interface{}{
+				"pull",
+			},
+		},
+	})
 }

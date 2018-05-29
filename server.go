@@ -4,6 +4,7 @@
 package charmstore // import "gopkg.in/juju/charmstore.v5"
 
 import (
+	"crypto/rsa"
 	"fmt"
 	"net/http"
 	"sort"
@@ -125,6 +126,10 @@ type ServerParams struct {
 	// that may use the given MongoDB database.
 	// If this is nil, a MongoDB backend will be used.
 	NewBlobBackend func(db *mgo.Database) blobstore.Backend
+
+	// DockerRegistryAuthorizerKey contains the key to use to sign
+	// docker registry authorization tokens.
+	DockerRegistryAuthorizerKey *rsa.PrivateKey
 }
 
 // NewServer returns a new handler that handles charm store requests and stores
