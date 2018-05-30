@@ -7,7 +7,8 @@
 package charmstore // import "gopkg.in/juju/charmstore.v5/internal/charmstore"
 
 import (
-	"crypto/rsa"
+	"crypto"
+	"crypto/x509"
 	"net/http"
 	"strings"
 	"time"
@@ -111,9 +112,13 @@ type ServerParams struct {
 	// If this is nil, a MongoDB backend will be used.
 	NewBlobBackend func(db *mgo.Database) blobstore.Backend
 
-	// DockerRegistryAuthorizerKey contains the key to use to sign
+	// DockerRegistryAuthCertificates contains the chain of
+	// certificates used to validate the DockerRegistryAuthKey.
+	DockerRegistryAuthCertificates []*x509.Certificate
+
+	// DockerRegistryAuthKey contains the key to use to sign
 	// docker registry authorization tokens.
-	DockerRegistryAuthorizerKey *rsa.PrivateKey
+	DockerRegistryAuthKey crypto.Signer
 }
 
 const defaultRootKeyExpiryDuration = 24 * time.Hour

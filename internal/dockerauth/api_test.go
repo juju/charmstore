@@ -4,8 +4,13 @@
 package dockerauth_test
 
 import (
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"math/big"
 	"net/http/httptest"
 
 	jwt "github.com/dgrijalva/jwt-go"
@@ -75,10 +80,13 @@ func (s *APISuite) TestParseScope(c *gc.C) {
 }
 
 func (s *APISuite) TestToken(c *gc.C) {
-	key, err := rsa.GenerateKey(rand.Reader, 512)
-	c.Assert(err, gc.Equals, nil)
-	hnd, err := dockerauth.NewAPIHandler(nil, &charmstore.ServerParams{
-		DockerRegistryAuthorizerKey: key,
+	cert, key := newCert(c)
+
+	hnd, err := dockerauth.NewAPIHandler(nil, charmstore.ServerParams{
+		DockerRegistryAuthKey: key,
+		DockerRegistryAuthCertificates: []*x509.Certificate{
+			cert,
+		},
 	}, "")
 	c.Assert(err, gc.Equals, nil)
 	srv := httptest.NewServer(hnd)
@@ -88,7 +96,7 @@ func (s *APISuite) TestToken(c *gc.C) {
 		BaseURL: srv.URL,
 	}
 	var resp dockerauth.TokenResponse
-	err = client.Get(context.Background(), "/docker-registry/token?service=myregistry&scope=repository:myrepo:pull", &resp)
+	err = client.Get(context.Background(), "/token?service=myregistry&scope=repository:myrepo:pull", &resp)
 	c.Assert(err, gc.Equals, nil)
 	tok, err := jwt.Parse(resp.Token, func(_ *jwt.Token) (interface{}, error) {
 		return key.Public(), nil
@@ -105,4 +113,20 @@ func (s *APISuite) TestToken(c *gc.C) {
 			},
 		},
 	})
+}
+
+func newCert(c *gc.C) (_ *x509.Certificate, key crypto.Signer) {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	c.Assert(err, gc.Equals, nil)
+	template := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			CommonName: "test",
+		},
+	}
+	raw, err := x509.CreateCertificate(rand.Reader, &template, &template, key.(crypto.Signer).Public(), key)
+	c.Assert(err, gc.Equals, nil)
+	cert, err := x509.ParseCertificate(raw)
+	c.Assert(err, gc.Equals, nil)
+	return cert, key
 }
