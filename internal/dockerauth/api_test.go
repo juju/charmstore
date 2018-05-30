@@ -99,7 +99,7 @@ func (s *APISuite) TestToken(c *gc.C) {
 	err = client.Get(context.Background(), "/token?service=myregistry&scope=repository:myrepo:pull", &resp)
 	c.Assert(err, gc.Equals, nil)
 	tok, err := jwt.Parse(resp.Token, func(_ *jwt.Token) (interface{}, error) {
-		return key.(crypto.Signer).Public(), nil
+		return key.Public(), nil
 	})
 	c.Assert(err, gc.Equals, nil)
 	claims, ok := tok.Claims.(jwt.MapClaims)
@@ -115,7 +115,7 @@ func (s *APISuite) TestToken(c *gc.C) {
 	})
 }
 
-func newCert(c *gc.C) (_ *x509.Certificate, key interface{}) {
+func newCert(c *gc.C) (_ *x509.Certificate, key crypto.Signer) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	c.Assert(err, gc.Equals, nil)
 	template := x509.Certificate{

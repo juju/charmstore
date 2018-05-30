@@ -4,6 +4,7 @@
 package charmstore // import "gopkg.in/juju/charmstore.v5"
 
 import (
+	"crypto"
 	"crypto/x509"
 	"fmt"
 	"net/http"
@@ -136,7 +137,7 @@ type ServerParams struct {
 
 	// DockerRegistryAuthKey contains the key to use to sign
 	// docker registry authorization tokens.
-	DockerRegistryAuthKey interface{}
+	DockerRegistryAuthKey crypto.Signer
 }
 
 // NewServer returns a new handler that handles charm store requests and stores

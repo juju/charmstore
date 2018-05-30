@@ -4,6 +4,7 @@
 package dockerauth
 
 import (
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/x509"
@@ -87,7 +88,7 @@ func (e *ScopeParseError) Error() string {
 }
 
 type Handler struct {
-	Key        interface{}
+	Key        crypto.Signer
 	Certs      []*x509.Certificate
 	TokenValid time.Duration
 }
@@ -136,12 +137,16 @@ func (h *Handler) Token(p httprequest.Params, req *tokenRequest) (*tokenResponse
 		sm = jwt.SigningMethodES256
 	case *rsa.PrivateKey:
 		sm = jwt.SigningMethodRS256
+	default:
+		sm = jwt.SigningMethodNone
 	}
 	tok := jwt.NewWithClaims(sm, claims)
 	certs := make([]string, len(h.Certs))
 	for i, c := range h.Certs {
 		certs[i] = base64.StdEncoding.EncodeToString(c.Raw)
 	}
+	// The x5c header contains the certificate chain used by the
+	// docker-registry to authenticate the token.
 	tok.Header["x5c"] = certs
 	s, err := tok.SignedString(h.Key)
 	if err != nil {

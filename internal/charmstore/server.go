@@ -7,6 +7,7 @@
 package charmstore // import "gopkg.in/juju/charmstore.v5/internal/charmstore"
 
 import (
+	"crypto"
 	"crypto/x509"
 	"net/http"
 	"strings"
@@ -117,7 +118,7 @@ type ServerParams struct {
 
 	// DockerRegistryAuthKey contains the key to use to sign
 	// docker registry authorization tokens.
-	DockerRegistryAuthKey interface{}
+	DockerRegistryAuthKey crypto.Signer
 }
 
 const defaultRootKeyExpiryDuration = 24 * time.Hour

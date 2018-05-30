@@ -6,6 +6,7 @@
 package config // import "gopkg.in/juju/charmstore.v5/config"
 
 import (
+	"crypto"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
@@ -184,7 +185,7 @@ func (c *X509Certificates) UnmarshalText(data []byte) error {
 }
 
 type X509PrivateKey struct {
-	Key interface{}
+	Key crypto.Signer
 }
 
 func (k *X509PrivateKey) UnmarshalText(data []byte) error {
@@ -199,7 +200,11 @@ func (k *X509PrivateKey) UnmarshalText(data []byte) error {
 	case "RSA PRIVATE KEY":
 		k.Key, err = x509.ParsePKCS1PrivateKey(b.Bytes)
 	case "PRIVATE KEY":
-		k.Key, err = x509.ParsePKCS8PrivateKey(b.Bytes)
+		var key interface{}
+		key, err = x509.ParsePKCS8PrivateKey(b.Bytes)
+		if err == nil {
+			k.Key = key.(crypto.Signer)
+		}
 	default:
 		err = errgo.Newf("unsupported key type %q", b.Type)
 	}
