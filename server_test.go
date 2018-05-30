@@ -56,7 +56,7 @@ type versionResponse struct {
 }
 
 func (s *ServerSuite) TestVersions(c *gc.C) {
-	c.Assert(charmstore.Versions(), gc.DeepEquals, []string{"", "v4", "v5"})
+	c.Assert(charmstore.Versions(), gc.DeepEquals, []string{"", "docker-registry", "v4", "v5"})
 }
 
 func (s *ServerSuite) TestNewServerWithVersions(c *gc.C) {

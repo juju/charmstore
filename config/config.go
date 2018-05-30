@@ -6,6 +6,8 @@
 package config // import "gopkg.in/juju/charmstore.v5/config"
 
 import (
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -20,39 +22,41 @@ import (
 
 type Config struct {
 	// TODO(rog) rename this to MongoAddr - it's not a URL.
-	MongoURL          string            `yaml:"mongo-url,omitempty"`
-	AuditLogFile      string            `yaml:"audit-log-file,omitempty"`
-	AuditLogMaxSize   int               `yaml:"audit-log-max-size,omitempty"`
-	AuditLogMaxAge    int               `yaml:"audit-log-max-age,omitempty"`
-	APIAddr           string            `yaml:"api-addr,omitempty"`
-	AuthUsername      string            `yaml:"auth-username,omitempty"`
-	AuthPassword      string            `yaml:"auth-password,omitempty"`
-	ESAddr            string            `yaml:"elasticsearch-addr,omitempty"` // elasticsearch is optional
-	IdentityPublicKey *bakery.PublicKey `yaml:"identity-public-key,omitempty"`
-	IdentityLocation  string            `yaml:"identity-location"`
-	TermsPublicKey    *bakery.PublicKey `yaml:"terms-public-key,omitempty"`
-	TermsLocation     string            `yaml:"terms-location,omitempty"`
-	AgentUsername     string            `yaml:"agent-username,omitempty"`
-	AgentKey          *bakery.KeyPair   `yaml:"agent-key,omitempty"`
-	MaxMgoSessions    int               `yaml:"max-mgo-sessions,omitempty"`
-	RequestTimeout    DurationString    `yaml:"request-timeout,omitempty"`
-	StatsCacheMaxAge  DurationString    `yaml:"stats-cache-max-age,omitempty"`
-	SearchCacheMaxAge DurationString    `yaml:"search-cache-max-age,omitempty"`
-	Database          string            `yaml:"database,omitempty"`
-	AccessLog         string            `yaml:"access-log"`
-	MinUploadPartSize int64             `yaml:"min-upload-part-size"`
-	MaxUploadPartSize int64             `yaml:"max-upload-part-size"`
-	MaxUploadParts    int               `yaml:"max-upload-parts"`
-	BlobStore         BlobStoreType     `yaml:"blobstore"`
-	SwiftAuthURL      string            `yaml:"swift-auth-url"`
-	SwiftEndpointURL  string            `yaml:"swift-endpoint-url"`
-	SwiftUsername     string            `yaml:"swift-username"`
-	SwiftSecret       string            `yaml:"swift-secret"`
-	SwiftBucket       string            `yaml:"swift-bucket"`
-	SwiftRegion       string            `yaml:"swift-region"`
-	SwiftTenant       string            `yaml:"swift-tenant"`
-	SwiftAuthMode     *SwiftAuthMode    `yaml:"swift-authmode"`
-	LoggingConfig     string            `yaml:"logging-config"`
+	MongoURL                       string            `yaml:"mongo-url,omitempty"`
+	AuditLogFile                   string            `yaml:"audit-log-file,omitempty"`
+	AuditLogMaxSize                int               `yaml:"audit-log-max-size,omitempty"`
+	AuditLogMaxAge                 int               `yaml:"audit-log-max-age,omitempty"`
+	APIAddr                        string            `yaml:"api-addr,omitempty"`
+	AuthUsername                   string            `yaml:"auth-username,omitempty"`
+	AuthPassword                   string            `yaml:"auth-password,omitempty"`
+	ESAddr                         string            `yaml:"elasticsearch-addr,omitempty"` // elasticsearch is optional
+	IdentityPublicKey              *bakery.PublicKey `yaml:"identity-public-key,omitempty"`
+	IdentityLocation               string            `yaml:"identity-location"`
+	TermsPublicKey                 *bakery.PublicKey `yaml:"terms-public-key,omitempty"`
+	TermsLocation                  string            `yaml:"terms-location,omitempty"`
+	AgentUsername                  string            `yaml:"agent-username,omitempty"`
+	AgentKey                       *bakery.KeyPair   `yaml:"agent-key,omitempty"`
+	MaxMgoSessions                 int               `yaml:"max-mgo-sessions,omitempty"`
+	RequestTimeout                 DurationString    `yaml:"request-timeout,omitempty"`
+	StatsCacheMaxAge               DurationString    `yaml:"stats-cache-max-age,omitempty"`
+	SearchCacheMaxAge              DurationString    `yaml:"search-cache-max-age,omitempty"`
+	Database                       string            `yaml:"database,omitempty"`
+	AccessLog                      string            `yaml:"access-log"`
+	MinUploadPartSize              int64             `yaml:"min-upload-part-size"`
+	MaxUploadPartSize              int64             `yaml:"max-upload-part-size"`
+	MaxUploadParts                 int               `yaml:"max-upload-parts"`
+	BlobStore                      BlobStoreType     `yaml:"blobstore"`
+	SwiftAuthURL                   string            `yaml:"swift-auth-url"`
+	SwiftEndpointURL               string            `yaml:"swift-endpoint-url"`
+	SwiftUsername                  string            `yaml:"swift-username"`
+	SwiftSecret                    string            `yaml:"swift-secret"`
+	SwiftBucket                    string            `yaml:"swift-bucket"`
+	SwiftRegion                    string            `yaml:"swift-region"`
+	SwiftTenant                    string            `yaml:"swift-tenant"`
+	SwiftAuthMode                  *SwiftAuthMode    `yaml:"swift-authmode"`
+	LoggingConfig                  string            `yaml:"logging-config"`
+	DockerRegistryAuthCertificates X509Certificates  `yaml:"docker-registry-auth-certs"`
+	DockerRegistryAuthKey          X509PrivateKey    `yaml:"docker-registry-auth-key"`
 }
 
 type BlobStoreType string
@@ -158,4 +162,46 @@ func (dp *DurationString) UnmarshalText(data []byte) error {
 	}
 	dp.Duration = d
 	return nil
+}
+
+type X509Certificates struct {
+	Certificates []*x509.Certificate
+}
+
+func (c *X509Certificates) UnmarshalText(data []byte) error {
+	for {
+		var b *pem.Block
+		b, data = pem.Decode(data)
+		if b == nil {
+			return nil
+		}
+		cert, err := x509.ParseCertificate(b.Bytes)
+		if err != nil {
+			return errgo.Mask(err)
+		}
+		c.Certificates = append(c.Certificates, cert)
+	}
+}
+
+type X509PrivateKey struct {
+	Key interface{}
+}
+
+func (k *X509PrivateKey) UnmarshalText(data []byte) error {
+	b, _ := pem.Decode(data)
+	if b == nil {
+		return nil
+	}
+	var err error
+	switch b.Type {
+	case "EC PRIVATE KEY":
+		k.Key, err = x509.ParseECPrivateKey(b.Bytes)
+	case "RSA PRIVATE KEY":
+		k.Key, err = x509.ParsePKCS1PrivateKey(b.Bytes)
+	case "PRIVATE KEY":
+		k.Key, err = x509.ParsePKCS8PrivateKey(b.Bytes)
+	default:
+		err = errgo.Newf("unsupported key type %q", b.Type)
+	}
+	return errgo.Mask(err)
 }

@@ -4,6 +4,9 @@
 package config_test
 
 import (
+	"crypto/ecdsa"
+	"crypto/x509"
+	"encoding/base64"
 	"io/ioutil"
 	"path"
 	"testing"
@@ -60,6 +63,31 @@ swift-region: somewhere
 swift-tenant: a-tenant
 swift-authmode: userpass
 logging-config: INFO
+docker-registry-auth-certs: |
+  -----BEGIN CERTIFICATE-----
+  MIIBSDCB+KADAgECAgEBMAoGCCqGSM49BAMCMA8xDTALBgNVBAMTBHJvb3QwHhcN
+  MTgwNTMwMDYxNzQ1WhcNMjMwNTMwMDYxNzQ1WjAPMQ0wCwYDVQQDEwR0ZXN0ME4w
+  EAYHKoZIzj0CAQYFK4EEACEDOgAEZVrQP4knlGBQ2cOMsYmgc0VEWu8DmOFlFa8s
+  /ym8yiBvsCfa7/t/V53VzepLnvTYb6j0LeMcnXajUDBOMAwGA1UdEwEB/wQCMAAw
+  HQYDVR0OBBYEFG1euQX6O6FbNV4lTu0CYAnFCpc8MB8GA1UdIwQYMBaAFNopWnFZ
+  iUBhd2W9d8NKbkRf8gujMAoGCCqGSM49BAMCAz8AMDwCHEPZ9X8JQRe5KBAMUTfo
+  wngH3J2yXb1nQXzLR4cCHEbutF5CmWNzWzcek2JfQMOl7aFjcBxAerJGgRU=
+  -----END CERTIFICATE-----
+  -----BEGIN CERTIFICATE-----
+  MIIBKzCB2qADAgECAgEAMAoGCCqGSM49BAMCMA8xDTALBgNVBAMTBHJvb3QwHhcN
+  MTgwNTMwMDYxNDQyWhcNMjgwNTI5MDYxNDQyWjAPMQ0wCwYDVQQDEwRyb290ME4w
+  EAYHKoZIzj0CAQYFK4EEACEDOgAEp5HUPVxs3wdpFF/HrimbFPVWkG+v6RacjFyP
+  ujEylCfsONDOvYFzzz3x6/kxpQBl0ZYCHSJSDzKjMjAwMA8GA1UdEwEB/wQFMAMB
+  Af8wHQYDVR0OBBYEFNopWnFZiUBhd2W9d8NKbkRf8gujMAoGCCqGSM49BAMCA0AA
+  MD0CHQC7z3ryynKOXgm/flVbOytXmAgnc8n2I7jLGMKhAhwmW2IwwXFWcH/nX9K/
+  e9AIP3l4dkWUxrNGRqwW
+  -----END CERTIFICATE-----
+docker-registry-auth-key: |
+  -----BEGIN EC PRIVATE KEY-----
+  MGgCAQEEHM9ekg7h0LAhNBaiSJolcfDNtyfS94DyUblrFu+gBwYFK4EEACGhPAM6
+  AARlWtA/iSeUYFDZw4yxiaBzRURa7wOY4WUVryz/KbzKIG+wJ9rv+39XndXN6kue
+  9NhvqPQt4xyddg==
+  -----END EC PRIVATE KEY-----
 `
 
 func (s *ConfigSuite) readConfig(c *gc.C, content string) (*config.Config, error) {
@@ -113,6 +141,15 @@ func (s *ConfigSuite) TestRead(c *gc.C) {
 		SwiftTenant:       "a-tenant",
 		SwiftAuthMode:     &config.SwiftAuthMode{identity.AuthUserPass},
 		LoggingConfig:     "INFO",
+		DockerRegistryAuthCertificates: config.X509Certificates{
+			Certificates: []*x509.Certificate{
+				mustParseCertificate("MIIBSDCB+KADAgECAgEBMAoGCCqGSM49BAMCMA8xDTALBgNVBAMTBHJvb3QwHhcNMTgwNTMwMDYxNzQ1WhcNMjMwNTMwMDYxNzQ1WjAPMQ0wCwYDVQQDEwR0ZXN0ME4wEAYHKoZIzj0CAQYFK4EEACEDOgAEZVrQP4knlGBQ2cOMsYmgc0VEWu8DmOFlFa8s/ym8yiBvsCfa7/t/V53VzepLnvTYb6j0LeMcnXajUDBOMAwGA1UdEwEB/wQCMAAwHQYDVR0OBBYEFG1euQX6O6FbNV4lTu0CYAnFCpc8MB8GA1UdIwQYMBaAFNopWnFZiUBhd2W9d8NKbkRf8gujMAoGCCqGSM49BAMCAz8AMDwCHEPZ9X8JQRe5KBAMUTfowngH3J2yXb1nQXzLR4cCHEbutF5CmWNzWzcek2JfQMOl7aFjcBxAerJGgRU="),
+				mustParseCertificate("MIIBKzCB2qADAgECAgEAMAoGCCqGSM49BAMCMA8xDTALBgNVBAMTBHJvb3QwHhcNMTgwNTMwMDYxNDQyWhcNMjgwNTI5MDYxNDQyWjAPMQ0wCwYDVQQDEwRyb290ME4wEAYHKoZIzj0CAQYFK4EEACEDOgAEp5HUPVxs3wdpFF/HrimbFPVWkG+v6RacjFyPujEylCfsONDOvYFzzz3x6/kxpQBl0ZYCHSJSDzKjMjAwMA8GA1UdEwEB/wQFMAMBAf8wHQYDVR0OBBYEFNopWnFZiUBhd2W9d8NKbkRf8gujMAoGCCqGSM49BAMCA0AAMD0CHQC7z3ryynKOXgm/flVbOytXmAgnc8n2I7jLGMKhAhwmW2IwwXFWcH/nX9K/e9AIP3l4dkWUxrNGRqwW"),
+			},
+		},
+		DockerRegistryAuthKey: config.X509PrivateKey{
+			Key: mustParseECPrivateKey("MGgCAQEEHM9ekg7h0LAhNBaiSJolcfDNtyfS94DyUblrFu+gBwYFK4EEACGhPAM6AARlWtA/iSeUYFDZw4yxiaBzRURa7wOY4WUVryz/KbzKIG+wJ9rv+39XndXN6kue9NhvqPQt4xyddg=="),
+		},
 	})
 }
 
@@ -139,4 +176,28 @@ func mustParseKey(s string) bakery.Key {
 		panic(err)
 	}
 	return k
+}
+
+func mustParseCertificate(s string) *x509.Certificate {
+	b, err := base64.StdEncoding.DecodeString(s)
+	if err != nil {
+		panic(err)
+	}
+	cert, err := x509.ParseCertificate(b)
+	if err != nil {
+		panic(err)
+	}
+	return cert
+}
+
+func mustParseECPrivateKey(s string) *ecdsa.PrivateKey {
+	b, err := base64.StdEncoding.DecodeString(s)
+	if err != nil {
+		panic(err)
+	}
+	key, err := x509.ParseECPrivateKey(b)
+	if err != nil {
+		panic(err)
+	}
+	return key
 }

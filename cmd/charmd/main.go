@@ -99,21 +99,23 @@ func serve(conf *config.Config) error {
 
 	logger.Infof("setting up the API server")
 	cfg := charmstore.ServerParams{
-		AuthUsername:            conf.AuthUsername,
-		AuthPassword:            conf.AuthPassword,
-		IdentityLocation:        conf.IdentityLocation,
-		TermsLocation:           conf.TermsLocation,
-		AgentUsername:           conf.AgentUsername,
-		AgentKey:                conf.AgentKey,
-		StatsCacheMaxAge:        conf.StatsCacheMaxAge.Duration,
-		MaxMgoSessions:          conf.MaxMgoSessions,
-		HTTPRequestWaitDuration: conf.RequestTimeout.Duration,
-		SearchCacheMaxAge:       conf.SearchCacheMaxAge.Duration,
-		PublicKeyLocator:        keyring,
-		MinUploadPartSize:       conf.MinUploadPartSize,
-		MaxUploadPartSize:       conf.MaxUploadPartSize,
-		MaxUploadParts:          conf.MaxUploadParts,
-		RunBlobStoreGC:          true,
+		AuthUsername:                   conf.AuthUsername,
+		AuthPassword:                   conf.AuthPassword,
+		IdentityLocation:               conf.IdentityLocation,
+		TermsLocation:                  conf.TermsLocation,
+		AgentUsername:                  conf.AgentUsername,
+		AgentKey:                       conf.AgentKey,
+		StatsCacheMaxAge:               conf.StatsCacheMaxAge.Duration,
+		MaxMgoSessions:                 conf.MaxMgoSessions,
+		HTTPRequestWaitDuration:        conf.RequestTimeout.Duration,
+		SearchCacheMaxAge:              conf.SearchCacheMaxAge.Duration,
+		PublicKeyLocator:               keyring,
+		MinUploadPartSize:              conf.MinUploadPartSize,
+		MaxUploadPartSize:              conf.MaxUploadPartSize,
+		MaxUploadParts:                 conf.MaxUploadParts,
+		RunBlobStoreGC:                 true,
+		DockerRegistryAuthCertificates: conf.DockerRegistryAuthCertificates.Certificates,
+		DockerRegistryAuthKey:          conf.DockerRegistryAuthKey.Key,
 	}
 	switch conf.BlobStore {
 	case config.MongoDBBlobStore:
@@ -141,7 +143,15 @@ func serve(conf *config.Config) error {
 		}
 	}
 
-	server, err := charmstore.NewServer(db, es, "cs", cfg, charmstore.Legacy, charmstore.V4, charmstore.V5)
+	vers := []string{
+		charmstore.Legacy,
+		charmstore.V4,
+		charmstore.V5,
+	}
+	if conf.DockerRegistryAuthKey.Key != nil {
+		vers = append(vers, charmstore.DockerAuth)
+	}
+	server, err := charmstore.NewServer(db, es, "cs", cfg, vers...)
 	if err != nil {
 		return errgo.Notef(err, "cannot create new server at %q", conf.APIAddr)
 	}

@@ -4,7 +4,7 @@
 package charmstore // import "gopkg.in/juju/charmstore.v5"
 
 import (
-	"crypto/rsa"
+	"crypto/x509"
 	"fmt"
 	"net/http"
 	"sort"
@@ -18,6 +18,7 @@ import (
 	"gopkg.in/juju/charmstore.v5/elasticsearch"
 	"gopkg.in/juju/charmstore.v5/internal/blobstore"
 	"gopkg.in/juju/charmstore.v5/internal/charmstore"
+	"gopkg.in/juju/charmstore.v5/internal/dockerauth"
 	"gopkg.in/juju/charmstore.v5/internal/legacy"
 	"gopkg.in/juju/charmstore.v5/internal/v4"
 	"gopkg.in/juju/charmstore.v5/internal/v5"
@@ -25,15 +26,17 @@ import (
 
 // Versions of the API that can be served.
 const (
-	Legacy = ""
-	V4     = "v4"
-	V5     = "v5"
+	DockerAuth = "docker-registry"
+	Legacy     = ""
+	V4         = "v4"
+	V5         = "v5"
 )
 
 var versions = map[string]charmstore.NewAPIHandlerFunc{
-	Legacy: legacy.NewAPIHandler,
-	V4:     v4.NewAPIHandler,
-	V5:     v5.NewAPIHandler,
+	DockerAuth: dockerauth.NewAPIHandler,
+	Legacy:     legacy.NewAPIHandler,
+	V4:         v4.NewAPIHandler,
+	V5:         v5.NewAPIHandler,
 }
 
 // HTTPCloseHandler represents a HTTP handler that
@@ -127,9 +130,13 @@ type ServerParams struct {
 	// If this is nil, a MongoDB backend will be used.
 	NewBlobBackend func(db *mgo.Database) blobstore.Backend
 
-	// DockerRegistryAuthorizerKey contains the key to use to sign
+	// DockerRegistryAuthCertificates contains the chain of
+	// certificates used to validate the DockerRegistryAuthKey.
+	DockerRegistryAuthCertificates []*x509.Certificate
+
+	// DockerRegistryAuthKey contains the key to use to sign
 	// docker registry authorization tokens.
-	DockerRegistryAuthorizerKey *rsa.PrivateKey
+	DockerRegistryAuthKey interface{}
 }
 
 // NewServer returns a new handler that handles charm store requests and stores

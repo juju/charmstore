@@ -4,7 +4,10 @@
 package dockerauth
 
 import (
+	"crypto/ecdsa"
 	"crypto/rsa"
+	"crypto/x509"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"strings"
@@ -84,13 +87,13 @@ func (e *ScopeParseError) Error() string {
 }
 
 type Handler struct {
-	Key        *rsa.PrivateKey
+	Key        interface{}
+	Certs      []*x509.Certificate
 	TokenValid time.Duration
-	Location   string
 }
 
 type tokenRequest struct {
-	httprequest.Route `httprequest:"GET /docker-registry/token"`
+	httprequest.Route `httprequest:"GET /token"`
 	Scope             string `httprequest:"scope,form"`
 	Service           string `httprequest:"service,form"`
 }
@@ -111,6 +114,10 @@ func (h *Handler) Token(p httprequest.Params, req *tokenRequest) (*tokenResponse
 	if err != nil {
 		logger.Infof("Invalid scope: %s", err)
 	}
+	var issuer string
+	if len(h.Certs) > 0 {
+		issuer = h.Certs[0].Subject.CommonName
+	}
 	issuedAt := time.Now()
 	expiresAt := issuedAt.Add(h.TokenValid)
 	claims := dockerRegistryClaims{
@@ -119,16 +126,29 @@ func (h *Handler) Token(p httprequest.Params, req *tokenRequest) (*tokenResponse
 			ExpiresAt: expiresAt.Unix(),
 			IssuedAt:  issuedAt.Unix(),
 			NotBefore: issuedAt.Unix(),
-			Issuer:    h.Location,
+			Issuer:    issuer,
 		},
 		Access: ras,
 	}
-	tok, err := jwt.NewWithClaims(jwt.SigningMethodRS256, claims).SignedString(h.Key)
+	var sm jwt.SigningMethod
+	switch h.Key.(type) {
+	case *ecdsa.PrivateKey:
+		sm = jwt.SigningMethodES256
+	case *rsa.PrivateKey:
+		sm = jwt.SigningMethodRS256
+	}
+	tok := jwt.NewWithClaims(sm, claims)
+	certs := make([]string, len(h.Certs))
+	for i, c := range h.Certs {
+		certs[i] = base64.StdEncoding.EncodeToString(c.Raw)
+	}
+	tok.Header["x5c"] = certs
+	s, err := tok.SignedString(h.Key)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
 	return &tokenResponse{
-		Token:     tok,
+		Token:     s,
 		ExpiresIn: int(h.TokenValid / time.Second),
 		IssuedAt:  issuedAt,
 	}, nil
@@ -138,11 +158,12 @@ func (h *Handler) handler(p httprequest.Params) (*Handler, context.Context, erro
 	return h, p.Context, nil
 }
 
-func NewAPIHandler(_ *charmstore.Pool, p *charmstore.ServerParams, absPath string) (charmstore.HTTPCloseHandler, error) {
+func NewAPIHandler(_ *charmstore.Pool, p charmstore.ServerParams, absPath string) (charmstore.HTTPCloseHandler, error) {
+	logger.Infof("Adding docker-registry")
 	h := &Handler{
-		Location:   "charmstore",
+		Key:        p.DockerRegistryAuthKey,
+		Certs:      p.DockerRegistryAuthCertificates,
 		TokenValid: 120 * time.Second,
-		Key:        p.DockerRegistryAuthorizerKey,
 	}
 	r := httprouter.New()
 	srv := httprequest.Server{
