@@ -44,8 +44,8 @@ type ReqHandler struct {
 	*v5.ReqHandler
 }
 
-func New(pool *charmstore.Pool, config charmstore.ServerParams, rootPath string) (Handler, error) {
-	h, err := v5.New(pool, config, rootPath)
+func New(p charmstore.APIHandlerParams) (Handler, error) {
+	h, err := v5.New(p)
 	if err != nil {
 		return Handler{}, errgo.Mask(err)
 	}
@@ -66,8 +66,8 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	rh.ServeHTTP(w, req)
 }
 
-func NewAPIHandler(pool *charmstore.Pool, config charmstore.ServerParams, rootPath string) (charmstore.HTTPCloseHandler, error) {
-	h, err := New(pool, config, rootPath)
+func NewAPIHandler(p charmstore.APIHandlerParams) (charmstore.HTTPCloseHandler, error) {
+	h, err := New(p)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}

@@ -82,12 +82,14 @@ func (s *APISuite) TestParseScope(c *gc.C) {
 func (s *APISuite) TestToken(c *gc.C) {
 	cert, key := newCert(c)
 
-	hnd, err := dockerauth.NewAPIHandler(nil, charmstore.ServerParams{
-		DockerRegistryAuthKey: key,
-		DockerRegistryAuthCertificates: []*x509.Certificate{
-			cert,
+	hnd, err := dockerauth.NewAPIHandler(charmstore.APIHandlerParams{
+		ServerParams: charmstore.ServerParams{
+			DockerRegistryAuthKey: key,
+			DockerRegistryAuthCertificates: []*x509.Certificate{
+				cert,
+			},
 		},
-	}, "")
+	})
 	c.Assert(err, gc.Equals, nil)
 	srv := httptest.NewServer(hnd)
 	defer srv.Close()

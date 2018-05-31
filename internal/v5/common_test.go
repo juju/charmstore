@@ -307,7 +307,11 @@ func (s *commonSuite) setPerms(c *gc.C, readACLs map[string][]string) {
 // used to invoke private methods. The caller
 // is responsible for calling Put on the returned handler.
 func (s *commonSuite) handler(c *gc.C) *v5.ReqHandler {
-	h, err := v5.New(s.store.Pool(), s.srvParams, "")
+	params := charmstore.APIHandlerParams{
+		ServerParams: s.srvParams,
+		Pool:         s.store.Pool(),
+	}
+	h, err := v5.New(params)
 	c.Assert(err, gc.Equals, nil)
 	defer h.Close()
 	rh, err := h.NewReqHandler(new(http.Request))

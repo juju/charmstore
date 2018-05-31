@@ -163,7 +163,7 @@ func (h *Handler) handler(p httprequest.Params) (*Handler, context.Context, erro
 	return h, p.Context, nil
 }
 
-func NewAPIHandler(_ *charmstore.Pool, p charmstore.ServerParams, absPath string) (charmstore.HTTPCloseHandler, error) {
+func NewAPIHandler(p charmstore.APIHandlerParams) (charmstore.HTTPCloseHandler, error) {
 	logger.Infof("Adding docker-registry")
 	h := &Handler{
 		Key:        p.DockerRegistryAuthKey,

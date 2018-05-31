@@ -794,7 +794,7 @@ func checkBaseEntityInvariants(c *gc.C, e *mongodoc.BaseEntity, store *Store) {
 // runMigrations starts a new server which will cause all migrations
 // to be triggered.
 func (s *migrationsIntegrationSuite) runMigrations(db *mgo.Database) error {
-	apiHandler := func(p *Pool, config ServerParams, _ string) (HTTPCloseHandler, error) {
+	apiHandler := func(APIHandlerParams) (HTTPCloseHandler, error) {
 		return nopCloseHandler{http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {})}, nil
 	}
 	srv, err := NewServer(db, nil, serverParams, map[string]NewAPIHandlerFunc{
