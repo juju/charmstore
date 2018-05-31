@@ -13,11 +13,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/juju/idmclient"
 	"github.com/prometheus/client_golang/prometheus"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/worker.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgostorage"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/natefinch/lumberjack.v2"
 
@@ -26,10 +28,26 @@ import (
 	"gopkg.in/juju/charmstore.v5/internal/router"
 )
 
+// An APIHandlerParams contains the parameters provided when calling a
+// NewAPIHandlerFunc.
+type APIHandlerParams struct {
+	ServerParams
+
+	// Pool contains the Pool from which Stores should be collected.
+	Pool *Pool
+
+	// IDMClient contains an IDMClient for use by the API handler.
+	IDMClient *idmclient.Client
+
+	// Path contains the absolute path within the server for the
+	// handler.
+	Path string
+}
+
 // NewAPIHandlerFunc is a function that returns a new API handler that uses
 // the given Store. The absPath parameter holds the root path of the
 // API handler.
-type NewAPIHandlerFunc func(pool *Pool, p ServerParams, absPath string) (HTTPCloseHandler, error)
+type NewAPIHandlerFunc func(APIHandlerParams) (HTTPCloseHandler, error)
 
 // HTTPCloseHandler represents a HTTP handler that
 // must be closed after use.
@@ -170,16 +188,33 @@ func NewServer(db *mgo.Database, si *SearchIndex, config ServerParams, versions 
 		pool: pool,
 		mux:  router.NewServeMux(),
 	}
+	params := APIHandlerParams{
+		ServerParams: config,
+		Pool:         pool,
+	}
+	if config.IdentityLocation != "" {
+		bclient := httpbakery.NewClient()
+		bclient.Key = config.AgentKey
+		client, err := idmclient.New(idmclient.NewParams{
+			Client:        bclient,
+			BaseURL:       config.IdentityLocation,
+			AgentUsername: config.AgentUsername,
+		})
+		if err != nil {
+			return nil, errgo.Notef(err, "cannot initialize identity client")
+		}
+		params.IDMClient = client
+	}
 	// Version independent API.
 	handle(srv.mux, "/debug", newServiceDebugHandler(pool, config, srv.mux))
 	handle(srv.mux, "/metrics", prometheusHandler())
 	for vers, newAPI := range versions {
-		root := "/" + vers
-		h, err := newAPI(pool, config, root)
+		params.Path = "/" + vers
+		h, err := newAPI(params)
 		if err != nil {
 			return nil, errgo.Notef(err, "cannot initialize handler for version %v", vers)
 		}
-		handle(srv.mux, root, h)
+		handle(srv.mux, params.Path, h)
 		srv.handlers = append(srv.handlers, h)
 	}
 	if config.RunBlobStoreGC {

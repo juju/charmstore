@@ -48,7 +48,7 @@ type versionResponse struct {
 func (s *ServerSuite) TestNewServerWithVersions(c *gc.C) {
 	db := s.Session.DB("foo")
 	serveVersion := func(vers string) NewAPIHandlerFunc {
-		return func(p *Pool, config ServerParams, _ string) (HTTPCloseHandler, error) {
+		return func(APIHandlerParams) (HTTPCloseHandler, error) {
 			return nopCloseHandler{
 				router.HandleJSON(func(_ http.Header, req *http.Request) (interface{}, error) {
 					return versionResponse{
@@ -112,7 +112,7 @@ func (s *ServerSuite) TestNewServerWithConfig(c *gc.C) {
 		AuthPassword:     "test-password",
 		IdentityLocation: "http://0.1.2.3/",
 	}
-	serveConfig := func(p *Pool, config ServerParams, _ string) (HTTPCloseHandler, error) {
+	serveConfig := func(config APIHandlerParams) (HTTPCloseHandler, error) {
 		return nopCloseHandler{
 			router.HandleJSON(func(_ http.Header, req *http.Request) (interface{}, error) {
 				return serverConfig{
@@ -153,10 +153,10 @@ func (s *ServerSuite) TestNewServerWithElasticSearch(c *gc.C) {
 		AuthPassword:     "test-password",
 		IdentityLocation: "http://0.1.2.3",
 	}
-	serveConfig := func(p *Pool, config ServerParams, _ string) (HTTPCloseHandler, error) {
+	serveConfig := func(p APIHandlerParams) (HTTPCloseHandler, error) {
 		return nopCloseHandler{
 			router.HandleJSON(func(_ http.Header, req *http.Request) (interface{}, error) {
-				store := p.Store()
+				store := p.Pool.Store()
 				c.Check(store.ES, gc.NotNil)
 				store.Close()
 				return "ok", nil
@@ -290,7 +290,7 @@ func (nopCloseHandler) Close() {
 }
 
 var nopAPI = map[string]NewAPIHandlerFunc{
-	"unused": func(*Pool, ServerParams, string) (HTTPCloseHandler, error) {
+	"unused": func(APIHandlerParams) (HTTPCloseHandler, error) {
 		return nopCloseHandler{http.NewServeMux()}, nil
 	},
 }

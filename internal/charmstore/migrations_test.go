@@ -30,7 +30,7 @@ func (s *migrationsSuite) SetUpTest(c *gc.C) {
 }
 
 func (s *migrationsSuite) newServer(c *gc.C) error {
-	apiHandler := func(p *Pool, config ServerParams, _ string) (HTTPCloseHandler, error) {
+	apiHandler := func(APIHandlerParams) (HTTPCloseHandler, error) {
 		return nopCloseHandler{http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {})}, nil
 	}
 	srv, err := NewServer(s.db.Database, nil, serverParams, map[string]NewAPIHandlerFunc{

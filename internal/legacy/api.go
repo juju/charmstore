@@ -104,8 +104,8 @@ var reqHandlerPool = mempool.Pool{
 	},
 }
 
-func NewAPIHandler(pool *charmstore.Pool, config charmstore.ServerParams, rootPath string) (charmstore.HTTPCloseHandler, error) {
-	h, err := v4.New(pool, config, rootPath)
+func NewAPIHandler(p charmstore.APIHandlerParams) (charmstore.HTTPCloseHandler, error) {
+	h, err := v4.New(p)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
