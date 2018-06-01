@@ -7,9 +7,9 @@ const (
 	Repository = "repository"
 )
 
-// A ResourceAccessRights specifies the access rights given to a single
+// resourceAccessRights specifies the access rights given to a single
 // resource.
-type ResourceAccessRights struct {
+type resourceAccessRights struct {
 	// Type specifies the type of the resource.
 	Type string `json:"type"`
 
