@@ -4,17 +4,23 @@
 package v5 // import "gopkg.in/juju/charmstore.v5/internal/v5"
 
 import (
+	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/juju/charm.v6/resource"
 	"gopkg.in/juju/charmrepo.v3/csclient/params"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	macaroon "gopkg.in/macaroon.v2-unstable"
 
 	"gopkg.in/juju/charmstore.v5/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
@@ -40,6 +46,42 @@ func (h *ReqHandler) serveResources(id *router.ResolvedURL, w http.ResponseWrite
 	}
 }
 
+func (h *ReqHandler) serveDockerResourceUploadInfo(id *router.ResolvedURL, w http.ResponseWriter, req *http.Request) error {
+	if err := h.AuthorizeEntityForOp(id, req, OpWrite); err != nil {
+		return errgo.Mask(err, errgo.Any)
+	}
+	resourceName := req.Form.Get("resource-name")
+	if resourceName == "" {
+		return badRequestf(nil, "must specify resource-name parameter")
+	}
+	e, err := h.Cache.Entity(&id.URL, charmstore.FieldSelector("charmmeta"))
+	if err != nil {
+		// Should never happen, as the entity will have been cached
+		// when the charm URL was resolved.
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	if !charmstore.IsKubernetesCharm(e.CharmMeta) {
+		return errgo.WithCausef(nil, params.ErrForbidden, "%q does not support docker resource upload", id.URL.String())
+	}
+	r, ok := e.CharmMeta.Resources[resourceName]
+	if !ok {
+		return errgo.WithCausef(nil, params.ErrForbidden, "%q has no resource named %q", id.URL.String(), resourceName)
+	}
+	if r.Type != resource.TypeDocker {
+		return errgo.WithCausef(nil, params.ErrForbidden, "resource %q is not a docker resource", resourceName)
+	}
+	resp := params.DockerInfoResponse{
+		ImageName: h.Handler.config.DockerRegistryAddress + "/" + id.URL.User + "/" + id.URL.Name + "/" + resourceName,
+		Username:  "docker-uploader",
+	}
+	password, err := h.dockerAuthPassword(id, resourceName, "push")
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	resp.Password = password
+	return httprequest.WriteJSON(w, http.StatusOK, resp)
+}
+
 func (h *ReqHandler) serveDownloadResource(id *router.ResolvedURL, w http.ResponseWriter, req *http.Request) error {
 	rid, err := parseResourceId(strings.TrimPrefix(req.URL.Path, "/"))
 	if err != nil {
@@ -53,6 +95,13 @@ func (h *ReqHandler) serveDownloadResource(id *router.ResolvedURL, w http.Respon
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
+	if r.DockerImageDigest != "" {
+		return errgo.Mask(h.serveDownloadResourceDocker(id, r, w, req))
+	}
+	return errgo.Mask(h.serveDownloadResourceFile(id, r, w, req))
+}
+
+func (h *ReqHandler) serveDownloadResourceFile(id *router.ResolvedURL, r *mongodoc.Resource, w http.ResponseWriter, req *http.Request) error {
 	blob, err := h.Store.OpenResourceBlob(r)
 	if err != nil {
 		return errgo.Notef(err, "cannot open resource blob")
@@ -68,6 +117,46 @@ func (h *ReqHandler) serveDownloadResource(id *router.ResolvedURL, w http.Respon
 	return nil
 }
 
+func (h *ReqHandler) serveDownloadResourceDocker(id *router.ResolvedURL, r *mongodoc.Resource, w http.ResponseWriter, req *http.Request) error {
+	var resp params.DockerInfoResponse
+	if r.DockerImageName != "" {
+		resp.ImageName = r.DockerImageName + "@" + r.DockerImageDigest
+	} else {
+		resp.ImageName = h.Handler.config.DockerRegistryAddress + "/" + id.URL.User + "/" + id.URL.Name + "/" + r.Name + "@" + r.DockerImageDigest
+		// Tecnically we don't need an authorization token when the charm is public,
+		// and the user hasn't authenticated, but it's easier if we always use one,
+		// as then the docker auth endpoint does not need to check any ACLs.
+		resp.Username = "docker-registry"
+		password, err := h.dockerAuthPassword(id, r.Name, "pull")
+		if err != nil {
+			return errgo.Mask(err)
+		}
+		resp.Password = password
+	}
+	return httprequest.WriteJSON(w, http.StatusOK, resp)
+}
+
+var dockerAuthOpLifetimes = map[string]time.Duration{
+	"push": time.Minute,
+	"pull": 10 * time.Minute,
+}
+
+func (h *ReqHandler) dockerAuthPassword(id *router.ResolvedURL, resourceName string, op string) (string, error) {
+	m, err := h.Store.Bakery.NewMacaroon([]checkers.Caveat{
+		{Condition: "is-docker-repo " + id.URL.User + "/" + id.URL.Name + "/" + resourceName},
+		checkers.AllowCaveat(op),
+		checkers.TimeBeforeCaveat(time.Now().Add(dockerAuthOpLifetimes[op])),
+	})
+	if err != nil {
+		return "", errgo.Mask(err)
+	}
+	b, err := macaroon.Slice{m}.MarshalBinary()
+	if err != nil {
+		return "", errgo.Mask(err)
+	}
+	return base64.RawStdEncoding.EncodeToString(b), nil
+}
+
 func (h *ReqHandler) serveUploadResource(id *router.ResolvedURL, w http.ResponseWriter, req *http.Request) error {
 	if id.URL.Series == "bundle" {
 		return errgo.WithCausef(nil, params.ErrForbidden, "cannot upload a resource to a bundle")
@@ -76,6 +165,15 @@ func (h *ReqHandler) serveUploadResource(id *router.ResolvedURL, w http.Response
 	if !validResourceName(name) {
 		return badRequestf(nil, "invalid resource name")
 	}
+	e, err := h.Cache.Entity(&id.URL, charmstore.FieldSelector("charmmeta"))
+	if err != nil {
+		// Should never happen, as the entity will have been cached
+		// when the charm URL was resolved.
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	if charmstore.IsKubernetesCharm(e.CharmMeta) {
+		return h.serveUploadDockerResource(id, name, w, req)
+	}
 	hash := req.Form.Get("hash")
 	uploadId := req.Form.Get("upload-id")
 	if hash == "" && uploadId == "" {
@@ -83,12 +181,6 @@ func (h *ReqHandler) serveUploadResource(id *router.ResolvedURL, w http.Response
 	}
 	if uploadId == "" && req.ContentLength == -1 {
 		return badRequestf(nil, "Content-Length not specified")
-	}
-	e, err := h.Cache.Entity(&id.URL, charmstore.FieldSelector("charmmeta"))
-	if err != nil {
-		// Should never happen, as the entity will have been cached
-		// when the charm URL was resolved.
-		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	r, ok := e.CharmMeta.Resources[name]
 	if !ok {
@@ -117,6 +209,35 @@ func (h *ReqHandler) serveUploadResource(id *router.ResolvedURL, w http.Response
 	return httprequest.WriteJSON(w, http.StatusOK, &params.ResourceUploadResponse{
 		Revision: rdoc.Revision,
 	})
+}
+
+func (h *ReqHandler) serveUploadDockerResource(id *router.ResolvedURL, resourceName string, w http.ResponseWriter, req *http.Request) error {
+	if req.Form.Get("hash") != "" {
+		return badRequestf(nil, "cannot specify hash parameter on docker image resources")
+	}
+	if req.Form.Get("upload-id") != "" {
+		return badRequestf(nil, "cannot specify upload-id parameter on docker image resources")
+	}
+	data, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		return errgo.Notef(err, "cannot read body")
+	}
+	var p params.DockerResourceUploadRequest
+	if err := json.Unmarshal(data, &p); err != nil {
+		return badRequestf(err, "bad JSON body")
+	}
+	if p.Digest == "" {
+		return badRequestf(nil, "digest not provided")
+	}
+	// TODO check that ImageName parses as a valid docker resource
+	rdoc, err := h.Store.AddDockerResource(id, resourceName, p.ImageName, p.Digest)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	return httprequest.WriteJSON(w, http.StatusOK, &params.ResourceUploadResponse{
+		Revision: rdoc.Revision,
+	})
+	return nil
 }
 
 // GET id/meta/resource

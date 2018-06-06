@@ -7,25 +7,20 @@ import (
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"encoding/base64"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/juju/idmclient"
 	"github.com/juju/loggo"
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
 	httprequest "gopkg.in/httprequest.v1"
-	charm "gopkg.in/juju/charm.v6"
-	"gopkg.in/juju/charmrepo.v3/csclient/params"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon.v2-unstable"
 
 	"gopkg.in/juju/charmstore.v5/internal/charmstore"
-	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
 )
 
 var logger = loggo.GetLogger("charmstore.internal.dockerauth")
@@ -58,38 +53,15 @@ func parseScope(s string) ([]resourceAccessRights, error) {
 	if s == "" {
 		return nil, nil
 	}
-	var errs []error
 	var ras []resourceAccessRights
-	for _, s := range strings.Split(s, " ") {
-		ra, err := parseResourceAccessRights(s)
+	for _, rights := range strings.Split(s, " ") {
+		ra, err := parseResourceAccessRights(rights)
 		if err != nil {
-			errs = append(errs, err)
-			continue
+			return nil, errgo.Notef(err, "invalid access rights in resource scope %q", s)
 		}
 		ras = append(ras, ra)
 	}
-	if len(errs) > 0 {
-		return ras, &scopeParseError{errs}
-	}
 	return ras, nil
-}
-
-// A scopeParseError is an error returned when part of a scope is not
-// valid.
-type scopeParseError struct {
-	errs []error
-}
-
-// Error implements error.
-func (e *scopeParseError) Error() string {
-	if len(e.errs) == 1 {
-		return e.errs[0].Error()
-	}
-	errs := make([]string, len(e.errs))
-	for i, err := range e.errs {
-		errs[i] = err.Error()
-	}
-	return fmt.Sprintf("[%s]", strings.Join(errs, ", "))
 }
 
 type Handler struct {
@@ -142,45 +114,23 @@ func (h *handler) Token(p httprequest.Params, req *tokenRequest) (*tokenResponse
 		return nil, errgo.Mask(err)
 	}
 	ms := credentials(p.Request)
-	declared := checkers.InferDeclared(ms)
-	// TODO(mhilton) support the "everyone" ACL entry to allow
-	// unauthenticated access.
-	var user user = noUser{}
-	if identity, err := h.h.params.IDMClient.DeclaredIdentity(declared); err == nil {
-		if u, ok := identity.(*idmclient.User); ok {
-			user = u
-		}
-	}
 	filteredRAs := make([]resourceAccessRights, 0, len(ras))
 	for _, ra := range ras {
 		if ra.Type != "repository" {
 			continue
 		}
-		acl, err := h.repositoryACL(ra.Name)
-		if err != nil {
-			return nil, errgo.Mask(err)
+		repoChecker := dockerRepoChecker{
+			repoName: ra.Name,
 		}
 		filteredActions := make([]string, 0, len(ra.Actions))
 		for _, a := range ra.Actions {
-			switch a {
-			case "pull":
-				allow, _ := user.Allow(acl.Read)
-				if !allow {
-					continue
-				}
-			case "push":
-				allow, _ := user.Allow(acl.Write)
-				if !allow {
-					continue
-				}
-			default:
-				continue
+			// Note: possible values for a include "push" and "pull".
+			err := h.store.Bakery.Check(ms, checkers.New(checkers.OperationChecker(a), repoChecker, checkers.TimeBefore))
+			if err == nil {
+				filteredActions = append(filteredActions, a)
+			} else {
+				logger.Infof("check failed: %v", err)
 			}
-			// TODO(mhilton) support more caveats.
-			if h.store.Bakery.Check(ms, checkers.New(declared)) != nil {
-				continue
-			}
-			filteredActions = append(filteredActions, a)
 		}
 		if len(filteredActions) == 0 {
 			continue
@@ -203,6 +153,21 @@ func (h *handler) Token(p httprequest.Params, req *tokenRequest) (*tokenResponse
 	}, nil
 }
 
+type dockerRepoChecker struct {
+	repoName string
+}
+
+func (c dockerRepoChecker) Condition() string {
+	return "is-docker-repo"
+}
+
+func (c dockerRepoChecker) Check(_, arg string) error {
+	if c.repoName != arg {
+		return errgo.Newf("invalid repository name")
+	}
+	return nil
+}
+
 func credentials(req *http.Request) macaroon.Slice {
 	_, pw, _ := req.BasicAuth()
 	b, err := base64.RawStdEncoding.DecodeString(pw)
@@ -216,33 +181,6 @@ func credentials(req *http.Request) macaroon.Slice {
 		return nil
 	}
 	return ms
-}
-
-// repositoryACL finds the ACL corresponding to the given
-// docker-repository name. A repository name is of the form
-// <owner>/<charm name>/<channel>/<resource name>. If an invalid name is
-// given then an empty ACL will be returned causing the access request to
-// be denied.
-func (h *handler) repositoryACL(name string) (mongodoc.ACL, error) {
-	parts := strings.SplitN(name, "/", 4)
-	if len(parts) != 4 {
-		return mongodoc.ACL{}, nil
-	}
-	baseURL := charm.URL{
-		Schema:   "cs",
-		User:     parts[0],
-		Name:     parts[1],
-		Revision: -1,
-	}
-	be, err := h.store.FindBaseEntity(&baseURL, map[string]int{
-		"_id":         1,
-		"channelacls": 1,
-	})
-	if err != nil {
-		return mongodoc.ACL{}, errgo.Mask(err)
-	}
-	// TODO(mhilton) validate the resource name corresponds to a charm resource?
-	return be.ChannelACLs[params.Channel(parts[2])], nil
 }
 
 // createToken creates a JWT for the given service with the givne access
@@ -316,15 +254,4 @@ func errorMapper(ctx context.Context, err error) (httpStatus int, errorBody inte
 	return http.StatusInternalServerError, &httprequest.RemoteError{
 		Message: err.Error(),
 	}
-}
-
-type user interface {
-	Allow([]string) (bool, error)
-}
-
-type noUser struct {
-}
-
-func (noUser) Allow([]string) (bool, error) {
-	return false, nil
 }

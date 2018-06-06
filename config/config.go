@@ -56,6 +56,7 @@ type Config struct {
 	SwiftTenant                    string            `yaml:"swift-tenant"`
 	SwiftAuthMode                  *SwiftAuthMode    `yaml:"swift-authmode"`
 	LoggingConfig                  string            `yaml:"logging-config"`
+	DockerRegistryAddress          string            `yaml:"docker-registry-address"`
 	DockerRegistryAuthCertificates X509Certificates  `yaml:"docker-registry-auth-certs"`
 	DockerRegistryAuthKey          X509PrivateKey    `yaml:"docker-registry-auth-key"`
 }
