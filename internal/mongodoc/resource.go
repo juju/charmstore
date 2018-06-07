@@ -25,20 +25,28 @@ type Resource struct {
 	// Revision identifies the specific revision of the resource.
 	Revision int
 
+	// UploadTime is the is the time the resource file was stored in
+	// the blob store.
+	UploadTime time.Time
+
+	// For Kubernetes charms holds the SHA256 digest of the image.
+	// If this is set, none of the fields after DockerImageName will be set.
+	DockerImageDigest string `bson:",omitempty"`
+
+	// DockerImageName holds the name of the docker image if it's
+	// external to the charm store's docker registry.
+	DockerImageName string `bson:",omitempty"`
+
 	// BlobHash holds the hash checksum of the blob, in hexadecimal format,
 	// as created by blobstore.NewHash.
-	BlobHash string
+	BlobHash string `bson:",omitempty"`
 
 	// Size is the size of the resource file, in bytes.
-	Size int64 `bson:"size"`
+	Size int64 `bson:"size,omitempty"`
 
 	// BlobIndex stores the multipart index when the blob
 	// is composed of several parts.
 	BlobIndex *MultipartIndex `bson:",omitempty"`
-
-	// UploadTime is the is the time the resource file was stored in
-	// the blob store.
-	UploadTime time.Time
 }
 
 // MultipartIndex holds the index of all the parts of a multipart blob.
@@ -69,12 +77,20 @@ func (doc *Resource) Validate() error {
 		return errgo.Newf("got negative revision %d", doc.Revision)
 	}
 
-	if doc.BlobHash == "" {
-		return errgo.New("missing blob hash")
-	}
-
-	if doc.Size < 0 {
-		return errgo.Newf("got negative size %d", doc.Size)
+	if doc.DockerImageDigest == "" {
+		if doc.BlobHash == "" {
+			return errgo.New("missing blob hash")
+		}
+		if doc.Size < 0 {
+			return errgo.Newf("got negative size %d", doc.Size)
+		}
+	} else {
+		if doc.BlobHash != "" {
+			return errgo.New("cannot combine docker image digest with blob hash")
+		}
+		if doc.Size != 0 {
+			return errgo.Newf("cannot combine docker image size with blob hash")
+		}
 	}
 
 	if doc.UploadTime.IsZero() {

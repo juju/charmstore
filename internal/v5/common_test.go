@@ -174,12 +174,13 @@ func (s *commonSuite) startServer(c *gc.C) {
 	s.swift.CreateContainer("testc", swift.Private)
 
 	config := charmstore.ServerParams{
-		AuthUsername:      testUsername,
-		AuthPassword:      testPassword,
-		StatsCacheMaxAge:  time.Nanosecond,
-		MaxMgoSessions:    s.maxMgoSessions,
-		MinUploadPartSize: 10,
-		NewBlobBackend:    s.newBlobBackend,
+		AuthUsername:          testUsername,
+		AuthPassword:          testPassword,
+		StatsCacheMaxAge:      time.Nanosecond,
+		MaxMgoSessions:        s.maxMgoSessions,
+		MinUploadPartSize:     10,
+		NewBlobBackend:        s.newBlobBackend,
+		DockerRegistryAddress: "dockerregistry.example.com",
 	}
 	keyring := httpbakery.NewPublicKeyRing(nil, nil)
 	keyring.AllowInsecure()
@@ -241,7 +242,7 @@ func (s *commonSuite) addPublicCharm(c *gc.C, ch charm.Charm, id *router.Resolve
 	c.Assert(err, gc.Equals, nil)
 
 	var resources map[string]int
-	if len(ch.Meta().Resources) > 0 {
+	if len(ch.Meta().Resources) > 0 && !charmstore.IsKubernetesCharm(ch.Meta()) {
 		resources = make(map[string]int)
 		// The charm has resources. Ensure that all the required resources are uploaded,
 		// then publish with them.

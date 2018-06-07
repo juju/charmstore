@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"strings"
 
+	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
@@ -397,6 +398,235 @@ func (s *ResourceSuite) TestUploadResourcePathWithNoExtension(c *gc.C) {
 			// Note: revision 1 because addPublicCharm has already uploaded
 			// revision 0.
 			Revision: 1,
+		},
+		Do: s.bakeryDoAsUser("charmers"),
+	})
+}
+
+func (s *ResourceSuite) TestUploadResourceDockerImage(c *gc.C) {
+	id := newResolvedURL("~charmers/kubecharm-0", -1)
+	err := s.store.AddCharmWithArchive(id, storetesting.NewCharm(&charm.Meta{
+		Series: []string{"kubernetes"},
+		Resources: map[string]resource.Meta{
+			"someResource": {
+				Name: "someResource",
+				Type: resource.TypeDocker,
+			},
+		},
+	}))
+	c.Assert(err, gc.Equals, nil)
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		Method:  "POST",
+		URL:     storeURL(id.URL.Path() + "/resource/someResource"),
+		JSONBody: params.DockerResourceUploadRequest{
+			Digest: "sha256:d1d44afba88cabf44cccd8d9fde2daacba31e09e9b7e46526ba9c1e3b41c0a3b",
+		},
+		ExpectBody: params.ResourceUploadResponse{
+			Revision: 0,
+		},
+		Do: s.bakeryDoAsUser("charmers"),
+	})
+}
+
+type DockerResourceGetResponse struct {
+	ImageName string
+	Username  string
+	Password  string
+}
+
+func (s *ResourceSuite) TestGetResourceDockerImage(c *gc.C) {
+	id := newResolvedURL("~charmers/kubecharm-0", -1)
+	err := s.store.AddCharmWithArchive(id, storetesting.NewCharm(&charm.Meta{
+		Series: []string{"kubernetes"},
+		Resources: map[string]resource.Meta{
+			"someResource": {
+				Name: "someResource",
+				Type: resource.TypeDocker,
+			},
+		},
+	}))
+	c.Assert(err, gc.Equals, nil)
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		Method:  "POST",
+		URL:     storeURL(id.URL.Path() + "/resource/someResource"),
+		JSONBody: params.DockerResourceUploadRequest{
+			Digest: "sha256:d1d44afba88cabf44cccd8d9fde2daacba31e09e9b7e46526ba9c1e3b41c0a3b",
+		},
+		ExpectBody: params.ResourceUploadResponse{
+			Revision: 0,
+		},
+		Do: s.bakeryDoAsUser("charmers"),
+	})
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		Method:  "GET",
+		URL:     storeURL(id.URL.Path() + "/resource/someResource/0"),
+		ExpectBody: httptesting.BodyAsserter(func(c *gc.C, m json.RawMessage) {
+			var resp params.DockerInfoResponse
+			err := json.Unmarshal(m, &resp)
+			c.Assert(err, gc.Equals, nil)
+			password := resp.Password
+			resp.Password = ""
+			c.Assert(resp, jc.DeepEquals, params.DockerInfoResponse{
+				ImageName: "dockerregistry.example.com/charmers/kubecharm/someResource@sha256:d1d44afba88cabf44cccd8d9fde2daacba31e09e9b7e46526ba9c1e3b41c0a3b",
+				Username:  "docker-registry",
+			})
+			c.Assert(password, gc.Not(gc.Equals), "")
+		}),
+		Do: s.bakeryDoAsUser("charmers"),
+	})
+
+}
+
+func (s *ResourceSuite) TestGetResourceDockerImageWithExplicitImageName(c *gc.C) {
+	id := newResolvedURL("~charmers/kubecharm-0", -1)
+	err := s.store.AddCharmWithArchive(id, storetesting.NewCharm(&charm.Meta{
+		Series: []string{"kubernetes"},
+		Resources: map[string]resource.Meta{
+			"someResource": {
+				Name: "someResource",
+				Type: resource.TypeDocker,
+			},
+		},
+	}))
+	c.Assert(err, gc.Equals, nil)
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		Method:  "POST",
+		URL:     storeURL(id.URL.Path() + "/resource/someResource"),
+		JSONBody: params.DockerResourceUploadRequest{
+			ImageName: "0.1.2.3/someimage",
+			Digest:    "sha256:d1d44afba88cabf44cccd8d9fde2daacba31e09e9b7e46526ba9c1e3b41c0a3b",
+		},
+		ExpectBody: params.ResourceUploadResponse{
+			Revision: 0,
+		},
+		Do: s.bakeryDoAsUser("charmers"),
+	})
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		Method:  "GET",
+		URL:     storeURL(id.URL.Path() + "/resource/someResource/0"),
+		ExpectBody: params.DockerInfoResponse{
+			ImageName: "0.1.2.3/someimage@sha256:d1d44afba88cabf44cccd8d9fde2daacba31e09e9b7e46526ba9c1e3b41c0a3b",
+		},
+		Do: s.bakeryDoAsUser("charmers"),
+	})
+
+}
+
+func (s *ResourceSuite) TestGetResourceDockerImageUploadInfo(c *gc.C) {
+	id := newResolvedURL("~charmers/kubecharm-0", -1)
+	err := s.store.AddCharmWithArchive(id, storetesting.NewCharm(&charm.Meta{
+		Series: []string{"kubernetes"},
+		Resources: map[string]resource.Meta{
+			"someResource": {
+				Name: "someResource",
+				Type: resource.TypeDocker,
+			},
+		},
+	}))
+	c.Assert(err, gc.Equals, nil)
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		Method:  "GET",
+		URL:     storeURL(id.URL.Path() + "/docker-resource-upload-info?resource-name=someResource"),
+		ExpectBody: httptesting.BodyAsserter(func(c *gc.C, m json.RawMessage) {
+			var resp params.DockerInfoResponse
+			err := json.Unmarshal(m, &resp)
+			c.Assert(err, gc.Equals, nil)
+			password := resp.Password
+			resp.Password = ""
+			c.Assert(resp, jc.DeepEquals, params.DockerInfoResponse{
+				ImageName: "dockerregistry.example.com/charmers/kubecharm/someResource",
+				Username:  "docker-uploader",
+			})
+			c.Assert(password, gc.Not(gc.Equals), "")
+		}),
+		Do: s.bakeryDoAsUser("charmers"),
+	})
+}
+
+func (s *ResourceSuite) TestGetResourceDockerImageUploadInfoNoResourceName(c *gc.C) {
+	id := newResolvedURL("~charmers/kubecharm-0", -1)
+	err := s.store.AddCharmWithArchive(id, storetesting.NewCharm(&charm.Meta{
+		Series: []string{"kubernetes"},
+		Resources: map[string]resource.Meta{
+			"someResource": {
+				Name: "someResource",
+				Type: resource.TypeDocker,
+			},
+		},
+	}))
+	c.Assert(err, gc.Equals, nil)
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		Method:  "GET",
+		URL:     storeURL(id.URL.Path() + "/docker-resource-upload-info"),
+		ExpectStatus: http.StatusBadRequest,
+		ExpectBody: params.Error{
+			Code:    params.ErrBadRequest,
+			Message: `must specify resource-name parameter`,
+		},
+		Do: s.bakeryDoAsUser("charmers"),
+	})
+}
+
+
+func (s *ResourceSuite) TestGetResourceDockerImageUploadInfoForNonExistentCharm(c *gc.C) {
+	id := newResolvedURL("~charmers/kubecharm-0", -1)
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:      s.srv,
+		Method:       "GET",
+		URL:          storeURL(id.URL.Path() + "/docker-resource-upload-info?resource-name=someResource"),
+		ExpectStatus: http.StatusNotFound,
+		ExpectBody: params.Error{
+			Code:    params.ErrNotFound,
+			Message: `no matching charm or bundle for cs:~charmers/kubecharm-0`,
+		},
+	})
+}
+
+func (s *ResourceSuite) TestGetResourceDockerImageUploadInfoForNonExistentResource(c *gc.C) {
+	id := newResolvedURL("~charmers/kubecharm-0", -1)
+	err := s.store.AddCharmWithArchive(id, storetesting.NewCharm(&charm.Meta{
+		Series: []string{"kubernetes"},
+		Resources: map[string]resource.Meta{
+			"someResource": {
+				Name: "someResource",
+				Type: resource.TypeDocker,
+			},
+		},
+	}))
+	c.Assert(err, gc.Equals, nil)
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:      s.srv,
+		Method:       "GET",
+		URL:          storeURL(id.URL.Path() + "/docker-resource-upload-info?resource-name=otherResource"),
+		ExpectStatus: http.StatusForbidden,
+		ExpectBody: params.Error{
+			Code:    params.ErrForbidden,
+			Message: `"cs:~charmers/kubecharm-0" has no resource named "otherResource"`,
+		},
+		Do: s.bakeryDoAsUser("charmers"),
+	})
+}
+
+func (s *ResourceSuite) TestGetResourceDockerImageUploadInfoForBundle(c *gc.C) {
+	id := newResolvedURL("~charmers/bundle/something-0", -1)
+	s.addPublicBundle(c, relationTestingBundle([]string{
+		"cs:utopic/wordpress-42",
+	}), id, true)
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:      s.srv,
+		Method:       "GET",
+		URL:          storeURL(id.URL.Path() + "/docker-resource-upload-info?resource-name=otherResource"),
+		ExpectStatus: http.StatusForbidden,
+		ExpectBody: params.Error{
+			Code:    params.ErrForbidden,
+			Message: `"cs:~charmers/bundle/something-0" does not support docker resource upload`,
 		},
 		Do: s.bakeryDoAsUser("charmers"),
 	})

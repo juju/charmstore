@@ -63,6 +63,7 @@ swift-region: somewhere
 swift-tenant: a-tenant
 swift-authmode: userpass
 logging-config: INFO
+docker-registry-address: 0.1.3.5:1000
 docker-registry-auth-certs: |
   -----BEGIN CERTIFICATE-----
   MIIBSDCB+KADAgECAgEBMAoGCCqGSM49BAMCMA8xDTALBgNVBAMTBHJvb3QwHhcN
@@ -141,6 +142,7 @@ func (s *ConfigSuite) TestRead(c *gc.C) {
 		SwiftTenant:       "a-tenant",
 		SwiftAuthMode:     &config.SwiftAuthMode{identity.AuthUserPass},
 		LoggingConfig:     "INFO",
+		DockerRegistryAddress: "0.1.3.5:1000",
 		DockerRegistryAuthCertificates: config.X509Certificates{
 			Certificates: []*x509.Certificate{
 				mustParseCertificate("MIIBSDCB+KADAgECAgEBMAoGCCqGSM49BAMCMA8xDTALBgNVBAMTBHJvb3QwHhcNMTgwNTMwMDYxNzQ1WhcNMjMwNTMwMDYxNzQ1WjAPMQ0wCwYDVQQDEwR0ZXN0ME4wEAYHKoZIzj0CAQYFK4EEACEDOgAEZVrQP4knlGBQ2cOMsYmgc0VEWu8DmOFlFa8s/ym8yiBvsCfa7/t/V53VzepLnvTYb6j0LeMcnXajUDBOMAwGA1UdEwEB/wQCMAAwHQYDVR0OBBYEFG1euQX6O6FbNV4lTu0CYAnFCpc8MB8GA1UdIwQYMBaAFNopWnFZiUBhd2W9d8NKbkRf8gujMAoGCCqGSM49BAMCAz8AMDwCHEPZ9X8JQRe5KBAMUTfowngH3J2yXb1nQXzLR4cCHEbutF5CmWNzWzcek2JfQMOl7aFjcBxAerJGgRU="),

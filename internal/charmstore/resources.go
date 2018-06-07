@@ -11,6 +11,7 @@ import (
 
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6"
+	"gopkg.in/juju/charm.v6/resource"
 	"gopkg.in/juju/charmrepo.v3/csclient/params"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -205,6 +206,34 @@ func (s *Store) AddResourceWithUploadId(id *router.ResolvedURL, name string, upl
 	return res, nil
 }
 
+// AddDockerResource adds a docker resource to the Kubernetes charm with the given id. The image name
+// should be non-empty only if the image is held outside the charm store's associated registry.
+// The digest holds the hash of the image, in "sha256:abcdabcd" format.
+func (s *Store) AddDockerResource(id *router.ResolvedURL, resourceName, imageName, digest string) (*mongodoc.Resource, error) {
+	entity, err := s.FindEntity(id, FieldSelector("charmmeta", "baseurl"))
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	if !IsKubernetesCharm(entity.CharmMeta) {
+		return nil, errgo.Newf("entity is not a kubernetes charm")
+	}
+	if !charmHasDockerResource(entity.CharmMeta, resourceName) {
+		return nil, errgo.Newf("%q does not have image resource %q", id, resourceName)
+	}
+	res, err := s.addResource(&mongodoc.Resource{
+		BaseURL:           entity.BaseURL,
+		Name:              resourceName,
+		Revision:          -1,
+		UploadTime:        time.Now().UTC(),
+		DockerImageName:   imageName,
+		DockerImageDigest: digest,
+	}, "")
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return res, nil
+}
+
 // addResource adds r to the resources collection. If r does not specify
 // a revision number will be one higher than any existing revisions. The
 // inserted resource is returned on success.
@@ -294,12 +323,24 @@ func (s *Store) ResolveResource(url *router.ResolvedURL, name string, revision i
 	return &r, nil
 }
 
+func IsKubernetesCharm(meta *charm.Meta) bool {
+	return meta != nil && len(meta.Series) == 1 && meta.Series[0] == "kubernetes"
+}
+
 func charmHasResource(meta *charm.Meta, name string) bool {
 	if meta == nil {
 		return false
 	}
 	_, ok := meta.Resources[name]
 	return ok
+}
+
+func charmHasDockerResource(meta *charm.Meta, name string) bool {
+	if meta == nil {
+		return false
+	}
+	r, ok := meta.Resources[name]
+	return ok && r.Type == resource.TypeDocker
 }
 
 // OpenResourceBlob returns the blob associated with the given resource.

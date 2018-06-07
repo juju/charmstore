@@ -131,6 +131,10 @@ type ServerParams struct {
 	// If this is nil, a MongoDB backend will be used.
 	NewBlobBackend func(db *mgo.Database) blobstore.Backend
 
+	// DockerRegistryAddress contains the address of the docker
+	// registry associated with the charmstore.
+	DockerRegistryAddress string
+
 	// DockerRegistryAuthCertificates contains the chain of
 	// certificates used to validate the DockerRegistryAuthKey.
 	DockerRegistryAuthCertificates []*x509.Certificate
