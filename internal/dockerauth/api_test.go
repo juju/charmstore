@@ -71,6 +71,7 @@ func (s *APISuite) newServer(c *gc.C, cert *x509.Certificate, key crypto.Signer)
 	srv, err := charmstore.NewServer(db, nil, charmstore.ServerParams{
 		AgentUsername:         "charmstore-agent",
 		AgentKey:              idmServer.UserPublicKey("charmstore-agent"),
+		DockerRegistryAddress: "0.1.2.3",
 		DockerRegistryAuthKey: key,
 		DockerRegistryAuthCertificates: []*x509.Certificate{
 			cert,
@@ -272,6 +273,65 @@ func (s *APISuite) TestPullAuthWithInfoFromAPI(c *gc.C) {
 		"name": "charmers/kubecharm/someResource",
 		"actions": []interface{}{
 			"pull",
+		},
+	}})
+}
+
+func (s *APISuite) TestPushAuthWithInfoFromAPI(c *gc.C) {
+	cert, key := newCert(c)
+	hnd, store, idmServer := s.newServer(c, cert, key)
+	defer hnd.Close()
+	defer store.Close()
+	defer idmServer.Close()
+	srv := httptest.NewServer(hnd)
+	defer srv.Close()
+
+	id := router.MustNewResolvedURL("~charmers/kubecharm-0", -1)
+	err := store.AddCharmWithArchive(id, storetesting.NewCharm(&charm.Meta{
+		Series: []string{"kubernetes"},
+		Resources: map[string]resource.Meta{
+			"someResource": {
+				Name: "someResource",
+				Type: resource.TypeDocker,
+			},
+		},
+	}))
+	c.Assert(err, gc.Equals, nil)
+
+	// First get the upload info from the charm store.
+	client := httprequest.Client{
+		BaseURL: srv.URL,
+		Doer:    idmServer.Client("charmers"),
+	}
+	var infoResp params.DockerInfoResponse
+	err = client.Get(context.TODO(), "/v5/~charmers/kubecharm-0/docker-resource-upload-info?resource-name=someResource", &infoResp)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(infoResp.Username, gc.Equals, "docker-uploader")
+	c.Assert(infoResp.ImageName, gc.Equals, `0.1.2.3/charmers/kubecharm/someResource`)
+
+	// Then, pretending to be the docker instance, we obtain the registry token
+	// using the docker auth endpoint and the credentials we just obtained.
+	req, err := http.NewRequest("GET", "/docker-registry/token?service=myregistry&scope=repository:charmers/kubecharm/someResource:pull,push", nil)
+	c.Assert(err, gc.Equals, nil)
+	req.SetBasicAuth(infoResp.Username, infoResp.Password)
+	var tokenResp dockerauth.TokenResponse
+	err = client.Do(context.Background(), req, &tokenResp)
+	c.Assert(err, gc.Equals, nil)
+
+	// Then check that we've got a plausible-looking token that authorizes the
+	// required actions (pull and push).
+	tok, err := jwt.Parse(tokenResp.Token, func(_ *jwt.Token) (interface{}, error) {
+		return key.Public(), nil
+	})
+	c.Assert(err, gc.Equals, nil)
+	claims, ok := tok.Claims.(jwt.MapClaims)
+	c.Assert(ok, gc.Equals, true)
+	c.Assert(claims["access"], jc.DeepEquals, []interface{}{map[string]interface{}{
+		"type": "repository",
+		"name": "charmers/kubecharm/someResource",
+		"actions": []interface{}{
+			"pull",
+			"push",
 		},
 	}})
 }

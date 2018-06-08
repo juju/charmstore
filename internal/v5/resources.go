@@ -74,7 +74,7 @@ func (h *ReqHandler) serveDockerResourceUploadInfo(id *router.ResolvedURL, w htt
 		ImageName: h.Handler.config.DockerRegistryAddress + "/" + id.URL.User + "/" + id.URL.Name + "/" + resourceName,
 		Username:  "docker-uploader",
 	}
-	password, err := h.dockerAuthPassword(id, resourceName, "push")
+	password, err := h.dockerAuthPassword(id, resourceName, "push", "pull")
 	if err != nil {
 		return errgo.Mask(err)
 	}
@@ -141,11 +141,14 @@ var dockerAuthOpLifetimes = map[string]time.Duration{
 	"pull": 10 * time.Minute,
 }
 
-func (h *ReqHandler) dockerAuthPassword(id *router.ResolvedURL, resourceName string, op string) (string, error) {
+// dockerAuthPassword returns a password (actually an encoded macaroon) suitable for
+// a docker instance to authenticate to the charm store and perform the given resource
+// operations.
+func (h *ReqHandler) dockerAuthPassword(id *router.ResolvedURL, resourceName string, ops ...string) (string, error) {
 	m, err := h.Store.Bakery.NewMacaroon([]checkers.Caveat{
 		{Condition: "is-docker-repo " + id.URL.User + "/" + id.URL.Name + "/" + resourceName},
-		checkers.AllowCaveat(op),
-		checkers.TimeBeforeCaveat(time.Now().Add(dockerAuthOpLifetimes[op])),
+		checkers.AllowCaveat(ops...),
+		checkers.TimeBeforeCaveat(time.Now().Add(dockerAuthOpLifetimes[ops[0]])),
 	})
 	if err != nil {
 		return "", errgo.Mask(err)

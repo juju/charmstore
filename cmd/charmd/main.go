@@ -114,6 +114,7 @@ func serve(conf *config.Config) error {
 		MaxUploadPartSize:              conf.MaxUploadPartSize,
 		MaxUploadParts:                 conf.MaxUploadParts,
 		RunBlobStoreGC:                 true,
+		DockerRegistryAddress:          conf.DockerRegistryAddress,
 		DockerRegistryAuthCertificates: conf.DockerRegistryAuthCertificates.Certificates,
 		DockerRegistryAuthKey:          conf.DockerRegistryAuthKey.Key,
 	}
@@ -149,7 +150,10 @@ func serve(conf *config.Config) error {
 		charmstore.V5,
 	}
 	if conf.DockerRegistryAuthKey.Key != nil {
+		logger.Infof("serving docker auth API")
 		vers = append(vers, charmstore.DockerAuth)
+	} else {
+		logger.Infof("no docker key: skipping docker auth API")
 	}
 	server, err := charmstore.NewServer(db, es, "cs", cfg, vers...)
 	if err != nil {

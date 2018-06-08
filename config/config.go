@@ -171,11 +171,15 @@ type X509Certificates struct {
 }
 
 func (c *X509Certificates) UnmarshalText(data []byte) error {
+	if len(data) == 0 {
+		c.Certificates = nil
+		return nil
+	}
 	for {
 		var b *pem.Block
 		b, data = pem.Decode(data)
 		if b == nil {
-			return nil
+			break
 		}
 		cert, err := x509.ParseCertificate(b.Bytes)
 		if err != nil {
@@ -183,6 +187,10 @@ func (c *X509Certificates) UnmarshalText(data []byte) error {
 		}
 		c.Certificates = append(c.Certificates, cert)
 	}
+	if len(c.Certificates) == 0 {
+		return errgo.Newf("no certificates found")
+	}
+	return nil
 }
 
 type X509PrivateKey struct {
@@ -190,9 +198,12 @@ type X509PrivateKey struct {
 }
 
 func (k *X509PrivateKey) UnmarshalText(data []byte) error {
+	if len(data) == 0 {
+		return nil
+	}
 	b, _ := pem.Decode(data)
 	if b == nil {
-		return nil
+		return errgo.Newf("no private key found")
 	}
 	var err error
 	switch b.Type {

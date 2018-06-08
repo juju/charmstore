@@ -129,7 +129,7 @@ func (h *handler) Token(p httprequest.Params, req *tokenRequest) (*tokenResponse
 			if err == nil {
 				filteredActions = append(filteredActions, a)
 			} else {
-				logger.Infof("check failed: %v", err)
+				logger.Debugf("docker token check failed for operation %q: %v", a, err)
 			}
 		}
 		if len(filteredActions) == 0 {
@@ -163,7 +163,7 @@ func (c dockerRepoChecker) Condition() string {
 
 func (c dockerRepoChecker) Check(_, arg string) error {
 	if c.repoName != arg {
-		return errgo.Newf("invalid repository name")
+		return errgo.Newf("invalid repository name; got %q want %q", c.repoName, arg)
 	}
 	return nil
 }
