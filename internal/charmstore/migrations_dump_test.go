@@ -293,7 +293,7 @@ func dumpDB(db *mgo.Database) ([]collectionData, error) {
 		}
 		data, err := dumpCollection(db.C(c))
 		if err != nil {
-			return nil, errgo.Notef(err, "cannot dump %q: %v", c)
+			return nil, errgo.Notef(err, "cannot dump %q", c)
 		}
 		dumped = append(dumped, collectionData{
 			name: c,

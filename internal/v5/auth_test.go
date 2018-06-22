@@ -86,7 +86,7 @@ func (s *commonSuite) testMacaroonAuth(c *gc.C, p httptesting.JSONCallParams) {
 	// Set up the idm server so that it won't discharge so we
 	// can tell that we're not falling back to macaroon authorization.
 	s.idmServer.SetDefaultUser("")
-	c.Log("simple auth sucess (handler %#v)", p.Handler)
+	c.Logf("simple auth sucess (handler %#v)", p.Handler)
 	p.Username = "test-user"
 	p.Password = "test-password"
 	httptesting.AssertJSONCall(c, p)
