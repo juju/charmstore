@@ -451,6 +451,11 @@ func (s *ArchiveSuite) TestPostSingleSeriesCharmWhenMultiSeriesVersionExists(c *
 	)
 }
 
+func (s *ArchiveSuite) TestPostKubernetesCharm(c *gc.C) {
+	// A charm that did not exist before should get revision 0.
+	s.assertUploadCharm(c, "POST", newResolvedURL("~charmers/juju-gui-0", -1), "kubernetes", nil)
+}
+
 func (s *ArchiveSuite) TestPutCharmWithChannel(c *gc.C) {
 	s.assertUploadCharm(c, "PUT", newResolvedURL("~charmers/precise/juju-gui-0", -1), "wordpress", []params.Channel{params.EdgeChannel})
 	s.assertUploadCharm(c, "PUT", newResolvedURL("~charmers/precise/juju-gui-1", -1), "wordpress", []params.Channel{params.StableChannel})
