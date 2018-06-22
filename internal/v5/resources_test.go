@@ -562,9 +562,9 @@ func (s *ResourceSuite) TestGetResourceDockerImageUploadInfoNoResourceName(c *gc
 	}))
 	c.Assert(err, gc.Equals, nil)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler: s.srv,
-		Method:  "GET",
-		URL:     storeURL(id.URL.Path() + "/docker-resource-upload-info"),
+		Handler:      s.srv,
+		Method:       "GET",
+		URL:          storeURL(id.URL.Path() + "/docker-resource-upload-info"),
 		ExpectStatus: http.StatusBadRequest,
 		ExpectBody: params.Error{
 			Code:    params.ErrBadRequest,
@@ -573,7 +573,6 @@ func (s *ResourceSuite) TestGetResourceDockerImageUploadInfoNoResourceName(c *gc
 		Do: s.bakeryDoAsUser("charmers"),
 	})
 }
-
 
 func (s *ResourceSuite) TestGetResourceDockerImageUploadInfoForNonExistentCharm(c *gc.C) {
 	id := newResolvedURL("~charmers/kubecharm-0", -1)

@@ -547,6 +547,60 @@ func (s *resourceSuite) TestOpenResourceBlob(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `cannot open archive data for cs:~charmers/wordpress resource "someResource/0": blob not found`)
 }
 
+func (s *resourceSuite) TestAddDockerResource(c *gc.C) {
+	store := s.newStore(c, false)
+	defer store.Close()
+
+	meta := storetesting.MetaWithDockerResources(nil, "resource1")
+	meta = storetesting.MetaWithSupportedSeries(meta, "kubernetes")
+	id := MustParseResolvedURL("cs:~charmers/docker-registry-0")
+	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
+	c.Assert(err, gc.Equals, nil)
+
+	res, err := store.AddDockerResource(id, "resource1", "registry.example.com/library/image", "crc32:363a3020")
+	c.Assert(err, gc.Equals, nil)
+	checkResourceDocs(c, store, id, []string{"resource1/0"}, []*mongodoc.Resource{res})
+}
+
+func (s *resourceSuite) TestAddDockerResourceNoSuchCharm(c *gc.C) {
+	store := s.newStore(c, false)
+	defer store.Close()
+
+	id := MustParseResolvedURL("cs:~charmers/docker-registry-0")
+
+	_, err := store.AddDockerResource(id, "resource1", "registry.example.com/library/image", "crc32:363a3020")
+	c.Assert(err, gc.ErrorMatches, `entity not found`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+}
+
+func (s *resourceSuite) TestAddDockerResourceNotKubernetesCharm(c *gc.C) {
+	store := s.newStore(c, false)
+	defer store.Close()
+
+	meta := storetesting.MetaWithDockerResources(nil, "resource1")
+	meta = storetesting.MetaWithSupportedSeries(meta, "bionic")
+	id := MustParseResolvedURL("cs:~charmers/docker-registry-0")
+	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
+	c.Assert(err, gc.Equals, nil)
+
+	_, err = store.AddDockerResource(id, "resource1", "registry.example.com/library/image", "crc32:363a3020")
+	c.Assert(err, gc.ErrorMatches, `entity is not a kubernetes charm`)
+}
+
+func (s *resourceSuite) TestAddDockerResourceNoSuchResource(c *gc.C) {
+	store := s.newStore(c, false)
+	defer store.Close()
+
+	meta := storetesting.MetaWithDockerResources(nil, "resource1")
+	meta = storetesting.MetaWithSupportedSeries(meta, "kubernetes")
+	id := MustParseResolvedURL("cs:~charmers/docker-registry-0")
+	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
+	c.Assert(err, gc.Equals, nil)
+
+	_, err = store.AddDockerResource(id, "resource2", "registry.example.com/library/image", "crc32:363a3020")
+	c.Assert(err, gc.ErrorMatches, `"cs:~charmers/docker-registry-0" does not have image resource "resource2"`)
+}
+
 // uploadResources uploads all the resources required by the given entity,
 // giving each one blob content that's the resource name
 // followed by the given content suffix.
