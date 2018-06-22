@@ -293,12 +293,37 @@ func MetaWithResources(m *charm.Meta, resources ...string) *charm.Meta {
 	if m == nil {
 		m = new(charm.Meta)
 	}
-	m.Resources = make(map[string]resource.Meta)
+	if m.Resources == nil {
+		m.Resources = make(map[string]resource.Meta)
+	}
 	for _, name := range resources {
 		m.Resources[name] = resource.Meta{
 			Name:        name,
 			Type:        resource.TypeFile,
 			Path:        name + "-file",
+			Description: name + " description",
+		}
+	}
+	return m
+}
+
+// MetaWithDockerResources returns m with Resources set to a set of
+// docker resources with the given names. If m is nil, new(charm.Meta)
+// will be used instead.
+//
+// The description of the resources are derived from the resource name by
+// adding " description" suffix respectively.
+func MetaWithDockerResources(m *charm.Meta, resources ...string) *charm.Meta {
+	if m == nil {
+		m = new(charm.Meta)
+	}
+	if m.Resources == nil {
+		m.Resources = make(map[string]resource.Meta)
+	}
+	for _, name := range resources {
+		m.Resources[name] = resource.Meta{
+			Name:        name,
+			Type:        resource.TypeDocker,
 			Description: name + " description",
 		}
 	}
