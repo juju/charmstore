@@ -1,0 +1,9 @@
+name: kubernetes
+summary: kubernetes test charm
+description: Test charm that supports kubernetes
+series:
+ - kubernetes
+resources:
+  resource:
+    type: docker
+    description: A resource.
