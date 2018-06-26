@@ -89,6 +89,7 @@ docker-registry-auth-key: |
   AARlWtA/iSeUYFDZw4yxiaBzRURa7wOY4WUVryz/KbzKIG+wJ9rv+39XndXN6kue
   9NhvqPQt4xyddg==
   -----END EC PRIVATE KEY-----
+docker-registry-token-duration: 1h10m
 `
 
 func (s *ConfigSuite) readConfig(c *gc.C, content string) (*config.Config, error) {
@@ -152,6 +153,7 @@ func (s *ConfigSuite) TestRead(c *gc.C) {
 		DockerRegistryAuthKey: config.X509PrivateKey{
 			Key: mustParseECPrivateKey("MGgCAQEEHM9ekg7h0LAhNBaiSJolcfDNtyfS94DyUblrFu+gBwYFK4EEACGhPAM6AARlWtA/iSeUYFDZw4yxiaBzRURa7wOY4WUVryz/KbzKIG+wJ9rv+39XndXN6kue9NhvqPQt4xyddg=="),
 		},
+		DockerRegistryTokenDuration: config.DurationString{time.Hour + 10*time.Minute},
 	})
 }
 

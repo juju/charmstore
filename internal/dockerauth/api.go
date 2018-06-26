@@ -65,8 +65,7 @@ func parseScope(s string) ([]resourceAccessRights, error) {
 }
 
 type Handler struct {
-	params     charmstore.APIHandlerParams
-	TokenValid time.Duration
+	params charmstore.APIHandlerParams
 }
 
 type tokenRequest struct {
@@ -148,7 +147,7 @@ func (h *handler) Token(p httprequest.Params, req *tokenRequest) (*tokenResponse
 	}
 	return &tokenResponse{
 		Token:     s,
-		ExpiresIn: int(h.h.TokenValid / time.Second),
+		ExpiresIn: int(h.h.params.DockerRegistryTokenDuration / time.Second),
 		IssuedAt:  issuedAt,
 	}, nil
 }
@@ -190,7 +189,7 @@ func (h *handler) createToken(ras []resourceAccessRights, service string, issued
 	if len(h.h.params.DockerRegistryAuthCertificates) > 0 {
 		issuer = h.h.params.DockerRegistryAuthCertificates[0].Subject.CommonName
 	}
-	expiresAt := issuedAt.Add(h.h.TokenValid)
+	expiresAt := issuedAt.Add(h.h.params.DockerRegistryTokenDuration)
 	claims := dockerRegistryClaims{
 		StandardClaims: jwt.StandardClaims{
 			Audience:  service,
@@ -229,8 +228,6 @@ func NewAPIHandler(p charmstore.APIHandlerParams) (charmstore.HTTPCloseHandler, 
 	logger.Infof("Adding docker-registry")
 	h := &Handler{
 		params: p,
-		// TODO(mhilton) make TokenValid configurable.
-		TokenValid: 120 * time.Second,
 	}
 	r := httprouter.New()
 	srv := httprequest.Server{

@@ -117,6 +117,7 @@ func serve(conf *config.Config) error {
 		DockerRegistryAddress:          conf.DockerRegistryAddress,
 		DockerRegistryAuthCertificates: conf.DockerRegistryAuthCertificates.Certificates,
 		DockerRegistryAuthKey:          conf.DockerRegistryAuthKey.Key,
+		DockerRegistryTokenDuration:    conf.DockerRegistryTokenDuration.Duration,
 	}
 	switch conf.BlobStore {
 	case config.MongoDBBlobStore:
