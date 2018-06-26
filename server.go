@@ -142,6 +142,10 @@ type ServerParams struct {
 	// DockerRegistryAuthKey contains the key to use to sign
 	// docker registry authorization tokens.
 	DockerRegistryAuthKey crypto.Signer
+
+	// DockerRegistryTokenDuration is the time a docker registry
+	// token will be valid for after it is created.
+	DockerRegistryTokenDuration time.Duration
 }
 
 // NewServer returns a new handler that handles charm store requests and stores
