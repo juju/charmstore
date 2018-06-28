@@ -677,7 +677,7 @@ func (s *Store) newBundle(id *router.ResolvedURL, r io.ReadSeeker, blobSize int6
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot retrieve bundle charms")
 	}
-	if err := bundleData.VerifyWithCharms(verifyConstraints, verifyStorage, charms); err != nil {
+	if err := bundleData.VerifyWithCharms(verifyConstraints, verifyStorage, verifyDevices, charms); err != nil {
 		// TODO frankban: use multiError (defined in internal/router).
 		return nil, errgo.NoteMask(verificationError(err), "bundle verification failed", errgo.Is(params.ErrInvalidEntity))
 	}
@@ -833,6 +833,11 @@ func verifyConstraints(s string) error {
 
 func verifyStorage(s string) error {
 	// TODO(frankban) provide some actual storage checking here.
+	return nil
+}
+
+func verifyDevices(s string) error {
+	// TODO(ycliuhw) provide some actual devices checking here.
 	return nil
 }
 
