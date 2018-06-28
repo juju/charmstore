@@ -875,7 +875,7 @@ func (s *StoreSuite) TestBundleMachineCount(c *gc.C) {
 		url := router.MustNewResolvedURL("cs:~charmers/bundle/testbundle-0", -1)
 		url.URL.Revision = i
 		url.PromulgatedRevision = i
-		err := test.data.Verify(nil, nil)
+		err := test.data.Verify(nil, nil, nil)
 		c.Assert(err, gc.Equals, nil)
 		// Add the bundle used for this test.
 		b := storetesting.NewBundle(test.data)
