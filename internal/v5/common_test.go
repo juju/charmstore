@@ -179,7 +179,7 @@ func (s *commonSuite) startServer(c *gc.C) {
 		StatsCacheMaxAge:      time.Nanosecond,
 		MaxMgoSessions:        s.maxMgoSessions,
 		MinUploadPartSize:     10,
-		NewBlobBackend:        s.newBlobBackend,
+		NewBlobBackend:        s.newBlobBackend(c),
 		DockerRegistryAddress: "dockerregistry.example.com",
 	}
 	keyring := httpbakery.NewPublicKeyRing(nil, nil)
@@ -225,8 +225,10 @@ func (s *commonSuite) startServer(c *gc.C) {
 	s.store = s.srv.Pool().Store()
 }
 
-func (s *commonSuite) newBlobBackend(db *mgo.Database) blobstore.Backend {
-	return blobstore.NewSwiftBackend(s.openstackCred, identity.AuthUserPass, "testc")
+func (s *commonSuite) newBlobBackend(c *gc.C) func(db *mgo.Database) blobstore.Backend {
+	return func(db *mgo.Database) blobstore.Backend {
+		return blobstore.NewSwiftBackend(s.openstackCred, identity.AuthUserPass, "testc", c.MkDir())
+	}
 }
 
 func (s *commonSuite) addPublicCharmFromRepo(c *gc.C, charmName string, rurl *router.ResolvedURL) (*router.ResolvedURL, charm.Charm) {

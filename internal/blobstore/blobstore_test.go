@@ -87,13 +87,19 @@ func (s *SwiftStoreSuite) SetUpTest(c *gc.C) {
 	sw.CreateContainer("testc", swift.Private)
 
 	s.blobStoreSuite.SetUpTest(c, func(db *mgo.Database) blobstore.Backend {
-		return blobstore.NewSwiftBackend(cred2, identity.AuthUserPass, "testc")
+		return blobstore.NewSwiftBackend(cred2, identity.AuthUserPass, "testc", c.MkDir())
 	})
 }
 
 func (s *SwiftStoreSuite) TearDownTest(c *gc.C) {
 	s.blobStoreSuite.TearDownTest(c)
 	s.openstack.Stop()
+}
+
+func (s *SwiftStoreSuite) TestPutInvalidHashBuffered(c *gc.C) {
+	content := "some data"
+	err := s.store.Put(justReader{strings.NewReader(content)}, hashOf("wrong"), int64(len(content)))
+	c.Assert(err, gc.ErrorMatches, "hash mismatch")
 }
 
 type blobStoreSuite struct {
@@ -1126,4 +1132,12 @@ func (r *syncReader) Read(buf []byte) (int, error) {
 		r.sync = nil
 	}
 	return r.r.Read(buf)
+}
+
+type justReader struct {
+	r io.Reader
+}
+
+func (r justReader) Read(b []byte) (int, error) {
+	return r.r.Read(b)
 }

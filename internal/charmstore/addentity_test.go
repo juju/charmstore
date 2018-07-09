@@ -196,10 +196,8 @@ var uploadEntityErrorsTests = []struct {
 	url:         "~charmers/precise/wordpress-0",
 	upload:      storetesting.NewCharm(nil),
 	blobSize:    99999,
-	expectError: "cannot read charm archive: seek past end of file",
-	// It would be nice if the above error was better and
-	// the cause was:
-	// expectCause: params.ErrInvalidEntity,
+	expectError: "cannot put archive blob: size mismatch",
+	expectCause: params.ErrInvalidEntity,
 }, {
 	about:       "charm uploaded to bundle URL",
 	url:         "~charmers/bundle/foo-0",

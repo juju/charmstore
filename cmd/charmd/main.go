@@ -96,7 +96,9 @@ func serve(conf *config.Config) error {
 			return errgo.Mask(err)
 		}
 	}
-
+	if conf.TempDir == "" {
+		conf.TempDir = os.TempDir()
+	}
 	logger.Infof("setting up the API server")
 	cfg := charmstore.ServerParams{
 		AuthUsername:                   conf.AuthUsername,
@@ -131,7 +133,7 @@ func serve(conf *config.Config) error {
 			TenantName: conf.SwiftTenant,
 		}
 		cfg.NewBlobBackend = func(db *mgo.Database) blobstore.Backend {
-			return blobstore.NewSwiftBackend(cred, conf.SwiftAuthMode.Mode, conf.SwiftBucket)
+			return blobstore.NewSwiftBackend(cred, conf.SwiftAuthMode.Mode, conf.SwiftBucket, conf.TempDir)
 		}
 	default:
 		return errgo.Newf("unknown blob store type")
