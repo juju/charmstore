@@ -13,7 +13,6 @@ import (
 	"path"
 	"strconv"
 	"strings"
-	"time"
 
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
@@ -136,11 +135,6 @@ func (h *ReqHandler) serveDownloadResourceDocker(id *router.ResolvedURL, r *mong
 	return httprequest.WriteJSON(w, http.StatusOK, resp)
 }
 
-var dockerAuthOpLifetimes = map[string]time.Duration{
-	"push": time.Minute,
-	"pull": 10 * time.Minute,
-}
-
 // dockerAuthPassword returns a password (actually an encoded macaroon) suitable for
 // a docker instance to authenticate to the charm store and perform the given resource
 // operations.
@@ -148,7 +142,6 @@ func (h *ReqHandler) dockerAuthPassword(id *router.ResolvedURL, resourceName str
 	m, err := h.Store.Bakery.NewMacaroon([]checkers.Caveat{
 		{Condition: "is-docker-repo " + id.URL.User + "/" + id.URL.Name + "/" + resourceName},
 		checkers.AllowCaveat(ops...),
-		checkers.TimeBeforeCaveat(time.Now().Add(dockerAuthOpLifetimes[ops[0]])),
 	})
 	if err != nil {
 		return "", errgo.Mask(err)
