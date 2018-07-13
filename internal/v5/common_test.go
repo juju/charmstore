@@ -486,6 +486,14 @@ func (s *commonSuite) uploadResource(c *gc.C, id *router.ResolvedURL, name strin
 	c.Assert(err, gc.Equals, nil)
 }
 
+// addDockerResource adds a resource with the given name to the given
+// charm. The digest will be calculated using hashOf(content) and will
+// have the prefix "test-hash".
+func (s *commonSuite) addDockerResource(c *gc.C, id *router.ResolvedURL, name string, content string) {
+	_, err := s.store.AddDockerResource(id, name, "", "test-hash:"+hashOfString(content))
+	c.Assert(err, gc.Equals, nil)
+}
+
 func bakeryDo(client *httpbakery.Client) func(*http.Request) (*http.Response, error) {
 	if client == nil {
 		client = httpbakery.NewClient()

@@ -940,3 +940,38 @@ func (s *ResourceSuite) TestMetaResourcesSingleResourceWithNameNotInCharm(c *gc.
 		Do: s.bakeryDoAsUser("charmers"),
 	})
 }
+
+func (s *ResourceSuite) TestMetaResourcesDockerResource(c *gc.C) {
+	id := newResolvedURL("~charmers/caas-0", -1)
+	meta := storetesting.MetaWithDockerResources(nil, "resource1", "resource2")
+	meta = storetesting.MetaWithSupportedSeries(meta, "kubernetes")
+	err := s.store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
+	c.Assert(err, gc.Equals, nil)
+	s.addDockerResource(c, id, "resource1", "resource1 content")
+	s.addDockerResource(c, id, "resource2", "resource2 content")
+
+	err = s.store.Publish(id, map[string]int{
+		"resource1": 0,
+		"resource2": 0,
+	}, params.StableChannel)
+	c.Assert(err, gc.Equals, nil)
+	err = s.store.SetPerms(&id.URL, "stable.read", params.Everyone)
+	c.Assert(err, gc.Equals, nil)
+
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:      s.srv,
+		URL:          storeURL(id.URL.Path() + "/meta/resources"),
+		ExpectStatus: http.StatusOK,
+		ExpectBody: []params.Resource{{
+			Name:        "resource1",
+			Type:        "docker",
+			Description: "resource1 description",
+			Revision:    0,
+		}, {
+			Name:        "resource2",
+			Type:        "docker",
+			Description: "resource2 description",
+			Revision:    0,
+		}},
+	})
+}

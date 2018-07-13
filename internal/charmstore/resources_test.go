@@ -14,6 +14,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6"
+	"gopkg.in/juju/charm.v6/resource"
 	"gopkg.in/juju/charmrepo.v3/csclient/params"
 	"gopkg.in/mgo.v2"
 
@@ -206,6 +207,46 @@ func (s *resourceSuite) TestListResourcesResourceNotFound(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	checkResourceDocs(c, store, id, []string{"resource1/0", "resource2/-1"}, docs)
+}
+
+func (s *resourceSuite) TestListResourcesCharmWithDockerResources(c *gc.C) {
+	store := s.newStore(c, false)
+	defer store.Close()
+
+	id := MustParseResolvedURL("cs:~charmers/caas-0")
+	meta := storetesting.MetaWithDockerResources(nil, "resource1", "resource2")
+	meta = storetesting.MetaWithSupportedSeries(meta, "kubernetes")
+	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
+	c.Assert(err, gc.Equals, nil)
+	uploadResources(c, store, id, "")
+
+	err = store.Publish(id, map[string]int{
+		"resource1": 0,
+		"resource2": 0,
+	}, params.StableChannel)
+	c.Assert(err, gc.Equals, nil)
+
+	docs, err := store.ListResources(id, params.StableChannel)
+	c.Assert(err, gc.Equals, nil)
+
+	checkResourceDocs(c, store, id, []string{"resource1/0", "resource2/0"}, docs)
+}
+
+func (s *resourceSuite) TestListResourcesCharmWithDockerResourcesUnpublished(c *gc.C) {
+	store := s.newStore(c, false)
+	defer store.Close()
+
+	id := MustParseResolvedURL("cs:~charmers/caas-0")
+	meta := storetesting.MetaWithDockerResources(nil, "resource1", "resource2")
+	meta = storetesting.MetaWithSupportedSeries(meta, "kubernetes")
+	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
+	c.Assert(err, gc.Equals, nil)
+	uploadResources(c, store, id, "")
+
+	docs, err := store.ListResources(id, params.UnpublishedChannel)
+	c.Assert(err, gc.Equals, nil)
+
+	checkResourceDocs(c, store, id, []string{"resource1/0", "resource2/0"}, docs)
 }
 
 func (s *resourceSuite) TestUploadResource(c *gc.C) {
@@ -601,19 +642,26 @@ func (s *resourceSuite) TestAddDockerResourceNoSuchResource(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `"cs:~charmers/docker-registry-0" does not have image resource "resource2"`)
 }
 
-// uploadResources uploads all the resources required by the given entity,
-// giving each one blob content that's the resource name
-// followed by the given content suffix.
+// uploadResources uploads all the resources required by the given
+// entity. File resources contain blob content that's the resource name
+// followed by the given content suffix. Docker resources have a digest
+// generated from the resource name followed by the given content suffix.
 func uploadResources(c *gc.C, store *Store, id *router.ResolvedURL, contentSuffix string) {
 	entity, err := store.FindEntity(id, nil)
 	c.Assert(err, gc.Equals, nil)
-	for name := range entity.CharmMeta.Resources {
+	for name, res := range entity.CharmMeta.Resources {
 		c.Logf("uploading resource %v", name)
 		content := name + contentSuffix
 		hash := hashOfString(content)
 		r := strings.NewReader(content)
-		_, err := store.UploadResource(id, name, r, hash, int64(len(content)))
-		c.Assert(err, gc.Equals, nil)
+		switch res.Type {
+		case resource.TypeFile:
+			_, err := store.UploadResource(id, name, r, hash, int64(len(content)))
+			c.Assert(err, gc.Equals, nil)
+		case resource.TypeDocker:
+			_, err := store.AddDockerResource(id, name, "", "test-hash:"+hash)
+			c.Assert(err, gc.Equals, nil)
+		}
 	}
 }
 
