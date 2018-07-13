@@ -325,10 +325,14 @@ func fromResourceDoc(doc *mongodoc.Resource, resources map[string]resource.Meta)
 		Path:        meta.Path,
 		Description: meta.Description,
 	}
-	if doc.BlobHash == "" {
+	if meta.Type == resource.TypeFile && doc.BlobHash == "" {
 		// No hash implies that there is no file (the entry
 		// is just a placeholder), so we don't fill in
 		// blob details.
+		return r, nil
+	}
+	r.Revision = doc.Revision
+	if meta.Type == resource.TypeDocker {
 		return r, nil
 	}
 	rawHash, err := hex.DecodeString(doc.BlobHash)
@@ -337,7 +341,6 @@ func fromResourceDoc(doc *mongodoc.Resource, resources map[string]resource.Meta)
 	}
 	r.Size = doc.Size
 	r.Fingerprint = rawHash
-	r.Revision = doc.Revision
 	return r, nil
 }
 
