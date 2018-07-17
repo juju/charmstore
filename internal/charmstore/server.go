@@ -7,8 +7,13 @@
 package charmstore // import "gopkg.in/juju/charmstore.v5/internal/charmstore"
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/x509"
+	"encoding/json"
+	"fmt"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
@@ -16,6 +21,7 @@ import (
 	"github.com/juju/idmclient"
 	"github.com/prometheus/client_golang/prometheus"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/juju/charmrepo.v3/csclient/params"
 	"gopkg.in/juju/worker.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgostorage"
@@ -251,7 +257,29 @@ type Server struct {
 
 // ServeHTTP implements http.Handler.ServeHTTP.
 func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	if req.Header.Get("Stream-Body") == "" {
+		data, err := ioutil.ReadAll(req.Body)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			data, _ := json.Marshal(params.Error{
+				Message: fmt.Sprintf("cannot read body: %v", err),
+			})
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write(data)
+			return
+		}
+		logger.Debugf("read request body %d bytes (content length %d)", len(data), req.ContentLength)
+		req.Body = readSeekerShim{
+			ReadSeeker: bytes.NewReader(data),
+			Closer:     req.Body,
+		}
+	}
 	s.mux.ServeHTTP(w, req)
+}
+
+type readSeekerShim struct {
+	io.ReadSeeker
+	io.Closer
 }
 
 // Close closes the server. It must be called when the server
