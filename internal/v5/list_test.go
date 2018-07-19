@@ -99,15 +99,37 @@ func (s *ListSuite) TestSuccessfulList(c *gc.C) {
 			"cs:trusty/mysql-7",
 		},
 	}, {
+		about: "name filter list",
+		query: "name=mysql&name=wordpress",
+		results: []string{
+			"cs:precise/wordpress-23",
+			"cs:trusty/mysql-7",
+		},
+	}, {
 		about: "owner filter list",
 		query: "owner=foo",
 		results: []string{
 			"cs:~foo/trusty/varnish-1",
 		},
 	}, {
+		about: "owner filter list",
+		query: "owner=foo&owner=openstack-charmers",
+		results: []string{
+			"cs:trusty/mysql-7",
+			"cs:~foo/trusty/varnish-1",
+		},
+	}, {
 		about: "series filter list",
 		query: "series=trusty",
 		results: []string{
+			"cs:trusty/mysql-7",
+			"cs:~foo/trusty/varnish-1",
+		},
+	}, {
+		about: "series filter list",
+		query: "series=trusty&series=precise",
+		results: []string{
+			"cs:precise/wordpress-23",
 			"cs:trusty/mysql-7",
 			"cs:~foo/trusty/varnish-1",
 		},

@@ -1502,11 +1502,11 @@ func prepareList(sp SearchParams) (filters map[string]interface{}, err error) {
 	for k, v := range sp.Filters {
 		switch k {
 		case "name":
-			filters[k] = v[0]
+			filters[k] = orQuery(v)
 		case "owner":
-			filters["user"] = v[0]
+			filters["user"] = orQuery(v)
 		case "series":
-			filters["series"] = v[0]
+			filters["series"] = orQuery(v)
 		case "type":
 			if v[0] == "bundle" {
 				filters["series"] = "bundle"
@@ -1524,6 +1524,16 @@ func prepareList(sp SearchParams) (filters map[string]interface{}, err error) {
 		}
 	}
 	return filters, nil
+}
+
+func orQuery(values []string) interface{} {
+	switch len(values) {
+		case 0:
+			return nil
+		case 1:
+			return values[0]
+		}
+	return bson.D{{"$in", values}}
 }
 
 // ListQuery holds a list query from which an iterator
