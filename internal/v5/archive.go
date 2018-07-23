@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"mime"
 	"net/http"
+	"path"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -334,6 +335,17 @@ func (h *ReqHandler) serveArchiveFile(id *router.ResolvedURL, w http.ResponseWri
 func (h *ReqHandler) ServeBlobFile(w http.ResponseWriter, req *http.Request, id *router.ResolvedURL, blob *charmstore.Blob) error {
 	r, size, err := h.Store.OpenBlobFile(blob, req.URL.Path)
 	if err != nil {
+		if redirect, ok := err.(charmstore.ErrRedirect); ok {
+			p, err := router.RelativeURLPath(req.URL.Path, path.Join(path.Dir(req.URL.Path), redirect.URL))
+			if err != nil {
+				return errgo.Notef(err, "cannot make relative URL from %q and %q", req.URL.Path, path.Join(path.Dir(req.URL.Path), redirect.URL))
+			}
+			// We can't use the http.redirect function because it tries to build an absolute url but the path in the
+			// request URL has been changed.
+			w.Header().Set("Location", p)
+			w.WriteHeader(http.StatusMovedPermanently)
+			return nil
+		}
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound), errgo.Is(params.ErrForbidden))
 	}
 	defer r.Close()
