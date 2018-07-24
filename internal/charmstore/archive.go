@@ -115,6 +115,9 @@ func (r *multiReadSeekCloser) Close() error {
 // If no such file was found, it returns an error
 // with a params.ErrNotFound cause.
 //
+// If the file is a symlink, it returns an error ErrRedirect that holds the path
+// that the symbolic link refers to.
+//
 // If the file is actually a directory in the blob, it returns
 // an error with a params.ErrForbidden cause.
 func (s *Store) OpenBlobFile(blob *Blob, filePath string) (io.ReadCloser, int64, error) {
@@ -143,19 +146,22 @@ func (s *Store) OpenBlobFile(blob *Blob, filePath string) (io.ReadCloser, int64,
 			if err != nil {
 				return nil, 0, errgo.Notef(err, "cannot read archive data for symlink %s", file.Name)
 			}
-			return nil, 0, ErrRedirect{URL: string(url)}
+			return nil, 0, &ErrRedirect{Path: string(url)}
 		}
 		return content, fileInfo.Size(), nil
 	}
 	return nil, 0, errgo.WithCausef(nil, params.ErrNotFound, "file %q not found in the archive", filePath)
 }
 
+// ErrRedirect holds the error returned by OpenBlobFile when a symbolic link
+// is opened. The Path field holds the name of the file that the symbolic link
+// refers to.
 type ErrRedirect struct {
-	URL string
+	Path string
 }
 
 func (e ErrRedirect) Error() string {
-	return fmt.Sprintf("redirect to %v", e.URL)
+	return fmt.Sprintf("file is a symbolic link to %q", e.Path)
 }
 
 // OpenCachedBlobFile opens a file from the given entity's archive blob.
