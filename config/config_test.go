@@ -15,7 +15,6 @@ import (
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/goose.v2/identity"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 
 	"gopkg.in/juju/charmstore.v5/config"
@@ -61,7 +60,6 @@ swift-secret: secret
 swift-bucket: bucket
 swift-region: somewhere
 swift-tenant: a-tenant
-swift-authmode: userpass
 logging-config: INFO
 docker-registry-address: 0.1.3.5:1000
 docker-registry-auth-certs: |
@@ -141,7 +139,6 @@ func (s *ConfigSuite) TestRead(c *gc.C) {
 		SwiftBucket:           "bucket",
 		SwiftRegion:           "somewhere",
 		SwiftTenant:           "a-tenant",
-		SwiftAuthMode:         &config.SwiftAuthMode{identity.AuthUserPass},
 		LoggingConfig:         "INFO",
 		DockerRegistryAddress: "0.1.3.5:1000",
 		DockerRegistryAuthCertificates: config.X509Certificates{
@@ -276,7 +273,7 @@ func (s *ConfigSuite) TestValidateConfigError(c *gc.C) {
 	c.Assert(cfg, gc.IsNil)
 
 	cfg, err = s.readConfig(c, "blobstore: swift\n")
-	c.Assert(err, gc.ErrorMatches, "missing fields mongo-url, api-addr, auth-username, auth-password, swift-auth-url, swift-username, swift-secret, swift-bucket, swift-region, swift-tenant, swift-auth-mode in config file")
+	c.Assert(err, gc.ErrorMatches, "missing fields mongo-url, api-addr, auth-username, auth-password, swift-auth-url, swift-username, swift-secret, swift-bucket, swift-region, swift-tenant in config file")
 	c.Assert(cfg, gc.IsNil)
 }
 

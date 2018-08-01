@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"gopkg.in/errgo.v1"
-	"gopkg.in/goose.v2/identity"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/yaml.v2"
 )
@@ -54,7 +53,6 @@ type Config struct {
 	SwiftBucket                    string            `yaml:"swift-bucket"`
 	SwiftRegion                    string            `yaml:"swift-region"`
 	SwiftTenant                    string            `yaml:"swift-tenant"`
-	SwiftAuthMode                  *SwiftAuthMode    `yaml:"swift-authmode"`
 	LoggingConfig                  string            `yaml:"logging-config"`
 	DockerRegistryAddress          string            `yaml:"docker-registry-address"`
 	DockerRegistryAuthCertificates X509Certificates  `yaml:"docker-registry-auth-certs"`
@@ -68,28 +66,6 @@ const (
 	MongoDBBlobStore BlobStoreType = "mongodb"
 	SwiftBlobStore   BlobStoreType = "swift"
 )
-
-// SwiftAuthMode implements unmarshaling for
-// an identity.AuthMode.
-type SwiftAuthMode struct {
-	Mode identity.AuthMode
-}
-
-func (m *SwiftAuthMode) UnmarshalText(data []byte) error {
-	switch string(data) {
-	case "legacy":
-		m.Mode = identity.AuthLegacy
-	case "keypair":
-		m.Mode = identity.AuthKeyPair
-	case "userpassv3":
-		m.Mode = identity.AuthUserPassV3
-	case "userpass":
-		m.Mode = identity.AuthUserPass
-	default:
-		return errgo.Newf("unknown swift auth mode %q", data)
-	}
-	return nil
-}
 
 func (c *Config) validate() error {
 	var missing []string
@@ -116,9 +92,6 @@ func (c *Config) validate() error {
 		needString("swift-bucket", c.SwiftBucket)
 		needString("swift-region", c.SwiftRegion)
 		needString("swift-tenant", c.SwiftTenant)
-		if c.SwiftAuthMode == nil {
-			missing = append(missing, "swift-auth-mode")
-		}
 	case MongoDBBlobStore:
 	default:
 		return errgo.Newf("invalid blob store type %q", c.BlobStore)
