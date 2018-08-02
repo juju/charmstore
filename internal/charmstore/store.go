@@ -1528,11 +1528,11 @@ func prepareList(sp SearchParams) (filters map[string]interface{}, err error) {
 
 func orQuery(values []string) interface{} {
 	switch len(values) {
-		case 0:
-			return nil
-		case 1:
-			return values[0]
-		}
+	case 0:
+		return nil
+	case 1:
+		return values[0]
+	}
 	return bson.D{{"$in", values}}
 }
 
