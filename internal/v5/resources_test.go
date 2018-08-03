@@ -410,7 +410,7 @@ func (s *ResourceSuite) TestUploadResourceDockerImage(c *gc.C) {
 		Resources: map[string]resource.Meta{
 			"someResource": {
 				Name: "someResource",
-				Type: resource.TypeDocker,
+				Type: resource.TypeContainerImage,
 			},
 		},
 	}))
@@ -442,7 +442,7 @@ func (s *ResourceSuite) TestGetResourceDockerImage(c *gc.C) {
 		Resources: map[string]resource.Meta{
 			"someResource": {
 				Name: "someResource",
-				Type: resource.TypeDocker,
+				Type: resource.TypeContainerImage,
 			},
 		},
 	}))
@@ -487,7 +487,7 @@ func (s *ResourceSuite) TestGetResourceDockerImageWithExplicitImageName(c *gc.C)
 		Resources: map[string]resource.Meta{
 			"someResource": {
 				Name: "someResource",
-				Type: resource.TypeDocker,
+				Type: resource.TypeContainerImage,
 			},
 		},
 	}))
@@ -524,7 +524,7 @@ func (s *ResourceSuite) TestGetResourceDockerImageUploadInfo(c *gc.C) {
 		Resources: map[string]resource.Meta{
 			"someResource": {
 				Name: "someResource",
-				Type: resource.TypeDocker,
+				Type: resource.TypeContainerImage,
 			},
 		},
 	}))
@@ -556,7 +556,7 @@ func (s *ResourceSuite) TestGetResourceDockerImageUploadInfoNoResourceName(c *gc
 		Resources: map[string]resource.Meta{
 			"someResource": {
 				Name: "someResource",
-				Type: resource.TypeDocker,
+				Type: resource.TypeContainerImage,
 			},
 		},
 	}))
@@ -595,7 +595,7 @@ func (s *ResourceSuite) TestGetResourceDockerImageUploadInfoForNonExistentResour
 		Resources: map[string]resource.Meta{
 			"someResource": {
 				Name: "someResource",
-				Type: resource.TypeDocker,
+				Type: resource.TypeContainerImage,
 			},
 		},
 	}))
@@ -964,12 +964,12 @@ func (s *ResourceSuite) TestMetaResourcesDockerResource(c *gc.C) {
 		ExpectStatus: http.StatusOK,
 		ExpectBody: []params.Resource{{
 			Name:        "resource1",
-			Type:        "docker",
+			Type:        "oci-image",
 			Description: "resource1 description",
 			Revision:    0,
 		}, {
 			Name:        "resource2",
-			Type:        "docker",
+			Type:        "oci-image",
 			Description: "resource2 description",
 			Revision:    0,
 		}},

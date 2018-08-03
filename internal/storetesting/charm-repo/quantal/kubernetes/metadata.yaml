@@ -5,5 +5,5 @@ series:
  - kubernetes
 resources:
   resource:
-    type: docker
+    type: oci-image
     description: A resource.

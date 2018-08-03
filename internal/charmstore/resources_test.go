@@ -658,7 +658,7 @@ func uploadResources(c *gc.C, store *Store, id *router.ResolvedURL, contentSuffi
 		case resource.TypeFile:
 			_, err := store.UploadResource(id, name, r, hash, int64(len(content)))
 			c.Assert(err, gc.Equals, nil)
-		case resource.TypeDocker:
+		case resource.TypeContainerImage:
 			_, err := store.AddDockerResource(id, name, "", "test-hash:"+hash)
 			c.Assert(err, gc.Equals, nil)
 		}

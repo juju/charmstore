@@ -340,7 +340,7 @@ func charmHasDockerResource(meta *charm.Meta, name string) bool {
 		return false
 	}
 	r, ok := meta.Resources[name]
-	return ok && r.Type == resource.TypeDocker
+	return ok && r.Type == resource.TypeContainerImage
 }
 
 // OpenResourceBlob returns the blob associated with the given resource.
