@@ -221,7 +221,7 @@ func (s *APISuite) TestPullAuthWithInfoFromAPI(c *gc.C) {
 		Resources: map[string]resource.Meta{
 			"someResource": {
 				Name: "someResource",
-				Type: resource.TypeDocker,
+				Type: resource.TypeContainerImage,
 			},
 		},
 	}))
@@ -292,7 +292,7 @@ func (s *APISuite) TestPushAuthWithInfoFromAPI(c *gc.C) {
 		Resources: map[string]resource.Meta{
 			"someResource": {
 				Name: "someResource",
-				Type: resource.TypeDocker,
+				Type: resource.TypeContainerImage,
 			},
 		},
 	}))

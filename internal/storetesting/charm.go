@@ -323,7 +323,7 @@ func MetaWithDockerResources(m *charm.Meta, resources ...string) *charm.Meta {
 	for _, name := range resources {
 		m.Resources[name] = resource.Meta{
 			Name:        name,
-			Type:        resource.TypeDocker,
+			Type:        resource.TypeContainerImage,
 			Description: name + " description",
 		}
 	}

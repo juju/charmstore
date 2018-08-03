@@ -66,7 +66,7 @@ func (h *ReqHandler) serveDockerResourceUploadInfo(id *router.ResolvedURL, w htt
 	if !ok {
 		return errgo.WithCausef(nil, params.ErrForbidden, "%q has no resource named %q", id.URL.String(), resourceName)
 	}
-	if r.Type != resource.TypeDocker {
+	if r.Type != resource.TypeContainerImage {
 		return errgo.WithCausef(nil, params.ErrForbidden, "resource %q is not a docker resource", resourceName)
 	}
 	resp := params.DockerInfoResponse{
@@ -332,7 +332,7 @@ func fromResourceDoc(doc *mongodoc.Resource, resources map[string]resource.Meta)
 		return r, nil
 	}
 	r.Revision = doc.Revision
-	if meta.Type == resource.TypeDocker {
+	if meta.Type == resource.TypeContainerImage {
 		return r, nil
 	}
 	rawHash, err := hex.DecodeString(doc.BlobHash)
