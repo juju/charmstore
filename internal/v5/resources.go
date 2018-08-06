@@ -4,9 +4,11 @@
 package v5 // import "gopkg.in/juju/charmstore.v5/internal/v5"
 
 import (
+	"crypto/sha512"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -132,7 +134,16 @@ func (h *ReqHandler) serveDownloadResourceDocker(id *router.ResolvedURL, r *mong
 		}
 		resp.Password = password
 	}
-	return httprequest.WriteJSON(w, http.StatusOK, resp)
+	buf, err := json.Marshal(resp)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(params.ContentHashHeader, fmt.Sprintf("%x", sha512.Sum384(buf)))
+	if _, err := w.Write(buf); err != nil {
+		logger.Errorf("error writing response: %s", err)
+	}
+	return nil
 }
 
 // dockerAuthPassword returns a password (actually an encoded macaroon) suitable for

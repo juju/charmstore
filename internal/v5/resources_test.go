@@ -429,6 +429,39 @@ func (s *ResourceSuite) TestUploadResourceDockerImage(c *gc.C) {
 	})
 }
 
+func (s *ResourceSuite) TestDownloadResourceDockerImageIncludesHash(c *gc.C) {
+	id := newResolvedURL("~charmers/kubecharm-0", -1)
+	err := s.store.AddCharmWithArchive(id, storetesting.NewCharm(&charm.Meta{
+		Series: []string{"kubernetes"},
+		Resources: map[string]resource.Meta{
+			"someResource": {
+				Name: "someResource",
+				Type: resource.TypeContainerImage,
+			},
+		},
+	}))
+	c.Assert(err, gc.Equals, nil)
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		Method:  "POST",
+		URL:     storeURL(id.URL.Path() + "/resource/someResource"),
+		JSONBody: params.DockerResourceUploadRequest{
+			Digest: "sha256:d1d44afba88cabf44cccd8d9fde2daacba31e09e9b7e46526ba9c1e3b41c0a3b",
+		},
+		ExpectBody: params.ResourceUploadResponse{
+			Revision: 0,
+		},
+		Do: s.bakeryDoAsUser("charmers"),
+	})
+	rr := httptesting.DoRequest(c, httptesting.DoRequestParams{
+		Handler: s.srv,
+		URL:     storeURL(id.URL.Path() + "/resource/someResource"),
+		Do:      s.bakeryDoAsUser("charmers"),
+	})
+	_, ok := rr.HeaderMap[params.ContentHashHeader]
+	c.Assert(ok, gc.Equals, true)
+}
+
 type DockerResourceGetResponse struct {
 	ImageName string
 	Username  string
