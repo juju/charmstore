@@ -473,7 +473,7 @@ func (s *commonSuite) doAsUser(user string, f func()) {
 // charm with the given id.
 func (s *commonSuite) uploadResource(c *gc.C, id *router.ResolvedURL, name string, content string) {
 	hash := hashOfString(content)
-	_, err := s.store.UploadResource(id, name, strings.NewReader(content), hash, int64(len(content)))
+	_, err := s.store.UploadResource(id, name, -1, strings.NewReader(content), hash, int64(len(content)))
 	c.Assert(err, gc.Equals, nil)
 }
 
@@ -481,7 +481,7 @@ func (s *commonSuite) uploadResource(c *gc.C, id *router.ResolvedURL, name strin
 // charm. The digest will be calculated using hashOf(content) and will
 // have the prefix "test-hash".
 func (s *commonSuite) addDockerResource(c *gc.C, id *router.ResolvedURL, name string, content string) {
-	_, err := s.store.AddDockerResource(id, name, "", "test-hash:"+hashOfString(content))
+	_, err := s.store.AddDockerResource(id, name, -1, "", "test-hash:"+hashOfString(content))
 	c.Assert(err, gc.Equals, nil)
 }
 

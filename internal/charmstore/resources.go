@@ -138,13 +138,13 @@ func mapRevisions(resourceRevisions []mongodoc.ResourceRevision) map[string]int 
 }
 
 // UploadResource add blob to the blob store and adds a new resource with
-// the given name to the entity with the given id. The revision of the new resource
+// the given name to the entity with the given id. If revision is -1, the revision of the new resource
 // will be calculated to be one higher than any existing resources.
 //
 // TODO consider restricting uploads so that if the hash matches the
 // latest revision then a new revision isn't created. This would match
 // the behaviour for charms and bundles.
-func (s *Store) UploadResource(id *router.ResolvedURL, name string, blob io.Reader, blobHash string, size int64) (*mongodoc.Resource, error) {
+func (s *Store) UploadResource(id *router.ResolvedURL, name string, revision int, blob io.Reader, blobHash string, size int64) (*mongodoc.Resource, error) {
 	entity, err := s.FindEntity(id, FieldSelector("charmmeta", "baseurl"))
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
@@ -158,7 +158,7 @@ func (s *Store) UploadResource(id *router.ResolvedURL, name string, blob io.Read
 	res, err := s.addResource(&mongodoc.Resource{
 		BaseURL:    entity.BaseURL,
 		Name:       name,
-		Revision:   -1,
+		Revision:   revision,
 		BlobHash:   blobHash,
 		Size:       size,
 		UploadTime: time.Now().UTC(),
@@ -171,7 +171,7 @@ func (s *Store) UploadResource(id *router.ResolvedURL, name string, blob io.Read
 
 // AddResourceWithUploadId is like UploadResource except that it associates
 // the resource with an already-uploaded multipart upload.
-func (s *Store) AddResourceWithUploadId(id *router.ResolvedURL, name string, uploadId string) (*mongodoc.Resource, error) {
+func (s *Store) AddResourceWithUploadId(id *router.ResolvedURL, name string, revision int, uploadId string) (*mongodoc.Resource, error) {
 	entity, err := s.FindEntity(id, FieldSelector("charmmeta", "baseurl"))
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
@@ -194,7 +194,7 @@ func (s *Store) AddResourceWithUploadId(id *router.ResolvedURL, name string, upl
 	res, err := s.addResource(&mongodoc.Resource{
 		BaseURL:    entity.BaseURL,
 		Name:       name,
-		Revision:   -1,
+		Revision:   revision,
 		BlobHash:   info.Hash,
 		BlobIndex:  idx,
 		Size:       size,
@@ -206,10 +206,14 @@ func (s *Store) AddResourceWithUploadId(id *router.ResolvedURL, name string, upl
 	return res, nil
 }
 
-// AddDockerResource adds a docker resource to the Kubernetes charm with the given id. The image name
-// should be non-empty only if the image is held outside the charm store's associated registry.
-// The digest holds the hash of the image, in "sha256:abcdabcd" format.
-func (s *Store) AddDockerResource(id *router.ResolvedURL, resourceName, imageName, digest string) (*mongodoc.Resource, error) {
+// AddDockerResource adds a docker resource to the Kubernetes charm with
+// the given id. The image name should be non-empty only if the image is
+// held outside the charm store's associated registry. The digest holds
+// the hash of the image, in "sha256:abcdabcd" format.
+//
+// If revision is -1 the revision of the new resource will be calculated
+// to be one higher than any existing resources.
+func (s *Store) AddDockerResource(id *router.ResolvedURL, resourceName string, revision int, imageName, digest string) (*mongodoc.Resource, error) {
 	entity, err := s.FindEntity(id, FieldSelector("charmmeta", "baseurl"))
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
@@ -223,7 +227,7 @@ func (s *Store) AddDockerResource(id *router.ResolvedURL, resourceName, imageNam
 	res, err := s.addResource(&mongodoc.Resource{
 		BaseURL:           entity.BaseURL,
 		Name:              resourceName,
-		Revision:          -1,
+		Revision:          revision,
 		UploadTime:        time.Now().UTC(),
 		DockerImageName:   imageName,
 		DockerImageDigest: digest,
