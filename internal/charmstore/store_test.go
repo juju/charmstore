@@ -4254,7 +4254,7 @@ func (s *StoreSuite) TestGC(c *gc.C) {
 		"abcdefghijklmnopqrstuvxwyz",
 	}
 	uid := putMultipart(c, store.BlobStore, time.Time{}, contents...)
-	_, err = store.AddResourceWithUploadId(id3, "someResource", uid)
+	_, err = store.AddResourceWithUploadId(id3, "someResource", -1, uid)
 	c.Assert(err, gc.Equals, nil)
 
 	contents = []string{
@@ -4262,7 +4262,7 @@ func (s *StoreSuite) TestGC(c *gc.C) {
 		"ABCDEFGHIJKLMNOPQURSTUVWXYZ",
 	}
 	uid = putMultipart(c, store.BlobStore, time.Time{}, contents...)
-	resource2, err := store.AddResourceWithUploadId(id3, "someResource", uid)
+	resource2, err := store.AddResourceWithUploadId(id3, "someResource", -1, uid)
 	c.Assert(err, gc.Equals, nil)
 
 	type blobInfo struct {

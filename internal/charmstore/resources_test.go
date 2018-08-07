@@ -260,7 +260,7 @@ func (s *resourceSuite) TestUploadResource(c *gc.C) {
 
 	now := time.Now()
 	blob := "content 1"
-	res, err := store.UploadResource(id, "someResource", strings.NewReader(blob), hashOfString(blob), int64(len(blob)))
+	res, err := store.UploadResource(id, "someResource", -1, strings.NewReader(blob), hashOfString(blob), int64(len(blob)))
 	c.Assert(err, gc.Equals, nil)
 	if res.UploadTime.Before(now) {
 		c.Fatalf("upload time earlier than expected; want > %v; got %v", now, res.UploadTime)
@@ -268,9 +268,28 @@ func (s *resourceSuite) TestUploadResource(c *gc.C) {
 	checkResourceDocs(c, store, id, []string{"someResource/0"}, []*mongodoc.Resource{res})
 
 	blob = "content 2"
-	res, err = store.UploadResource(id, "someResource", strings.NewReader(blob), hashOfString(blob), int64(len(blob)))
+	res, err = store.UploadResource(id, "someResource", -1, strings.NewReader(blob), hashOfString(blob), int64(len(blob)))
 	c.Assert(err, gc.Equals, nil)
 	checkResourceDocs(c, store, id, []string{"someResource/1"}, []*mongodoc.Resource{res})
+}
+
+func (s *resourceSuite) TestUploadResourceWithSpecificRevisionId(c *gc.C) {
+	store := s.newStore(c, false)
+	defer store.Close()
+
+	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
+	meta := storetesting.MetaWithResources(nil, "someResource")
+	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
+	c.Assert(err, gc.Equals, nil)
+
+	now := time.Now()
+	blob := "content 1"
+	res, err := store.UploadResource(id, "someResource", 2, strings.NewReader(blob), hashOfString(blob), int64(len(blob)))
+	c.Assert(err, gc.Equals, nil)
+	if res.UploadTime.Before(now) {
+		c.Fatalf("upload time earlier than expected; want > %v; got %v", now, res.UploadTime)
+	}
+	checkResourceDocs(c, store, id, []string{"someResource/2"}, []*mongodoc.Resource{res})
 }
 
 func (s *resourceSuite) TestAddResourceWithUploadId(c *gc.C) {
@@ -288,7 +307,7 @@ func (s *resourceSuite) TestAddResourceWithUploadId(c *gc.C) {
 	}
 	uid := putMultipart(c, store.BlobStore, time.Time{}, contents...)
 
-	res, err := store.AddResourceWithUploadId(id, "someResource", uid)
+	res, err := store.AddResourceWithUploadId(id, "someResource", -1, uid)
 	c.Assert(err, gc.Equals, nil)
 
 	// Check that the upload document has been removed.
@@ -305,6 +324,27 @@ func (s *resourceSuite) TestAddResourceWithUploadId(c *gc.C) {
 	data, err := ioutil.ReadAll(blob)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(string(data), gc.Equals, allContents)
+}
+
+func (s *resourceSuite) TestAddResourceWithUploadIdAndSpecificRevisionId(c *gc.C) {
+	store := s.newStore(c, false)
+	defer store.Close()
+
+	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
+	meta := storetesting.MetaWithResources(nil, "someResource")
+	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
+	c.Assert(err, gc.Equals, nil)
+
+	contents := []string{
+		"123456789 123456789 ",
+		"abcdefghijklmnopqrstuvwyz",
+	}
+	uid := putMultipart(c, store.BlobStore, time.Time{}, contents...)
+
+	res, err := store.AddResourceWithUploadId(id, "someResource", 2, uid)
+	c.Assert(err, gc.Equals, nil)
+
+	checkResourceDocs(c, store, id, []string{"someResource/2"}, []*mongodoc.Resource{res})
 }
 
 func (s *resourceSuite) TestAddResourceWithSharedUploadId(c *gc.C) {
@@ -326,7 +366,7 @@ func (s *resourceSuite) TestAddResourceWithSharedUploadId(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	// We get an error but the upload should not be removed.
-	_, err = store.AddResourceWithUploadId(id, "someResource", uid)
+	_, err = store.AddResourceWithUploadId(id, "someResource", -1, uid)
 	c.Assert(err, gc.ErrorMatches, `cannot set owner of upload: upload already used by something else`)
 
 	// Check that the blob is still around.
@@ -398,7 +438,7 @@ func (s *resourceSuite) TestUploadResourceErrors(c *gc.C) {
 
 	for i, test := range uploadResourceErrorTests {
 		c.Logf("%d. %s", i, test.about)
-		_, err = store.UploadResource(id, test.name, strings.NewReader(test.blob), test.hash, test.size)
+		_, err = store.UploadResource(id, test.name, -1, strings.NewReader(test.blob), test.hash, test.size)
 		c.Assert(err, gc.ErrorMatches, test.expectError)
 	}
 }
@@ -481,7 +521,7 @@ func (s *resourceSuite) TestResolveResource(c *gc.C) {
 	// Upload three version of the resource.
 	for i := 0; i < 3; i++ {
 		content := fmt.Sprintf("content%d", i)
-		_, err := store.UploadResource(id, "someResource", strings.NewReader(content), hashOfString(content), int64(len(content)))
+		_, err := store.UploadResource(id, "someResource", -1, strings.NewReader(content), hashOfString(content), int64(len(content)))
 		c.Assert(err, gc.Equals, nil)
 	}
 	// Publish the charm to different channels with the different resources.
@@ -598,9 +638,24 @@ func (s *resourceSuite) TestAddDockerResource(c *gc.C) {
 	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
 	c.Assert(err, gc.Equals, nil)
 
-	res, err := store.AddDockerResource(id, "resource1", "registry.example.com/library/image", "crc32:363a3020")
+	res, err := store.AddDockerResource(id, "resource1", -1, "registry.example.com/library/image", "crc32:363a3020")
 	c.Assert(err, gc.Equals, nil)
 	checkResourceDocs(c, store, id, []string{"resource1/0"}, []*mongodoc.Resource{res})
+}
+
+func (s *resourceSuite) TestAddDockerResourceWithSpecificRevisionId(c *gc.C) {
+	store := s.newStore(c, false)
+	defer store.Close()
+
+	meta := storetesting.MetaWithDockerResources(nil, "resource1")
+	meta = storetesting.MetaWithSupportedSeries(meta, "kubernetes")
+	id := MustParseResolvedURL("cs:~charmers/docker-registry-0")
+	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
+	c.Assert(err, gc.Equals, nil)
+
+	res, err := store.AddDockerResource(id, "resource1", 2, "registry.example.com/library/image", "crc32:363a3020")
+	c.Assert(err, gc.Equals, nil)
+	checkResourceDocs(c, store, id, []string{"resource1/2"}, []*mongodoc.Resource{res})
 }
 
 func (s *resourceSuite) TestAddDockerResourceNoSuchCharm(c *gc.C) {
@@ -609,7 +664,7 @@ func (s *resourceSuite) TestAddDockerResourceNoSuchCharm(c *gc.C) {
 
 	id := MustParseResolvedURL("cs:~charmers/docker-registry-0")
 
-	_, err := store.AddDockerResource(id, "resource1", "registry.example.com/library/image", "crc32:363a3020")
+	_, err := store.AddDockerResource(id, "resource1", -1, "registry.example.com/library/image", "crc32:363a3020")
 	c.Assert(err, gc.ErrorMatches, `entity not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
@@ -624,7 +679,7 @@ func (s *resourceSuite) TestAddDockerResourceNotKubernetesCharm(c *gc.C) {
 	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
 	c.Assert(err, gc.Equals, nil)
 
-	_, err = store.AddDockerResource(id, "resource1", "registry.example.com/library/image", "crc32:363a3020")
+	_, err = store.AddDockerResource(id, "resource1", -1, "registry.example.com/library/image", "crc32:363a3020")
 	c.Assert(err, gc.ErrorMatches, `entity is not a kubernetes charm`)
 }
 
@@ -638,7 +693,7 @@ func (s *resourceSuite) TestAddDockerResourceNoSuchResource(c *gc.C) {
 	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
 	c.Assert(err, gc.Equals, nil)
 
-	_, err = store.AddDockerResource(id, "resource2", "registry.example.com/library/image", "crc32:363a3020")
+	_, err = store.AddDockerResource(id, "resource2", -1, "registry.example.com/library/image", "crc32:363a3020")
 	c.Assert(err, gc.ErrorMatches, `"cs:~charmers/docker-registry-0" does not have image resource "resource2"`)
 }
 
@@ -656,17 +711,17 @@ func uploadResources(c *gc.C, store *Store, id *router.ResolvedURL, contentSuffi
 		r := strings.NewReader(content)
 		switch res.Type {
 		case resource.TypeFile:
-			_, err := store.UploadResource(id, name, r, hash, int64(len(content)))
+			_, err := store.UploadResource(id, name, -1, r, hash, int64(len(content)))
 			c.Assert(err, gc.Equals, nil)
 		case resource.TypeContainerImage:
-			_, err := store.AddDockerResource(id, name, "", "test-hash:"+hash)
+			_, err := store.AddDockerResource(id, name, -1, "", "test-hash:"+hash)
 			c.Assert(err, gc.Equals, nil)
 		}
 	}
 }
 
 func uploadResource(c *gc.C, store *Store, id *router.ResolvedURL, name string, blob string) {
-	_, err := store.UploadResource(id, name, strings.NewReader(blob), hashOfString(blob), int64(len(blob)))
+	_, err := store.UploadResource(id, name, -1, strings.NewReader(blob), hashOfString(blob), int64(len(blob)))
 	c.Assert(err, gc.Equals, nil)
 }
 

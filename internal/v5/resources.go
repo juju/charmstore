@@ -206,9 +206,9 @@ func (h *ReqHandler) serveUploadResource(id *router.ResolvedURL, w http.Response
 	}
 	var rdoc *mongodoc.Resource
 	if uploadId != "" {
-		rdoc, err = h.Store.AddResourceWithUploadId(id, name, uploadId)
+		rdoc, err = h.Store.AddResourceWithUploadId(id, name, -1, uploadId)
 	} else {
-		rdoc, err = h.Store.UploadResource(id, name, req.Body, hash, req.ContentLength)
+		rdoc, err = h.Store.UploadResource(id, name, -1, req.Body, hash, req.ContentLength)
 	}
 	if err != nil {
 		return errgo.Mask(err)
@@ -237,7 +237,7 @@ func (h *ReqHandler) serveUploadDockerResource(id *router.ResolvedURL, resourceN
 		return badRequestf(nil, "digest not provided")
 	}
 	// TODO check that ImageName parses as a valid docker resource
-	rdoc, err := h.Store.AddDockerResource(id, resourceName, p.ImageName, p.Digest)
+	rdoc, err := h.Store.AddDockerResource(id, resourceName, -1, p.ImageName, p.Digest)
 	if err != nil {
 		return errgo.Mask(err)
 	}
