@@ -451,6 +451,24 @@ func (s *ArchiveSuite) TestPostSingleSeriesCharmWhenMultiSeriesVersionExists(c *
 	)
 }
 
+func (s *ArchiveSuite) TestPutSingleSeriesCharmWhenMultiSeriesVersionExists(c *gc.C) {
+	s.assertUploadCharm(c, "POST", newResolvedURL("~charmers/juju-gui-0", -1), "multi-series", nil)
+
+	s.assertUploadCharmError(
+		c,
+		"PUT",
+		charm.MustParseURL("~charmers/saucy/juju-gui-1"),
+		nil,
+		"wordpress",
+		nil,
+		http.StatusForbidden,
+		params.Error{
+			Message: "charm name duplicates multi-series charm name cs:~charmers/juju-gui-0",
+			Code:    params.ErrEntityIdNotAllowed,
+		},
+	)
+}
+
 func (s *ArchiveSuite) TestPostKubernetesCharm(c *gc.C) {
 	// A charm that did not exist before should get revision 0.
 	s.assertUploadCharm(c, "POST", newResolvedURL("~charmers/juju-gui-0", -1), "kubernetes", nil)
@@ -489,6 +507,26 @@ func (s *ArchiveSuite) TestPutCharmWithInvalidChannel(c *gc.C) {
 			Code:    params.ErrBadRequest,
 		},
 	)
+}
+
+func (s *ArchiveSuite) TestPutMultiseriesCharm(c *gc.C) {
+	s.assertUploadCharm(c, "PUT", newResolvedURL("~charmers/juju-gui-2", -1), "multi-series", nil)
+}
+
+func (s *ArchiveSuite) TestPutBundle(c *gc.C) {
+	// Upload the required charms.
+	for _, rurl := range []*router.ResolvedURL{
+		newResolvedURL("cs:~charmers/utopic/mysql-42", 42),
+		newResolvedURL("cs:~charmers/utopic/wordpress-47", 47),
+		newResolvedURL("cs:~charmers/utopic/logging-1", 1),
+	} {
+		err := s.store.AddCharmWithArchive(rurl, storetesting.Charms.CharmArchive(c.MkDir(), rurl.URL.Name))
+		c.Assert(err, gc.Equals, nil)
+		err = s.store.Publish(rurl, nil, params.StableChannel)
+		c.Assert(err, gc.Equals, nil)
+	}
+
+	s.assertUploadBundle(c, "PUT", newResolvedURL("~charmers/bundle/wordpress-simple-2", -1), "wordpress-simple")
 }
 
 func (s *ArchiveSuite) TestPutCharm(c *gc.C) {

@@ -113,6 +113,7 @@ func (s *commonSuite) TearDownSuite(c *gc.C) {
 	if s.esSuite != nil {
 		s.esSuite.TearDownSuite(c)
 	}
+	s.IsolatedMgoSuite.TearDownSuite(c)
 }
 
 func (s *commonSuite) SetUpTest(c *gc.C) {

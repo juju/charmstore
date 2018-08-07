@@ -228,9 +228,6 @@ func (h *ReqHandler) servePostArchive(id *charm.URL, w http.ResponseWriter, req 
 
 func (h *ReqHandler) servePutArchive(id *charm.URL, w http.ResponseWriter, req *http.Request) (err error) {
 	defer h.updateStatsArchiveUpload(id, &err)
-	if id.Series == "" {
-		return badRequestf(nil, "series not specified")
-	}
 	if id.Revision == -1 {
 		return badRequestf(nil, "revision not specified")
 	}

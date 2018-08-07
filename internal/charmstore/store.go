@@ -548,7 +548,7 @@ func (s *Store) NewRevision(id *charm.URL) (int, error) {
 }
 
 // AddRevision records a new revision of the given id,
-// meaning that any subequent NewRevision call
+// meaning that any subsequent NewRevision call
 // for the id will return a higher revision number.
 func (s *Store) AddRevision(id *router.ResolvedURL) error {
 	if err := s.addRevision(&id.URL); err != nil {
