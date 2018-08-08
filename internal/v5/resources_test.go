@@ -75,6 +75,43 @@ func (s *ResourceSuite) TestPost(c *gc.C) {
 	c.Assert(string(data), gc.Equals, content)
 }
 
+func (s *ResourceSuite) TestPut(c *gc.C) {
+	id := newResolvedURL("~charmers/precise/wordpress-0", -1)
+	s.addPublicCharm(c, storetesting.NewCharm(&charm.Meta{
+		Resources: map[string]resource.Meta{
+			"someResource": {
+				Name: "someResource",
+				Type: resource.TypeFile,
+				Path: "1.zip",
+			},
+		},
+	}), id)
+	content := "some content"
+	hash := fmt.Sprintf("%x", sha512.Sum384([]byte(content)))
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:      s.srv,
+		Method:       "PUT",
+		Body:         strings.NewReader(content),
+		URL:          storeURL(fmt.Sprintf("%s/resource/someResource/5?hash=%s&filename=foo.zip", id.URL.Path(), hash)),
+		ExpectStatus: http.StatusOK,
+		ExpectBody: params.ResourceUploadResponse{
+			Revision: 5,
+		},
+		Do: s.bakeryDoAsUser("charmers"),
+	})
+
+	// Check that the resource has really been uploaded.
+	r, err := s.store.ResolveResource(id, "someResource", 5, "")
+	c.Assert(err, gc.Equals, nil)
+
+	blob, err := s.store.OpenResourceBlob(r)
+	c.Assert(err, gc.Equals, nil)
+	defer blob.Close()
+	data, err := ioutil.ReadAll(blob)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(string(data), gc.Equals, content)
+}
+
 func (s *ResourceSuite) TestMultipartPost(c *gc.C) {
 	// Create the upload.
 	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
@@ -226,12 +263,12 @@ func (s *ResourceSuite) TestInvalidMethod(c *gc.C) {
 	s.addPublicCharm(c, storetesting.NewCharm(nil), id)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:      s.srv,
-		Method:       "PUT",
+		Method:       "PATCH",
 		URL:          storeURL(id.URL.Path() + "/resource/someResource"),
 		ExpectStatus: http.StatusMethodNotAllowed,
 		ExpectBody: params.Error{
 			Code:    params.ErrMethodNotAllowed,
-			Message: `PUT not allowed`,
+			Message: `PATCH not allowed`,
 		},
 		Do: s.bakeryDoAsUser("charmers"),
 	})
@@ -253,17 +290,49 @@ func (s *ResourceSuite) TestCannotUploadToBundle(c *gc.C) {
 	})
 }
 
-func (s *ResourceSuite) TestUploadInvalidResourceName(c *gc.C) {
+func (s *ResourceSuite) TestPostInvalidResourceName(c *gc.C) {
 	id := newResolvedURL("~charmers/precise/wordpress-0", -1)
 	s.addPublicCharm(c, storetesting.NewCharm(nil), id)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:      s.srv,
 		Method:       "POST",
 		URL:          storeURL(id.URL.Path() + "/resource/someResource/x"),
+		ExpectStatus: http.StatusNotFound,
+		ExpectBody: params.Error{
+			Code:    params.ErrNotFound,
+			Message: `malformed revision number`,
+		},
+		Do: s.bakeryDoAsUser("charmers"),
+	})
+}
+
+func (s *ResourceSuite) TestPostWithRevisionNumber(c *gc.C) {
+	id := newResolvedURL("~charmers/precise/wordpress-0", -1)
+	s.addPublicCharm(c, storetesting.NewCharm(nil), id)
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:      s.srv,
+		Method:       "POST",
+		URL:          storeURL(id.URL.Path() + "/resource/someResource/3"),
+		ExpectStatus: http.StatusMethodNotAllowed,
+		ExpectBody: params.Error{
+			Code:    params.ErrMethodNotAllowed,
+			Message: `cannot POST to specific resource revision`,
+		},
+		Do: s.bakeryDoAsUser("charmers"),
+	})
+}
+
+func (s *ResourceSuite) TestPutWithoutRevision(c *gc.C) {
+	id := newResolvedURL("~charmers/precise/wordpress-0", -1)
+	s.addPublicCharm(c, storetesting.NewCharm(nil), id)
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:      s.srv,
+		Method:       "PUT",
+		URL:          storeURL(id.URL.Path() + "/resource/someResource"),
 		ExpectStatus: http.StatusBadRequest,
 		ExpectBody: params.Error{
 			Code:    params.ErrBadRequest,
-			Message: `invalid resource name`,
+			Message: `revision not specified`,
 		},
 		Do: s.bakeryDoAsUser("charmers"),
 	})

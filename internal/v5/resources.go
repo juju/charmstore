@@ -40,7 +40,7 @@ func (h *ReqHandler) serveResources(id *router.ResolvedURL, w http.ResponseWrite
 	switch req.Method {
 	case "GET":
 		return h.serveDownloadResource(id, w, req)
-	case "POST":
+	case "POST", "PUT":
 		return h.serveUploadResource(id, w, req)
 	default:
 		return errgo.WithCausef(nil, params.ErrMethodNotAllowed, "%s not allowed", req.Method)
@@ -168,9 +168,21 @@ func (h *ReqHandler) serveUploadResource(id *router.ResolvedURL, w http.Response
 	if id.URL.Series == "bundle" {
 		return errgo.WithCausef(nil, params.ErrForbidden, "cannot upload a resource to a bundle")
 	}
-	name := strings.TrimPrefix(req.URL.Path, "/")
-	if !validResourceName(name) {
+	rid, err := parseResourceId(strings.TrimPrefix(req.URL.Path, "/"))
+	if err != nil {
+		return errgo.WithCausef(err, params.ErrNotFound, "")
+	}
+	if !validResourceName(rid.Name) {
 		return badRequestf(nil, "invalid resource name")
+	}
+	if req.Method == "PUT" {
+		if rid.Revision == -1 {
+			return badRequestf(nil, "revision not specified")
+		}
+	} else {
+		if rid.Revision != -1 {
+			return errgo.WithCausef(nil, params.ErrMethodNotAllowed, "cannot POST to specific resource revision")
+		}
 	}
 	e, err := h.Cache.Entity(&id.URL, charmstore.FieldSelector("charmmeta"))
 	if err != nil {
@@ -179,7 +191,7 @@ func (h *ReqHandler) serveUploadResource(id *router.ResolvedURL, w http.Response
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	if charmstore.IsKubernetesCharm(e.CharmMeta) {
-		return h.serveUploadDockerResource(id, name, w, req)
+		return h.serveUploadDockerResource(id, rid, w, req)
 	}
 	hash := req.Form.Get("hash")
 	uploadId := req.Form.Get("upload-id")
@@ -189,9 +201,9 @@ func (h *ReqHandler) serveUploadResource(id *router.ResolvedURL, w http.Response
 	if uploadId == "" && req.ContentLength == -1 {
 		return badRequestf(nil, "Content-Length not specified")
 	}
-	r, ok := e.CharmMeta.Resources[name]
+	r, ok := e.CharmMeta.Resources[rid.Name]
 	if !ok {
-		return errgo.WithCausef(nil, params.ErrForbidden, "resource %q not found in charm metadata", name)
+		return errgo.WithCausef(nil, params.ErrForbidden, "resource %q not found in charm metadata", rid.Name)
 	}
 	if r.Type != resource.TypeFile {
 		return errgo.WithCausef(nil, params.ErrForbidden, "non-file resource types not supported")
@@ -206,9 +218,9 @@ func (h *ReqHandler) serveUploadResource(id *router.ResolvedURL, w http.Response
 	}
 	var rdoc *mongodoc.Resource
 	if uploadId != "" {
-		rdoc, err = h.Store.AddResourceWithUploadId(id, name, -1, uploadId)
+		rdoc, err = h.Store.AddResourceWithUploadId(id, rid.Name, rid.Revision, uploadId)
 	} else {
-		rdoc, err = h.Store.UploadResource(id, name, -1, req.Body, hash, req.ContentLength)
+		rdoc, err = h.Store.UploadResource(id, rid.Name, rid.Revision, req.Body, hash, req.ContentLength)
 	}
 	if err != nil {
 		return errgo.Mask(err)
@@ -218,13 +230,14 @@ func (h *ReqHandler) serveUploadResource(id *router.ResolvedURL, w http.Response
 	})
 }
 
-func (h *ReqHandler) serveUploadDockerResource(id *router.ResolvedURL, resourceName string, w http.ResponseWriter, req *http.Request) error {
+func (h *ReqHandler) serveUploadDockerResource(id *router.ResolvedURL, rid mongodoc.ResourceRevision, w http.ResponseWriter, req *http.Request) error {
 	if req.Form.Get("hash") != "" {
 		return badRequestf(nil, "cannot specify hash parameter on docker image resources")
 	}
 	if req.Form.Get("upload-id") != "" {
 		return badRequestf(nil, "cannot specify upload-id parameter on docker image resources")
 	}
+	// TODO limit the size of the body here.
 	data, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		return errgo.Notef(err, "cannot read body")
@@ -237,7 +250,7 @@ func (h *ReqHandler) serveUploadDockerResource(id *router.ResolvedURL, resourceN
 		return badRequestf(nil, "digest not provided")
 	}
 	// TODO check that ImageName parses as a valid docker resource
-	rdoc, err := h.Store.AddDockerResource(id, resourceName, -1, p.ImageName, p.Digest)
+	rdoc, err := h.Store.AddDockerResource(id, rid.Name, rid.Revision, p.ImageName, p.Digest)
 	if err != nil {
 		return errgo.Mask(err)
 	}
