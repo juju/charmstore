@@ -15,10 +15,12 @@ import (
 
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
-	"github.com/ncw/swift"
-	"github.com/ncw/swift/swifttest"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/goose.v2/client"
+	"gopkg.in/goose.v2/identity"
+	"gopkg.in/goose.v2/swift"
+	"gopkg.in/goose.v2/testservices/openstackservice"
 	"gopkg.in/mgo.v2"
 
 	"gopkg.in/juju/charmstore.v5/internal/blobstore"
@@ -50,39 +52,48 @@ func (s *MongoStoreSuite) TestPutConcurrent(c *gc.C) {
 }
 
 type SwiftStoreSuite struct {
-	swift *swifttest.SwiftServer
+	openstack *openstackservice.Openstack
 	blobStoreSuite
 }
 
 var _ = gc.Suite(&SwiftStoreSuite{})
 
 func (s *SwiftStoreSuite) SetUpTest(c *gc.C) {
-	var err error
-	s.swift, err = swifttest.NewSwiftServer("")
-	c.Assert(err, gc.Equals, nil)
-
-	// Create the container
-	conn := &swift.Connection{
-		AuthUrl:  s.swift.AuthURL,
-		ApiKey:   swifttest.TEST_ACCOUNT,
-		UserName: swifttest.TEST_ACCOUNT,
+	// Set up an Openstack service.
+	cred := &identity.Credentials{
+		URL:        "http://0.1.2.3/",
+		User:       "fred",
+		Secrets:    "secret",
+		Region:     "some region",
+		TenantName: "tenant",
 	}
-	err = conn.ContainerCreate("testc", nil)
-	c.Assert(err, gc.Equals, nil)
+	var logMsg []string
+	s.openstack, logMsg = openstackservice.New(cred, identity.AuthUserPass, false)
+	for _, msg := range logMsg {
+		c.Logf(msg)
+	}
+	s.openstack.SetupHTTP(nil)
+
+	cred2 := &identity.Credentials{
+		URL:        s.openstack.URLs["identity"],
+		User:       "fred",
+		Secrets:    "secret",
+		Region:     "some region",
+		TenantName: "tenant",
+	}
+
+	client := client.NewClient(cred, identity.AuthUserPass, nil)
+	sw := swift.New(client)
+	sw.CreateContainer("testc", swift.Private)
 
 	s.blobStoreSuite.SetUpTest(c, func(db *mgo.Database) blobstore.Backend {
-		return blobstore.NewSwiftBackend(blobstore.SwiftParams{
-			AuthURL:  s.swift.AuthURL,
-			Bucket:   "testc",
-			Secret:   swifttest.TEST_ACCOUNT,
-			Username: swifttest.TEST_ACCOUNT,
-		})
+		return blobstore.NewSwiftBackend(cred2, identity.AuthUserPass, "testc")
 	})
 }
 
 func (s *SwiftStoreSuite) TearDownTest(c *gc.C) {
 	s.blobStoreSuite.TearDownTest(c)
-	s.swift.Close()
+	s.openstack.Stop()
 }
 
 type blobStoreSuite struct {
