@@ -24,7 +24,6 @@ github.com/juju/xml	git	eb759a627588d35166bc505fceb51b88500e291e	2015-04-13T13:1
 github.com/juju/zip	git	f6b1e93fa2e29a1d7d49b566b2b51efb060c982a	2016-02-05T10:52:21Z
 github.com/julienschmidt/httprouter	git	77a895ad01ebc98a4dc95d8355bc825ce80a56f6	2015-10-13T22:55:20Z
 github.com/matttproud/golang_protobuf_extensions	git	c12348ce28de40eed0136aa2b644d0ee0650e56c	2016-04-24T11:30:07Z
-github.com/ncw/swift	git	b2a7479cf26fa841ff90dd932d0221cb5c50782d	2018-03-27T20:33:07Z
 github.com/prometheus/client_golang	git	575f371f7862609249a1be4c9145f429fe065e32	2016-11-24T15:57:32Z
 github.com/prometheus/client_model	git	99fa1f4be8e564e8a6b613da7fa6f46c9edafc6c	2017-11-17T10:05:41Z
 github.com/prometheus/common	git	6fb6fce6f8b75884b92e1889c150403fc0872c5e	2018-02-28T09:25:48Z
@@ -34,6 +33,7 @@ golang.org/x/crypto	git	159ae71589f303f9fbfd7528413e0fe944b9c1cb	2018-05-24T12:5
 golang.org/x/net	git	d25186b37f34ebdbbea8f488ef055638dfab272d	2018-03-06T06:01:52Z
 gopkg.in/check.v1	git	4f90aeace3a26ad7021961c297b22c42160c7b25	2016-01-05T16:49:36Z
 gopkg.in/errgo.v1	git	442357a80af5c6bf9b6d51ae791a39c3421004f3	2016-12-22T12:58:16Z
+gopkg.in/goose.v2	git	4dc44b23a313a8a3e4051e7ee568a954a8cb3385	2018-02-08T12:05:40Z
 gopkg.in/httprequest.v1	git	3531529dedf047a744dd77f5262515aefff8cd48	2018-03-19T12:54:57Z
 gopkg.in/juju/charm.v6	git	abaa717bc6ed4f694281737cb01f32f7de7ea357	2018-08-03T03:00:15Z
 gopkg.in/juju/charmrepo.v3	git	1068bda266ca4f268822587b820bf1b4a5438745	2018-06-19T10:58:31Z

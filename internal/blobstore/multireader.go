@@ -117,10 +117,7 @@ func (r *multiReader) Read(buf []byte) (int, error) {
 	n, err := r.r.Read(buf)
 	r.pos += int64(n)
 	r.rpos = r.pos
-	// As per https://golang.org/pkg/io/#Reader a reader may return
-	// io.EOF with the final data bytes in that case we should not
-	// produce an error.
-	if err != nil && err != io.EOF {
+	if err != nil {
 		return n, errgo.Notef(err, "error reading blob %q", r.hashes[r.rindex])
 	}
 	return n, nil

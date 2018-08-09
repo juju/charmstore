@@ -10,15 +10,18 @@ package main // import "gopkg.in/juju/charmstore.v5/cmd/migrateblobs"
 import (
 	"flag"
 	"fmt"
-	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sync/atomic"
 
 	"github.com/juju/loggo"
 	"github.com/juju/utils/parallel"
-	"github.com/ncw/swift"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/goose.v2/client"
+	"gopkg.in/goose.v2/errors"
+	"gopkg.in/goose.v2/identity"
+	"gopkg.in/goose.v2/swift"
 	"gopkg.in/mgo.v2"
 
 	"gopkg.in/juju/charmstore.v5/config"
@@ -70,14 +73,19 @@ func run(confPath string) error {
 	defer session.Close()
 	db := session.DB("juju")
 
-	dst := &swift.Connection{
-		ApiKey:     config.SwiftSecret,
-		AuthUrl:    config.SwiftAuthURL,
+	cred := &identity.Credentials{
+		URL:        config.SwiftAuthURL,
+		User:       config.SwiftUsername,
+		Secrets:    config.SwiftSecret,
 		Region:     config.SwiftRegion,
-		StorageUrl: config.SwiftEndpointURL,
-		Tenant:     config.SwiftTenant,
-		UserName:   config.SwiftUsername,
+		TenantName: config.SwiftTenant,
 	}
+	if config.SwiftEndpointURL != "" {
+		//do something with config.SwiftEndpointURL
+	}
+	client := client.NewClient(cred, config.SwiftAuthMode.Mode, nil)
+	client.SetRequiredServiceTypes([]string{"object-store"})
+	dst := swift.New(client)
 
 	logger.Infof("migrating entity blobs")
 	counter, alreadyExistsCounter, err := migrate(db.GridFS("entitystore"), dst, config.SwiftBucket)
@@ -89,7 +97,7 @@ func run(confPath string) error {
 	return nil
 }
 
-func migrate(gridfs *mgo.GridFS, sc *swift.Connection, dstContainerName string) (counter int32, alreadyExistsCounter int32, err error) {
+func migrate(gridfs *mgo.GridFS, sc *swift.Client, dstContainerName string) (counter int32, alreadyExistsCounter int32, err error) {
 	iter := gridfs.Find(nil).Sort("-uploadDate").Iter()
 	defer iter.Close()
 	run := parallel.NewRun(*numParallel)
@@ -111,7 +119,7 @@ func migrate(gridfs *mgo.GridFS, sc *swift.Connection, dstContainerName string) 
 			}
 			found := false
 			err = retry(func() error {
-				_, _, err := sc.Object(dstContainerName, file1.Name())
+				_, err := sc.HeadObject(dstContainerName, file1.Name())
 				if err == nil {
 					found = true
 					logger.Infof("- skipping/existing %s [%d] %v",
@@ -119,7 +127,7 @@ func migrate(gridfs *mgo.GridFS, sc *swift.Connection, dstContainerName string) 
 						file1.UploadDate().Format("2006-01-02 15:04:05"))
 					return nil
 				}
-				if err != swift.ObjectNotFound {
+				if err != nil && !errors.IsNotFound(err) {
 					return errgo.Mask(err)
 				}
 				return nil
@@ -155,20 +163,30 @@ func migrate(gridfs *mgo.GridFS, sc *swift.Connection, dstContainerName string) 
 	return counter, alreadyExistsCounter, nil
 }
 
-func copyObject(file *mgo.GridFile, sc *swift.Connection, dstContainerName string) error {
+func copyObject(file *mgo.GridFile, sc *swift.Client, dstContainerName string) error {
 	err := retry(func() error {
 		file.Seek(0, 0) // If file was read and we are retrying, we need to seek to start of file.
-		dst, err := sc.ObjectCreate(dstContainerName, file.Name(), true, file.MD5(), file.ContentType(), nil)
-		if err != nil {
-			return errgo.Mask(err)
-		}
-		if _, err := io.Copy(dst, file); err != nil {
-			return errgo.Mask(err)
-		}
-		return errgo.Mask(dst.Close())
+		return sc.PutReader(dstContainerName, file.Name(), file, file.Size())
 	})
 	if err != nil {
 		return errgo.Notef(err, "cannot put archive for %s", file.Name())
+	}
+	var head http.Header
+	err = retry(func() (err error) {
+		head, err = sc.HeadObject(dstContainerName, file.Name())
+		return err
+	})
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	if head.Get("Etag") != file.MD5() {
+		err = retry(func() error {
+			return sc.DeleteObject(dstContainerName, file.Name())
+		})
+		if err != nil {
+			logger.Errorf("unable to delete swift file: %q", file.Name())
+		}
+		return errgo.Notef(nil, "md5 check sum failed for file: %q", file.Name())
 	}
 	return nil
 }

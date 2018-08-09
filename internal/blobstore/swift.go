@@ -8,121 +8,60 @@ import (
 	"io"
 	"strconv"
 
-	"github.com/ncw/swift"
+	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/goose.v2/client"
+	"gopkg.in/goose.v2/errors"
+	"gopkg.in/goose.v2/identity"
+	"gopkg.in/goose.v2/swift"
 )
 
-// SwiftParams holds the configuration parameters for the swift backend.
-type SwiftParams struct {
-	// AuthURL holds the keystone authentication URL.
-	AuthURL string
-
-	// EndpointURL holds the URL of the swift endpoint.
-	EndpointURL string
-
-	// Bucket holds the swift container name to use to store all the blobs.
-	Bucket string
-
-	// Region holds the openstack region used in authentication.
-	Region string
-
-	// Secret holds the password or secret key used to authenticate.
-	Secret string
-
-	// Tenant holds the tenant name used in authentication.
-	Tenant string
-
-	// Username holds the name of the authenticating user.
-	Username string
-}
-
 type swiftBackend struct {
-	connection *swift.Connection
-	container  string
+	client    *swift.Client
+	container string
 }
 
 // NewSwiftBackend returns a backend which uses OpenStack's Swift for
 // its operations with the given credentials and auth mode. It stores
 // all the data objects in the container with the given name.
-func NewSwiftBackend(params SwiftParams) Backend {
+func NewSwiftBackend(cred *identity.Credentials, authmode identity.AuthMode, container string) Backend {
+	c := client.NewClient(cred,
+		authmode,
+		gooseLogger{},
+	)
+	c.SetRequiredServiceTypes([]string{"object-store"})
 	return &swiftBackend{
-		connection: &swift.Connection{
-			ApiKey:     params.Secret,
-			AuthUrl:    params.AuthURL,
-			Region:     params.Region,
-			Tenant:     params.Tenant,
-			UserName:   params.Username,
-			StorageUrl: params.EndpointURL,
-		},
-		container: params.Bucket,
+		client:    swift.New(c),
+		container: container,
 	}
 }
 
 func (s *swiftBackend) Get(name string) (r ReadSeekCloser, size int64, err error) {
-	f, headers, err := s.connection.ObjectOpen(s.container, name, true, nil)
+	// Use infinite read-ahead here as the goose implementation of
+	// byte range handling seems to differ from swift's.
+	r2, headers, err := s.client.OpenObject(s.container, name, -1)
 	if err != nil {
-		if isNotFound(err) {
+		if errors.IsNotFound(err) {
 			return nil, 0, errgo.WithCausef(nil, ErrNotFound, "")
 		}
 		return nil, 0, errgo.Mask(err)
 	}
-	lengthstr := headers["Content-Length"]
+	lengthstr := headers.Get("Content-Length")
 	size, err = strconv.ParseInt(lengthstr, 10, 64)
-	return swiftBackendReader{f}, size, errgo.Mask(err)
+	return swiftBackendReader{r2.(ReadSeekCloser)}, size, err
 }
 
-const maxBufferSize = 500 * 1024
-
 func (s *swiftBackend) Put(name string, r io.Reader, size int64, hash string) error {
-	// Ensure that we never try to write too much data.
-	r = io.LimitReader(r, size)
-	// Buffer the first few KiB in memory so that we can retry if there is an authentication failure.
-	bufferSize := int64(maxBufferSize)
-	if size < bufferSize {
-		bufferSize = size
-	}
-	buf := make([]byte, size)
-	if _, err := io.ReadFull(r, buf); err != nil {
-		return errgo.Mask(err)
-	}
-
-	var f *swift.ObjectCreateFile
 	h := NewHash()
-	var err error
-	for i := 0; i < 2; i++ {
-		f, err = s.connection.ObjectCreate(s.container, name, true, "", "", swift.Headers{"Content-Length": fmt.Sprintf("%d", size)})
-		if errgo.Cause(err) == swift.AuthorizationFailed {
-			continue
-		}
-		if err != nil {
-			break
-		}
-		w := io.MultiWriter(f, h)
-		_, err = w.Write(buf)
-		if errgo.Cause(err) == swift.AuthorizationFailed {
-			f.Close()
-			f = nil
-			h.Reset()
-			continue
-		}
-		if err != nil {
-			break
-		}
-		// If we've written first part successfully we expect the remainder to complete.
-		_, err = io.Copy(w, r)
-		break
-	}
-	if f != nil {
-		err1 := f.Close()
-		if err == nil {
-			err = err1
-		}
-	}
+	r2 := io.TeeReader(r, h)
+	err := s.client.PutReader(s.container, name, r2, size)
 	if err != nil {
+		// TODO: investigate if PutReader can return err but the object still be
+		// written. Should there be cleanup here?
 		return errgo.Mask(err)
 	}
-	if fmt.Sprintf("%x", h.Sum(nil)) != hash {
-		err := s.connection.ObjectDelete(s.container, name)
+	if hash != fmt.Sprintf("%x", h.Sum(nil)) {
+		err := s.client.DeleteObject(s.container, name)
 		if err != nil {
 			logger.Errorf("could not delete object from container after a hash mismatch was detected: %v", err)
 		}
@@ -132,8 +71,8 @@ func (s *swiftBackend) Put(name string, r io.Reader, size int64, hash string) er
 }
 
 func (s *swiftBackend) Remove(name string) error {
-	err := s.connection.ObjectDelete(s.container, name)
-	if err != nil && isNotFound(err) {
+	err := s.client.DeleteObject(s.container, name)
+	if err != nil && errors.IsNotFound(err) {
 		return errgo.WithCausef(nil, ErrNotFound, "")
 	}
 	return errgo.Mask(err)
@@ -151,13 +90,18 @@ func (r swiftBackendReader) Read(buf []byte) (int, error) {
 	if err == nil || err == io.EOF {
 		return n, err
 	}
-	if isNotFound(err) {
+	if errors.IsNotFound(err) {
 		return n, errgo.WithCausef(nil, ErrNotFound, "")
 	}
 	return n, errgo.Mask(err)
 }
 
-func isNotFound(err error) bool {
-	err = errgo.Cause(err)
-	return err == swift.ContainerNotFound || err == swift.ObjectNotFound
+// gooseLogger implements the logger interface required
+// by goose, using the loggo logger to do the actual
+// logging.
+// TODO: Patch goose to use loggo directly.
+type gooseLogger struct{}
+
+func (gooseLogger) Printf(f string, a ...interface{}) {
+	logger.LogCallf(2, loggo.DEBUG, f, a...)
 }

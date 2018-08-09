@@ -14,9 +14,12 @@ import (
 	"github.com/juju/loggo"
 	jujutesting "github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
-	"github.com/ncw/swift"
-	"github.com/ncw/swift/swifttest"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/goose.v2/client"
+	"gopkg.in/goose.v2/identity"
+	"gopkg.in/goose.v2/swift"
+	"gopkg.in/goose.v2/testing/httpsuite"
+	"gopkg.in/goose.v2/testservices/openstackservice"
 	"gopkg.in/juju/charm.v6"
 	"gopkg.in/juju/charmrepo.v3/csclient/params"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
@@ -97,12 +100,15 @@ type commonSuite struct {
 	// to config.MaxMgoSessions when calling charmstore.NewServer.
 	maxMgoSessions int
 
-	swift       *swift.Connection
-	swiftServer *swifttest.SwiftServer
+	swift *swift.Client
+	httpsuite.HTTPSuite
+	openstack     *openstackservice.Openstack
+	openstackCred *identity.Credentials
 }
 
 func (s *commonSuite) SetUpSuite(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpSuite(c)
+	s.HTTPSuite.SetUpSuite(c)
 	if s.enableES {
 		s.esSuite = new(storetesting.ElasticSearchSuite)
 		s.esSuite.SetUpSuite(c)
@@ -110,6 +116,7 @@ func (s *commonSuite) SetUpSuite(c *gc.C) {
 }
 
 func (s *commonSuite) TearDownSuite(c *gc.C) {
+	s.HTTPSuite.TearDownSuite(c)
 	if s.esSuite != nil {
 		s.esSuite.TearDownSuite(c)
 	}
@@ -128,7 +135,7 @@ func (s *commonSuite) SetUpTest(c *gc.C) {
 }
 
 func (s *commonSuite) TearDownTest(c *gc.C) {
-	s.swiftServer.Close()
+	s.openstack.Stop()
 	s.store.Pool().Close()
 	s.store.Close()
 	s.srv.Close()
@@ -149,16 +156,23 @@ func (s *commonSuite) TearDownTest(c *gc.C) {
 func (s *commonSuite) startServer(c *gc.C) {
 	// Disable group caching.
 	s.PatchValue(&v5.PermCacheExpiry, time.Duration(0))
-	// Set up an Swift service.
-	var err error
-	s.swiftServer, err = swifttest.NewSwiftServer("")
-	c.Assert(err, gc.Equals, nil)
-	s.swift = &swift.Connection{
-		AuthUrl:  s.swiftServer.AuthURL,
-		ApiKey:   swifttest.TEST_ACCOUNT,
-		UserName: swifttest.TEST_ACCOUNT,
+	// Set up an Openstack service.
+	s.openstackCred = &identity.Credentials{
+		URL:        s.Server.URL,
+		User:       "fred",
+		Secrets:    "secret",
+		Region:     "heaven",
+		TenantName: "awesomo",
 	}
-	s.swift.ContainerCreate("testc", nil)
+	var logMsg []string
+	s.openstack, logMsg = openstackservice.New(s.openstackCred, identity.AuthUserPass, false)
+	for _, msg := range logMsg {
+		c.Logf(msg)
+	}
+	client := client.NewClient(s.openstackCred, identity.AuthUserPass, nil)
+	s.swift = swift.New(client)
+	s.openstack.SetupHTTP(nil)
+	s.swift.CreateContainer("testc", swift.Private)
 
 	config := charmstore.ServerParams{
 		AuthUsername:          testUsername,
@@ -195,6 +209,7 @@ func (s *commonSuite) startServer(c *gc.C) {
 		}
 	}
 	db := s.Session.DB("charmstore")
+	var err error
 	s.srv, err = charmstore.NewServer(db, si, config, map[string]charmstore.NewAPIHandlerFunc{"v5": v5.NewAPIHandler})
 	c.Assert(err, gc.Equals, nil)
 	s.srvParams = config
@@ -212,12 +227,7 @@ func (s *commonSuite) startServer(c *gc.C) {
 }
 
 func (s *commonSuite) newBlobBackend(db *mgo.Database) blobstore.Backend {
-	return blobstore.NewSwiftBackend(blobstore.SwiftParams{
-		AuthURL:  s.swiftServer.AuthURL,
-		Bucket:   "testc",
-		Secret:   swifttest.TEST_ACCOUNT,
-		Username: swifttest.TEST_ACCOUNT,
-	})
+	return blobstore.NewSwiftBackend(s.openstackCred, identity.AuthUserPass, "testc")
 }
 
 func (s *commonSuite) addPublicCharmFromRepo(c *gc.C, charmName string, rurl *router.ResolvedURL) (*router.ResolvedURL, charm.Charm) {
