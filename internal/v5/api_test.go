@@ -96,6 +96,7 @@ type metaEndpoint struct {
 const (
 	charmOnly = iota + 1
 	bundleOnly
+	promulgatedOnly
 )
 
 func (ep metaEndpoint) isExcluded(url *router.ResolvedURL) bool {
@@ -104,6 +105,8 @@ func (ep metaEndpoint) isExcluded(url *router.ResolvedURL) bool {
 		return url.URL.Series != "bundle"
 	case charmOnly:
 		return url.URL.Series == "bundle"
+	case promulgatedOnly:
+		return url.PromulgatedRevision != -1
 	default:
 		return false
 	}
@@ -495,6 +498,53 @@ var metaEndpoints = []metaEndpoint{{
 			Series:   "utopic",
 			Name:     "category",
 			Revision: 2,
+		})
+	},
+}, {
+	name: "unpromulgated-id",
+	get: func(store *charmstore.Store, url *router.ResolvedURL) (interface{}, error) {
+		id := &url.URL
+		return params.IdResponse{
+			Id:       id,
+			User:     id.User,
+			Series:   id.Series,
+			Name:     id.Name,
+			Revision: id.Revision,
+		}, nil
+	},
+	checkURL: newResolvedURL("~charmers/utopic/category-2", 4),
+	assertCheckData: func(c *gc.C, data interface{}) {
+		c.Assert(data, jc.DeepEquals, params.IdResponse{
+			Id:       charm.MustParseURL("cs:~charmers/utopic/category-2"),
+			User:     "charmers",
+			Series:   "utopic",
+			Name:     "category",
+			Revision: 2,
+		})
+	},
+}, {
+	name:      "promulgated-id",
+	exclusive: promulgatedOnly,
+	get: func(store *charmstore.Store, url *router.ResolvedURL) (interface{}, error) {
+		if url.PromulgatedRevision == -1 {
+			return nil, nil
+		}
+		id := url.PromulgatedURL()
+		return params.IdResponse{
+			Id:       id,
+			User:     id.User,
+			Series:   id.Series,
+			Name:     id.Name,
+			Revision: id.Revision,
+		}, nil
+	},
+	checkURL: newResolvedURL("~charmers/utopic/category-2", 4),
+	assertCheckData: func(c *gc.C, data interface{}) {
+		c.Assert(data, jc.DeepEquals, params.IdResponse{
+			Id:       charm.MustParseURL("cs:utopic/category-4"),
+			Series:   "utopic",
+			Name:     "category",
+			Revision: 4,
 		})
 	},
 }, {
@@ -1953,7 +2003,7 @@ func (s *APISuite) TestMetaEndpointsAny(c *gc.C) {
 			Meta: make(map[string]interface{}),
 		}
 		for _, ep := range metaEndpoints {
-			if ep.isExcluded(url) {
+			if ep.isExcluded(url) || ep.exclusive == promulgatedOnly {
 				// endpoint not relevant.
 				continue
 			}

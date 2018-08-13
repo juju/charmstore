@@ -142,12 +142,16 @@ func newReqHandler() ReqHandler {
 
 	// Delete new endpoints that we don't want to provide in v4.
 	delete(handlers.Id, "publish")
-	delete(handlers.Meta, "published")
 	delete(handlers.Id, "resource")
+
+	delete(handlers.Meta, "published")
 	delete(handlers.Meta, "resources")
 	delete(handlers.Meta, "resources/")
 	delete(handlers.Meta, "can-ingest")
 	delete(handlers.Meta, "can-write")
+	delete(handlers.Meta, "promulgated-id")
+	delete(handlers.Meta, "unpromulgated-id")
+
 	delete(handlers.Global, "upload")
 	delete(handlers.Global, "upload/")
 

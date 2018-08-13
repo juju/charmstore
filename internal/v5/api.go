@@ -273,6 +273,8 @@ func RouterHandlers(h *ReqHandler) *router.Handlers {
 			"id-user":          h.EntityHandler(h.metaIdUser, "_id"),
 			"id-revision":      h.EntityHandler(h.metaIdRevision, "_id"),
 			"id-series":        h.EntityHandler(h.metaIdSeries, "_id"),
+			"unpromulgated-id": h.EntityHandler(h.metaUnpromulgatedId, "_id"),
+			"promulgated-id":   h.EntityHandler(h.metaPromulgatedId, "_id", "promulgated-url"),
 			"manifest":         h.EntityHandler(h.metaManifest, "blobhash"),
 			"owner":            h.EntityHandler(h.metaOwner, "_id"),
 			"perm":             h.puttableBaseEntityHandler(h.metaPerm, h.putMetaPerm, "channelacls"),
@@ -860,19 +862,6 @@ func (h *ReqHandler) metaIdSeries(entity *mongodoc.Entity, id *router.ResolvedUR
 	}, nil
 }
 
-// GET id/meta/id
-// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetaid
-func (h *ReqHandler) metaId(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
-	u := id.PreferredURL()
-	return params.IdResponse{
-		Id:       u,
-		User:     u.User,
-		Series:   u.Series,
-		Name:     u.Name,
-		Revision: u.Revision,
-	}, nil
-}
-
 // GET id/meta/id-name
 // https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetaid-name
 func (h *ReqHandler) metaIdName(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
@@ -887,6 +876,37 @@ func (h *ReqHandler) metaIdRevision(entity *mongodoc.Entity, id *router.Resolved
 	return params.IdRevisionResponse{
 		Revision: id.PreferredURL().Revision,
 	}, nil
+}
+
+// GET id/meta/id
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetaid
+func (h *ReqHandler) metaId(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
+	return newIdResponse(id.PreferredURL()), nil
+}
+
+// GET id/meta/unpromulgated-id
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetaunpromulgatedid
+func (h *ReqHandler) metaUnpromulgatedId(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
+	return newIdResponse(&id.URL), nil
+}
+
+// GET id/meta/promulgated-id
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetapromulgatedid
+func (h *ReqHandler) metaPromulgatedId(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
+	if entity.PromulgatedURL == nil {
+		return nil, nil
+	}
+	return newIdResponse(entity.PromulgatedURL), nil
+}
+
+func newIdResponse(u *charm.URL) *params.IdResponse {
+	return &params.IdResponse{
+		Id:       u,
+		User:     u.User,
+		Series:   u.Series,
+		Name:     u.Name,
+		Revision: u.Revision,
+	}
 }
 
 // GET id/meta/supported-series
