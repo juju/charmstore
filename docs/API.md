@@ -1707,6 +1707,18 @@ Example: `GET ~bob/trusty/wordpress-42/meta/id-series`
 }
 ```
 
+#### GET *id*/meta/unpromulgated-id
+
+The `unpromulgated-id` path is like `meta/id` but always returns the
+id with an owner - the canonical form of the charm or bundle id.
+
+#### GET *id*/meta/promulgated-id
+
+The `promulgated-id` path is like `meta/id` but if the entity has been
+promulgated, it returns the promulgated id (without owner).
+If the entity has never been promulgated, it returns a "metadata not found" error
+(or the entry is omitted when within a bulk metadata request).
+
 #### GET *id*/meta/owner
 
 The `owner` path returns information on the owner of the charm or bundle.
