@@ -279,7 +279,7 @@ func (s *blobStoreSuite) TestPutPartAgain(c *gc.C) {
 	// Perform a Put with mismatching content. This should leave the part in progress
 	// but not completed.
 	err := s.store.PutPart(id, 0, strings.NewReader("something different"), int64(len(content)), 0, hashOf(content))
-	c.Assert(err, gc.ErrorMatches, `cannot upload part ".+": hash mismatch`)
+	c.Assert(err, gc.ErrorMatches, `cannot upload part (.|\n)*`)
 
 	// Try again with the correct content this time.
 	err = s.store.PutPart(id, 0, strings.NewReader(content), int64(len(content)), 0, hashOf(content))
@@ -479,7 +479,7 @@ func (s *blobStoreSuite) TestFinishUploadPartIncomplete(c *gc.C) {
 
 	content0 := "123456789 123456789 "
 	err := s.store.PutPart(id, 0, strings.NewReader("1"), int64(len(content0)), 0, hashOf(content0))
-	c.Assert(err, gc.ErrorMatches, `cannot upload part "[a-z0-9]+": (.|\n)*(hash mismatch|unexpected EOF)(.|\n)*`)
+	c.Assert(err, gc.ErrorMatches, `cannot upload part (.|\n)*`)
 
 	idx, hash, err := s.store.FinishUpload(id, []blobstore.Part{{
 		Hash: hashOf(content0),
