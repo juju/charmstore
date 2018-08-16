@@ -40,10 +40,10 @@ func (m *mongoBackend) Put(name string, r io.Reader, size int64, hash string) er
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	if err := copyAndCheckHash(f, r, hash); err != nil {
+	if err := copyAndCheckHash(f, r, size, hash); err != nil {
 		f.Abort()
 		f.Close()
-		return errgo.Mask(err)
+		return errgo.Mask(err, errgo.Is(io.ErrUnexpectedEOF))
 	}
 	if err := f.Close(); err != nil {
 		return errgo.Mask(err)
@@ -58,9 +58,12 @@ func (m *mongoBackend) Remove(name string) error {
 	return nil
 }
 
-func copyAndCheckHash(w io.Writer, r io.Reader, hash string) error {
+func copyAndCheckHash(w io.Writer, r io.Reader, size int64, hash string) error {
 	hasher := NewHash()
-	if _, err := io.Copy(io.MultiWriter(w, hasher), r); err != nil {
+	if _, err := io.CopyN(io.MultiWriter(w, hasher), r, size); err != nil {
+		if err == io.EOF {
+			err = io.ErrUnexpectedEOF
+		}
 		return err
 	}
 	actualHash := fmt.Sprintf("%x", hasher.Sum(nil))

@@ -48,8 +48,10 @@ type Backend interface {
 	Get(name string) (r ReadSeekCloser, size int64, err error)
 
 	// Put puts an object by reading its data from the given reader.
-	// The data read from the reader should have the given
-	// size and hex-encoded SHA384 hash.
+	// The data read from the reader should have the given size and
+	// hex-encoded SHA384 hash. If it is not possible to read size
+	// bytes from r then an error with a cause of io.ErrUnexpectedEOF
+	// will be returned.
 	Put(name string, r io.Reader, size int64, hash string) error
 
 	// Remove removes the object with the given name.
@@ -168,7 +170,7 @@ func (s *Store) PutAtTime(r io.Reader, hash string, size int64, now time.Time) e
 	uuid := uuidGen.Next()
 	name := fmt.Sprintf(hash[0:16] + "-" + fmt.Sprintf("%x", uuid[0:8]))
 	if err := s.backend.Put(name, r, size, hash); err != nil {
-		return errgo.Mask(err)
+		return errgo.Mask(err, errgo.Is(io.ErrUnexpectedEOF))
 	}
 	err = s.blobRefc.Insert(&blobRefDoc{
 		Hash:    hash,

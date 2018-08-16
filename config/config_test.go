@@ -90,6 +90,7 @@ docker-registry-auth-key: |
   9NhvqPQt4xyddg==
   -----END EC PRIVATE KEY-----
 docker-registry-token-duration: 1h10m
+tempdir: /var/tmp/charmstore
 `
 
 func (s *ConfigSuite) readConfig(c *gc.C, content string) (*config.Config, error) {
@@ -154,6 +155,7 @@ func (s *ConfigSuite) TestRead(c *gc.C) {
 			Key: mustParseECPrivateKey("MGgCAQEEHM9ekg7h0LAhNBaiSJolcfDNtyfS94DyUblrFu+gBwYFK4EEACGhPAM6AARlWtA/iSeUYFDZw4yxiaBzRURa7wOY4WUVryz/KbzKIG+wJ9rv+39XndXN6kue9NhvqPQt4xyddg=="),
 		},
 		DockerRegistryTokenDuration: config.DurationString{time.Hour + 10*time.Minute},
+		TempDir:                     "/var/tmp/charmstore",
 	})
 }
 

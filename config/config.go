@@ -60,6 +60,7 @@ type Config struct {
 	DockerRegistryAuthCertificates X509Certificates  `yaml:"docker-registry-auth-certs"`
 	DockerRegistryAuthKey          X509PrivateKey    `yaml:"docker-registry-auth-key"`
 	DockerRegistryTokenDuration    DurationString    `yaml:"docker-registry-token-duration"`
+	TempDir                        string            `yaml:"tempdir"`
 }
 
 type BlobStoreType string

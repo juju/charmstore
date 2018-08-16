@@ -131,7 +131,7 @@ func (s *Store) UploadEntity(url *router.ResolvedURL, blob io.Reader, blobHash s
 	}
 	blobHash256, err := s.putArchive(blob, size, blobHash)
 	if err != nil {
-		return errgo.Mask(err)
+		return errgo.Mask(err, errgo.Is(params.ErrInvalidEntity))
 	}
 	uploadDuration := monitoring.NewUploadProcessingDuration()
 	defer uploadDuration.Done()
@@ -166,7 +166,10 @@ func (s *Store) putArchive(blob io.Reader, blobSize int64, hash string) (blobHas
 	err = s.BlobStore.Put(blob, hash, blobSize)
 	if err != nil {
 		// TODO return error with ErrInvalidEntity cause when
-		// there's a hash or size mismatch.
+		// there's a hash mismatch.
+		if errgo.Cause(err) == io.ErrUnexpectedEOF {
+			return "", errgo.WithCausef(nil, params.ErrInvalidEntity, "cannot put archive blob: size mismatch")
+		}
 		return "", errgo.Notef(err, "cannot put archive blob")
 	}
 	return fmt.Sprintf("%x", hash256.Sum(nil)), nil
