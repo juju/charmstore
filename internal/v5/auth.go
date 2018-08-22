@@ -542,7 +542,7 @@ func (c isEntityChecker) Check(_, args string) error {
 }
 
 // entityChannel returns the default channel that applies to
-// the entity with the given id. If the request has explictly
+// the entity with the given id. If the request has explicitly
 // mentioned a channel, that channel is used; otherwise
 // a channel will be selected from the channels that the
 // entity has been published to: in order of preference,

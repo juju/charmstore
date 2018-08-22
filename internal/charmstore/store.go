@@ -133,11 +133,13 @@ func NewPool(db *mgo.Database, si *SearchIndex, bakeryParams *bakery.NewServiceP
 
 	store := p.Store()
 	defer store.Close()
-	if err := store.ensureIndexes(); err != nil {
-		return nil, errgo.Notef(err, "cannot ensure indexes")
-	}
-	if err := store.ES.ensureIndexes(false); err != nil {
-		return nil, errgo.Notef(err, "cannot ensure elasticsearch indexes")
+	if !config.NoIndexes {
+		if err := store.ensureIndexes(); err != nil {
+			return nil, errgo.Notef(err, "cannot ensure indexes")
+		}
+		if err := store.ES.ensureIndexes(false); err != nil {
+			return nil, errgo.Notef(err, "cannot ensure elasticsearch indexes")
+		}
 	}
 	return p, nil
 }

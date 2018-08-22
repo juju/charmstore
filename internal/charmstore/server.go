@@ -125,6 +125,11 @@ type ServerParams struct {
 	// the blobstore garbage collector worker.
 	RunBlobStoreGC bool
 
+	// NoIndexes specifies that none of the MongoDB indexes should be
+	// created. This speeds up initialization (useful for tests) but should
+	// never be set in production.
+	NoIndexes bool
+
 	// NewBlobBackend returns a new blobstore backend
 	// that may use the given MongoDB database.
 	// If this is nil, a MongoDB backend will be used.
