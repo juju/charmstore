@@ -232,6 +232,7 @@ func RouterHandlers(h *ReqHandler) *router.Handlers {
 			"readme":                      resolveId(authId(h.serveReadMe), "contents", "blobhash"),
 			"resource/":                   reqBodyReadHandler(resolveId(authId(h.serveResources), "charmmeta")),
 			"docker-resource-upload-info": resolveId(h.serveDockerResourceUploadInfo, "charmmeta"),
+			"allperms":                    h.serveAllPerms,
 		},
 		Meta: map[string]router.BulkIncludeHandler{
 			"archive-size":         h.EntityHandler(h.metaArchiveSize, "size"),
@@ -1466,10 +1467,54 @@ func (h *ReqHandler) servePromulgate(id *router.ResolvedURL, w http.ResponseWrit
 	return nil
 }
 
+// GET id/allperms
+// https://github.com/juju/charmstore/blob/v5/docs/API.md#get-id-allperms
+func (h *ReqHandler) serveAllPerms(id *charm.URL, w http.ResponseWriter, req *http.Request) error {
+	if req.Method != "GET" {
+		return errgo.WithCausef(nil, params.ErrMethodNotAllowed, "%s not allowed", req.Method)
+	}
+	if id.Revision != -1 {
+		return badRequestf(nil, "cannot specify revision in charm id for allperms request")
+	}
+	if id.User == "" {
+		return badRequestf(nil, "cannot use promulgated URL in allperms request")
+	}
+	baseEntity, err := h.Cache.BaseEntity(id, charmstore.FieldSelector("perms"))
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	// We can't use entityChannel because we want this to succeed
+	// even when there's no entity.
+	channel := h.Store.Channel
+	if channel == params.NoChannel {
+		channel = params.UnpublishedChannel
+	}
+	_, err = h.authorize(authorizeParams{
+		req: req,
+		acls: []mongodoc.ACL{
+			baseEntity.ChannelACLs[channel],
+		},
+		ops: []string{OpReadWithNoTerms},
+	})
+	if err != nil {
+		return errgo.Mask(err, errgo.Any)
+	}
+	m := make(map[params.Channel]params.PermResponse)
+	for channel, acls := range baseEntity.ChannelACLs {
+		m[channel] = params.PermResponse{
+			Read:  acls.Read,
+			Write: acls.Write,
+		}
+	}
+	httprequest.WriteJSON(w, http.StatusOK, params.AllPermsResponse{
+		Perms: m,
+	})
+	return nil
+}
+
 // PUT id/publish
 // See https://github.com/juju/charmstore/blob/v5/docs/API.md#put-idpublish
 func (h *ReqHandler) servePublish(id *router.ResolvedURL, w http.ResponseWriter, req *http.Request) error {
-	// Perform basic validation of the request.
 	if req.Method != "PUT" {
 		return errgo.WithCausef(nil, params.ErrMethodNotAllowed, "%s not allowed", req.Method)
 	}

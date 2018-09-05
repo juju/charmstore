@@ -3137,6 +3137,109 @@ func (s *APISuite) TestChangesPublishedErrors(c *gc.C) {
 	}
 }
 
+var allPermsErrorsTests = []struct {
+	about        string
+	method       string
+	id           string
+	contentType  string
+	asUser       string
+	body         string
+	expectStatus int
+	expectBody   params.Error
+}{{
+	about:        "put method not allowed",
+	method:       "PUT",
+	id:           "~who/trusty/wordpress",
+	asUser:       "who",
+	expectStatus: http.StatusMethodNotAllowed,
+	expectBody: params.Error{
+		Code:    params.ErrMethodNotAllowed,
+		Message: "PUT not allowed",
+	},
+}, {
+	about:        "promulgated URL",
+	method:       "GET",
+	id:           "trusty/wordpress",
+	asUser:       "who",
+	expectStatus: http.StatusBadRequest,
+	expectBody: params.Error{
+		Code:    params.ErrBadRequest,
+		Message: "cannot use promulgated URL in allperms request",
+	},
+}, {
+	about:        "revision cannot be specified",
+	method:       "GET",
+	id:           "~charmers/trusty/wordpress-34",
+	asUser:       "who",
+	expectStatus: http.StatusBadRequest,
+	expectBody: params.Error{
+		Code:    params.ErrBadRequest,
+		Message: "cannot specify revision in charm id for allperms request",
+	},
+}, {
+	about:        "permission denied",
+	method:       "GET",
+	id:           "~who/trusty/wordpress",
+	asUser:       "wronguser",
+	expectStatus: http.StatusUnauthorized,
+	expectBody: params.Error{
+		Code:    params.ErrUnauthorized,
+		Message: `access denied for user "wronguser"`,
+	},
+}}
+
+func (s *APISuite) TestAllPermsErrors(c *gc.C) {
+	id := newResolvedURL("~who/trusty/wordpress-0", -1)
+	err := s.store.AddCharmWithArchive(id, storetesting.NewCharm(nil))
+	c.Assert(err, gc.Equals, nil)
+	for i, test := range allPermsErrorsTests {
+		c.Logf("test %d: %v", i, test.about)
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler:      s.srv,
+			URL:          storeURL(test.id) + "/allperms",
+			Method:       test.method,
+			ExpectStatus: test.expectStatus,
+			ExpectBody:   test.expectBody,
+			Do:           bakeryDo(s.idmServer.Client(test.asUser)),
+		})
+	}
+}
+
+func (s *APISuite) TestAllPerms(c *gc.C) {
+	id := newResolvedURL("~who/trusty/wordpress-0", -1)
+	err := s.store.AddCharmWithArchive(id, storetesting.NewCharm(nil))
+	c.Assert(err, gc.Equals, nil)
+	err = s.store.SetPerms(&id.URL, "stable.read", "bob", "alice")
+	c.Assert(err, gc.Equals, nil)
+	err = s.store.SetPerms(&id.URL, "edge.write", "foo", "bar")
+	c.Assert(err, gc.Equals, nil)
+	expect := make(map[params.Channel]params.PermResponse)
+	for _, ch := range params.OrderedChannels {
+		expect[ch] = params.PermResponse{
+			Read:  []string{"who"},
+			Write: []string{"who"},
+		}
+	}
+	expect["stable"] = params.PermResponse{
+		Read:  []string{"bob", "alice"},
+		Write: []string{"who"},
+	}
+	expect["edge"] = params.PermResponse{
+		Read:  []string{"who"},
+		Write: []string{"foo", "bar"},
+	}
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:  s.srv,
+		URL:      storeURL("~who/trusty/wordpress/allperms"),
+		Method:   "GET",
+		Username: testUsername,
+		Password: testPassword,
+		ExpectBody: params.AllPermsResponse{
+			Perms: expect,
+		},
+	})
+}
+
 var publishErrorsTests = []struct {
 	about        string
 	method       string

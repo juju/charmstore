@@ -165,6 +165,44 @@ Example: `GET precise/wordpress-34/expand-id`
 ]
 ```
 
+### Getting all permissions
+
+#### GET *id*/allperms
+
+The allperms path returns all permissions associated with the charm.
+It requires an id with a user part and no revision, and returns the permissions
+associated with all revisions of that charm or bundle. If a channel is
+not specified in the request, permissions will be checked on the
+unpublished channel.
+
+```go
+type PermResponse struct {
+    Read  []string
+    Write []string
+}
+
+type AllPerms struct {
+	Perms map[string]PermResponse
+}
+```
+
+Example: `GET ~charmers/wordpress/allperms`
+
+```
+{
+	"Perms": {
+		"stable": {
+			"Read": ["everyone"],
+			"Write": ["alice", "bob"]
+		},
+		"edge": {
+			"Read": ["alice"],
+			"Write": ["alice"]
+		}
+	}
+}
+```
+
 ### Archive
 
 #### GET *id*/archive
