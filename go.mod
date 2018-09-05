@@ -46,7 +46,7 @@ require (
 	gopkg.in/goose.v2 v2.0.0-20180814191012-c6b4881f832a
 	gopkg.in/httprequest.v1 v1.0.0-20180319125457-3531529dedf0
 	gopkg.in/juju/charm.v6 v6.0.0-20180803030015-abaa717bc6ed
-	gopkg.in/juju/charmrepo.v3 v3.0.0-20180619105831-1068bda266ca
+	gopkg.in/juju/charmrepo.v3 v3.0.0
 	gopkg.in/juju/jujusvg.v3 v3.0.0-20180628074225-b69768dfdf88
 	gopkg.in/juju/names.v2 v2.0.0-20171113112047-54f00845ae47 // indirect
 	gopkg.in/juju/worker.v1 v1.0.0-20170308002458-6965b9d82671
