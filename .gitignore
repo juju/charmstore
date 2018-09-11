@@ -3,3 +3,5 @@ version/init.go
 /charmstore-*.tar.xz
 
 .vscode
+dist
+.*.swp
