@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "charmstore.fullname" . }}
+  labels:
+    app: {{ template "charmstore.name" . }}
+    chart: {{ template "charmstore.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+data:
+    config.yaml: |-
+        mongo-url: {{ .Release.Name }}-mongodb.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.mongodb.service.port }}
+        api-addr: :{{ .Values.charmstoreproxy.port }}
+        identity-location: {{ .Values.identity.url }}
+        identity-public-key: {{ .Values.identity.publicKey }}
+        terms-location: {{ .Values.terms.url }}
+        terms-public-key: {{ .Values.terms.publicKey }}
+        auth-username: {{ .Values.auth.username }}
+        auth-password: {{ .Values.auth.password }}

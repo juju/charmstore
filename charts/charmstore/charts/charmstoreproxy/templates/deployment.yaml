@@ -1,0 +1,67 @@
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: {{ template "charmstoreproxy.fullname" . }}
+  labels:
+    app: {{ template "charmstoreproxy.name" . }}
+    chart: {{ template "charmstoreproxy.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ template "charmstoreproxy.name" . }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ template "charmstoreproxy.name" . }}
+        release: {{ .Release.Name }}
+    spec:
+      volumes:
+        - name: haproxy-conf
+          configMap:
+            name: {{ template "charmstoreproxy.fullname" . }}
+      initContainers:
+        - name: {{ .Chart.Name }}-check-config
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ['haproxy', '-c', '-f', '/usr/local/etc/haproxy/haproxy.cfg']
+          volumeMounts:
+            - name: haproxy-conf
+              mountPath: /usr/local/etc/haproxy
+              readOnly: true
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          volumeMounts:
+            - name: haproxy-conf
+              mountPath: /usr/local/etc/haproxy
+              readOnly: true
+          command: ['haproxy', '-f', '/usr/local/etc/haproxy/haproxy.cfg']
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          livenessProbe:
+            tcpSocket:
+              port: http
+          readinessProbe:
+            tcpSocket:
+              port: http
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+    {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+    {{- end }}

@@ -1,0 +1,4 @@
+apiVersion: v1
+description: Frontend for charmstore
+name: charmstoreproxy
+version: 0.1.0
