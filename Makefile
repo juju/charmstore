@@ -135,6 +135,28 @@ charmstore-$(VERSION).tar.xz: $(VERSIONDEPS)
 	tar cv -C charmstore-release . | xz > $@
 	-rm -r charmstore-release
 
+DOCKER := microk8s.docker
+DOCKER_REGISTRY := localhost:32000
+
+# Docker targets, defaulting to a microk8s with registry enabled.
+.PHONY: docker
+docker:
+	$(MAKE) GOBIN=$(shell pwd)/dist/bin install MAKE_GODEPS=true
+	$(DOCKER) build -t charmstore:$(VERSION) .
+	$(DOCKER) tag charmstore:$(VERSION) charmstore:latest
+
+.PHONY: docker-image
+docker-image: docker
+	-mkdir -p dist/docker
+	$(DOCKER) save charmstore:$(VERSION) | gzip -9 > dist/docker/charmstore-$(VERSION).tar.gz
+
+.PHONY: docker-push
+docker-push: docker
+	$(DOCKER) tag charmstore:$(VERSION) $(DOCKER_REGISTRY)/charmstore:$(VERSION)
+	$(DOCKER) push $(DOCKER_REGISTRY)/charmstore:$(VERSION)
+	$(DOCKER) tag charmstore:latest $(DOCKER_REGISTRY)/charmstore:latest
+	$(DOCKER) push $(DOCKER_REGISTRY)/charmstore:latest
+
 help:
 	@echo -e 'Charmstore - list of make targets:\n'
 	@echo 'make - Build the package.'

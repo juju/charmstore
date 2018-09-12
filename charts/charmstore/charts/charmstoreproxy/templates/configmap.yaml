@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "charmstoreproxy.fullname" . }}
+  labels:
+    app: {{ template "charmstoreproxy.name" . }}
+    chart: {{ template "charmstoreproxy.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+data:
+    haproxy.cfg: |-
+        defaults
+            log global
+            mode http
+            option httplog
+            option dontlognull
+            retries 3
+            timeout queue 20000
+            timeout client 50000
+            timeout connect 5000
+            timeout server 50000
+        
+        frontend haproxy-0-80
+            bind 0.0.0.0:80
+            mode http
+            default_backend charmstore_public
+        
+        backend charmstore_public
+            mode http
+            balance leastconn
+            reqrep ^([^\ :]*)\ /charmstore/(.*)     \1\ /\2
+            server charmstore {{ .Release.Name }}-charmstore.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.port }} check port {{ .Values.port }}

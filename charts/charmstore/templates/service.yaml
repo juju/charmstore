@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "charmstore.fullname" . }}
+  labels:
+    app: {{ template "charmstore.name" . }}
+    chart: {{ template "charmstore.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.charmstoreproxy.port }}
+      targetPort: {{ .Values.charmstoreproxy.port }}
+      protocol: TCP
+      name: http
+  selector:
+    app: {{ template "charmstore.name" . }}
+    release: {{ .Release.Name }}

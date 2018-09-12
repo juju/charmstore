@@ -3,3 +3,6 @@ version/init.go
 /charmstore-*.tar.xz
 
 .vscode
+dist
+.*.swp
+charts/charmstore/charts/*.tgz

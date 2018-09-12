@@ -1,0 +1,64 @@
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: {{ template "charmstore.fullname" . }}
+  labels:
+    app: {{ template "charmstore.name" . }}
+    chart: {{ template "charmstore.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ template "charmstore.name" . }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ template "charmstore.name" . }}
+        release: {{ .Release.Name }}
+    spec:
+      volumes:
+        - name: charmd-conf
+          configMap:
+            name: {{ template "charmstore.fullname" . }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ['/srv/charmstore/bin/charmd', '/srv/charmstore/etc/config.yaml']
+          volumeMounts:
+            - name: charmd-conf
+              mountPath: /srv/charmstore/etc
+              readOnly: true
+          ports:
+            - name: http
+              containerPort: {{ .Values.charmstoreproxy.port }}
+              protocol: TCP
+          livenessProbe:
+            tcpSocket:
+              port: {{ .Values.charmstoreproxy.port }}
+            #httpGet:
+              #path: /
+              #port: http
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.charmstoreproxy.port }}
+            #httpGet:
+              #path: /
+              #port: http
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+    {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+    {{- end }}

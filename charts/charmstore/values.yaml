@@ -1,0 +1,49 @@
+# Default values for charmstore.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: localhost:32000/charmstore
+  tag: latest
+  pullPolicy: Always
+
+identity:
+  url:  https://api.jujucharms.com/identity
+  publicKey: hmHaPgCC1UfuhYHUSX5+aihSAZesqpVdjRv0mgfIwjo=
+
+terms:
+  url: https://api.jujucharms.com/terms
+  publicKey: LeU0MxqM9W3M6Cuq6q6nlwp+SW8GhWMJM5KMJf6BLRk=
+
+auth:
+  username: admin
+  password: nimda
+
+charmstoreproxy:
+  port: 8080
+
+mongodb:
+  usePassword: false
+
+service:
+  type: ClusterIP
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #  cpu: 100m
+  #  memory: 128Mi
+  # requests:
+  #  cpu: 100m
+  #  memory: 128Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
