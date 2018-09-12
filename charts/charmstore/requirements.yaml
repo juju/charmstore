@@ -1,0 +1,4 @@
+dependencies:
+  - name: mongodb
+    repository: "alias:stable"
+    version: "4.3.4"

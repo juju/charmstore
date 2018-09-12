@@ -5,3 +5,4 @@ version/init.go
 .vscode
 dist
 .*.swp
+charts/charmstore/charts/*.tgz
