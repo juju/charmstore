@@ -73,5 +73,5 @@ var Series = map[string]SeriesInfo{
 	"centos7": {true, CentOS, true, 1.1},
 
 	// Kubernetes
-	"kubernetes": {true, Kubernetes, false, 0},
+	"kubernetes": {true, Kubernetes, true, 0},
 }
