@@ -490,14 +490,17 @@ func (s *Store) ArchiveDownloadCounts(id *charm.URL, refresh bool) (thisRevision
 	}
 	thisRevision = v.(AggregatedCounts)
 
-	fetchId.Revision = -1
-	if refresh {
-		s.pool.statsCache.Evict(fetchId.String())
-	}
-	v, err = s.pool.statsCache.Get(fetchId.String(), fetch)
+	// Only make second statsCache.Get call if we need to
+	if fetchId.Revision != -1 {
+		fetchId.Revision = -1
+		if refresh {
+			s.pool.statsCache.Evict(fetchId.String())
+		}
+		v, err = s.pool.statsCache.Get(fetchId.String(), fetch)
 
-	if err != nil {
-		return AggregatedCounts{}, AggregatedCounts{}, errgo.Mask(err)
+		if err != nil {
+			return AggregatedCounts{}, AggregatedCounts{}, errgo.Mask(err)
+		}
 	}
 	allRevisions = v.(AggregatedCounts)
 	return
