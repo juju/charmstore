@@ -245,7 +245,6 @@ func (si *SearchIndex) search(sp SearchParams) (SearchResult, error) {
 		return SearchResult{}, nil
 	}
 	q := createSearchDSL(sp)
-	q.Fields = append(q.Fields, "URL", "PromulgatedURL", "Series")
 	esr, err := si.Search(si.Index, typeName, q)
 	if err != nil {
 		return SearchResult{}, errgo.Mask(err)
@@ -256,35 +255,14 @@ func (si *SearchIndex) search(sp SearchParams) (SearchResult, error) {
 		Results:    make([]*mongodoc.Entity, 0, len(esr.Hits.Hits)),
 	}
 	for _, h := range esr.Hits.Hits {
-		urlStr := h.Fields.GetString("URL")
-		url, err := charm.ParseURL(urlStr)
-		if err != nil {
-			return SearchResult{}, errgo.Notef(err, "invalid URL in result %q", urlStr)
+		var d SearchDoc
+		if err := json.Unmarshal(h.Source, &d); err != nil {
+			return SearchResult{}, errgo.Mask(err)
 		}
-		e := &mongodoc.Entity{
-			URL: url,
+		if d.SingleSeries && d.AllSeries {
+			d.Entity.Series = d.Series[0]
 		}
-		if url.Series == "" {
-			series := make([]string, len(h.Fields["Series"]))
-			for i, s := range h.Fields["Series"] {
-				series[i] = s.(string)
-			}
-			e.SupportedSeries = series
-		} else if url.Series != "bundle" {
-			e.SupportedSeries = []string{url.Series}
-		}
-		if purlStr := h.Fields.GetString("PromulgatedURL"); purlStr != "" {
-			purl, err := charm.ParseURL(purlStr)
-			if err != nil {
-				return SearchResult{}, errgo.Notef(err, "invalid promulgated URL in result %q", purlStr)
-			}
-			e.PromulgatedURL = purl
-			e.PromulgatedRevision = purl.Revision
-		} else {
-			e.PromulgatedURL = nil
-			e.PromulgatedRevision = -1
-		}
-		r.Results = append(r.Results, e)
+		r.Results = append(r.Results, d.Entity)
 	}
 	return r, nil
 }
