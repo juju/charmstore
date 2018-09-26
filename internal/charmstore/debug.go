@@ -225,7 +225,7 @@ type handler struct {
 }
 
 func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	monReq := monitoring.NewRequest(r.Method, "debug")
+	monReq := monitoring.NewRequest(r, "debug")
 	defer monReq.Done()
 	if _, path := h.mux.Handler(r); path != "" {
 		monReq.SetKind(path)

@@ -122,7 +122,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	defer rh.close()
-	rh.v4.Router.Monitor.Reset(req.Method, "legacy")
+	rh.v4.Router.Monitor.Reset(req, "legacy")
 	defer rh.v4.Router.Monitor.Done()
 	rh.mux.ServeHTTP(w, req)
 }
