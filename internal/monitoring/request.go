@@ -3,6 +3,7 @@
 package monitoring // import "gopkg.in/juju/charmstore.v5/internal/monitoring"
 
 import (
+	"net/http"
 	"time"
 )
 
@@ -12,37 +13,25 @@ import (
 type Request struct {
 	startTime time.Time
 	root      string
-	method    string
 	kind      string
-}
-
-var knownMethods = map[string]bool{
-	"DELETE":  true,
-	"GET":     true,
-	"HEAD":    true,
-	"OPTIONS": true,
-	"POST":    true,
-	"PUT":     true,
+	request   *http.Request
 }
 
 // NewRequest returns a new monitoring request
 // for monitoring a request within the given root.
 // When the request is done, Done should be called.
-func NewRequest(method, root string) *Request {
-	var req Request
-	req.Reset(method, root)
-	return &req
+func NewRequest(req *http.Request, root string) *Request {
+	var r Request
+	r.Reset(req, root)
+	return &r
 }
 
 // Reset resets r to indicate that a new request has started. The
 // parameter holds the API root (for example the API version).
-func (r *Request) Reset(method, root string) {
+func (r *Request) Reset(req *http.Request, root string) {
 	r.startTime = time.Now()
+	r.request = req
 	r.kind = ""
-	if !knownMethods[method] {
-		method = "UNKNOWN"
-	}
-	r.method = method
 	r.root = root
 }
 
@@ -54,7 +43,7 @@ func (r *Request) SetKind(kind string) {
 
 // Done records that the request is complete, and records any metrics for the request since the last call to Reset.
 func (r *Request) Done() {
-	requestDuration.WithLabelValues(r.method, r.root, r.kind).Observe(float64(time.Since(r.startTime)) / float64(time.Second))
+	requestDuration.WithLabelValues(r.request.Method, r.root, r.kind).Observe(float64(time.Since(r.startTime)) / float64(time.Second))
 }
 
 // Kind returns the kind that has been set. This is useful for testing.
