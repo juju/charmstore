@@ -35,6 +35,7 @@ import (
 	"gopkg.in/juju/charmstore.v5/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5/internal/entitycache"
 	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5/internal/monitoring"
 	"gopkg.in/juju/charmstore.v5/internal/router"
 )
 
@@ -309,6 +310,7 @@ func newReqHandler() *ReqHandler {
 // request-specific instance of ReqHandler and
 // calling ServeHTTP on that.
 func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	rw := monitoring.NewResponseWriter(w)
 	rh, err := h.NewReqHandler(req)
 	if err != nil {
 		router.WriteError(context.TODO(), w, err)
@@ -316,8 +318,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	defer rh.Close()
 	rh.Router.Monitor.Reset(req, "v5")
-	defer rh.Router.Monitor.Done()
-	rh.ServeHTTP(w, req)
+	defer rh.Router.Monitor.Done(rw.Status)
+	rh.ServeHTTP(rw, req)
 }
 
 // ServeHTTP implements http.Handler by calling h.Router.ServeHTTP.

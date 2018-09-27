@@ -3,6 +3,7 @@
 package monitoring // import "gopkg.in/juju/charmstore.v5/internal/monitoring"
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 )
@@ -42,8 +43,9 @@ func (r *Request) SetKind(kind string) {
 }
 
 // Done records that the request is complete, and records any metrics for the request since the last call to Reset.
-func (r *Request) Done() {
-	requestDuration.WithLabelValues(r.request.Method, r.root, r.kind).Observe(float64(time.Since(r.startTime)) / float64(time.Second))
+func (r *Request) Done(status func() int) {
+	statusStr := fmt.Sprint(status())
+	requestDuration.WithLabelValues(r.request.Method, r.root, r.kind, statusStr, r.request.URL.Path).Observe(float64(time.Since(r.startTime)) / float64(time.Second))
 }
 
 // Kind returns the kind that has been set. This is useful for testing.
