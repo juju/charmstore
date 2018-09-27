@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 
 	"gopkg.in/juju/charmstore.v5/elasticsearch"
+	"gopkg.in/juju/charmstore.v5/internal/entitycache"
 	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
 	"gopkg.in/juju/charmstore.v5/internal/router"
 	"gopkg.in/juju/charmstore.v5/internal/series"
@@ -237,36 +239,6 @@ func (si *SearchIndex) getID(r *charm.URL) string {
 	return strings.TrimRight(s, "=")
 }
 
-// Search searches for matching entities in the configured elasticsearch index.
-// If there is no elasticsearch index configured then it will return an empty
-// SearchResult, as if no results were found.
-func (si *SearchIndex) search(sp SearchParams) (SearchResult, error) {
-	if si == nil || si.Database == nil {
-		return SearchResult{}, nil
-	}
-	q := createSearchDSL(sp)
-	esr, err := si.Search(si.Index, typeName, q)
-	if err != nil {
-		return SearchResult{}, errgo.Mask(err)
-	}
-	r := SearchResult{
-		SearchTime: time.Duration(esr.Took) * time.Millisecond,
-		Total:      esr.Hits.Total,
-		Results:    make([]*mongodoc.Entity, 0, len(esr.Hits.Hits)),
-	}
-	for _, h := range esr.Hits.Hits {
-		var d SearchDoc
-		if err := json.Unmarshal(h.Source, &d); err != nil {
-			return SearchResult{}, errgo.Mask(err)
-		}
-		if d.SingleSeries && d.AllSeries {
-			d.Entity.Series = d.Series[0]
-		}
-		r.Results = append(r.Results, d.Entity)
-	}
-	return r, nil
-}
-
 // GetSearchDocument retrieves the current search record for the charm
 // reference id.
 func (si *SearchIndex) GetSearchDocument(id *charm.URL) (*SearchDoc, error) {
@@ -477,16 +449,85 @@ type SortParam struct {
 	Descending bool
 }
 
-// SearchResult represents the result of performing a search. The entites
-// in Results will have the following fields completed:
-// 	- URL
-// 	- SupportedSeries
-// 	- PromulgatedURL
-// 	- PromulgatedRevision
-type SearchResult struct {
-	SearchTime time.Duration
-	Total      int
-	Results    []*mongodoc.Entity
+// SearchQuery represents a query on the elasticsearch index.
+type SearchQuery struct {
+	index    *SearchIndex
+	params   SearchParams
+	total    int
+	duration time.Duration
+}
+
+// Total returns the total number of hits found in the index. This will
+// only be correct after the iteration has completed successfully.
+func (q *SearchQuery) Total() int {
+	return q.total
+}
+
+// Duration returns the total time spent searching the index. This will
+// only be correct after the iteration has completed successfully.
+func (q *SearchQuery) Duration() time.Duration {
+	return q.duration
+}
+
+// Iter returns a new StoreIter to iterate through the results of the
+// query. The returned StoreIter will be an instance of SearchQueryIter.
+func (q *SearchQuery) Iter(fields map[string]int) entitycache.StoreIter {
+	if q.index == nil || q.index.Database == nil {
+		return new(searchQueryIter)
+	}
+	qdsl := createSearchDSL(q.params)
+	qdsl.Source = elasticsearch.SourceFilter{
+		"AllSeries",
+		"SingleSeries",
+	}
+
+	for k := range fields {
+		f, ok := searchFields[k]
+		if !ok {
+			logger.Warningf("unknown field %q requested", k)
+			continue
+		}
+		qdsl.Source = append(qdsl.Source, f)
+	}
+	result, err := q.index.Search(q.index.Index, typeName, qdsl)
+	q.total = result.Hits.Total
+	q.duration = time.Duration(result.Took) * time.Millisecond
+	return &searchQueryIter{
+		result: result,
+		err:    err,
+	}
+}
+
+type searchQueryIter struct {
+	n      int
+	result elasticsearch.SearchResult
+	err    error
+}
+
+func (i *searchQueryIter) Err() error {
+	return i.err
+}
+
+func (i *searchQueryIter) Close() error {
+	return i.err
+}
+
+func (i *searchQueryIter) Next(v interface{}) bool {
+	if i.n >= len(i.result.Hits.Hits) || i.err != nil {
+		return false
+	}
+	var doc SearchDoc
+	if err := json.Unmarshal(i.result.Hits.Hits[i.n].Source, &doc); err != nil {
+		i.err = errgo.Mask(err)
+		return false
+	}
+	e := v.(*mongodoc.Entity)
+	*e = *doc.Entity
+	if doc.SingleSeries && doc.AllSeries && len(doc.Series) > 0 {
+		e.Series = doc.Series[0]
+	}
+	i.n++
+	return true
 }
 
 // ListResult represents the result of performing a list.
@@ -790,4 +831,46 @@ func createElasticSort(s SortParam) elasticsearch.Sort {
 		sort.Order = elasticsearch.Descending
 	}
 	return sort
+}
+
+// searchFields maps the fields that will be requested in the Iter fields
+// parameter to the required elasticsearch source filter.
+var searchFields = func() map[string]string {
+	t := reflect.TypeOf(mongodoc.Entity{})
+	jsonFields := fieldNames(t, "json", nil)
+	mapping := make(map[string]string, len(jsonFields))
+	for i, bsonField := range fieldNames(t, "bson", strings.ToLower) {
+		mapping[bsonField] = jsonFields[i]
+	}
+	return mapping
+}()
+
+// fieldNames calculates the field names for documents derived from the
+// given type. A field name is added to the result for every exported
+// field in t. If the field has a tag with the given key then the name be
+// the first field in the tags value after it has been comma separated.
+// If there is no tag, or the name is empty then the name is derived by
+// calling the given function on the field name. If f is nil the field
+// name will be used without transformation.
+//
+// Note: this does not support embedded fields, but we don't have any
+// embedded structs in the types we care about yet so that's OK.
+func fieldNames(t reflect.Type, key string, f func(string) string) []string {
+	names := make([]string, 0, t.NumField())
+	if f == nil {
+		f = func(s string) string { return s }
+	}
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		if field.PkgPath != "" {
+			continue
+		}
+		parts := strings.Split(field.Tag.Get(key), ",")
+		if parts[0] != "" {
+			names = append(names, parts[0])
+			continue
+		}
+		names = append(names, f(field.Name))
+	}
+	return names
 }
