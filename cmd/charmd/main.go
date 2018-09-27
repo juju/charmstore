@@ -120,6 +120,7 @@ func serve(conf *config.Config) error {
 		DockerRegistryAuthCertificates: conf.DockerRegistryAuthCertificates.Certificates,
 		DockerRegistryAuthKey:          conf.DockerRegistryAuthKey.Key,
 		DockerRegistryTokenDuration:    conf.DockerRegistryTokenDuration.Duration,
+		DisableSlowMetadata:            conf.DisableSlowMetadata,
 	}
 	switch conf.BlobStore {
 	case config.MongoDBBlobStore:

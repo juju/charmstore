@@ -21,6 +21,9 @@ import (
 // GET id/meta/charm-related[?include=meta[&include=meta…]]
 // https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetacharm-related
 func (h *ReqHandler) metaCharmRelated(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
+	if h.Handler.config.DisableSlowMetadata {
+		return &params.RelatedResponse{}, nil
+	}
 	if id.URL.Series == "bundle" {
 		return nil, nil
 	}
@@ -146,6 +149,10 @@ func (h *ReqHandler) getRelatedIfaceResponses(
 // GET id/meta/bundles-containing[?include=meta[&include=meta…]][&any-series=1][&any-revision=1][&all-results=1]
 // https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetabundles-containing
 func (h *ReqHandler) metaBundlesContaining(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
+	if h.Handler.config.DisableSlowMetadata {
+		return []params.EntityResult{}, nil
+	}
+
 	if id.URL.Series == "bundle" {
 		return nil, nil
 	}
