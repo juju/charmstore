@@ -193,9 +193,14 @@ func NewServer(db *mgo.Database, si *SearchIndex, config ServerParams, versions 
 		return nil, errgo.Notef(err, "database migration failed")
 	}
 	store.Go(func(store *Store) {
-		if err := store.syncSearch(); err != nil {
+		logger.Infof("Populating elasticsearch...")
+		esStart := time.Now()
+		err := store.syncSearch()
+		if err != nil {
 			logger.Errorf("Cannot populate elasticsearch: %v", err)
+			return
 		}
+		logger.Infof("elasticsearch populated in %v", time.Since(esStart))
 	})
 	srv := &Server{
 		pool: pool,
