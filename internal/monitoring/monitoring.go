@@ -49,6 +49,13 @@ var (
 		Name:      "mean_blob_size",
 		Help:      "The mean stored blob size",
 	})
+
+	esSyncing = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: "charmstore",
+		Subsystem: "elastic_search",
+		Name:      "syncing",
+		Help:      "Set to 1 when Elastic Search sync is happening.",
+	})
 )
 
 // BlobStats holds statistics about blobs in the blob store.
@@ -76,5 +83,6 @@ func init() {
 	prometheus.MustRegister(blobCount)
 	prometheus.MustRegister(maxBlobSize)
 	prometheus.MustRegister(meanBlobSize)
+	prometheus.MustRegister(esSyncing)
 	prometheus.MustRegister(monitoring.NewMgoStatsCollector("charmstore"))
 }

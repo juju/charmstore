@@ -193,6 +193,8 @@ func NewServer(db *mgo.Database, si *SearchIndex, config ServerParams, versions 
 		return nil, errgo.Notef(err, "database migration failed")
 	}
 	store.Go(func(store *Store) {
+		monitoring.SetElasticSearchSyncing(true)
+		defer monitoring.SetElasticSearchSyncing(false)
 		if err := store.syncSearch(); err != nil {
 			logger.Errorf("Cannot populate elasticsearch: %v", err)
 		}
