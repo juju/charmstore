@@ -1178,14 +1178,14 @@ func (s *StoreSearchSuite) TestOnlyIndexStableCharms(c *gc.C) {
 	err = s.store.UpdateSearch(id)
 	c.Assert(err, gc.Equals, nil)
 	err = s.store.ES.GetDocument(s.TestIndex, typeName, s.store.ES.getID(&id.URL), &actual)
-	c.Assert(err, gc.ErrorMatches, "elasticsearch document not found")
+	c.Assert(err, gc.ErrorMatches, "not found")
 
 	err = s.store.Publish(id, nil, params.EdgeChannel)
 	c.Assert(err, gc.Equals, nil)
 	err = s.store.UpdateSearch(id)
 	c.Assert(err, gc.Equals, nil)
 	err = s.store.ES.GetDocument(s.TestIndex, typeName, s.store.ES.getID(&id.URL), &actual)
-	c.Assert(err, gc.ErrorMatches, "elasticsearch document not found")
+	c.Assert(err, gc.ErrorMatches, "not found")
 
 	err = s.store.Publish(id, nil, params.StableChannel)
 	c.Assert(err, gc.Equals, nil)

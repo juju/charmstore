@@ -39,20 +39,83 @@ const (
 	ExternalGTE = "external_gte"
 )
 
-var log = loggo.GetLogger("charmstore.elasticsearch")
+var logger = loggo.GetLogger("charmstore.elasticsearch")
 
-var ErrConflict = errgo.New("elasticsearch document conflict")
-var ErrNotFound = errgo.New("elasticsearch document not found")
+// An ElasticsearchError represents an error returned by the
+// elasticsearch server. All methods in this package return errors of
+// this type where the error was return from the elasticsearch service.
+type ElasticsearchError struct {
+	// Status contains the status code returned from the
+	// elasticsearch server.
+	Status int
 
-type ElasticSearchError struct {
-	Err    string `json:"error"`
-	Status int    `json:"status"`
+	// body contains the body of the error response.
+	body errorBody
 }
 
-func (e ElasticSearchError) Error() string {
-	return e.Err
+func (e *ElasticsearchError) Error() string {
+	s := strings.ToLower(http.StatusText(e.Status))
+	if e.body.Error.Reason != "" {
+		s += ": " + e.body.Error.Reason
+	}
+	return s
 }
 
+// Type returns the type specified in the elasticsearch error response,
+// if any.
+func (e *ElasticsearchError) Type() string {
+	return e.body.Error.Type
+}
+
+type errorBody struct {
+	Status int       `json:"status"`
+	Error  errorInfo `json:"error"`
+}
+
+type errorInfo struct {
+	Type   string `json:"type"`
+	Reason string `json:"reason"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler
+func (e *errorInfo) UnmarshalJSON(b []byte) error {
+	type ei errorInfo
+	if b[0] == '{' {
+		return json.Unmarshal(b, (*ei)(e))
+	}
+	return json.Unmarshal(b, &e.Reason)
+}
+
+// ErrorStatus returns the elasticsearch status code associated with the
+// given error, if any.
+func ErrorStatus(err error) int {
+	var status int
+	if eserr, ok := err.(*ElasticsearchError); ok {
+		status = eserr.Status
+	}
+	return status
+}
+
+// IsElasticsearchError reports whether the given error is an instance of
+// *ElasticsearchError.
+func IsElasticsearchError(err error) bool {
+	_, ok := err.(*ElasticsearchError)
+	return ok
+}
+
+// IsConflictError reports whether the given error is
+// returned from elasticsearch and represents a conflict.
+func IsConflictError(err error) bool {
+	return ErrorStatus(err) == http.StatusConflict
+}
+
+// IsNotFoundError reports whether the given error is
+// returned from elasticsearch and represents not found.
+func IsNotFoundError(err error) bool {
+	return ErrorStatus(err) == http.StatusNotFound
+}
+
+// Database represents a connection to an elasticsearch database.
 type Database struct {
 	Addr string
 }
@@ -67,7 +130,7 @@ type Document struct {
 	Source  json.RawMessage `json:"_source"`
 }
 
-// Represents the response from _cluster/health on elastic search
+// ClusterHealth represents the response from _cluster/health on elastic search
 // http://www.elasticsearch.org/guide/en/elasticsearch/reference/current/cluster-health.html
 type ClusterHealth struct {
 	ClusterName         string `json:"cluster_name"`
@@ -82,6 +145,7 @@ type ClusterHealth struct {
 	UnassignedShards    int64  `json:"unassigned_shards"`
 }
 
+// String implements fmt.Stringer.
 func (h *ClusterHealth) String() string {
 	return fmt.Sprintf("cluster_name: %s, status: %s, timed_out: %t"+
 		", number_of_nodes: %d, number_of_data_nodes: %d"+
@@ -94,14 +158,15 @@ func (h *ClusterHealth) String() string {
 		h.UnassignedShards)
 }
 
-// Alias creates or updates an index alias. An alias a is created,
-// or modified if it already exists, to point to i. See
+// Alias creates or updates an index alias. An alias a is created, or
+// modified if it already exists, to point to i. See
 // http://www.elasticsearch.org/guide/en/elasticsearch/reference/current/indices-aliases.html#indices-aliases
-// for further details.
+// for further details. If an error is returned by the elasticsearch
+// server then the returned error will have a cause of type *ElasticsearchError.
 func (db *Database) Alias(i, a string) error {
 	indexes, err := db.ListIndexesForAlias(a)
 	if err != nil {
-		return errgo.Notef(err, "cannot retrieve current aliases")
+		return errgo.NoteMask(err, "cannot retrieve current aliases", IsElasticsearchError)
 	}
 	var actions struct {
 		Actions []action `json:"actions"`
@@ -123,24 +188,18 @@ func (db *Database) Alias(i, a string) error {
 
 // Create document attempts to create a new document at index/type_/id with the
 // contents in doc. If the document already exists then CreateDocument will return
-// ErrConflict and return a non-nil error if any other error occurs.
+// an error with a cause that satisfies IsConflictError.
 // See http://www.elasticsearch.org/guide/en/elasticsearch/guide/current/create-doc.html#create-doc
 // for further details.
 func (db *Database) CreateDocument(index, type_, id string, doc interface{}) error {
-	if err := db.put(db.url(index, type_, id, "_create"), doc, nil); err != nil {
-		return getError(err)
-	}
-	return nil
+	return errgo.Mask(db.put(db.url(index, type_, id, "_create"), doc, nil), IsElasticsearchError)
 }
 
 // DeleteDocument deletes the document at index/type_/id from the elasticsearch
 // database. See http://www.elasticsearch.org/guide/en/elasticsearch/guide/current/delete-doc.html#delete-doc
 // for further details.
 func (db *Database) DeleteDocument(index, type_, id string) error {
-	if err := db.delete(db.url(index, type_, id), nil, nil); err != nil {
-		return getError(err)
-	}
-	return nil
+	return errgo.Mask(db.delete(db.url(index, type_, id), nil, nil), IsElasticsearchError)
 }
 
 // DeleteIndex deletes the index with the given name from the database.
@@ -148,23 +207,20 @@ func (db *Database) DeleteDocument(index, type_, id string) error {
 // If the index does not exist or if the database cannot be
 // reached, then an error is returned.
 func (db *Database) DeleteIndex(index string) error {
-	if err := db.delete(db.url(index), nil, nil); err != nil {
-		return getError(err)
-	}
-	return nil
+	return errgo.Mask(db.delete(db.url(index), nil, nil), IsElasticsearchError)
 }
 
-// GetDocument retrieves the document with the given index, type_ and id and
-// unmarshals the json response into v. GetDocument returns ErrNotFound if the
-// requested document is not present, and returns a non-nil error if any other error
-// occurs.
+// GetDocument retrieves the document with the given index, type_ and id
+// and unmarshals the json response into v. GetDocument returns an error
+// with a cause that satisfies IsNotFoundError if the requested document
+// is not present, and returns a non-nil error if any other error occurs.
 func (db *Database) GetDocument(index, type_, id string, v interface{}) error {
 	d, err := db.GetESDocument(index, type_, id)
 	if err != nil {
-		return getError(err)
+		return errgo.Mask(err, IsElasticsearchError)
 	}
 	if !d.Found {
-		return ErrNotFound
+		return errgo.WithCausef(nil, &ElasticsearchError{Status: http.StatusNotFound}, "")
 	}
 	if err := json.Unmarshal([]byte(d.Source), &v); err != nil {
 		return errgo.Mask(err)
@@ -178,7 +234,7 @@ func (db *Database) GetDocument(index, type_, id string, v interface{}) error {
 func (db *Database) GetESDocument(index, type_, id string) (Document, error) {
 	var d Document
 	if err := db.get(db.url(index, type_, id), nil, &d); err != nil {
-		return Document{}, getError(err)
+		return Document{}, errgo.Mask(err, IsElasticsearchError)
 	}
 	return d, nil
 }
@@ -189,7 +245,7 @@ func (db *Database) GetESDocument(index, type_, id string) (Document, error) {
 func (db *Database) HasDocument(index, type_, id string) (bool, error) {
 	var d Document
 	if err := db.get(db.url(index, type_, id)+"?_source=false", nil, &d); err != nil {
-		return false, getError(err)
+		return false, errgo.Mask(err, IsElasticsearchError)
 	}
 	return d.Found, nil
 }
@@ -199,7 +255,7 @@ func (db *Database) HasDocument(index, type_, id string) (bool, error) {
 func (db *Database) Health() (ClusterHealth, error) {
 	var result ClusterHealth
 	if err := db.get(db.url("_cluster", "health"), nil, &result); err != nil {
-		return ClusterHealth{}, getError(err)
+		return ClusterHealth{}, errgo.Mask(err, IsElasticsearchError)
 	}
 
 	return result, nil
@@ -211,7 +267,7 @@ func (db *Database) Health() (ClusterHealth, error) {
 func (db *Database) ListAllIndexes() ([]string, error) {
 	var result map[string]interface{}
 	if err := db.get(db.url("_aliases"), nil, &result); err != nil {
-		return nil, getError(err)
+		return nil, errgo.Mask(err, IsElasticsearchError)
 	}
 	var indexes []string
 	for key := range result {
@@ -229,7 +285,7 @@ func (db *Database) ListAllIndexes() ([]string, error) {
 func (db *Database) ListIndexesForAlias(a string) ([]string, error) {
 	var result map[string]struct{}
 	if err := db.get(db.url("*", "_alias", a), nil, &result); err != nil {
-		return nil, getError(err)
+		return nil, errgo.Mask(err, IsElasticsearchError)
 	}
 	var indexes []string
 	for key := range result {
@@ -247,7 +303,7 @@ func (db *Database) PostDocument(index, type_ string, doc interface{}) (string, 
 		ID string `json:"_id"`
 	}
 	if err := db.post(db.url(index, type_), doc, &resp); err != nil {
-		return "", getError(err)
+		return "", errgo.Mask(err, IsElasticsearchError)
 	}
 	return resp.ID, nil
 }
@@ -258,69 +314,62 @@ func (db *Database) PostDocument(index, type_ string, doc interface{}) (string, 
 // for more details.
 func (db *Database) PutDocument(index, type_, id string, doc interface{}) error {
 	if err := db.put(db.url(index, type_, id), doc, nil); err != nil {
-		return getError(err)
+		return errgo.Mask(err, IsElasticsearchError)
 	}
 	return nil
 }
 
-// PutDocumentVersion creates or updates the document in the given index if the version
-// parameter is the same as the currently stored version. The type_ parameter
-// controls how the document will be indexed. PutDocumentVersion returns
-// ErrConflict if the data cannot be stored due to a version mismatch, and a non-nil error if
-// any other error occurs.
-// See http://www.elasticsearch.org/guide/en/elasticsearch/reference/current/docs-index_.html#index-versioning
+// PutDocumentVersion creates or updates the document in the given index
+// if the version parameter is the same as the currently stored version.
+// The type_ parameter controls how the document will be indexed.
+// PutDocumentVersion returns an error with a cause that satisfies
+// IsConflictError if the data cannot be stored due to a version
+// mismatch, and a non-nil error if any other error occurs. See
+// http://www.elasticsearch.org/guide/en/elasticsearch/reference/current/docs-index_.html#index-versioning
 // for more information.
 func (db *Database) PutDocumentVersion(index, type_, id string, version int64, doc interface{}) error {
-	return db.PutDocumentVersionWithType(index, type_, id, version, "internal", doc)
+	return errgo.Mask(db.PutDocumentVersionWithType(index, type_, id, version, "internal", doc), IsElasticsearchError)
 }
 
-// PutDocumentVersion creates or updates the document in the given index if the version
-// parameter is the same as the currently stored version. The type_ parameter
-// controls how the document will be indexed. PutDocumentVersionWithType returns
-// ErrConflict if the data cannot be stored due to a version mismatch, and a non-nil error if
-// any other error occurs.
+// PutDocumentVersionWithType creates or updates the document in the
+// given index if the version parameter is the same as the currently
+// stored version. The type_ parameter controls how the document will be
+// indexed. PutDocumentVersionWithType returns an error with a cause that
+// satisfies IsConflictError if the data cannot be stored due to a
+// version mismatch, and a non-nil error if any other error occurs.
 //
-// The constants Internal, External and ExternalGTE represent some of the available
-// version types. Other version types may also be available, plese check the elasticsearch
-// documentation.
+// The constants Internal, External and ExternalGTE represent some of the
+// available version types. Other version types may also be available,
+// plese check the elasticsearch documentation.
 //
-// See http://www.elasticsearch.org/guide/en/elasticsearch/reference/current/docs-index_.html#index-versioning
-// and http://www.elasticsearch.org/guide/en/elasticsearch/reference/current/docs-index_.html#_version_types for more information.
+// See
+// http://www.elasticsearch.org/guide/en/elasticsearch/reference/current/docs-index_.html#index-versioning
+// and
+// http://www.elasticsearch.org/guide/en/elasticsearch/reference/current/docs-index_.html#_version_types
+// for more information.
 func (db *Database) PutDocumentVersionWithType(
 	index, type_, id string,
 	version int64,
 	versionType string,
 	doc interface{}) error {
 	url := fmt.Sprintf("%s?version=%d&version_type=%s", db.url(index, type_, id), version, versionType)
-	if err := db.put(url, doc, nil); err != nil {
-		return getError(err)
-	}
-	return nil
+	return errgo.Mask(db.put(url, doc, nil), IsElasticsearchError)
 }
 
 // PutIndex creates the index with the given configuration.
 func (db *Database) PutIndex(index string, config interface{}) error {
-	if err := db.put(db.url(index), config, nil); err != nil {
-		return getError(err)
-	}
-	return nil
+	return errgo.Mask(db.put(db.url(index), config, nil), IsElasticsearchError)
 }
 
 // PutMapping creates or updates the mapping with the given configuration.
 func (db *Database) PutMapping(index, type_ string, config interface{}) error {
-	if err := db.put(db.url(index, "_mapping", type_), config, nil); err != nil {
-		return getError(err)
-	}
-	return nil
+	return errgo.Mask(db.put(db.url(index, "_mapping", type_), config, nil), IsElasticsearchError)
 }
 
 // RefreshIndex posts a _refresh to the index in the database.
 // http://www.elasticsearch.org/guide/en/elasticsearch/reference/current/indices-refresh.html
 func (db *Database) RefreshIndex(index string) error {
-	if err := db.post(db.url(index, "_refresh"), nil, nil); err != nil {
-		return getError(err)
-	}
-	return nil
+	return errgo.Mask(db.post(db.url(index, "_refresh"), nil, nil), IsElasticsearchError)
 }
 
 // Search performs the query specified in q on the values in index/type_ and returns a
@@ -328,7 +377,7 @@ func (db *Database) RefreshIndex(index string) error {
 func (db *Database) Search(index, type_ string, q QueryDSL) (SearchResult, error) {
 	var sr SearchResult
 	if err := db.get(db.url(index, type_, "_search"), q, &sr); err != nil {
-		return SearchResult{}, errgo.Notef(getError(err), "search failed")
+		return SearchResult{}, errgo.NoteMask(err, "search failed", IsElasticsearchError)
 	}
 	return sr, nil
 }
@@ -337,19 +386,16 @@ func (db *Database) Search(index, type_ string, q QueryDSL) (SearchResult, error
 // marshaled as a json object and sent with the request. If v is non nil the response
 // body will be unmarshalled into the value it points to.
 func (db *Database) do(method, url string, body, v interface{}) error {
-	log.Tracef(">>> %s %s", method, url)
 	var r io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)
 		if err != nil {
-			return errgo.Notef(err, "can not marshaling body")
+			return errgo.Notef(err, "cannot marshaling body")
 		}
-		log.Tracef(">>> %s", b)
 		r = bytes.NewReader(b)
 	}
 	req, err := http.NewRequest(method, url, r)
 	if err != nil {
-		log.Debugf("*** %s", err)
 		return errgo.Notef(err, "cannot create request")
 	}
 	if body != nil {
@@ -357,32 +403,36 @@ func (db *Database) do(method, url string, body, v interface{}) error {
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		log.Debugf("*** %s", err)
 		return errgo.Mask(err)
 	}
 	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Debugf("*** %s", err)
 		return errgo.Notef(err, "cannot read response")
 	}
-	log.Tracef("<<< %s", resp.Status)
-	log.Tracef("<<< %s", b)
-	var eserr *ElasticSearchError
-	// TODO(mhilton) don't try to parse every response as an error.
-	if err = json.Unmarshal(b, &eserr); err != nil {
-		log.Debugf("*** %s", err)
-	}
-	if eserr.Status != 0 {
-		return eserr
-	}
-	if v != nil {
-		if err = json.Unmarshal(b, v); err != nil {
-			log.Debugf("*** %s", err)
-			return errgo.Notef(err, "cannot unmarshal response")
+	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated {
+		if v != nil {
+			return errgo.Mask(json.Unmarshal(b, &v))
 		}
+		return nil
 	}
-	return nil
+	// There was potentially an error.
+	var errorBody errorBody
+	err = json.Unmarshal(b, &errorBody)
+
+	// In some circumstances Not Found will be returned when it isn't an error, handle that.
+	if errorBody.Status == 0 && resp.StatusCode == http.StatusNotFound && v != nil {
+		return errgo.Mask(json.Unmarshal(b, &v))
+	}
+
+	if err != nil {
+		logger.Errorf("cannot unmarshal elasticsearch error: %s", err)
+	}
+
+	return &ElasticsearchError{
+		Status: resp.StatusCode,
+		body:   errorBody,
+	}
 }
 
 // delete makes a DELETE request to the database url. A non-nil body will be
@@ -506,20 +556,4 @@ type alias struct {
 type action struct {
 	Remove *alias `json:"remove,omitempty"`
 	Add    *alias `json:"add,omitempty"`
-}
-
-// getError derives an error from the underlaying error returned
-// by elasticsearch.
-func getError(err error) error {
-	if eserr, ok := err.(*ElasticSearchError); ok {
-		switch eserr.Status {
-		case http.StatusNotFound:
-			return ErrNotFound
-		case http.StatusConflict:
-			return ErrConflict
-		default:
-			return err
-		}
-	}
-	return err
 }

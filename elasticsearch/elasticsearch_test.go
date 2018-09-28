@@ -11,6 +11,7 @@ import (
 	jujutesting "github.com/juju/testing"
 	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
+	errgo "gopkg.in/errgo.v1"
 
 	es "gopkg.in/juju/charmstore.v5/elasticsearch"
 	"gopkg.in/juju/charmstore.v5/internal/storetesting"
@@ -180,7 +181,7 @@ func (s *Suite) TestPutVersionWithTypeUpdateEarlierDocumentVersion(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	doc["a"] = "c"
 	err = s.ES.PutDocumentVersionWithType(s.TestIndex, "testtype", "a", 1, es.ExternalGTE, doc)
-	c.Assert(err, gc.Equals, es.ErrConflict)
+	c.Assert(es.IsConflictError(errgo.Cause(err)), gc.Equals, true)
 	var result map[string]string
 	err = s.ES.GetDocument(s.TestIndex, "testtype", "a", &result)
 	c.Assert(result["a"], gc.Equals, "b")
@@ -201,8 +202,7 @@ func (s *Suite) TestDelete(c *gc.C) {
 
 func (s *Suite) TestDeleteErrorOnNonExistingIndex(c *gc.C) {
 	err := s.ES.DeleteIndex("nope")
-	c.Assert(err, gc.NotNil)
-	c.Assert(err.Error(), gc.Equals, "elasticsearch document not found")
+	c.Assert(es.IsNotFoundError(errgo.Cause(err)), gc.Equals, true)
 }
 
 func (s *Suite) TestIndexesCreatedAutomatically(c *gc.C) {
