@@ -150,6 +150,11 @@ type ServerParams struct {
 	// DockerRegistryTokenDuration is the time a docker registry
 	// token will be valid for after it is created.
 	DockerRegistryTokenDuration time.Duration
+
+	// DisableSlowMetadata indicates that we will have a placeholder response instead of a full
+	// response for slow endpoints.
+	// This is temporary.
+	DisableSlowMetadata bool
 }
 
 const defaultRootKeyExpiryDuration = 24 * time.Hour
