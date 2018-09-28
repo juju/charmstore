@@ -152,7 +152,7 @@ type ServerParams struct {
 	DockerRegistryTokenDuration time.Duration
 
 	// DisableSlowMetadata indicates that we will have a placeholder response instead of a full
-	// response for slow enpoints.
+	// response for slow endpoints.
 	// This is temporary.
 	DisableSlowMetadata bool
 }
