@@ -198,7 +198,7 @@ func (si *SearchIndex) update(doc *SearchDoc) error {
 		int64(doc.URL.Revision),
 		elasticsearch.ExternalGTE,
 		doc)
-	if err != nil && err != elasticsearch.ErrConflict {
+	if err != nil && !elasticsearch.IsConflictError(errgo.Cause(err)) {
 		return errgo.Mask(err)
 	}
 	if doc.Entity.URL.Series != "" {
@@ -342,7 +342,7 @@ func (si *SearchIndex) ensureIndexes(force bool) error {
 func (si *SearchIndex) getCurrentVersion() (version, int64, error) {
 	var v version
 	d, err := si.GetESDocument(versionIndex, versionType, si.Index)
-	if err != nil && err != elasticsearch.ErrNotFound {
+	if err != nil && !elasticsearch.IsNotFoundError(errgo.Cause(err)) {
 		return version{}, 0, errgo.Notef(err, "cannot get settings version")
 	}
 	if d.Found {
@@ -382,7 +382,7 @@ func (si *SearchIndex) updateVersion(v version, dv int64) (bool, error) {
 		err = si.PutDocumentVersion(versionIndex, versionType, si.Index, dv, v)
 	}
 	if err != nil {
-		if errgo.Cause(err) == elasticsearch.ErrConflict {
+		if elasticsearch.IsConflictError(errgo.Cause(err)) {
 			return false, nil
 		}
 		return false, err
