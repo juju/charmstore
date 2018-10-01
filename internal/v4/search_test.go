@@ -436,11 +436,16 @@ func (s *SearchSuite) TestSearchIncludeError(c *gc.C) {
 
 	// Now update the entity to hold an invalid hash.
 	// The list should still work, but only return a single result.
-	err = s.store.UpdateEntity(newResolvedURL("~charmers/precise/wordpress-23", 23), bson.D{{
+	rurl := newResolvedURL("~charmers/precise/wordpress-23", 23)
+	err = s.store.UpdateEntity(rurl, bson.D{{
 		"$set", bson.D{{
 			"blobhash", hashOfString("nope"),
 		}},
 	}})
+	c.Assert(err, gc.Equals, nil)
+	err = s.store.UpdateSearch(rurl)
+	c.Assert(err, gc.Equals, nil)
+	err = s.esSuite.ES.RefreshIndex(s.esSuite.TestIndex)
 	c.Assert(err, gc.Equals, nil)
 
 	// Now search again - we should get one result less

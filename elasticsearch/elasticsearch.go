@@ -26,15 +26,15 @@ import (
 )
 
 const (
-	// Internal provides elasticsearche's "internal" versioning system, as described in
+	// Internal provides elasticsearch's "internal" versioning system, as described in
 	// http://www.elasticsearch.org/guide/en/elasticsearch/reference/current/docs-index_.html#_version_types
 	Internal = "internal"
 
-	// External provides elasticsearche's "external" versioning system, as described in
+	// External provides elasticsearch's "external" versioning system, as described in
 	// http://www.elasticsearch.org/guide/en/elasticsearch/reference/current/docs-index_.html#_version_types
 	External = "external"
 
-	// ExternalGTE provides elasticsearche's "external_gte" versioning system, as described in
+	// ExternalGTE provides elasticsearch's "external_gte" versioning system, as described in
 	// http://www.elasticsearch.org/guide/en/elasticsearch/reference/current/docs-index_.html#_version_types
 	ExternalGTE = "external_gte"
 )

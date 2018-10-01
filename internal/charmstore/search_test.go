@@ -31,7 +31,8 @@ var _ = gc.Suite(&StoreSearchSuite{})
 func (s *StoreSearchSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoESSuite.SetUpTest(c)
 	s.index = SearchIndex{s.ES, s.TestIndex}
-	s.ES.RefreshIndex(".versions")
+	err := s.ES.RefreshIndex(".versions")
+	c.Assert(err, gc.Equals, nil)
 	pool, err := NewPool(s.Session.DB("foo"), &s.index, nil, ServerParams{})
 	c.Assert(err, gc.Equals, nil)
 	s.pool = pool
@@ -749,16 +750,15 @@ func (s *StoreSearchSuite) TestSearches(c *gc.C) {
 	s.store.ES.Database.RefreshIndex(s.TestIndex)
 	for i, test := range searchTests {
 		c.Logf("test %d: %s", i, test.about)
-		res, err := s.store.Search(test.sp)
-		c.Assert(err, gc.Equals, nil)
-		sort.Sort(resolvedURLsByString(res.Results))
+		total, res := search(c, s.store, test.sp)
+		sort.Sort(resolvedURLsByString(res))
 		expected := make(Entities, len(test.results))
 		for i, r := range test.results {
 			expected[i] = r.storedEntity(c, s.store)
 		}
 		sort.Sort(resolvedURLsByString(expected))
-		c.Check(Entities(res.Results), jc.DeepEquals, expected)
-		c.Check(res.Total, gc.Equals, len(test.results)+test.totalDiff)
+		c.Check(Entities(res), jc.DeepEquals, expected)
+		c.Check(total, gc.Equals, len(test.results)+test.totalDiff)
 	}
 }
 
@@ -783,10 +783,9 @@ func (s *StoreSearchSuite) TestPaginatedSearch(c *gc.C) {
 		Text: "wordpress",
 		Skip: 1,
 	}
-	res, err := s.store.Search(sp)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(res.Results, gc.HasLen, 1)
-	c.Assert(res.Total, gc.Equals, 2)
+	total, res := search(c, s.store, sp)
+	c.Assert(res, gc.HasLen, 1)
+	c.Assert(total, gc.Equals, 2)
 }
 
 func (s *StoreSearchSuite) TestLimitTestSearch(c *gc.C) {
@@ -796,9 +795,8 @@ func (s *StoreSearchSuite) TestLimitTestSearch(c *gc.C) {
 		Text:  "wordpress",
 		Limit: 1,
 	}
-	res, err := s.store.Search(sp)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(res.Results, gc.HasLen, 1)
+	_, res := search(c, s.store, sp)
+	c.Assert(res, gc.HasLen, 1)
 }
 
 func (s *StoreSearchSuite) TestPromulgatedRank(c *gc.C) {
@@ -818,9 +816,8 @@ func (s *StoreSearchSuite) TestPromulgatedRank(c *gc.C) {
 			"name": {"varnish"},
 		},
 	}
-	res, err := s.store.Search(sp)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(Entities(res.Results), jc.DeepEquals, Entities{
+	_, res := search(c, s.store, sp)
+	c.Assert(Entities(res), jc.DeepEquals, Entities{
 		s.entity(c, "cs:~charmers/xenial/varnish-1"),
 		s.entity(c, searchEntities["varnish"].entity.URL.String()),
 	})
@@ -926,23 +923,22 @@ func (s *StoreSearchSuite) TestSorting(c *gc.C) {
 		var sp SearchParams
 		err := sp.ParseSortFields(test.sortQuery)
 		c.Assert(err, gc.Equals, nil)
-		res, err := s.store.Search(sp)
-		c.Assert(err, gc.Equals, nil)
+		total, res := search(c, s.store, sp)
 		expected := make([]*mongodoc.Entity, len(test.results))
 		for i, r := range test.results {
 			expected[i] = r.storedEntity(c, s.store)
 		}
-		c.Assert(Entities(res.Results), jc.DeepEquals, Entities(expected))
-		c.Assert(res.Total, gc.Equals, len(test.results))
+		c.Assert(Entities(res), jc.DeepEquals, Entities(expected))
+		c.Assert(total, gc.Equals, len(test.results))
 	}
 }
 
 func (s *StoreSearchSuite) TestBoosting(c *gc.C) {
-	s.store.ES.Database.RefreshIndex(s.TestIndex)
-	var sp SearchParams
-	res, err := s.store.Search(sp)
+	err := s.store.ES.Database.RefreshIndex(s.TestIndex)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(Entities(res.Results), jc.DeepEquals, Entities{
+	var sp SearchParams
+	_, res := search(c, s.store, sp)
+	c.Assert(Entities(res), jc.DeepEquals, Entities{
 		searchEntities["squid-forwardproxy"].storedEntity(c, s.store),
 		searchEntities["wordpress-simple"].storedEntity(c, s.store),
 		searchEntities["mysql"].storedEntity(c, s.store),
@@ -1116,19 +1112,18 @@ func (s *StoreSearchSuite) TestMultiSeriesCharmFiltersSeriesCorrectly(c *gc.C) {
 	}}
 	for i, test := range filterTests {
 		c.Logf("%d. %s", i, test.series)
-		res, err := s.store.Search(SearchParams{
+		_, res := search(c, s.store, SearchParams{
 			Filters: map[string][]string{
 				"name":   {"juju-gui"},
 				"series": {test.series},
 			},
 		})
-		c.Assert(err, gc.Equals, nil)
 		if test.notFound {
-			c.Assert(res.Results, gc.HasLen, 0)
+			c.Assert(res, gc.HasLen, 0)
 			continue
 		}
-		c.Assert(res.Results, gc.HasLen, 1)
-		c.Assert(res.Results[0].URL.String(), gc.Equals, url.String())
+		c.Assert(res, gc.HasLen, 1)
+		c.Assert(res[0].URL.String(), gc.Equals, url.String())
 	}
 }
 
@@ -1146,9 +1141,8 @@ func (s *StoreSearchSuite) TestMultiSeriesCharmSortsSeriesCorrectly(c *gc.C) {
 	s.store.ES.Database.RefreshIndex(s.TestIndex)
 	var sp SearchParams
 	sp.ParseSortFields("-series", "owner")
-	res, err := s.store.Search(sp)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(Entities(res.Results), jc.DeepEquals, Entities{
+	_, res := search(c, s.store, sp)
+	c.Assert(Entities(res), jc.DeepEquals, Entities{
 		s.entity(c, "cs:~charmers/juju-gui-25"),
 		searchEntities["varnish"].storedEntity(c, s.store),
 		searchEntities["mysql"].storedEntity(c, s.store),
@@ -1250,4 +1244,21 @@ func (es Entities) String() string {
 		urls[i] = e.URL.String()
 	}
 	return "[" + strings.Join(urls, ", ") + "]"
+}
+
+func search(c *gc.C, store *Store, params SearchParams) (int, []*mongodoc.Entity) {
+	q := store.SearchQuery(params)
+	var entities []*mongodoc.Entity
+	fields := make(map[string]int, len(searchFields))
+	for k := range searchFields {
+		fields[k] = 1
+	}
+	it := q.Iter(fields)
+	var e mongodoc.Entity
+	for it.Next(&e) {
+		e := e
+		entities = append(entities, &e)
+	}
+	c.Assert(it.Err(), gc.Equals, nil)
+	return q.Total(), entities
 }

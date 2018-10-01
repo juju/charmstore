@@ -227,11 +227,12 @@ func (f ExistsFilter) MarshalJSON() ([]byte, error) {
 // QueryDSL provides a structure to put together a query using the
 // elasticsearch DSL.
 type QueryDSL struct {
-	Fields []string `json:"fields"`
-	From   int      `json:"from,omitempty"`
-	Size   int      `json:"size,omitempty"`
-	Query  Query    `json:"query,omitempty"`
-	Sort   []Sort   `json:"sort,omitempty"`
+	Fields []string     `json:"fields"`
+	From   int          `json:"from,omitempty"`
+	Size   int          `json:"size,omitempty"`
+	Query  Query        `json:"query,omitempty"`
+	Sort   []Sort       `json:"sort,omitempty"`
+	Source SourceFilter `json:"_source,omitempty"`
 }
 
 type Sort struct {
@@ -263,4 +264,22 @@ var Descending = Order{"desc"}
 //	}
 func marshalNamedObject(name string, obj interface{}) ([]byte, error) {
 	return json.Marshal(map[string]interface{}{name: obj})
+}
+
+// A SourceFilter is filter used to select the parts of the _source
+// document returned by a search. See
+// https://www.elastic.co/guide/en/elasticsearch/reference/1.3/search-request-source-filtering.html
+// for details.
+type SourceFilter []string
+
+// MarshalJSON implements json.Marshaler. The filter is marshalled as a
+// list of fields that are contained in the slice. If the slice is empty
+// then the value false is output. Not that if the filter is nil it is
+// expected that the field will be omitted from the request entirely
+// causing the whole source to be returned.
+func (f SourceFilter) MarshalJSON() ([]byte, error) {
+	if len(f) == 0 {
+		return []byte("false"), nil
+	}
+	return json.Marshal([]string(f))
 }

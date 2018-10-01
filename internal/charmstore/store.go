@@ -1468,14 +1468,12 @@ func ReaderAtSeeker(r io.ReadSeeker) io.ReaderAt {
 	return &readerAtSeeker{r, 0}
 }
 
-// Search searches the store for the given SearchParams.
-// It returns a SearchResult containing the results of the search.
-func (store *Store) Search(sp SearchParams) (SearchResult, error) {
-	result, err := store.ES.search(sp)
-	if err != nil {
-		return SearchResult{}, errgo.Mask(err)
+// SearchQuery creates a new SearchQuery with the given parameters.
+func (s *Store) SearchQuery(sp SearchParams) *SearchQuery {
+	return &SearchQuery{
+		index:  s.ES,
+		params: sp,
 	}
-	return result, nil
 }
 
 var listFilters = map[string]string{
