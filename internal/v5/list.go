@@ -40,7 +40,7 @@ func (h *ReqHandler) serveList(_ http.Header, req *http.Request) (interface{}, e
 		results = append(results, iter.Entity())
 	}
 	if iter.Err() != nil {
-		return nil, errgo.Notef(err, "error listing charms and bundles")
+		return nil, errgo.Notef(iter.Err(), "error listing charms and bundles")
 	}
 	r, err := h.getMetadataForEntities(results, sp.Include, req, nil)
 	if err != nil {
