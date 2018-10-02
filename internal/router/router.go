@@ -260,13 +260,17 @@ func New(
 		Context:  ctxt,
 	}
 	mux := NewServeMux()
-	mux.Handle("/meta/", http.StripPrefix("/meta", HandleErrors(r.serveBulkMeta)))
+	mux.Handle("/meta/", http.StripPrefix("/meta", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		r.Monitor.SetEndpoint("/meta" + req.URL.Path)
+		HandleErrors(r.serveBulkMeta).ServeHTTP(w, req)
+	})))
 	for path, handler := range r.handlers.Global {
+		path := path
 		path = "/" + path
 		prefix := strings.TrimSuffix(path, "/")
 		handler := handler
 		mux.Handle(path, http.StripPrefix(prefix, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			r.Monitor.SetKind(path[1:])
+			r.Monitor.SetEndpoint(path)
 			handler.ServeHTTP(w, req)
 		})))
 	}
@@ -334,8 +338,8 @@ func (r *Router) serveIds(w http.ResponseWriter, req *http.Request) error {
 	}
 	handler := r.handlers.Id[key]
 	if handler != nil {
-		r.Monitor.SetKind(key)
 		req.URL.Path = path
+		r.Monitor.SetEndpoint("/:id/" + key)
 		err := handler(url, w, req)
 		// Note: preserve error cause from handlers.
 		return errgo.Mask(err, errgo.Any)
@@ -343,6 +347,7 @@ func (r *Router) serveIds(w http.ResponseWriter, req *http.Request) error {
 	if key != "meta/" && key != "meta" {
 		return errgo.WithCausef(nil, params.ErrNotFound, params.ErrNotFound.Error())
 	}
+	r.Monitor.SetEndpoint("/:id/meta" + path)
 	req.URL.Path = path
 	return r.serveMeta(url, w, req)
 }
@@ -421,7 +426,6 @@ func (r *Router) serveMetaGet(rurl *ResolvedURL, req *http.Request) (interface{}
 	if err := r.Context.AuthorizeEntity(rurl, req); err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
-	r.Monitor.SetKind("meta")
 	key, path := handlerKey(req.URL.Path)
 	if key == "" {
 		// GET id/meta
@@ -484,7 +488,6 @@ func (r *Router) serveMetaPut(id *ResolvedURL, req *http.Request) error {
 	if err := r.Context.AuthorizeEntity(id, req); err != nil {
 		return errgo.Mask(err, errgo.Any)
 	}
-	r.Monitor.SetKind("meta")
 	var body json.RawMessage
 	if err := unmarshalJSONBody(req, &body); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrBadRequest))
@@ -562,7 +565,6 @@ func (r *Router) metaNames() []string {
 
 // serveBulkMeta serves bulk metadata requests (requests to /meta/...).
 func (r *Router) serveBulkMeta(w http.ResponseWriter, req *http.Request) error {
-	r.Monitor.SetKind("meta")
 	switch req.Method {
 	case "GET", "HEAD":
 		// A bare meta returns all endpoints.
