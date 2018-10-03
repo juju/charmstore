@@ -658,6 +658,8 @@ func bundleCount(x *int) interface{} {
 // GET id/meta/manifest
 // https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetamanifest
 func (h *ReqHandler) metaManifest(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
+	mon := monitoring.NewMetaDuration("manifest")
+	defer mon.Done()
 	r, size, err := h.Store.BlobStore.Open(entity.BlobHash, nil)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot open archive data for %s", id)
@@ -756,6 +758,8 @@ func (h *ReqHandler) metaTags(entity *mongodoc.Entity, id *router.ResolvedURL, p
 // GET id/meta/stats/
 // https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetastats
 func (h *ReqHandler) metaStats(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
+	mon := monitoring.NewMetaDuration("stats")
+	defer mon.Done()
 	// Retrieve the aggregated downloads count for the specific revision.
 	refresh, err := router.ParseBool(flags.Get("refresh"))
 	if err != nil {
@@ -806,6 +810,8 @@ func (h *ReqHandler) metaStats(entity *mongodoc.Entity, id *router.ResolvedURL, 
 // GET id/meta/revision-info
 // https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetarevision-info
 func (h *ReqHandler) metaRevisionInfo(id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
+	mon := monitoring.NewMetaDuration("revision-info")
+	defer mon.Done()
 	searchURL := id.PreferredURL()
 	searchURL.Revision = -1
 
@@ -1125,6 +1131,8 @@ func (h *ReqHandler) metaCanIngest(entity *mongodoc.BaseEntity, id *router.Resol
 // GET id/meta/can-write
 // See https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetacan-write
 func (h *ReqHandler) metaCanWrite(entity *mongodoc.BaseEntity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
+	mon := monitoring.NewMetaDuration("can-write")
+	defer mon.Done()
 	err := h.AuthorizeEntityForOp(id, req, OpWrite)
 	if err != nil && errgo.Cause(err) != params.ErrUnauthorized {
 		return nil, errgo.Mask(err, isDischargeRequiredError)
@@ -1189,6 +1197,8 @@ func (h *ReqHandler) putMetaPermWithKey(id *router.ResolvedURL, path string, val
 // GET id/meta/published
 // https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetapublished
 func (h *ReqHandler) metaPublished(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
+	mon := monitoring.NewMetaDuration("published")
+	defer mon.Done()
 	baseEntity, err := h.Cache.BaseEntity(entity.URL, charmstore.FieldSelector("channelentities"))
 	if err != nil {
 		return nil, errgo.Mask(err)
