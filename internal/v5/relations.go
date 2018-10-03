@@ -15,6 +15,7 @@ import (
 	"gopkg.in/juju/charmstore.v5/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5/internal/entitycache"
 	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5/internal/monitoring"
 	"gopkg.in/juju/charmstore.v5/internal/router"
 )
 
@@ -27,6 +28,8 @@ func (h *ReqHandler) metaCharmRelated(entity *mongodoc.Entity, id *router.Resolv
 	if id.URL.Series == "bundle" {
 		return nil, nil
 	}
+	mon := monitoring.NewMetaDuration("charm-related")
+	defer mon.Done()
 	// If the charm does not define any relation we can just return without
 	// hitting the db.
 	if len(entity.CharmProvidedInterfaces)+len(entity.CharmRequiredInterfaces) == 0 {
@@ -156,6 +159,9 @@ func (h *ReqHandler) metaBundlesContaining(entity *mongodoc.Entity, id *router.R
 	if id.URL.Series == "bundle" {
 		return nil, nil
 	}
+
+	mon := monitoring.NewMetaDuration("bundles-containing")
+	defer mon.Done()
 
 	// Validate the URL query values.
 	anySeries, err := router.ParseBool(flags.Get("any-series"))

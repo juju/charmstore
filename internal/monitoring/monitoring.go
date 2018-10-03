@@ -15,6 +15,13 @@ var (
 		Help:      "The duration of a web request in seconds.",
 	}, []string{"method", "root", "status", "endpoint"})
 
+	metaDuration = prometheus.NewSummaryVec(prometheus.SummaryOpts{
+		Namespace: "charmstore",
+		Subsystem: "meta",
+		Name:      "duration",
+		Help:      "The time spent getting meta for an entity.",
+	}, []string{"meta"})
+
 	uploadProcessingDuration = prometheus.NewSummary(prometheus.SummaryOpts{
 		Namespace: "charmstore",
 		Subsystem: "archive",
@@ -78,6 +85,7 @@ func SetBlobStoreStats(s BlobStats) {
 
 func init() {
 	prometheus.MustRegister(requestDuration)
+	prometheus.MustRegister(metaDuration)
 	prometheus.MustRegister(uploadProcessingDuration)
 	prometheus.MustRegister(blobstoreGCDuration)
 	prometheus.MustRegister(blobCount)

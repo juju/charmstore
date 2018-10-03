@@ -25,6 +25,7 @@ import (
 
 	"gopkg.in/juju/charmstore.v5/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
+	"gopkg.in/juju/charmstore.v5/internal/monitoring"
 	"gopkg.in/juju/charmstore.v5/internal/router"
 )
 
@@ -266,6 +267,8 @@ func (h *ReqHandler) metaResources(entity *mongodoc.Entity, id *router.ResolvedU
 	if entity.URL.Series == "bundle" {
 		return nil, nil
 	}
+	mon := monitoring.NewMetaDuration("resources")
+	defer mon.Done()
 	ch, err := h.entityChannel(id)
 	if err != nil {
 		return nil, errgo.Mask(err)
@@ -288,6 +291,8 @@ func (h *ReqHandler) metaResources(entity *mongodoc.Entity, id *router.ResolvedU
 // GET id/meta/resource/*name*[/*revision]
 // https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetaresourcesnamerevision
 func (h *ReqHandler) metaResourcesSingle(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
+	mon := monitoring.NewMetaDuration("resources/")
+	defer mon.Done()
 	data, err := h.metaResourcesSingle0(entity, id, path, flags, req)
 	if err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
