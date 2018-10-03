@@ -228,11 +228,6 @@ func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	rw := monitoring.NewResponseWriter(w)
 	monReq := monitoring.NewRequest(r, "debug")
 	defer monReq.Done(rw.Status)
-	if _, path := h.mux.Handler(r); path != "" {
-		monReq.SetKind(path)
-	} else {
-		monReq.SetKind("unknown")
-	}
 	h.mux.ServeHTTP(rw, r)
 }
 

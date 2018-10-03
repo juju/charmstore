@@ -248,9 +248,9 @@ func prometheusHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		// Use prometheus to monitor its own requests...
 		monReq := monitoring.NewRequest(req, "prometheus")
+		monReq.SetEndpoint("/metrics")
 		rw := monitoring.NewResponseWriter(w)
 		defer monReq.Done(rw.Status)
-		monReq.SetKind("metrics")
 		h.ServeHTTP(rw, req)
 	})
 }

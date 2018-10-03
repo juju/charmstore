@@ -81,7 +81,6 @@ import (
 
 	"gopkg.in/juju/charmstore.v5/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
-	"gopkg.in/juju/charmstore.v5/internal/monitoring"
 	"gopkg.in/juju/charmstore.v5/internal/router"
 	"gopkg.in/juju/charmstore.v5/internal/v4"
 	"gopkg.in/juju/charmstore.v5/internal/v5"
@@ -117,16 +116,13 @@ func NewAPIHandler(p charmstore.APIHandlerParams) (charmstore.HTTPCloseHandler, 
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	req.ParseForm()
-	rw := monitoring.NewResponseWriter(w)
 	rh, err := h.newReqHandler()
 	if err != nil {
 		router.WriteError(context.TODO(), w, err)
 		return
 	}
 	defer rh.close()
-	rh.v4.Router.Monitor.Reset(req, "legacy")
-	defer rh.v4.Router.Monitor.Done(rw.Status)
-	rh.mux.ServeHTTP(rw, req)
+	rh.mux.ServeHTTP(w, req)
 }
 
 func (h *Handler) Close() {
@@ -188,7 +184,6 @@ func charmStatsKey(url *charm.URL, kind string) []string {
 var errNotFound = fmt.Errorf("entry not found")
 
 func (h *reqHandler) serveCharmInfo(_ http.Header, req *http.Request) (interface{}, error) {
-	h.v4.Router.Monitor.SetKind("charm-info")
 	response := make(map[string]*charmrepo.InfoResponse)
 	for _, url := range req.Form["charms"] {
 		c := &charmrepo.InfoResponse{}
@@ -244,7 +239,6 @@ func (h *reqHandler) serveCharmInfo(_ http.Header, req *http.Request) (interface
 // "charms" query. In this implementation, the only supported event is
 // "published", required by the "juju publish" command.
 func (h *reqHandler) serveCharmEvent(_ http.Header, req *http.Request) (interface{}, error) {
-	h.v4.Router.Monitor.SetKind("charm-event")
 	response := make(map[string]*charmrepo.EventResponse)
 	for _, url := range req.Form["charms"] {
 		c := &charmrepo.EventResponse{}

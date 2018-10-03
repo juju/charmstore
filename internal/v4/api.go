@@ -21,7 +21,6 @@ import (
 	"gopkg.in/juju/charmstore.v5/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5/internal/entitycache"
 	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
-	"gopkg.in/juju/charmstore.v5/internal/monitoring"
 	"gopkg.in/juju/charmstore.v5/internal/router"
 	"gopkg.in/juju/charmstore.v5/internal/v5"
 )
@@ -56,16 +55,13 @@ func New(p charmstore.APIHandlerParams) (Handler, error) {
 }
 
 func (h Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	rw := monitoring.NewResponseWriter(w)
 	rh, err := h.NewReqHandler(req)
 	if err != nil {
 		router.WriteError(context.TODO(), w, err)
 		return
 	}
 	defer rh.Close()
-	rh.Router.Monitor.Reset(req, "v4")
-	defer rh.Router.Monitor.Done(rw.Status)
-	rh.ServeHTTP(rw, req)
+	rh.ServeHTTP(w, req)
 }
 
 func NewAPIHandler(p charmstore.APIHandlerParams) (charmstore.HTTPCloseHandler, error) {

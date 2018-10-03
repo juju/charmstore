@@ -14,7 +14,7 @@ import (
 type Request struct {
 	startTime time.Time
 	root      string
-	kind      string
+	endpoint  string
 	request   *http.Request
 }
 
@@ -32,23 +32,27 @@ func NewRequest(req *http.Request, root string) *Request {
 func (r *Request) Reset(req *http.Request, root string) {
 	r.startTime = time.Now()
 	r.request = req
-	r.kind = ""
+	r.endpoint = ""
 	r.root = root
 }
 
-// SetKind sets the kind of the request. This is
-// an arbitrary string to classify different kinds of request.
-func (r *Request) SetKind(kind string) {
-	r.kind = kind
+// SetEndpoint sets the endpoint of the request.
+func (r *Request) SetEndpoint(endpoint string) {
+	r.endpoint = endpoint
+}
+
+// Endpoint returns the currently set endpoint for the request. If it is not set
+// it falls back to the request URL path if one exists (e.g. it may not in unit testing).
+func (r *Request) Endpoint() string {
+	if r.endpoint == "" && r.request != nil {
+		return r.request.URL.Path
+	}
+	return r.endpoint
 }
 
 // Done records that the request is complete, and records any metrics for the request since the last call to Reset.
+// If the request endpoint is empty, it falls back to the path from the request url.
 func (r *Request) Done(status func() int) {
 	statusStr := fmt.Sprint(status())
-	requestDuration.WithLabelValues(r.request.Method, r.root, r.kind, statusStr, r.request.URL.Path).Observe(float64(time.Since(r.startTime)) / float64(time.Second))
-}
-
-// Kind returns the kind that has been set. This is useful for testing.
-func (r *Request) Kind() string {
-	return r.kind
+	requestDuration.WithLabelValues(r.request.Method, r.root, statusStr, r.Endpoint()).Observe(float64(time.Since(r.startTime)) / float64(time.Second))
 }
