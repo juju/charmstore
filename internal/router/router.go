@@ -347,7 +347,26 @@ func (r *Router) serveIds(w http.ResponseWriter, req *http.Request) error {
 	if key != "meta/" && key != "meta" {
 		return errgo.WithCausef(nil, params.ErrNotFound, params.ErrNotFound.Error())
 	}
-	r.Monitor.SetEndpoint("/:id/meta" + path)
+
+	// We don't want to track things that are unique to entities.
+	// For example:
+	//     /wordpress/meta/resources/foo
+	//     We want to track as /:id/meta/resources/
+	//   and
+	//     /wordpress/meta/resources
+	//     We want to track as /:id/meta/resources
+	//
+	// Technically some things after the slash might not be unique
+	// to entities (for example meta/perm/read) but it's a good enough approximation
+	// for now.
+	monitorPath := path
+	if len(path) > 0 {
+		if i := strings.Index(path[1:], "/"); i > 0 {
+			monitorPath = path[0 : i+2]
+		}
+	}
+	r.Monitor.SetEndpoint("/:id/meta" + monitorPath)
+
 	req.URL.Path = path
 	return r.serveMeta(url, w, req)
 }

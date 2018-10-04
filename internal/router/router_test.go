@@ -481,7 +481,7 @@ var routerGetTests = []struct {
 		CharmURL: "cs:precise/wordpress-42",
 		Path:     "/bar/baz",
 	},
-	monitorEndpoint: "/:id/meta/foo/bar/baz",
+	monitorEndpoint: "/:id/meta/foo/",
 }, {
 	about: "meta handler with params",
 	handlers: Handlers{
@@ -519,7 +519,7 @@ var routerGetTests = []struct {
 		Code:    params.ErrNotFound,
 		Message: `unknown metadata "foo/bar"`,
 	},
-	monitorEndpoint: "/:id/meta/foo/bar",
+	monitorEndpoint: "/:id/meta/foo/",
 }, {
 	about: "meta handler with nil data",
 	handlers: Handlers{
