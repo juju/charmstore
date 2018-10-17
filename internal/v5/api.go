@@ -771,24 +771,6 @@ func (h *ReqHandler) metaStats(entity *mongodoc.Entity, id *router.ResolvedURL, 
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	if entity.Series == "" {
-		// Concatenate all the supported series for a multi-series entity.
-		for _, series := range entity.SupportedSeries {
-			preferredURL.Series = series
-			countsSeries, countsAllRevisionsSeries, err := h.Store.ArchiveDownloadCounts(preferredURL, refresh)
-			if err != nil {
-				return nil, errgo.Mask(err)
-			}
-			counts.Total += countsSeries.Total
-			counts.LastDay += countsSeries.LastDay
-			counts.LastWeek += countsSeries.LastWeek
-			counts.LastMonth += countsSeries.LastMonth
-			countsAllRevisions.Total += countsAllRevisionsSeries.Total
-			countsAllRevisions.LastDay += countsAllRevisionsSeries.LastDay
-			countsAllRevisions.LastWeek += countsAllRevisionsSeries.LastWeek
-			countsAllRevisions.LastMonth += countsAllRevisionsSeries.LastMonth
-		}
-	}
 	// Return the response.
 	return &params.StatsResponse{
 		ArchiveDownloadCount: counts.Total,

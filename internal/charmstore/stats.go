@@ -29,14 +29,10 @@ type stats struct {
 	statsTokenOld map[int]string
 }
 
-// Note that changing the StatsGranularity constant
-// will not change the stats time granularity - it
-// is defined for external code clarity.
-
 // StatsGranularity holds the time granularity of statistics
 // gathering. IncCounter(Async) calls within this duration
 // may be aggregated.
-const StatsGranularity = time.Minute
+const StatsGranularity = time.Hour
 
 // The stats mechanism uses the following MongoDB collections:
 //
@@ -190,8 +186,9 @@ func (s *Store) IncCounterAtTime(key []string, t time.Time) error {
 		return err
 	}
 
-	// Round to the start of the minute so we get one document per minute at most.
-	t = t.UTC().Add(-time.Duration(t.Second()) * time.Second)
+	// Round to the start of the stats granularity so we get one document per
+	// "grain" of time.
+	t = t.UTC().Truncate(StatsGranularity)
 	counters := s.DB.StatCounters()
 	_, err = counters.Upsert(bson.D{{"k", skey}, {"t", timeToStamp(t)}}, bson.D{{"$inc", bson.D{{"c", 1}}}})
 	return err
@@ -260,6 +257,37 @@ type Counter struct {
 	Time   time.Time
 }
 
+func (s *Store) fastCounters(key []string, prefix bool, searchKey string) ([]Counter, error) {
+	countersColl := s.DB.StatCounters()
+	var result struct {
+		Count int64 `bson:"c"`
+	}
+	var regex string
+	if prefix {
+		regex = "^" + searchKey + ".+"
+	} else {
+		regex = "^" + searchKey + "$"
+	}
+	err := countersColl.Pipe([]bson.D{
+		{{"$match", bson.D{{"k", bson.D{{"$regex", regex}}}}}},
+		{{"$group", bson.D{{"_id", 0}, {"c", bson.D{{"$sum", "$c"}}}}}},
+	}).One(&result)
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			return []Counter{{
+				Key:    key,
+				Prefix: prefix,
+			}}, nil
+		}
+		return nil, errgo.Mask(err)
+	}
+	return []Counter{{
+		Key:    key,
+		Prefix: prefix,
+		Count:  result.Count,
+	}}, nil
+}
+
 // Counters aggregates and returns counter values according to the provided request.
 func (s *Store) Counters(req *CounterRequest) ([]Counter, error) {
 	tokensColl := s.DB.StatTokens()
@@ -279,6 +307,10 @@ func (s *Store) Counters(req *CounterRequest) ([]Counter, error) {
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
+	if !req.List && req.By == ByAll && req.Start.IsZero() && req.Stop.IsZero() {
+		return s.fastCounters(req.Key, req.Prefix, searchKey)
+	}
+	logger.Infof("slowCounters %q; prefix %v", req.Key, req.Prefix)
 	var regex string
 	if req.Prefix {
 		regex = "^" + searchKey + ".+"
@@ -445,19 +477,19 @@ func (s sortableCounters) Less(i, j int) bool {
 // EntityStatsKey returns a stats key for the given charm or bundle
 // reference and the given kind.
 // Entity stats keys are generated using the following schema:
-//   kind:series:name:user:revision
+//   kind:user:name:series:revision
 // where user can be empty (for promulgated charms/bundles) and revision is
 // optional (e.g. when uploading an entity the revision is not specified).
 // For instance, entities' stats can then be retrieved like the following:
-//   - kind:utopic:* -> all charms of a specific series;
-//   - kind:trusty:django:* -> all revisions and user variations of a charm;
-//   - kind:trusty:django::* -> all revisions of a promulgated charm;
-//   - kind:trusty:django::42 -> a specific promulgated charm;
-//   - kind:trusty:django:who:* -> all revisions of a user owned charm;
-//   - kind:trusty:django:who:42 -> a specific user owned charm;
+//   - archive-download:bob:* -> download counts for all charms owned by bob.
+//   - archive-download:bob:django:trusty:* -> all revisions of cs:~bob/trusty/django
+//   - archive-download-promulgated::django:trusty:* -> all revisions of a promulgated charm;
+//   - archive-download-promulgated::django:trusty:42 -> a specific promulgated charm
+//   - archive-download:bob:django:* -> all revisions of a user owned charm;
+//   - archive-download:bob:django:trusty:42 -> a specific user owned charm;
 // The above also applies to bundles (where the series is "bundle").
 func EntityStatsKey(url *charm.URL, kind string) []string {
-	key := []string{kind, url.Series, url.Name, url.User}
+	key := []string{kind, url.User, url.Name, url.Series}
 	if url.Revision != -1 {
 		key = append(key, strconv.Itoa(url.Revision))
 	}
@@ -512,7 +544,13 @@ func (s *Store) statsCacheFetch(id *charm.URL) (interface{}, error) {
 	if id.User == "" {
 		kind = params.StatsArchiveDownloadPromulgated
 	}
-	counts, err := s.aggregateStats(EntityStatsKey(id, kind), prefix)
+	key := EntityStatsKey(id, kind)
+	if prefix && id.Series == "" {
+		// A search for stats on an id with no specified revision
+		// and no revision provides results on all series.
+		key = key[:len(key)-1]
+	}
+	counts, err := s.aggregateStats(key, prefix)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot get aggregated count for %q", id)
 	}
@@ -524,34 +562,49 @@ func (s *Store) statsCacheFetch(id *charm.URL) (interface{}, error) {
 func (s *Store) aggregateStats(key []string, prefix bool) (AggregatedCounts, error) {
 	var counts AggregatedCounts
 
-	req := CounterRequest{
-		Key:    key,
-		By:     ByDay,
-		Prefix: prefix,
-	}
-	results, err := s.Counters(&req)
-
-	if err != nil {
-		return counts, errgo.Notef(err, "cannot retrieve stats")
-	}
-
 	today := time.Now()
 	lastDay := today.AddDate(0, 0, -1)
 	lastWeek := today.AddDate(0, 0, -7)
 	lastMonth := today.AddDate(0, -1, 0)
 
+	// Use a simple request for all time.
+	results, err := s.Counters(&CounterRequest{
+		Key:    key,
+		Prefix: prefix,
+		By:     ByAll,
+	})
+	if err != nil {
+		return counts, errgo.Notef(err, "cannot retrieve stats")
+	}
+	if len(results) > 0 {
+		counts.Total = results[0].Count
+	}
+
+	// Use a more complex (but slower) reqest for the last day/week/month
+	// results.
+	results, err = s.Counters(&CounterRequest{
+		Key:    key,
+		By:     ByDay,
+		Prefix: prefix,
+		Start:  lastMonth,
+		Stop:   today,
+	})
+	if err != nil {
+		return counts, errgo.Notef(err, "cannot retrieve stats")
+	}
+
 	// Aggregate the results.
 	for _, result := range results {
-		if result.Time.After(lastMonth) {
+		switch {
+		case result.Time.After(lastDay):
+			counts.LastDay += result.Count
+			fallthrough
+		case result.Time.After(lastWeek):
+			counts.LastWeek += result.Count
+			fallthrough
+		default:
 			counts.LastMonth += result.Count
-			if result.Time.After(lastWeek) {
-				counts.LastWeek += result.Count
-				if result.Time.After(lastDay) {
-					counts.LastDay += result.Count
-				}
-			}
 		}
-		counts.Total += result.Count
 	}
 	return counts, nil
 }

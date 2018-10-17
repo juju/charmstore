@@ -161,10 +161,10 @@ func (s *ArchiveSuite) TestGetCounters(c *gc.C) {
 		)
 
 		// Check that the downloads count for the entity has been updated.
-		key := []string{params.StatsArchiveDownload, "utopic", "mysql", id.URL.User, "42"}
+		key := charmstore.EntityStatsKey(&id.URL, params.StatsArchiveDownload)
 		stats.CheckCounterSum(c, s.store, key, false, 1)
 		// Check that the promulgated download count for the entity has also been updated
-		key = []string{params.StatsArchiveDownloadPromulgated, "utopic", "mysql", "", "42"}
+		key = charmstore.EntityStatsKey(id.PromulgatedURL(), params.StatsArchiveDownloadPromulgated)
 		stats.CheckCounterSum(c, s.store, key, false, 1)
 	}
 }
@@ -696,45 +696,12 @@ func (s *ArchiveSuite) TestPostCounters(c *gc.C) {
 	if !storetesting.MongoJSEnabled() {
 		c.Skip("MongoDB JavaScript not available")
 	}
-
-	s.assertUploadCharm(c, "POST", newResolvedURL("~charmers/precise/wordpress-0", -1), "wordpress")
+	id := newResolvedURL("~charmers/precise/wordpress-0", -1)
+	s.assertUploadCharm(c, "POST", id, "wordpress")
 
 	// Check that the upload count for the entity has been updated.
-	key := []string{params.StatsArchiveUpload, "precise", "wordpress", "charmers"}
+	key := charmstore.EntityStatsKey(id.URL.WithRevision(-1), params.StatsArchiveUpload)
 	stats.CheckCounterSum(c, s.store, key, false, 1)
-}
-
-func (s *ArchiveSuite) TestPostFailureCounters(c *gc.C) {
-	if !storetesting.MongoJSEnabled() {
-		c.Skip("MongoDB JavaScript not available")
-	}
-
-	hash, _ := hashOf(invalidZip())
-	doPost := func(url string, expectCode int) {
-		rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
-			Handler: s.srv,
-			URL:     storeURL(url),
-			Method:  "POST",
-			Header: http.Header{
-				"Content-Type": {"application/zip"},
-			},
-			Body:     invalidZip(),
-			Username: testUsername,
-			Password: testPassword,
-		})
-		c.Assert(rec.Code, gc.Equals, expectCode, gc.Commentf("body: %s", rec.Body.Bytes()))
-	}
-
-	// Send a first invalid request (revision specified).
-	doPost("~charmers/utopic/wordpress-42/archive", http.StatusBadRequest)
-	// Send a second invalid request (no hash).
-	doPost("~charmers/utopic/wordpress/archive", http.StatusBadRequest)
-	// Send a third invalid request (invalid zip).
-	doPost("~charmers/utopic/wordpress/archive?hash="+hash, http.StatusBadRequest)
-
-	// Check that the failed upload count for the entity has been updated.
-	key := []string{params.StatsArchiveFailedUpload, "utopic", "wordpress", "charmers"}
-	stats.CheckCounterSum(c, s.store, key, false, 3)
 }
 
 func (s *ArchiveSuite) TestUploadOfCurrentCharmReadsFully(c *gc.C) {

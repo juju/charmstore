@@ -150,11 +150,9 @@ func (h *ReqHandler) updateStatsArchiveUpload(id *charm.URL, err *error) {
 	// Upload stats don't include revision: it is assumed that each
 	// entity revision is only uploaded once.
 	id.Revision = -1
-	kind := params.StatsArchiveUpload
-	if *err != nil {
-		kind = params.StatsArchiveFailedUpload
+	if *err == nil {
+		h.Store.IncCounterAsync(charmstore.EntityStatsKey(id, params.StatsArchiveUpload))
 	}
-	h.Store.IncCounterAsync(charmstore.EntityStatsKey(id, kind))
 }
 
 func (h *ReqHandler) servePostArchive(id *charm.URL, w http.ResponseWriter, req *http.Request) (err error) {
