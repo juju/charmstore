@@ -39,6 +39,7 @@ func NewSwiftBackend(cred *identity.Credentials, authmode identity.AuthMode, con
 	return &swiftBackend{
 		client:    swift.New(c),
 		container: container,
+		tmpdir:    tmpdir,
 	}
 }
 
