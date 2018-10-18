@@ -758,6 +758,9 @@ func (h *ReqHandler) metaTags(entity *mongodoc.Entity, id *router.ResolvedURL, p
 // GET id/meta/stats/
 // https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetastats
 func (h *ReqHandler) metaStats(entity *mongodoc.Entity, id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
+	if h.Handler.config.DisableSlowMetadata {
+		return &params.StatsResponse{}, nil
+	}
 	mon := monitoring.NewMetaDuration("stats")
 	defer mon.Done()
 	// Retrieve the aggregated downloads count for the specific revision.
