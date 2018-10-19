@@ -82,7 +82,9 @@ func errorToResp1(err error) (int, interface{}) {
 		status = http.StatusNotFound
 	case params.ErrBadRequest, params.ErrInvalidEntity:
 		status = http.StatusBadRequest
-	case params.ErrForbidden, params.ErrEntityIdNotAllowed:
+	case params.ErrForbidden,
+		params.ErrEntityIdNotAllowed,
+		params.ErrReadOnly:
 		status = http.StatusForbidden
 	case params.ErrUnauthorized:
 		status = http.StatusUnauthorized
