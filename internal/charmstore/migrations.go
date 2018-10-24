@@ -31,6 +31,16 @@ const (
 	migrationCandidateBetaChannels   mongodoc.MigrationName = "populate candidate and beta channel ACLs"
 	migrationRevisionsCollection     mongodoc.MigrationName = "populate revisions collection"
 	migrationBlobRefs                mongodoc.MigrationName = "populate blobref table"
+	migrationStatCounterSquash       mongodoc.MigrationName = "reduce stat counter"
+	migrationStatCounterReorderKey   mongodoc.MigrationName = "reorder state counter keys"
+)
+
+// The following two constants are exported so they can be used by the migratestats
+// command. We can remove them when that command has been run in
+// production.
+const (
+	MigrationStatCounterSquash     = migrationStatCounterSquash
+	MigrationStatCounterReorderKey = migrationStatCounterReorderKey
 )
 
 // migrations holds all the migration functions that are executed in the order
@@ -87,6 +97,12 @@ var migrations = []migration{{
 }, {
 	name:    migrationBlobRefs,
 	migrate: migrateBlobRefs,
+}, {
+	name:    migrationStatCounterSquash,
+	migrate: migrateStatCounterSquash,
+}, {
+	name:    migrationStatCounterReorderKey,
+	migrate: migrateStatCounterReorderKey,
 }}
 
 // migration holds a migration function with its corresponding name.
@@ -260,6 +276,14 @@ func migrateBlobRefs(db StoreDatabase) error {
 		return errgo.Mask(err)
 	}
 	return nil
+}
+
+func migrateStatCounterSquash(db StoreDatabase) error {
+	return errgo.Newf("stat counters collection must be migrated manually")
+}
+
+func migrateStatCounterReorderKey(db StoreDatabase) error {
+	return errgo.Newf("stat counters collection must be migrated manually")
 }
 
 type legacyEntity struct {
