@@ -92,6 +92,7 @@ docker-registry-auth-key: |
 docker-registry-token-duration: 1h10m
 tempdir: /var/tmp/charmstore
 disable-slow-metadata: true
+read-only: true
 `
 
 func (s *ConfigSuite) readConfig(c *gc.C, content string) (*config.Config, error) {
@@ -158,6 +159,7 @@ func (s *ConfigSuite) TestRead(c *gc.C) {
 		DockerRegistryTokenDuration: config.DurationString{time.Hour + 10*time.Minute},
 		TempDir:                     "/var/tmp/charmstore",
 		DisableSlowMetadata:         true,
+		ReadOnly:                    true,
 	})
 }
 

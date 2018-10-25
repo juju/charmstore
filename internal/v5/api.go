@@ -166,6 +166,9 @@ func (s *StoreWithChannel) FindBaseEntity(url *charm.URL, fields map[string]int)
 // If no handlers are available, it returns an error with
 // a charmstore.ErrTooManySessions cause.
 func (h *Handler) NewReqHandler(req *http.Request) (*ReqHandler, error) {
+	if h.config.ReadOnly && req.Method != "GET" && req.Method != "HEAD" {
+		return nil, errgo.WithCausef(nil, params.ErrReadOnly, "")
+	}
 	req.ParseForm()
 	// Validate all the values for channel, even though
 	// most endpoints will only ever use the first one.
@@ -479,7 +482,7 @@ func (h *ReqHandler) puttableBaseEntityHandler(get baseEntityHandlerFunc, handle
 	})
 }
 
-func (h *ReqHandler) processEntries(entries []audit.Entry) {
+func (h *ReqHandler) addAuditForEntries(entries []audit.Entry) {
 	for _, e := range entries {
 		h.addAudit(e)
 	}
@@ -489,7 +492,7 @@ func (h *ReqHandler) updateBaseEntity(id *router.ResolvedURL, fields map[string]
 	if err := h.Store.UpdateBaseEntity(id, entityUpdateOp(fields)); err != nil {
 		return errgo.Notef(err, "cannot update base entity %q", id)
 	}
-	h.processEntries(entries)
+	h.addAuditForEntries(entries)
 	return nil
 }
 
@@ -498,7 +501,7 @@ func (h *ReqHandler) updateEntity(id *router.ResolvedURL, fields map[string]inte
 	if err != nil {
 		return errgo.Notef(err, "cannot update %q", &id.URL)
 	}
-	h.processEntries(entries)
+	h.addAuditForEntries(entries)
 	return nil
 }
 
