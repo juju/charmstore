@@ -7,11 +7,11 @@ import (
 	"time"
 
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/juju/charmrepo.v3/csclient/params"
-	"gopkg.in/juju/charmstore.v5/internal/charmstore"
-	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
 	mgo "gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+
+	"gopkg.in/juju/charmstore.v5/internal/charmstore"
+	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
 )
 
 const (
@@ -32,6 +32,13 @@ var keepKinds = []string{
 func squashStats(db *mgo.Database) error {
 	seconds := int(charmstore.StatsGranularity / time.Second)
 	var r []struct{}
+	// Summary of the pipe:
+	// Group documents by the timestamp rounded down to the nearest StatsGranularity
+	// (we use t-t%granularity because earlier MongoDB versions don't have
+	// a way of truncating to integer) and the key (it's a composite key
+	// because we want to be unique over timestamp (t) and stats key (k).
+	// We accumulate the sum of all the count (c) fields and keep the first
+	// id field encountered,
 	err := db.C(statCountersColl).Pipe([]bson.M{{
 		"$group": bson.M{
 			"_id": bson.M{
@@ -63,7 +70,7 @@ func squashStats(db *mgo.Database) error {
 		"$out": "newstatcounters",
 	}}).AllowDiskUse().All(&r)
 	if err != nil {
-		return errgo.Notef(err, "cannot squash stats")
+		return errgo.Notef(err, "cannot coarse-grain stats")
 	}
 	if err := renameCollection(db, "newstatcounters", statCountersColl); err != nil {
 		return errgo.Mask(err)
@@ -78,9 +85,6 @@ func reorderStatsKeys(db *mgo.Database) error {
 	for _, k := range keepKinds {
 		key, err := statsKey(db, k)
 		if err != nil {
-			if errgo.Cause(err) == params.ErrNotFound {
-				continue
-			}
 			return errgo.Newf("cannot determine key for %q: %v", k, err)
 		}
 		keepKeys[key] = true

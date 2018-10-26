@@ -8,13 +8,13 @@ import (
 	"strings"
 	"time"
 
+	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/mgo.v2/bson"
 
-	jujutesting "github.com/juju/testing"
 	"gopkg.in/juju/charmstore.v5/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
-	"gopkg.in/mgo.v2/bson"
 )
 
 var _ = gc.Suite(&suite{})

@@ -278,12 +278,34 @@ func migrateBlobRefs(db StoreDatabase) error {
 	return nil
 }
 
+var ignoreManualMigrations = false
+
 func migrateStatCounterSquash(db StoreDatabase) error {
-	return errgo.Newf("stat counters collection must be migrated manually")
+	if ignoreManualMigrations {
+		return nil
+	}
+	n, err := db.StatCounters().Find(nil).Count()
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	if n > 0 {
+		return errgo.Newf("stat counters collection must be migrated manually")
+	}
+	return nil
 }
 
 func migrateStatCounterReorderKey(db StoreDatabase) error {
-	return errgo.Newf("stat counters collection must be migrated manually")
+	if ignoreManualMigrations {
+		return nil
+	}
+	n, err := db.StatCounters().Find(nil).Count()
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	if n > 0 {
+		return errgo.Newf("stat counters collection must be migrated manually")
+	}
+	return nil
 }
 
 type legacyEntity struct {
