@@ -12,7 +12,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"reflect"
-	"strconv"
 	"strings"
 	"time"
 
@@ -2409,13 +2408,13 @@ func (s *APISuite) TestMetaStats(c *gc.C) {
 			// Simulate the entity was downloaded at the specified dates.
 			for daysAgo, downloads := range downloadsPerDay {
 				date := today.AddDate(0, 0, -daysAgo)
-				key := []string{params.StatsArchiveDownload, url.URL.Series, url.URL.Name, url.URL.User, strconv.Itoa(url.URL.Revision)}
+				key := charmstore.EntityStatsKey(&url.URL, params.StatsArchiveDownload)
 				for i := 0; i < downloads; i++ {
 					err := s.store.IncCounterAtTime(key, date)
 					c.Assert(err, gc.Equals, nil)
 				}
 				if url.PromulgatedRevision > -1 {
-					key := []string{params.StatsArchiveDownloadPromulgated, url.URL.Series, url.URL.Name, "", strconv.Itoa(url.PromulgatedRevision)}
+					key := charmstore.EntityStatsKey(url.PromulgatedURL(), params.StatsArchiveDownloadPromulgated)
 					for i := 0; i < downloads; i++ {
 						err := s.store.IncCounterAtTime(key, date)
 						c.Assert(err, gc.Equals, nil)
