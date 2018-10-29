@@ -5,3 +5,8 @@ go:
 script: GO111MODULE=on go test ./...
 services:
   - mongodb
+  - elasticsearch
+before_script:
+  - sleep 10
+before_install:
+  - curl -O https://download.elastic.co/elasticsearch/release/org/elasticsearch/distribution/deb/elasticsearch/2.4.6/elasticsearch-2.4.6.deb && sudo dpkg -i --force-confnew elasticsearch-2.4.6.deb && sudo service elasticsearch restart
