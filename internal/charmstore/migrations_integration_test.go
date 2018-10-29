@@ -40,6 +40,11 @@ func (s *migrationsIntegrationSuite) SetUpSuite(c *gc.C) {
 	s.commonSuite.SetUpSuite(c)
 }
 
+func (s *migrationsIntegrationSuite) SetUpTest(c *gc.C) {
+	s.PatchValue(&ignoreManualMigrations, true)
+	s.commonSuite.SetUpTest(c)
+}
+
 func (s *migrationsIntegrationSuite) dump(c *gc.C) {
 	// We can't use the usual s.Session because we're using
 	// commonSuite which uses IsolationSuite which hides the
