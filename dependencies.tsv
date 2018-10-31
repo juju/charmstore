@@ -1,6 +1,5 @@
 github.com/ajstarks/svgo	git	6ce6a3bcf6cde6c5007887677ebd148ec30f42a4	2018-10-06T00:33:13Z
 github.com/beorn7/perks	git	3a771d992973f24aa725d07868b467d1ddfceafb	2018-03-21T16:47:47Z
-github.com/cloud-green/monitoring	git	666e3beca3cb4f6b5c8f176ba80daf2b3adbd84e	2017-11-27T13:22:20Z
 github.com/dgrijalva/jwt-go	git	01aeca54ebda6e0fbfafd0a524d234159c05ec20	2016-07-05T20:30:06Z
 github.com/golang/protobuf	git	aa810b61a9c79d51363740d207bb46cf8e620ed5	2018-08-14T21:14:27Z
 github.com/gorilla/handlers	git	13d73096a474cac93275c679c7b8a2dc17ddba82	2017-02-24T19:39:55Z
@@ -14,6 +13,7 @@ github.com/juju/httprequest	git	605594ea760a0d48e53017d4e6d975e4acbe0e57	2018-09
 github.com/juju/idmclient	git	fb1dc7175251ac8e2dc460897313e05175cbbc0d	2016-11-07T14:02:50Z
 github.com/juju/loggo	git	584905176618da46b895b176c721b02c476b6993	2018-05-24T02:20:52Z
 github.com/juju/mempool	git	24974d6c264fe5a29716e7d56ea24c4bd904b7cc	2016-02-05T10:49:27Z
+github.com/juju/mgomonitor	git	52206bb0cd318e6667fb0e651cca08437b70134b	2018-10-29T15:11:16Z
 github.com/juju/retry	git	1998d01ba1c3eeb4a4728c4a50660025b2fe7c8f	2016-09-28T20:18:58Z
 github.com/juju/schema	git	e4f08199aa80d3194008c0bd2e14ef5edc0e6be6	2018-01-09T04:18:50Z
 github.com/juju/testing	git	72703b1e95eb8ce4737fd8a3d8496c6b0be280a6	2018-05-17T13:41:05Z
@@ -34,7 +34,7 @@ github.com/rogpeppe/fastuuid	git	6724a57986aff9bff1a1770e9347036def7c89f6	2015-0
 golang.org/x/crypto	git	c126467f60eb25f8f27e5a981f32a87e3965053f	2018-07-23T16:41:46Z
 golang.org/x/net	git	3673e40ba22529d22c3fd7c93e97b0ce50fa7bdd	2018-07-24T23:48:03Z
 gopkg.in/check.v1	git	788fd78401277ebd861206a03c884797c6ec5541	2018-06-28T17:31:08Z
-gopkg.in/errgo.v1	git	442357a80af5c6bf9b6d51ae791a39c3421004f3	2016-12-22T12:58:16Z
+gopkg.in/errgo.v1	git	b20caedf0710d0988e92b5f2d76843ad1f231f2d	2018-08-18T17:50:15Z
 gopkg.in/goose.v2	git	c6b4881f832a0e573afec9b7b115d913954b3448	2018-08-14T19:10:12Z
 gopkg.in/httprequest.v1	git	3531529dedf047a744dd77f5262515aefff8cd48	2018-03-19T12:54:57Z
 gopkg.in/juju/charm.v6	git	abaa717bc6ed4f694281737cb01f32f7de7ea357	2018-08-03T03:00:15Z
