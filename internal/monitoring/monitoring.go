@@ -3,7 +3,7 @@
 package monitoring // import "gopkg.in/juju/charmstore.v5/internal/monitoring"
 
 import (
-	"github.com/cloud-green/monitoring"
+	"github.com/juju/mgomonitor"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -92,5 +92,5 @@ func init() {
 	prometheus.MustRegister(maxBlobSize)
 	prometheus.MustRegister(meanBlobSize)
 	prometheus.MustRegister(esSyncing)
-	prometheus.MustRegister(monitoring.NewMgoStatsCollector("charmstore"))
+	prometheus.MustRegister(mgomonitor.NewCollector("charmstore"))
 }
