@@ -6,7 +6,6 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgrijalva/jwt-go v0.0.0-20160705203006-01aeca54ebda
 	github.com/gorilla/handlers v0.0.0-20170224193955-13d73096a474
-	github.com/juju/ansiterm v0.0.0-20160907234532-b99631de12cf
 	github.com/juju/collections v0.0.0-20180717171555-9be91dc79b7c // indirect
 	github.com/juju/gojsonpointer v0.0.0-20150204194629-afe8b77aa08f // indirect
 	github.com/juju/gojsonreference v0.0.0-20150204194633-f0d24ac5ee33 // indirect
@@ -25,15 +24,11 @@ require (
 	github.com/juju/xml v0.0.0-20150413131121-eb759a627588
 	github.com/juju/zip v0.0.0-20160205105221-f6b1e93fa2e2
 	github.com/julienschmidt/httprouter v0.0.0-20151013225520-77a895ad01eb
-	github.com/lunixbochs/vtclean v0.0.0-20160125035106-4fbf7632a2c6
-	github.com/mattn/go-colorable v0.0.6
-	github.com/mattn/go-isatty v0.0.0-20160806122752-66b8e73f3f5c
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v0.0.0-20180319131721-d49167c4b9f3
 	github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af
 	github.com/stretchr/testify v1.2.2 // indirect
 	golang.org/x/net v0.0.0-20181029044818-c44066c5c816
-	golang.org/x/tools v0.0.0-20180911133044-677d2ff680c1
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
 	gopkg.in/errgo.v1 v1.0.0
 	gopkg.in/goose.v2 v2.0.0-20180814191012-c6b4881f832a
