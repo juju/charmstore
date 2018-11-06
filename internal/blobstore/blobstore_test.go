@@ -102,6 +102,21 @@ func (s *SwiftStoreSuite) TestPutInvalidHashBuffered(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, "hash mismatch")
 }
 
+func (s *SwiftStoreSuite) TestTemporaryDirectory(c *gc.C) {
+	cred := &identity.Credentials{
+		URL:        s.openstack.URLs["identity"],
+		User:       "fred",
+		Secrets:    "secret",
+		Region:     "some region",
+		TenantName: "tenant",
+	}
+
+	var r io.Reader
+	be := blobstore.NewSwiftBackend(cred, identity.AuthUserPass, "testc", "/no/such/path")
+	err := be.Put("test", r, 11*1024*1024, "a hash")
+	c.Assert(err, gc.ErrorMatches, `open /no/such/path/test: no such file or directory`)
+}
+
 type blobStoreSuite struct {
 	jujutesting.IsolatedMgoSuite
 	store      *blobstore.Store

@@ -155,6 +155,11 @@ type ServerParams struct {
 	// response for slow endpoints.
 	// This is temporary.
 	DisableSlowMetadata bool
+
+	// If ReadOnly is true, the charmstore will run in "read-only" mode,
+	// returning errors on any attempts to change the charmstore
+	// data.
+	ReadOnly bool
 }
 
 const defaultRootKeyExpiryDuration = 24 * time.Hour

@@ -121,6 +121,7 @@ func serve(conf *config.Config) error {
 		DockerRegistryAuthKey:          conf.DockerRegistryAuthKey.Key,
 		DockerRegistryTokenDuration:    conf.DockerRegistryTokenDuration.Duration,
 		DisableSlowMetadata:            conf.DisableSlowMetadata,
+		ReadOnly:                       conf.ReadOnly,
 	}
 	switch conf.BlobStore {
 	case config.MongoDBBlobStore:

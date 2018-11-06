@@ -87,6 +87,9 @@ type commonSuite struct {
 	// started with Elastic Search enabled.
 	enableES bool
 
+	// Start the store in read-only mode.
+	readOnly bool
+
 	// maxMgoSessions specifies the value that will be given
 	// to config.MaxMgoSessions when calling charmstore.NewServer.
 	maxMgoSessions int
@@ -142,6 +145,7 @@ func (s *commonSuite) startServer(c *gc.C) {
 		MaxMgoSessions:   s.maxMgoSessions,
 		AgentUsername:    "notused",
 		AgentKey:         new(bakery.KeyPair),
+		ReadOnly:         s.readOnly,
 	}
 	keyring := httpbakery.NewPublicKeyRing(nil, nil)
 	keyring.AllowInsecure()
