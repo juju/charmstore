@@ -62,6 +62,7 @@ type Config struct {
 	DockerRegistryTokenDuration    DurationString    `yaml:"docker-registry-token-duration"`
 	DisableSlowMetadata            bool              `yaml:"disable-slow-metadata"`
 	TempDir                        string            `yaml:"tempdir"`
+	ReadOnly                       bool              `yaml:"read-only"`
 }
 
 type BlobStoreType string

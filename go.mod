@@ -1,19 +1,18 @@
 module gopkg.in/juju/charmstore.v5
 
 require (
-	github.com/BurntSushi/toml v0.3.0 // indirect
-	github.com/ajstarks/svgo v0.0.0-20141004211159-89e3ac64b5b3 // indirect
+	github.com/BurntSushi/toml v0.3.1 // indirect
+	github.com/ajstarks/svgo v0.0.0-20181006003313-6ce6a3bcf6cd // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgrijalva/jwt-go v0.0.0-20160705203006-01aeca54ebda
 	github.com/gorilla/handlers v0.0.0-20170224193955-13d73096a474
-	github.com/juju/clock v0.0.0-20180808021310-bab88fc67299 // indirect
-	github.com/juju/collections v0.0.0-20180516022642-90152009b5f3 // indirect
-	github.com/juju/errors v0.0.0-20170703010042-c7d06af17c68 // indirect
+	github.com/juju/ansiterm v0.0.0-20160907234532-b99631de12cf
+	github.com/juju/collections v0.0.0-20180717171555-9be91dc79b7c // indirect
 	github.com/juju/gojsonpointer v0.0.0-20150204194629-afe8b77aa08f // indirect
 	github.com/juju/gojsonreference v0.0.0-20150204194633-f0d24ac5ee33 // indirect
 	github.com/juju/gojsonschema v0.0.0-20150312170016-e1ad140384f2 // indirect
 	github.com/juju/httpprof v0.0.0-20141217160036-14bf14c30767
-	github.com/juju/httprequest v0.0.0-20161006150909-266fd1e9debf // indirect
+	github.com/juju/httprequest v1.0.1 // indirect
 	github.com/juju/idmclient v0.0.0-20161107140250-fb1dc7175251
 	github.com/juju/loggo v0.0.0-20180524022052-584905176618
 	github.com/juju/mempool v0.0.0-20160205104927-24974d6c264f
@@ -21,32 +20,34 @@ require (
 	github.com/juju/retry v0.0.0-20180821225755-9058e192b216 // indirect
 	github.com/juju/schema v0.0.0-20180109041850-e4f08199aa80 // indirect
 	github.com/juju/testing v0.0.0-20180820040200-b0b89ba330f2
-	github.com/juju/utils v0.0.0-20180207021810-d18e608d0140
-	github.com/juju/version v0.0.0-20180108022336-b64dbd566305 // indirect
-	github.com/juju/webbrowser v0.0.0-20160309143629-54b8c57083b4 // indirect
+	github.com/juju/utils v0.0.0-20180619112806-c746c6e86f4f
+	github.com/juju/webbrowser v0.0.0-20180907093207-efb9432b2bcb // indirect
 	github.com/juju/xml v0.0.0-20150413131121-eb759a627588
 	github.com/juju/zip v0.0.0-20160205105221-f6b1e93fa2e2
 	github.com/julienschmidt/httprouter v0.0.0-20151013225520-77a895ad01eb
+	github.com/lunixbochs/vtclean v0.0.0-20160125035106-4fbf7632a2c6
+	github.com/mattn/go-colorable v0.0.6
+	github.com/mattn/go-isatty v0.0.0-20160806122752-66b8e73f3f5c
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/prometheus/client_golang v0.0.0-20161124155732-575f371f7862
+	github.com/prometheus/client_golang v0.0.0-20180319131721-d49167c4b9f3
 	github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af
 	github.com/stretchr/testify v1.2.2 // indirect
-	golang.org/x/crypto v0.0.0-20180524125353-159ae71589f3 // indirect
 	golang.org/x/net v0.0.0-20181029044818-c44066c5c816
+	golang.org/x/tools v0.0.0-20180911133044-677d2ff680c1
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
 	gopkg.in/errgo.v1 v1.0.0
 	gopkg.in/goose.v2 v2.0.0-20180814191012-c6b4881f832a
 	gopkg.in/httprequest.v1 v1.0.0-20180319125457-3531529dedf0
 	gopkg.in/juju/charm.v6 v6.0.0-20180803030015-abaa717bc6ed
-	gopkg.in/juju/charmrepo.v3 v3.0.0
-	gopkg.in/juju/jujusvg.v3 v3.0.0-20180628074225-b69768dfdf88
-	gopkg.in/juju/names.v2 v2.0.0-20171113112047-54f00845ae47 // indirect
+	gopkg.in/juju/charmrepo.v3 v3.0.1
+	gopkg.in/juju/jujusvg.v3 v3.0.0-20180629065738-1ebf5c5481e8
+	gopkg.in/juju/names.v2 v2.0.0-20180621093930-fd59336b4621 // indirect
 	gopkg.in/juju/worker.v1 v1.0.0-20170308002458-6965b9d82671
 	gopkg.in/macaroon-bakery.v2-unstable v2.0.0-20160623142747-5a131df02b23
 	gopkg.in/macaroon.v2-unstable v2.0.0-20180309131217-66ab28d0d56f
 	gopkg.in/mgo.v2 v2.0.0-20180705113604-9856a29383ce
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0-20170531180850-df99d62fd42d
-	gopkg.in/retry.v1 v1.0.0
+	gopkg.in/retry.v1 v1.0.2
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/tomb.v2 v2.0.0-20161208151619-d5d1b5820637
 	gopkg.in/yaml.v2 v2.2.1

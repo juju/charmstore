@@ -38,6 +38,7 @@ var reqHandlerPool = mempool.Pool{
 
 type Handler struct {
 	*v5.Handler
+	readOnly bool
 }
 
 type ReqHandler struct {
@@ -50,7 +51,8 @@ func New(p charmstore.APIHandlerParams) (Handler, error) {
 		return Handler{}, errgo.Mask(err)
 	}
 	return Handler{
-		Handler: h,
+		Handler:  h,
+		readOnly: p.ReadOnly,
 	}, nil
 }
 
@@ -89,6 +91,9 @@ var requiredEntityFields = func() map[string]int {
 // If no handlers are available, it returns an error with
 // a charmstore.ErrTooManySessions cause.
 func (h *Handler) NewReqHandler(req *http.Request) (ReqHandler, error) {
+	if h.readOnly && req.Method != "GET" && req.Method != "HEAD" {
+		return ReqHandler{}, errgo.WithCausef(nil, params.ErrReadOnly, "")
+	}
 	req.ParseForm()
 	// Validate all the values for channel, even though
 	// most endpoints will only ever use the first one.

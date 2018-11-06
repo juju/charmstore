@@ -156,6 +156,11 @@ type ServerParams struct {
 	// response for slow enpoints.
 	// This is temporary.
 	DisableSlowMetadata bool
+
+	// If ReadOnly is true, the charmstore will run in "read-only" mode,
+	// returning errors on any attempts to change the charmstore
+	// data.
+	ReadOnly bool
 }
 
 // NewServer returns a new handler that handles charm store requests and stores

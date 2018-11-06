@@ -983,10 +983,10 @@ func (s *StoreSearchSuite) TestEnsureConcurrent(c *gc.C) {
 	}()
 	err = s.store.ES.ensureIndexes(false)
 	c.Assert(err, gc.Equals, nil)
+	wg.Wait()
 	indexes, err = s.ES.ListIndexesForAlias(s.store.ES.Index)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(indexes, gc.HasLen, 1)
-	wg.Wait()
 }
 
 func (s *StoreSearchSuite) TestEnsureIndexForce(c *gc.C) {

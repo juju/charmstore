@@ -52,9 +52,10 @@ var Series = map[string]SeriesInfo{
 	"xenial":  {true, Ubuntu, true, 1.1375},
 	"yakkety": {true, Ubuntu, false, 0},
 	"zesty":   {true, Ubuntu, false, 0},
-	"artful":  {true, Ubuntu, true, 1.105},
+	"artful":  {true, Ubuntu, false, 1.105},
 	"bionic":  {true, Ubuntu, true, 1.15},
-	"cosmic":  {true, Ubuntu, true, 0}, // TODO: make this higher (1.107) when cosmic is released
+	"cosmic":  {true, Ubuntu, true, 1.107},
+	"disco":   {true, Ubuntu, true, 0}, // TODO make this higher (1.108) when 19.04 released
 
 	// Windows
 	"win2012hvr2": {true, Windows, true, 1.1},
