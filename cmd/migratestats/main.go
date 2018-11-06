@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/juju/loggo"
 	errgo "gopkg.in/errgo.v1"
@@ -52,6 +53,13 @@ func run(confPath string) error {
 	if err != nil {
 		return errgo.Notef(err, "cannot dial mongo at %q", config.MongoURL)
 	}
+	// The aggregation query takes a very long time, so disable the timeout.
+	session.SetCursorTimeout(0)
+	session.SetSocketTimeout(10 * 24 * time.Hour)
+	
+	// The query might cause MongoDB to be slow, so up the sync timeout a bit.
+	session.SetSyncTimeout(time.Minute)
+
 	defer session.Close()
 	return run1(session)
 }
