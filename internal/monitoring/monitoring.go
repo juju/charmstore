@@ -13,7 +13,7 @@ var (
 		Subsystem: "handler",
 		Name:      "request_duration",
 		Help:      "The duration of a web request in seconds.",
-	}, []string{"method", "root", "status", "endpoint"})
+	}, []string{"method", "root", "status"})
 
 	metaDuration = prometheus.NewSummaryVec(prometheus.SummaryOpts{
 		Namespace: "charmstore",
