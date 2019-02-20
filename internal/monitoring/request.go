@@ -54,5 +54,5 @@ func (r *Request) Endpoint() string {
 // If the request endpoint is empty, it falls back to the path from the request url.
 func (r *Request) Done(status func() int) {
 	statusStr := fmt.Sprint(status())
-	requestDuration.WithLabelValues(r.request.Method, r.root, statusStr, r.Endpoint()).Observe(float64(time.Since(r.startTime)) / float64(time.Second))
+	requestDuration.WithLabelValues(r.request.Method, r.root, statusStr).Observe(float64(time.Since(r.startTime)) / float64(time.Second))
 }
