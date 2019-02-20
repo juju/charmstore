@@ -2,7 +2,7 @@ language: go
 go_import_path: "gopkg.in/juju/charmstore.v5"
 go: 
   - "1.9"
-  - "1.11"
+  - "1.11.5"
 script: GO111MODULE=on go test ./...
 services:
   - mongodb

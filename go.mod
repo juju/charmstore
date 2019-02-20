@@ -30,7 +30,7 @@ require (
 	golang.org/x/net v0.0.0-20181029044818-c44066c5c816
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
 	gopkg.in/errgo.v1 v1.0.0
-	gopkg.in/goose.v2 v2.0.0-20180814191012-c6b4881f832a
+	gopkg.in/goose.v2 v2.0.0-20180816040309-cf9b64132d71
 	gopkg.in/httprequest.v1 v1.0.0-20180319125457-3531529dedf0
 	gopkg.in/juju/charm.v6 v6.0.0-20180803030015-abaa717bc6ed
 	gopkg.in/juju/charmrepo.v3 v3.0.1
