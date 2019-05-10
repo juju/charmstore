@@ -802,7 +802,8 @@ var seriesScore = map[string]int{
 	"zesty":   8,
 	"artful":  9,
 	"cosmic":  10,
-	"disco":   0, // TODO: make this higher when disco is released
+	"disco":   11,
+	"eoan":    0, // TODO: make this higher when eoan is released
 
 	// When we find a multi-series charm (no series) we
 	// will always choose it in preference to a series-specific

@@ -16,8 +16,9 @@ require (
 	github.com/juju/loggo v0.0.0-20180524022052-584905176618
 	github.com/juju/mempool v0.0.0-20160205104927-24974d6c264f
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
+	github.com/juju/retry v0.0.0-20180821225755-9058e192b216 // indirect
 	github.com/juju/schema v0.0.0-20180109041850-e4f08199aa80 // indirect
-	github.com/juju/testing v0.0.0-20180517134105-72703b1e95eb
+	github.com/juju/testing v0.0.0-20180820040200-b0b89ba330f2
 	github.com/juju/utils v0.0.0-20180619112806-c746c6e86f4f
 	github.com/juju/webbrowser v0.0.0-20180907093207-efb9432b2bcb // indirect
 	github.com/juju/xml v0.0.0-20150413131121-eb759a627588
