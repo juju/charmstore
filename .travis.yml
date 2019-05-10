@@ -1,8 +1,8 @@
 language: go
 go_import_path: "gopkg.in/juju/charmstore.v5"
 go: 
-  - "1.9"
-  - "1.11.5"
+  - "1.11.x"
+  - "1.12.x"
 script: GO111MODULE=on go test ./...
 services:
   - mongodb
@@ -11,7 +11,3 @@ before_script:
   - sleep 10
 before_install:
   - "curl -O https://download.elastic.co/elasticsearch/release/org/elasticsearch/distribution/deb/elasticsearch/2.4.6/elasticsearch-2.4.6.deb && sudo dpkg -i --force-confnew elasticsearch-2.4.6.deb && sudo service elasticsearch restart"
-  - "go get github.com/rogpeppe/godeps"
-install:
-  - "go get -d gopkg.in/juju/charmstore.v5 || true"
-  - "godeps -u $GOPATH/src/gopkg.in/juju/charmstore.v5/dependencies.tsv"

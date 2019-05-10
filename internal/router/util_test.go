@@ -5,7 +5,6 @@ package router_test
 
 import (
 	"encoding/json"
-	"errors"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -165,6 +164,8 @@ func (e errorReader) Read([]byte) (int, error) {
 	return 0, e.err
 }
 
+var testErrorCause = errgo.New("expected error")
+
 var unmarshalJSONResponseTests = []struct {
 	about            string
 	resp             *http.Response
@@ -182,7 +183,7 @@ var unmarshalJSONResponseTests = []struct {
 		Body: ioutil.NopCloser(strings.NewReader(`"OK"`)),
 	},
 	errorF: func(*http.Response) error {
-		return errors.New("unexpected error")
+		return errgo.New("unexpected error")
 	},
 	expectValue: "OK",
 }, {
@@ -195,7 +196,7 @@ var unmarshalJSONResponseTests = []struct {
 		Body: ioutil.NopCloser(strings.NewReader(`"OK"`)),
 	},
 	errorF: func(*http.Response) error {
-		return errors.New("expected error")
+		return errgo.New("expected error")
 	},
 	expectError: "expected error",
 }, {
@@ -218,7 +219,7 @@ var unmarshalJSONResponseTests = []struct {
 		Body: ioutil.NopCloser(strings.NewReader(`"OK"`)),
 	},
 	errorF: func(*http.Response) error {
-		return errors.New("expected error")
+		return errgo.New("expected error")
 	},
 	expectError: "cannot parse content type: mime: expected token after slash",
 }, {
@@ -231,7 +232,7 @@ var unmarshalJSONResponseTests = []struct {
 		Body: ioutil.NopCloser(strings.NewReader(`"OK"`)),
 	},
 	errorF: func(*http.Response) error {
-		return errors.New("expected error")
+		return errgo.New("expected error")
 	},
 	expectError: `unexpected content type "text/plain"`,
 }, {
@@ -241,10 +242,10 @@ var unmarshalJSONResponseTests = []struct {
 		Header: http.Header{
 			"Content-Type": {"application/json"},
 		},
-		Body: ioutil.NopCloser(errorReader{errors.New("read error")}),
+		Body: ioutil.NopCloser(errorReader{errgo.New("read error")}),
 	},
 	errorF: func(*http.Response) error {
-		return errors.New("unexpected error")
+		return errgo.New("unexpected error")
 	},
 	expectError: `cannot read response body: read error`,
 }, {
@@ -257,7 +258,7 @@ var unmarshalJSONResponseTests = []struct {
 		Body: ioutil.NopCloser(strings.NewReader(`"OK`)),
 	},
 	errorF: func(*http.Response) error {
-		return errors.New("unexpected error")
+		return errgo.New("unexpected error")
 	},
 	expectError: `cannot unmarshal response: unexpected end of JSON input`,
 }, {
@@ -270,10 +271,10 @@ var unmarshalJSONResponseTests = []struct {
 		Body: ioutil.NopCloser(strings.NewReader(`"OK"`)),
 	},
 	errorF: func(*http.Response) error {
-		return errgo.WithCausef(nil, errors.New("expected error"), "an error message")
+		return errgo.WithCausef(nil, testErrorCause, "an error message")
 	},
 	expectError:      "an error message",
-	expectErrorCause: errors.New("expected error"),
+	expectErrorCause: testErrorCause,
 }}
 
 func (*utilSuite) TestUnmarshalJSONObject(c *gc.C) {
@@ -284,7 +285,7 @@ func (*utilSuite) TestUnmarshalJSONObject(c *gc.C) {
 		if test.expectError != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectError)
 			if test.expectErrorCause != nil {
-				c.Assert(errgo.Cause(err), jc.DeepEquals, test.expectErrorCause)
+				c.Assert(errgo.Cause(err), gc.Equals, test.expectErrorCause)
 			}
 			continue
 		}

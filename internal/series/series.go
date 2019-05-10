@@ -34,28 +34,40 @@ type SeriesInfo struct {
 	SearchBoost float64
 }
 
+const (
+	boostBundle     = 1.1255
+	boostLTS1       = 1.125
+	boostLTS2       = 1.1125
+	boostLTS3       = 1.11
+	boostS1         = 1.102
+	boostS2         = 1.101
+	boostS3         = 1.1
+	boostUnreleased = 0.9
+)
+
 // Series contains the data charmstore knows about series names
 var Series = map[string]SeriesInfo{
 	// Bundle
-	"bundle": {false, "", true, 1.1380},
+	"bundle": {false, "", true, boostBundle},
 
 	// Ubuntu
 	"oneiric": {true, Ubuntu, false, 0},
-	"precise": {true, Ubuntu, true, 1.1125},
+	"precise": {true, Ubuntu, false, 0},
 	"quantal": {true, Ubuntu, false, 0},
 	"raring":  {true, Ubuntu, false, 0},
 	"saucy":   {true, Ubuntu, false, 0},
-	"trusty":  {true, Ubuntu, true, 1.125},
+	"trusty":  {true, Ubuntu, false, 0},
 	"utopic":  {true, Ubuntu, false, 0},
 	"vivid":   {true, Ubuntu, false, 0},
-	"wily":    {true, Ubuntu, false, 1.102},
-	"xenial":  {true, Ubuntu, true, 1.1375},
+	"wily":    {true, Ubuntu, false, 0},
+	"xenial":  {true, Ubuntu, true, boostLTS2},
 	"yakkety": {true, Ubuntu, false, 0},
 	"zesty":   {true, Ubuntu, false, 0},
-	"artful":  {true, Ubuntu, false, 1.105},
-	"bionic":  {true, Ubuntu, true, 1.15},
-	"cosmic":  {true, Ubuntu, true, 1.107},
-	"disco":   {true, Ubuntu, true, 0}, // TODO make this higher (1.108) when 19.04 released
+	"artful":  {true, Ubuntu, false, 0},
+	"bionic":  {true, Ubuntu, true, boostLTS1},
+	"cosmic":  {true, Ubuntu, false, boostS2},
+	"disco":   {true, Ubuntu, true, boostS1},
+	"eoan":    {true, Ubuntu, true, boostUnreleased}, // TODO make this higher (boostS1) when 19.10 released
 
 	// Windows
 	"win2012hvr2": {true, Windows, true, 1.1},
@@ -74,5 +86,5 @@ var Series = map[string]SeriesInfo{
 	"centos7": {true, CentOS, true, 1.1},
 
 	// Kubernetes
-	"kubernetes": {true, Kubernetes, true, 0},
+	"kubernetes": {true, Kubernetes, true, 1.1},
 }

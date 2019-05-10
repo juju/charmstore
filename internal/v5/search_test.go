@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
-	"strings"
 
 	"github.com/juju/loggo"
 	jc "github.com/juju/testing/checkers"
@@ -30,18 +29,6 @@ type SearchSuite struct {
 
 var _ = gc.Suite(&SearchSuite{})
 
-var exportTestCharms = map[string]*router.ResolvedURL{
-	"wordpress": newResolvedURL("cs:~charmers/precise/wordpress-23", 23),
-	"mysql":     newResolvedURL("cs:~openstack-charmers/trusty/mysql-7", 7),
-	"varnish":   newResolvedURL("cs:~foo/trusty/varnish-1", -1),
-	// Note: the riak charm is set up without read-everyone permissions.
-	"riak": newResolvedURL("cs:~charmers/trusty/riak-67", 67),
-}
-
-var exportTestBundles = map[string]*router.ResolvedURL{
-	"wordpress-simple": newResolvedURL("cs:~charmers/bundle/wordpress-simple-4", 4),
-}
-
 func (s *SearchSuite) SetUpSuite(c *gc.C) {
 	s.enableES = true
 	s.enableIdentity = true
@@ -60,26 +47,18 @@ func (s *SearchSuite) SetUpTest(c *gc.C) {
 }
 
 func (s *SearchSuite) addCharmsToStore(c *gc.C) {
-	for name, id := range exportTestCharms {
-		s.addPublicCharm(c, getSearchCharm(name), id)
+	for _, e := range storetesting.SearchEntities {
+		if e.Bundle != nil {
+			continue
+		}
+		s.addPublicCharm(c, e.Charm, e.ResolvedURL())
 	}
-	for name, id := range exportTestBundles {
-		s.addPublicBundle(c, getSearchBundle(name), id, false)
+	for _, e := range storetesting.SearchEntities {
+		if e.Bundle == nil {
+			continue
+		}
+		s.addPublicBundle(c, e.Bundle, e.ResolvedURL(), false)
 	}
-}
-
-func getSearchCharm(name string) *storetesting.Charm {
-	ca := storetesting.Charms.CharmDir(name)
-	meta := ca.Meta()
-	meta.Categories = append(strings.Split(name, "-"), "bar")
-	return storetesting.NewCharm(meta)
-}
-
-func getSearchBundle(name string) *storetesting.Bundle {
-	ba := storetesting.Charms.BundleDir(name)
-	data := ba.Data()
-	data.Tags = append(strings.Split(name, "-"), "baz")
-	return storetesting.NewBundle(data)
 }
 
 func (s *SearchSuite) TestParseSearchParams(c *gc.C) {
@@ -277,151 +256,231 @@ func (s *SearchSuite) TestSuccessfulSearches(c *gc.C) {
 	}{{
 		about: "bare search",
 		query: "",
-		results: []*router.ResolvedURL{
-			exportTestCharms["wordpress"],
-			exportTestCharms["mysql"],
-			exportTestCharms["varnish"],
-			exportTestBundles["wordpress-simple"],
-		},
+		results: storetesting.ResolvedURLs(
+			[]storetesting.SearchEntity{
+				storetesting.SearchEntities["multi-series"],
+				storetesting.SearchEntities["wordpress"],
+				storetesting.SearchEntities["mysql"],
+				storetesting.SearchEntities["varnish"],
+				storetesting.SearchEntities["wordpress-simple"],
+				storetesting.SearchEntities["cloud-controller-worker-v2"],
+				storetesting.SearchEntities["squid-forwardproxy"],
+			},
+			false,
+		),
 	}, {
 		about: "text search",
 		query: "text=wordpress",
-		results: []*router.ResolvedURL{
-			exportTestCharms["wordpress"],
-			exportTestBundles["wordpress-simple"],
-		},
+		results: storetesting.ResolvedURLs(
+			[]storetesting.SearchEntity{
+				storetesting.SearchEntities["wordpress"],
+				storetesting.SearchEntities["wordpress-simple"],
+			},
+			false,
+		),
 	}, {
 		about: "autocomplete search",
 		query: "text=word&autocomplete=1",
-		results: []*router.ResolvedURL{
-			exportTestCharms["wordpress"],
-			exportTestBundles["wordpress-simple"],
-		},
+		results: storetesting.ResolvedURLs(
+			[]storetesting.SearchEntity{
+				storetesting.SearchEntities["wordpress"],
+				storetesting.SearchEntities["wordpress-simple"],
+			},
+			false,
+		),
 	}, {
 		about: "blank text search",
 		query: "text=",
-		results: []*router.ResolvedURL{
-			exportTestCharms["wordpress"],
-			exportTestCharms["mysql"],
-			exportTestCharms["varnish"],
-			exportTestBundles["wordpress-simple"],
-		},
+		results: storetesting.ResolvedURLs(
+			[]storetesting.SearchEntity{
+				storetesting.SearchEntities["multi-series"],
+				storetesting.SearchEntities["wordpress"],
+				storetesting.SearchEntities["mysql"],
+				storetesting.SearchEntities["varnish"],
+				storetesting.SearchEntities["wordpress-simple"],
+				storetesting.SearchEntities["cloud-controller-worker-v2"],
+				storetesting.SearchEntities["squid-forwardproxy"],
+			},
+			false,
+		),
 	}, {
 		about: "description filter search",
 		query: "description=database",
-		results: []*router.ResolvedURL{
-			exportTestCharms["mysql"],
-			exportTestCharms["varnish"],
-		},
+		results: storetesting.ResolvedURLs(
+			[]storetesting.SearchEntity{
+				storetesting.SearchEntities["mysql"],
+				storetesting.SearchEntities["varnish"],
+			},
+			false,
+		),
 	}, {
 		about: "name filter search",
 		query: "name=mysql",
-		results: []*router.ResolvedURL{
-			exportTestCharms["mysql"],
-		},
+		results: storetesting.ResolvedURLs(
+			[]storetesting.SearchEntity{
+				storetesting.SearchEntities["mysql"],
+			},
+			false,
+		),
 	}, {
 		about: "owner filter search",
 		query: "owner=foo",
-		results: []*router.ResolvedURL{
-			exportTestCharms["varnish"],
-		},
+		results: storetesting.ResolvedURLs(
+			[]storetesting.SearchEntity{
+				storetesting.SearchEntities["varnish"],
+			},
+			false,
+		),
 	}, {
 		about: "provides filter search",
 		query: "provides=mysql",
-		results: []*router.ResolvedURL{
-			exportTestCharms["mysql"],
-		},
+		results: storetesting.ResolvedURLs(
+			[]storetesting.SearchEntity{
+				storetesting.SearchEntities["mysql"],
+			},
+			false,
+		),
 	}, {
 		about: "requires filter search",
 		query: "requires=mysql",
-		results: []*router.ResolvedURL{
-			exportTestCharms["wordpress"],
-		},
+		results: storetesting.ResolvedURLs(
+			[]storetesting.SearchEntity{
+				storetesting.SearchEntities["multi-series"],
+				storetesting.SearchEntities["wordpress"],
+			},
+			false,
+		),
 	}, {
 		about: "series filter search",
-		query: "series=trusty",
-		results: []*router.ResolvedURL{
-			exportTestCharms["mysql"],
-			exportTestCharms["varnish"],
-		},
+		query: "series=" + storetesting.SearchSeries[0],
+		results: storetesting.ResolvedURLs(
+			[]storetesting.SearchEntity{
+				storetesting.SearchEntities["multi-series"],
+				storetesting.SearchEntities["wordpress"],
+			},
+			false,
+		),
 	}, {
 		about: "summary filter search",
 		query: "summary=database",
-		results: []*router.ResolvedURL{
-			exportTestCharms["mysql"],
-			exportTestCharms["varnish"],
-		},
+		results: storetesting.ResolvedURLs(
+			[]storetesting.SearchEntity{
+				storetesting.SearchEntities["mysql"],
+				storetesting.SearchEntities["varnish"],
+			},
+			false,
+		),
 	}, {
 		about: "tags filter search",
 		query: "tags=wordpress",
-		results: []*router.ResolvedURL{
-			exportTestCharms["wordpress"],
-			exportTestBundles["wordpress-simple"],
-		},
+		results: storetesting.ResolvedURLs(
+			[]storetesting.SearchEntity{
+				storetesting.SearchEntities["wordpress"],
+				storetesting.SearchEntities["wordpress-simple"],
+			},
+			false,
+		),
 	}, {
 		about: "type filter search",
 		query: "type=bundle",
-		results: []*router.ResolvedURL{
-			exportTestBundles["wordpress-simple"],
-		},
+		results: storetesting.ResolvedURLs(
+			[]storetesting.SearchEntity{
+				storetesting.SearchEntities["wordpress-simple"],
+			},
+			false,
+		),
 	}, {
 		about: "multiple type filter search",
 		query: "type=bundle&type=charm",
-		results: []*router.ResolvedURL{
-			exportTestCharms["wordpress"],
-			exportTestCharms["mysql"],
-			exportTestCharms["varnish"],
-			exportTestBundles["wordpress-simple"],
-		},
+		results: storetesting.ResolvedURLs(
+			[]storetesting.SearchEntity{
+				storetesting.SearchEntities["multi-series"],
+				storetesting.SearchEntities["wordpress"],
+				storetesting.SearchEntities["mysql"],
+				storetesting.SearchEntities["varnish"],
+				storetesting.SearchEntities["wordpress-simple"],
+				storetesting.SearchEntities["cloud-controller-worker-v2"],
+				storetesting.SearchEntities["squid-forwardproxy"],
+			},
+			false,
+		),
 	}, {
 		about: "provides multiple interfaces filter search",
 		query: "provides=monitoring+http",
-		results: []*router.ResolvedURL{
-			exportTestCharms["wordpress"],
-		},
+		results: storetesting.ResolvedURLs(
+			[]storetesting.SearchEntity{
+				storetesting.SearchEntities["multi-series"],
+				storetesting.SearchEntities["wordpress"],
+			},
+			false,
+		),
 	}, {
 		about: "requires multiple interfaces filter search",
 		query: "requires=mysql+varnish",
-		results: []*router.ResolvedURL{
-			exportTestCharms["wordpress"],
-		},
+		results: storetesting.ResolvedURLs(
+			[]storetesting.SearchEntity{
+				storetesting.SearchEntities["multi-series"],
+				storetesting.SearchEntities["wordpress"],
+			},
+			false,
+		),
 	}, {
 		about: "multiple tags filter search",
 		query: "tags=mysql+bar",
-		results: []*router.ResolvedURL{
-			exportTestCharms["mysql"],
-		},
+		results: storetesting.ResolvedURLs(
+			[]storetesting.SearchEntity{
+				storetesting.SearchEntities["mysql"],
+			},
+			false,
+		),
 	}, {
 		about: "blank owner",
 		query: "owner=",
-		results: []*router.ResolvedURL{
-			exportTestCharms["wordpress"],
-			exportTestCharms["mysql"],
-			exportTestBundles["wordpress-simple"],
-		},
+		results: storetesting.ResolvedURLs(
+			[]storetesting.SearchEntity{
+				storetesting.SearchEntities["multi-series"],
+				storetesting.SearchEntities["wordpress"],
+				storetesting.SearchEntities["mysql"],
+				storetesting.SearchEntities["wordpress-simple"],
+				storetesting.SearchEntities["squid-forwardproxy"],
+			},
+			false,
+		),
 	}, {
 		about: "paginated search",
 		query: "name=mysql&skip=1",
 	}, {
 		about: "promulgated",
 		query: "promulgated=1",
-		results: []*router.ResolvedURL{
-			exportTestCharms["wordpress"],
-			exportTestCharms["mysql"],
-			exportTestBundles["wordpress-simple"],
-		},
+		results: storetesting.ResolvedURLs(
+			[]storetesting.SearchEntity{
+				storetesting.SearchEntities["multi-series"],
+				storetesting.SearchEntities["wordpress"],
+				storetesting.SearchEntities["mysql"],
+				storetesting.SearchEntities["wordpress-simple"],
+				storetesting.SearchEntities["squid-forwardproxy"],
+			},
+			false,
+		),
 	}, {
 		about: "not promulgated",
 		query: "promulgated=0",
-		results: []*router.ResolvedURL{
-			exportTestCharms["varnish"],
-		},
+		results: storetesting.ResolvedURLs(
+			[]storetesting.SearchEntity{
+				storetesting.SearchEntities["varnish"],
+				storetesting.SearchEntities["cloud-controller-worker-v2"],
+			},
+			false,
+		),
 	}, {
 		about: "promulgated with owner",
 		query: "promulgated=1&owner=openstack-charmers",
-		results: []*router.ResolvedURL{
-			exportTestCharms["mysql"],
-		},
+		results: storetesting.ResolvedURLs(
+			[]storetesting.SearchEntity{
+				storetesting.SearchEntities["mysql"],
+			},
+			false,
+		),
 	}}
 	for i, test := range tests {
 		c.Logf("test %d. %s", i, test.about)
@@ -459,37 +518,37 @@ func (s *SearchSuite) TestMetadataFields(c *gc.C) {
 		about: "archive-size",
 		query: "name=mysql&include=archive-size",
 		meta: map[string]interface{}{
-			"archive-size": params.ArchiveSizeResponse{getSearchCharm("mysql").Size()},
+			"archive-size": params.ArchiveSizeResponse{storetesting.SearchEntities["mysql"].Charm.Size()},
 		},
 	}, {
 		about: "bundle-metadata",
 		query: "name=wordpress-simple&type=bundle&include=bundle-metadata",
 		meta: map[string]interface{}{
-			"bundle-metadata": getSearchBundle("wordpress-simple").Data(),
+			"bundle-metadata": storetesting.SearchEntities["wordpress-simple"].Bundle.Data(),
 		},
 	}, {
 		about: "bundle-machine-count",
 		query: "name=wordpress-simple&type=bundle&include=bundle-machine-count",
 		meta: map[string]interface{}{
-			"bundle-machine-count": params.BundleCount{2},
+			"bundle-machine-count": params.BundleCount{1},
 		},
 	}, {
 		about: "bundle-unit-count",
 		query: "name=wordpress-simple&type=bundle&include=bundle-unit-count",
 		meta: map[string]interface{}{
-			"bundle-unit-count": params.BundleCount{2},
+			"bundle-unit-count": params.BundleCount{1},
 		},
 	}, {
 		about: "charm-actions",
 		query: "name=wordpress&type=charm&include=charm-actions",
 		meta: map[string]interface{}{
-			"charm-actions": getSearchCharm("wordpress").Actions(),
+			"charm-actions": storetesting.SearchEntities["wordpress"].Charm.Actions(),
 		},
 	}, {
 		about: "charm-config",
 		query: "name=wordpress&type=charm&include=charm-config",
 		meta: map[string]interface{}{
-			"charm-config": getSearchCharm("wordpress").Config(),
+			"charm-config": storetesting.SearchEntities["wordpress"].Charm.Config(),
 		},
 	}, {
 		about: "charm-related",
@@ -499,12 +558,7 @@ func (s *SearchSuite) TestMetadataFields(c *gc.C) {
 				Provides: map[string][]params.EntityResult{
 					"mysql": {
 						{
-							Id: exportTestCharms["mysql"].PreferredURL(),
-						},
-					},
-					"varnish": {
-						{
-							Id: exportTestCharms["varnish"].PreferredURL(),
+							Id: storetesting.SearchEntities["mysql"].ResolvedURL().PreferredURL(),
 						},
 					},
 				},
@@ -518,17 +572,12 @@ func (s *SearchSuite) TestMetadataFields(c *gc.C) {
 				Provides: map[string][]params.EntityResult{
 					"mysql": {
 						{
-							Id: exportTestCharms["mysql"].PreferredURL(),
-						},
-					},
-					"varnish": {
-						{
-							Id: exportTestCharms["varnish"].PreferredURL(),
+							Id: storetesting.SearchEntities["mysql"].ResolvedURL().PreferredURL(),
 						},
 					},
 				},
 			},
-			"charm-config": getSearchCharm("wordpress").Config(),
+			"charm-config": storetesting.SearchEntities["wordpress"].Charm.Config(),
 		},
 	}}
 	for i, test := range tests {
@@ -577,11 +626,12 @@ func (s *SearchSuite) TestSearchIncludeError(c *gc.C) {
 	var resp params.SearchResponse
 	err := json.Unmarshal(rec.Body.Bytes(), &resp)
 	// cs:riak will not be found because it is not visible to "everyone".
-	c.Assert(resp.Results, gc.HasLen, len(exportTestCharms)-1)
+	// cs:wordpress-simple will not be found as it is a bundle
+	c.Assert(resp.Results, gc.HasLen, len(storetesting.SearchEntities)-2)
 
 	// Now update the entity to hold an invalid hash.
 	// The list should still work, but only return a single result.
-	rurl := newResolvedURL("~charmers/precise/wordpress-23", 23)
+	rurl := newResolvedURL("~charmers/"+storetesting.SearchSeries[0]+"/wordpress-23", 23)
 	err = s.store.UpdateEntity(rurl, bson.D{{
 		"$set", bson.D{{
 			"blobhash", hashOfString("nope"),
@@ -612,9 +662,10 @@ func (s *SearchSuite) TestSearchIncludeError(c *gc.C) {
 	err = json.Unmarshal(rec.Body.Bytes(), &resp)
 	// cs:riak will not be found because it is not visible to "everyone".
 	// cs:wordpress will not be found because it has no manifest.
-	c.Assert(resp.Results, gc.HasLen, len(exportTestCharms)-2)
+	// cs:wordpress-simple will not be found because it is a bundle.
+	c.Assert(resp.Results, gc.HasLen, len(storetesting.SearchEntities)-3)
 
-	c.Assert(tw.Log(), jc.LogMatches, []string{"cannot retrieve metadata for cs:precise/wordpress-23: cannot open archive data for cs:precise/wordpress-23: .*"})
+	c.Assert(tw.Log(), jc.LogMatches, []string{"cannot retrieve metadata for cs:" + storetesting.SearchSeries[0] + "/wordpress-23: cannot open archive data for cs:" + storetesting.SearchSeries[0] + "/wordpress-23: .*"})
 }
 
 func (s *SearchSuite) TestSorting(c *gc.C) {
@@ -625,57 +676,99 @@ func (s *SearchSuite) TestSorting(c *gc.C) {
 	}{{
 		about: "name ascending",
 		query: "sort=name",
-		results: []*router.ResolvedURL{
-			exportTestCharms["mysql"],
-			exportTestCharms["varnish"],
-			exportTestCharms["wordpress"],
-			exportTestBundles["wordpress-simple"],
-		},
+		results: storetesting.ResolvedURLs(
+			[]storetesting.SearchEntity{
+				storetesting.SearchEntities["cloud-controller-worker-v2"],
+				storetesting.SearchEntities["multi-series"],
+				storetesting.SearchEntities["mysql"],
+				storetesting.SearchEntities["squid-forwardproxy"],
+				storetesting.SearchEntities["varnish"],
+				storetesting.SearchEntities["wordpress"],
+				storetesting.SearchEntities["wordpress-simple"],
+			},
+			false,
+		),
 	}, {
 		about: "name descending",
 		query: "sort=-name",
-		results: []*router.ResolvedURL{
-			exportTestBundles["wordpress-simple"],
-			exportTestCharms["wordpress"],
-			exportTestCharms["varnish"],
-			exportTestCharms["mysql"],
-		},
+		results: storetesting.ResolvedURLs(
+			[]storetesting.SearchEntity{
+				storetesting.SearchEntities["wordpress-simple"],
+				storetesting.SearchEntities["wordpress"],
+				storetesting.SearchEntities["varnish"],
+				storetesting.SearchEntities["squid-forwardproxy"],
+				storetesting.SearchEntities["mysql"],
+				storetesting.SearchEntities["multi-series"],
+				storetesting.SearchEntities["cloud-controller-worker-v2"],
+			},
+			false,
+		),
 	}, {
 		about: "series ascending",
 		query: "sort=series,name",
-		results: []*router.ResolvedURL{
-			exportTestBundles["wordpress-simple"],
-			exportTestCharms["wordpress"],
-			exportTestCharms["mysql"],
-			exportTestCharms["varnish"],
-		},
+		results: storetesting.ResolvedURLs(
+			storetesting.SortBySeries(
+				[]storetesting.SearchEntity{
+					storetesting.SearchEntities["cloud-controller-worker-v2"],
+					storetesting.SearchEntities["multi-series"],
+					storetesting.SearchEntities["mysql"],
+					storetesting.SearchEntities["squid-forwardproxy"],
+					storetesting.SearchEntities["varnish"],
+					storetesting.SearchEntities["wordpress"],
+					storetesting.SearchEntities["wordpress-simple"],
+				},
+				false,
+			),
+			false,
+		),
 	}, {
 		about: "series descending",
 		query: "sort=-series&sort=name",
-		results: []*router.ResolvedURL{
-			exportTestCharms["mysql"],
-			exportTestCharms["varnish"],
-			exportTestCharms["wordpress"],
-			exportTestBundles["wordpress-simple"],
-		},
+		results: storetesting.ResolvedURLs(
+			storetesting.SortBySeries(
+				[]storetesting.SearchEntity{
+					storetesting.SearchEntities["cloud-controller-worker-v2"],
+					storetesting.SearchEntities["multi-series"],
+					storetesting.SearchEntities["mysql"],
+					storetesting.SearchEntities["squid-forwardproxy"],
+					storetesting.SearchEntities["varnish"],
+					storetesting.SearchEntities["wordpress"],
+					storetesting.SearchEntities["wordpress-simple"],
+				},
+				true,
+			),
+			false,
+		),
 	}, {
 		about: "owner ascending",
 		query: "sort=owner,name",
-		results: []*router.ResolvedURL{
-			exportTestCharms["wordpress"],
-			exportTestBundles["wordpress-simple"],
-			exportTestCharms["varnish"],
-			exportTestCharms["mysql"],
-		},
+		results: storetesting.ResolvedURLs(
+			[]storetesting.SearchEntity{
+				storetesting.SearchEntities["cloud-controller-worker-v2"],
+				storetesting.SearchEntities["multi-series"],
+				storetesting.SearchEntities["squid-forwardproxy"],
+				storetesting.SearchEntities["wordpress"],
+				storetesting.SearchEntities["wordpress-simple"],
+				storetesting.SearchEntities["varnish"],
+				storetesting.SearchEntities["mysql"],
+			},
+			false,
+		),
 	}, {
 		about: "owner descending",
 		query: "sort=-owner&sort=name",
-		results: []*router.ResolvedURL{
-			exportTestCharms["mysql"],
-			exportTestCharms["varnish"],
-			exportTestCharms["wordpress"],
-			exportTestBundles["wordpress-simple"],
-		},
+		results: storetesting.ResolvedURLs(
+			[]storetesting.SearchEntity{
+				storetesting.SearchEntities["mysql"],
+				storetesting.SearchEntities["varnish"],
+				storetesting.SearchEntities["multi-series"],
+				storetesting.SearchEntities["squid-forwardproxy"],
+				storetesting.SearchEntities["wordpress"],
+				storetesting.SearchEntities["wordpress-simple"],
+				storetesting.SearchEntities["cloud-controller-worker-v2"],
+			},
+			false,
+		),
 	}}
 	for i, test := range tests {
 		c.Logf("test %d. %s", i, test.about)
@@ -690,7 +783,7 @@ func (s *SearchSuite) TestSorting(c *gc.C) {
 		c.Assert(sr.Results, gc.HasLen, len(test.results), gc.Commentf("expected %#v", test.results))
 		c.Logf("results: %s", rec.Body.Bytes())
 		for i := range test.results {
-			c.Assert(sr.Results[i].Id.String(), gc.Equals, test.results[i].PreferredURL().String(), gc.Commentf("element %d"))
+			c.Assert(sr.Results[i].Id.String(), gc.Equals, test.results[i].PreferredURL().String(), gc.Commentf("element %d", i))
 		}
 	}
 }
@@ -714,9 +807,9 @@ func (s *SearchSuite) TestDownloadsBoost(c *gc.C) {
 		"varnish":   8,
 	}
 	for n, cnt := range charmDownloads {
-		url := newResolvedURL("cs:~downloads-test/trusty/x-1", -1)
+		url := newResolvedURL("cs:~downloads-test/"+storetesting.SearchSeries[1]+"/x-1", -1)
 		url.URL.Name = n
-		s.addPublicCharm(c, getSearchCharm(n), url)
+		s.addPublicCharm(c, storetesting.SearchEntities[n].Charm, url)
 		for i := 0; i < cnt; i++ {
 			err := s.store.IncrementDownloadCounts(url)
 			c.Assert(err, gc.Equals, nil)
@@ -745,13 +838,19 @@ func (s *SearchSuite) TestSearchWithAdminCredentials(c *gc.C) {
 		Password: testPassword,
 	})
 	c.Assert(rec.Code, gc.Equals, http.StatusOK)
-	expected := []*router.ResolvedURL{
-		exportTestCharms["mysql"],
-		exportTestCharms["wordpress"],
-		exportTestCharms["riak"],
-		exportTestCharms["varnish"],
-		exportTestBundles["wordpress-simple"],
-	}
+	expected := storetesting.ResolvedURLs(
+		[]storetesting.SearchEntity{
+			storetesting.SearchEntities["multi-series"],
+			storetesting.SearchEntities["mysql"],
+			storetesting.SearchEntities["wordpress"],
+			storetesting.SearchEntities["riak"],
+			storetesting.SearchEntities["varnish"],
+			storetesting.SearchEntities["wordpress-simple"],
+			storetesting.SearchEntities["cloud-controller-worker-v2"],
+			storetesting.SearchEntities["squid-forwardproxy"],
+		},
+		false,
+	)
 	var sr params.SearchResponse
 	err := json.Unmarshal(rec.Body.Bytes(), &sr)
 	c.Assert(err, gc.Equals, nil)
@@ -765,13 +864,19 @@ func (s *SearchSuite) TestSearchWithUserMacaroon(c *gc.C) {
 		Do:      bakeryDo(s.login("test-user")),
 	})
 	c.Assert(rec.Code, gc.Equals, http.StatusOK)
-	expected := []*router.ResolvedURL{
-		exportTestCharms["mysql"],
-		exportTestCharms["wordpress"],
-		exportTestCharms["riak"],
-		exportTestCharms["varnish"],
-		exportTestBundles["wordpress-simple"],
-	}
+	expected := storetesting.ResolvedURLs(
+		[]storetesting.SearchEntity{
+			storetesting.SearchEntities["multi-series"],
+			storetesting.SearchEntities["mysql"],
+			storetesting.SearchEntities["wordpress"],
+			storetesting.SearchEntities["riak"],
+			storetesting.SearchEntities["varnish"],
+			storetesting.SearchEntities["wordpress-simple"],
+			storetesting.SearchEntities["cloud-controller-worker-v2"],
+			storetesting.SearchEntities["squid-forwardproxy"],
+		},
+		false,
+	)
 	var sr params.SearchResponse
 	err := json.Unmarshal(rec.Body.Bytes(), &sr)
 	c.Assert(err, gc.Equals, nil)
@@ -805,13 +910,19 @@ func (s *SearchSuite) TestSearchWithUserInGroups(c *gc.C) {
 		Do:      bakeryDo(s.login("bob")),
 	})
 	c.Assert(rec.Code, gc.Equals, http.StatusOK)
-	expected := []*router.ResolvedURL{
-		exportTestCharms["mysql"],
-		exportTestCharms["wordpress"],
-		exportTestCharms["riak"],
-		exportTestCharms["varnish"],
-		exportTestBundles["wordpress-simple"],
-	}
+	expected := storetesting.ResolvedURLs(
+		[]storetesting.SearchEntity{
+			storetesting.SearchEntities["multi-series"],
+			storetesting.SearchEntities["mysql"],
+			storetesting.SearchEntities["wordpress"],
+			storetesting.SearchEntities["riak"],
+			storetesting.SearchEntities["varnish"],
+			storetesting.SearchEntities["wordpress-simple"],
+			storetesting.SearchEntities["cloud-controller-worker-v2"],
+			storetesting.SearchEntities["squid-forwardproxy"],
+		},
+		false,
+	)
 	var sr params.SearchResponse
 	err := json.Unmarshal(rec.Body.Bytes(), &sr)
 	c.Assert(err, gc.Equals, nil)
@@ -827,12 +938,18 @@ func (s *SearchSuite) TestSearchWithBadAdminCredentialsAndACookie(c *gc.C) {
 		Password: "bad-password",
 	})
 	c.Assert(rec.Code, gc.Equals, http.StatusOK)
-	expected := []*router.ResolvedURL{
-		exportTestCharms["mysql"],
-		exportTestCharms["wordpress"],
-		exportTestCharms["varnish"],
-		exportTestBundles["wordpress-simple"],
-	}
+	expected := storetesting.ResolvedURLs(
+		[]storetesting.SearchEntity{
+			storetesting.SearchEntities["multi-series"],
+			storetesting.SearchEntities["mysql"],
+			storetesting.SearchEntities["wordpress"],
+			storetesting.SearchEntities["varnish"],
+			storetesting.SearchEntities["wordpress-simple"],
+			storetesting.SearchEntities["cloud-controller-worker-v2"],
+			storetesting.SearchEntities["squid-forwardproxy"],
+		},
+		false,
+	)
 	var sr params.SearchResponse
 	err := json.Unmarshal(rec.Body.Bytes(), &sr)
 	c.Assert(err, gc.Equals, nil)
@@ -851,20 +968,4 @@ func assertResultSet(c *gc.C, sr params.SearchResponse, expected []*router.Resol
 	sort.Strings(results)
 	sort.Strings(expect)
 	c.Assert(results, jc.DeepEquals, expect)
-}
-
-type searchResultById []params.EntityResult
-
-func (s searchResultById) Len() int      { return len(s) }
-func (s searchResultById) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
-func (s searchResultById) Less(i, j int) bool {
-	return s[i].Id.String() < s[j].Id.String()
-}
-
-type resolvedURLByPreferredURL []*router.ResolvedURL
-
-func (s resolvedURLByPreferredURL) Len() int      { return len(s) }
-func (s resolvedURLByPreferredURL) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
-func (s resolvedURLByPreferredURL) Less(i, j int) bool {
-	return s[i].PreferredURL().String() < s[j].PreferredURL().String()
 }
