@@ -56,7 +56,7 @@ var Series = map[string]SeriesInfo{
 	"quantal": {true, Ubuntu, false, 0},
 	"raring":  {true, Ubuntu, false, 0},
 	"saucy":   {true, Ubuntu, false, 0},
-	"trusty":  {true, Ubuntu, false, 0},
+	"trusty":  {true, Ubuntu, true, boostLTS3},
 	"utopic":  {true, Ubuntu, false, 0},
 	"vivid":   {true, Ubuntu, false, 0},
 	"wily":    {true, Ubuntu, false, 0},

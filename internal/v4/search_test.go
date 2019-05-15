@@ -455,9 +455,9 @@ func (s *SearchSuite) TestSearchIncludeError(c *gc.C) {
 	err := json.Unmarshal(rec.Body.Bytes(), &resp)
 	// V4 SPECIFIC
 	// cs:riak will not be found because it is not visible to "everyone".
-	// cs:multi-series will be expanded to 4 different results.
+	// cs:multi-series will be expanded to separate series.
 	// cs:wordpress-simple won't be found as it is a bundle
-	c.Assert(resp.Results, gc.HasLen, len(storetesting.SearchEntities)+3-2)
+	c.Assert(resp.Results, gc.HasLen, len(storetesting.SearchEntities)+len(storetesting.SearchSeries)-3)
 
 	// Now update the entity to hold an invalid hash.
 	// The list should still work, but only return a single result.
