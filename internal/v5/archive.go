@@ -357,7 +357,7 @@ func (h *ReqHandler) isPublic(id *router.ResolvedURL) bool {
 
 // ArchiveCachePublicMaxAge specifies the cache expiry duration for items
 // returned from the archive where the id represents the id of a public entity.
-const ArchiveCachePublicMaxAge = 1 * time.Hour
+const ArchiveCachePublicMaxAge = 1 * 24 * 7 * time.Hour
 
 // setArchiveCacheControl sets cache control headers
 // in a response to an archive-derived endpoint.
