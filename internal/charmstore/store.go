@@ -416,6 +416,12 @@ func (s *Store) ensureIndexes() error {
 	}, {
 		s.DB.Revisions(),
 		mgo.Index{Key: []string{"baseurl"}},
+	}, {
+		s.DB.Entities(),
+		mgo.Index{Key: []string{"-revision"}},
+	}, {
+		s.DB.Entities(),
+		mgo.Index{Key: []string{"-promulgated-revision"}},
 	}}
 	for _, idx := range indexes {
 		err := idx.c.EnsureIndex(idx.i)
