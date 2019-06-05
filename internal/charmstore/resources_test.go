@@ -697,6 +697,81 @@ func (s *resourceSuite) TestAddDockerResourceNoSuchResource(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `"cs:~charmers/docker-registry-0" does not have image resource "resource2"`)
 }
 
+func (s *resourceSuite) TestDeleteResource(c *gc.C) {
+	store := s.newStore(c, false)
+	defer store.Close()
+
+	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
+	meta := storetesting.MetaWithResources(nil, "resource1", "resource2")
+	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
+	c.Assert(err, gc.Equals, nil)
+	uploadResources(c, store, id, "")
+	uploadResources(c, store, id, "-1")
+
+	err = store.Publish(id, map[string]int{
+		"resource1": 1,
+		"resource2": 1,
+	}, params.StableChannel)
+	c.Assert(err, gc.Equals, nil)
+
+	docs, err := store.ListResources(id, params.StableChannel)
+	c.Assert(err, gc.Equals, nil)
+
+	checkResourceDocs(c, store, id, []string{"resource1/1", "resource2/1"}, docs)
+
+	err = store.DeleteResource(id, mongodoc.ResourceRevision{
+		Name:     "resource1",
+		Revision: 0,
+	})
+	c.Assert(err, gc.Equals, nil)
+}
+
+func (s *resourceSuite) TestDeleteResourceWithOnlyOneRevision(c *gc.C) {
+	store := s.newStore(c, false)
+	defer store.Close()
+
+	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
+	meta := storetesting.MetaWithResources(nil, "resource1", "resource2")
+	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
+	c.Assert(err, gc.Equals, nil)
+	uploadResources(c, store, id, "")
+
+	err = store.DeleteResource(id, mongodoc.ResourceRevision{
+		Name:     "resource1",
+		Revision: 0,
+	})
+	c.Assert(err, gc.ErrorMatches, `cannot delete last revision of resource`)
+}
+
+func (s *resourceSuite) TestDeleteResourceWithPublishedRevision(c *gc.C) {
+	store := s.newStore(c, false)
+	defer store.Close()
+
+	id := MustParseResolvedURL("cs:~charmers/precise/wordpress-3")
+	meta := storetesting.MetaWithResources(nil, "resource1", "resource2")
+	err := store.AddCharmWithArchive(id, storetesting.NewCharm(meta))
+	c.Assert(err, gc.Equals, nil)
+	uploadResources(c, store, id, "")
+	uploadResources(c, store, id, "-1")
+
+	err = store.Publish(id, map[string]int{
+		"resource1": 1,
+		"resource2": 1,
+	}, params.StableChannel)
+	c.Assert(err, gc.Equals, nil)
+
+	docs, err := store.ListResources(id, params.StableChannel)
+	c.Assert(err, gc.Equals, nil)
+
+	checkResourceDocs(c, store, id, []string{"resource1/1", "resource2/1"}, docs)
+
+	err = store.DeleteResource(id, mongodoc.ResourceRevision{
+		Name:     "resource1",
+		Revision: 1,
+	})
+	c.Assert(err, gc.ErrorMatches, `cannot delete "cs:~charmers/precise/wordpress-3/resource1/1" because it is the current revision in channels \[stable\]`)
+}
+
 // uploadResources uploads all the resources required by the given
 // entity. File resources contain blob content that's the resource name
 // followed by the given content suffix. Docker resources have a digest

@@ -137,6 +137,74 @@ func mapRevisions(resourceRevisions []mongodoc.ResourceRevision) map[string]int 
 	return revisions
 }
 
+// DeleteResource deletes the resource with the given id from the store.
+// If the resource is the currently published revision for any channel or
+// the last revision for base entity and resource name an error will be
+// returned with an ErrForbidden cause.
+func (s *Store) DeleteResource(id *router.ResolvedURL, rev mongodoc.ResourceRevision) error {
+	// Find all resources that use the Base URL of id and the
+	// resource name so we can refuse to delete the last resource.
+	var resources []mongodoc.Resource
+	err := s.DB.Resources().Find(bson.D{
+		{"baseurl", mongodoc.BaseURL(&id.URL)},
+		{"name", rev.Name},
+	}).All(&resources)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+
+	var res *mongodoc.Resource
+	for i := range resources {
+		if resources[i].Revision == rev.Revision {
+			res = &resources[i]
+			break
+		}
+	}
+
+	if res == nil {
+		return errgo.WithCausef(nil, params.ErrNotFound, "")
+	}
+	if len(resources) == 1 {
+		return errgo.WithCausef(nil, params.ErrForbidden, "cannot delete last revision of resource")
+	}
+	// Find the base entity so that we can check that we're not
+	// removing any of the current released resources.
+	baseEntity, err := s.FindBaseEntity(&id.URL, map[string]int{
+		"_id":              1,
+		"channelresources": 1,
+	})
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	var published []string
+	for ch, resourceRevisions := range baseEntity.ChannelResources {
+		for _, publishedrev := range resourceRevisions {
+			if publishedrev.Name == rev.Name && publishedrev.Revision == rev.Revision {
+				published = append(published, string(ch))
+			}
+		}
+	}
+	if len(published) > 0 {
+		sort.Strings(published)
+		return errgo.WithCausef(nil, params.ErrForbidden, "cannot delete \"%s/%s/%d\" because it is the current revision in channels %s", &id.URL, res.Name, res.Revision, published)
+	}
+	// Remove the resource.
+	err = s.DB.Resources().Remove(bson.D{
+		{"baseurl", mongodoc.BaseURL(&id.URL)},
+		{"name", rev.Name},
+		{"revision", rev.Revision},
+	})
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			// Someone else got there first.
+			err = params.ErrNotFound
+		}
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+
+	return nil
+}
+
 // UploadResource add blob to the blob store and adds a new resource with
 // the given name to the entity with the given id. If revision is -1, the revision of the new resource
 // will be calculated to be one higher than any existing resources.
