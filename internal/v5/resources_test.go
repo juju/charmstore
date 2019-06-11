@@ -1077,3 +1077,116 @@ func (s *ResourceSuite) TestMetaResourcesDockerResource(c *gc.C) {
 		}},
 	})
 }
+
+func (s *ResourceSuite) TestDelete(c *gc.C) {
+	id0 := newResolvedURL("~charmers/precise/wordpress-0", -1)
+	meta := storetesting.MetaWithResources(nil, "someResource")
+	s.addPublicCharm(c, storetesting.NewCharm(meta), id0)
+
+	content := "some content"
+	hash := fmt.Sprintf("%x", sha512.Sum384([]byte(content)))
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:      s.srv,
+		Method:       "POST",
+		Body:         strings.NewReader(content),
+		URL:          storeURL(fmt.Sprintf("%s/resource/someResource?hash=%s&filename=foo.zip", id0.URL.Path(), hash)),
+		ExpectStatus: http.StatusOK,
+		ExpectBody: params.ResourceUploadResponse{
+			// Note: revision 1 because addPublicCharm has already uploaded
+			// revision 0.
+			Revision: 1,
+		},
+		Do: s.bakeryDoAsUser("charmers"),
+	})
+
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		Method: "DELETE",
+		URL: storeURL(fmt.Sprintf("%s/resource/someResource/1", id0.URL.Path())),
+		ExpectStatus: http.StatusOK,
+		Do: s.bakeryDoAsUser("charmers"),		
+	})
+
+	// check we can't access version 1 anymore.
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		Method: "GET",
+		URL: storeURL(fmt.Sprintf("%s/resource/someResource/1", id0.URL.Path())),
+		ExpectStatus: http.StatusNotFound,
+		ExpectBody: params.Error{
+			Code: "not found",
+			Message: `cs:~charmers/precise/wordpress-0 has no "someResource/1" resource`,
+		},
+		Do: s.bakeryDoAsUser("charmers"),		
+	})	
+}
+
+func (s *ResourceSuite) TestDeleteNotFound(c *gc.C) {
+	id0 := newResolvedURL("~charmers/precise/wordpress-0", -1)
+	meta := storetesting.MetaWithResources(nil, "someResource")
+	s.addPublicCharm(c, storetesting.NewCharm(meta), id0)
+
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		Method: "DELETE",
+		URL: storeURL(fmt.Sprintf("%s/resource/someResource/1", id0.URL.Path())),
+		ExpectStatus: http.StatusNotFound,
+		ExpectBody: params.Error{
+			Code: "not found",
+			Message: `cs:~charmers/precise/wordpress-0 has no "someResource/1" resource`,
+		},
+		Do: s.bakeryDoAsUser("charmers"),		
+	})	
+}
+
+func (s *ResourceSuite) TestDeletePublished(c *gc.C) {
+	id0 := newResolvedURL("~charmers/precise/wordpress-0", -1)
+	meta := storetesting.MetaWithResources(nil, "someResource")
+	s.addPublicCharm(c, storetesting.NewCharm(meta), id0)
+
+	content := "some content"
+	hash := fmt.Sprintf("%x", sha512.Sum384([]byte(content)))
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:      s.srv,
+		Method:       "POST",
+		Body:         strings.NewReader(content),
+		URL:          storeURL(fmt.Sprintf("%s/resource/someResource?hash=%s&filename=foo.zip", id0.URL.Path(), hash)),
+		ExpectStatus: http.StatusOK,
+		ExpectBody: params.ResourceUploadResponse{
+			// Note: revision 1 because addPublicCharm has already uploaded
+			// revision 0.
+			Revision: 1,
+		},
+		Do: s.bakeryDoAsUser("charmers"),
+	})
+
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		Method: "DELETE",
+		URL: storeURL(fmt.Sprintf("%s/resource/someResource/0", id0.URL.Path())),
+		ExpectStatus: http.StatusForbidden,
+		ExpectBody: params.Error{
+			Code: "forbidden",
+			Message: `cannot delete "cs:~charmers/precise/wordpress-0/someResource/0" because it is the current revision in channels [stable]`,
+		},
+		Do: s.bakeryDoAsUser("charmers"),		
+	})	
+}
+
+func (s *ResourceSuite) TestDeleteLastResource(c *gc.C) {
+	id0 := newResolvedURL("~charmers/precise/wordpress-0", -1)
+	meta := storetesting.MetaWithResources(nil, "someResource")
+	s.addPublicCharm(c, storetesting.NewCharm(meta), id0)
+
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		Method: "DELETE",
+		URL: storeURL(fmt.Sprintf("%s/resource/someResource/0", id0.URL.Path())),
+		ExpectStatus: http.StatusForbidden,
+		ExpectBody: params.Error{
+			Code: "forbidden",
+			Message: `cannot delete last revision of resource`,
+		},
+		Do: s.bakeryDoAsUser("charmers"),		
+	})	
+}

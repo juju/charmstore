@@ -162,7 +162,7 @@ func (s *Store) DeleteResource(id *router.ResolvedURL, rev mongodoc.ResourceRevi
 	}
 
 	if res == nil {
-		return errgo.WithCausef(nil, params.ErrNotFound, "")
+		return errgo.WithCausef(nil, params.ErrNotFound, "%s has no %q resource", id, fmt.Sprintf("%s/%d", rev.Name, rev.Revision))
 	}
 	if len(resources) == 1 {
 		return errgo.WithCausef(nil, params.ErrForbidden, "cannot delete last revision of resource")
