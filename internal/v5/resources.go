@@ -37,8 +37,9 @@ import (
 func (h *ReqHandler) serveResources(id *router.ResolvedURL, w http.ResponseWriter, req *http.Request) error {
 	// Resources are "published" using "POST id/publish" so we don't
 	// support PUT here.
-	// TODO(ericsnow) Support DELETE to remove a resource (like serveArchive)?
 	switch req.Method {
+	case "DELETE":
+		return h.serveDeleteResource(id, w, req)
 	case "GET":
 		return h.serveDownloadResource(id, w, req)
 	case "POST", "PUT":
@@ -259,6 +260,17 @@ func (h *ReqHandler) serveUploadDockerResource(id *router.ResolvedURL, rid mongo
 		Revision: rdoc.Revision,
 	})
 	return nil
+}
+
+func (h *ReqHandler) serveDeleteResource(id *router.ResolvedURL, w http.ResponseWriter, req *http.Request) error {
+	rid, err := parseResourceId(strings.TrimPrefix(req.URL.Path, "/"))
+	if err != nil {
+		return errgo.WithCausef(err, params.ErrNotFound, "")
+	}
+	if rid.Revision < 0 {
+		return badRequestf(nil, "resource revision must be specified")
+	}
+	return errgo.Mask(h.Store.DeleteResource(id, rid), errgo.Is(params.ErrNotFound), errgo.Is(params.ErrForbidden))
 }
 
 // GET id/meta/resource
