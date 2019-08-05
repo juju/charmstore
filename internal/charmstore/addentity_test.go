@@ -365,6 +365,60 @@ services:
 	c.Assert(entity.BundleData.Applications, gc.DeepEquals, bundle.Data().Applications)
 }
 
+func (s *AddEntitySuite) TestUploadBundleWithCharmsFromDifferentChannels(c *gc.C) {
+	store := s.newStore(c, true)
+	defer store.Close()
+	blob := storetesting.NewBlob([]storetesting.File{{
+		Name: "README.md",
+		Data: []byte("Readme\n"),
+	}, {
+		Name: "bundle.yaml",
+		Data: []byte(`
+services:
+  dummy-in-edge:
+    charm: cs:~charmers/bionic/dummy
+    channel: edge
+  other-dummy-in-beta:
+    charm: cs:~charmers/bionic/other-dummy
+    channel: beta
+  wordpress:
+    charm: wordpress
+    num_units: 1
+`),
+	}})
+	file := filepath.Join(c.MkDir(), "bundle.zip")
+	ioutil.WriteFile(file, blob.Bytes(), 0666)
+	bundle, err := charm.ReadBundle(file)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(bundle.Data().Applications, gc.HasLen, 3)
+
+	wordpress := storetesting.Charms.CharmArchive(c.MkDir(), "wordpress")
+	rurl := router.MustNewResolvedURL("cs:~charmers/bionic/wordpress-47", 47)
+	err = store.AddCharmWithArchive(rurl, wordpress)
+	c.Assert(err, gc.Equals, nil)
+	err = store.Publish(rurl, nil, params.StableChannel)
+	c.Assert(err, gc.Equals, nil)
+
+	dummy := storetesting.Charms.CharmArchive(c.MkDir(), "dummy")
+	rurl = router.MustNewResolvedURL("cs:~charmers/bionic/dummy-1", 1)
+	err = store.AddCharmWithArchive(rurl, dummy)
+	c.Assert(err, gc.Equals, nil)
+	err = store.Publish(rurl, nil, params.EdgeChannel)
+	c.Assert(err, gc.Equals, nil)
+	rurl = router.MustNewResolvedURL("cs:~charmers/bionic/other-dummy-1", 1)
+	err = store.AddCharmWithArchive(rurl, dummy)
+	c.Assert(err, gc.Equals, nil)
+	err = store.Publish(rurl, nil, params.BetaChannel)
+	c.Assert(err, gc.Equals, nil)
+
+	rurl = router.MustNewResolvedURL("cs:~who/bundle/my-bundle-33", 33)
+	err = store.AddBundleWithArchive(rurl, bundle)
+	c.Assert(err, gc.Equals, nil)
+	entity, err := store.FindEntity(rurl, nil)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(entity.BundleData.Applications, gc.DeepEquals, bundle.Data().Applications)
+}
+
 func (s *AddEntitySuite) checkAddCharm(c *gc.C, ch charm.Charm, url *router.ResolvedURL) {
 	store := s.newStore(c, true)
 	defer store.Close()

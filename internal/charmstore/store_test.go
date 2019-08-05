@@ -3323,6 +3323,12 @@ func (s *StoreSuite) TestBundleCharms(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	err = store.Publish(rurl, nil, params.StableChannel)
 	c.Assert(err, gc.Equals, nil)
+	varnish := storetesting.Charms.CharmArchive(c.MkDir(), "varnish")
+	rurl = router.MustNewResolvedURL("cs:~charmers/trusty/varnish-2", 2)
+	err = store.AddCharmWithArchive(rurl, varnish)
+	c.Assert(err, gc.Equals, nil)
+	err = store.Publish(rurl, nil, params.EdgeChannel)
+	c.Assert(err, gc.Equals, nil)
 
 	tests := []struct {
 		about  string
@@ -3379,6 +3385,14 @@ func (s *StoreSuite) TestBundleCharms(c *gc.C) {
 			"cs:~charmers/saucy/mysql":                                  mysql,
 			"cs:~charmers/" + storetesting.SearchSeries[1] + "/riak-42": riak,
 			"~charmers/mysql":                                           mysql,
+		},
+	}, {
+		about: "charms with a preferred channel",
+		reqs: []requiredCharm{
+			{charm: "~charmers/varnish", channel: "edge"},
+		},
+		charms: map[string]charm.Charm{
+			"~charmers/varnish": varnish,
 		},
 	}}
 
