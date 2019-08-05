@@ -135,6 +135,8 @@ gopkg.in/juju/charm.v6 v6.0.0-20180803030015-abaa717bc6ed h1:26cVnCC+fG3n83KAhiL
 gopkg.in/juju/charm.v6 v6.0.0-20180803030015-abaa717bc6ed/go.mod h1:281mnuYcs2K9RJNBwP33vlsqQvd2sWs/052ypKpAs2c=
 gopkg.in/juju/charm.v6 v6.0.0-20190725114015-b0e282572b09 h1:IjrrenC3qqyX417oFU8xsGTTHUA7UnoYjXRW/KBs+ho=
 gopkg.in/juju/charm.v6 v6.0.0-20190725114015-b0e282572b09/go.mod h1:hxrXMqwAUilkdI7CWGTvh/YAxEwOjJ6wKP8AFRfRFhU=
+gopkg.in/juju/charm.v6 v6.0.0-20190729113111-40ffcf7d10e5 h1:C/kZ4TUdrCyoPBLHljWNxcedge25W14UAWu+8vY5570=
+gopkg.in/juju/charm.v6 v6.0.0-20190729113111-40ffcf7d10e5/go.mod h1:hxrXMqwAUilkdI7CWGTvh/YAxEwOjJ6wKP8AFRfRFhU=
 gopkg.in/juju/charmrepo.v3 v3.0.1 h1:mm7/CwCczsO7JYHlYkw4iCUYR7X8upEOaY5bYj7eUkw=
 gopkg.in/juju/charmrepo.v3 v3.0.1/go.mod h1:668xH3HE/21XxiU1h4WIkc4tX2QjG5tmZeVmUMDYXYA=
 gopkg.in/juju/jujusvg.v3 v3.0.0-20180629065738-1ebf5c5481e8 h1:Xq1uwjNDSbxdZtkVgBD49tcYA7ZAzKLE3Vzz7VNyXv0=
