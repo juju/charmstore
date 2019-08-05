@@ -894,3 +894,26 @@ func (e *entityCharm) Actions() *charm.Actions {
 func (e *entityCharm) Revision() int {
 	return e.URL.Revision
 }
+
+type requiredCharm struct {
+	charm   string
+	channel params.Channel
+}
+
+// requiredCharms returns a list of a bundle's charms and the preferred channel
+// for obtaining them.
+func requiredCharms(bd *charm.BundleData) []requiredCharm {
+	list := make([]requiredCharm, 0, len(bd.Applications))
+	for _, app := range bd.Applications {
+		list = append(list, requiredCharm{
+			charm:   app.Charm,
+			channel: params.Channel(app.Channel),
+		})
+	}
+
+	sort.Slice(list, func(a, b int) bool {
+		return list[a].charm < list[b].charm
+	})
+
+	return list
+}
