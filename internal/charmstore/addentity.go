@@ -681,7 +681,7 @@ func (s *Store) newBundle(id *router.ResolvedURL, r io.ReadSeeker, blobSize int6
 	}
 
 	bundleData := b.Data()
-	charms, err := s.bundleCharms(bundleData.RequiredCharms())
+	charms, err := s.bundleCharms(requiredCharms(bundleData))
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot retrieve bundle charms")
 	}
@@ -692,20 +692,20 @@ func (s *Store) newBundle(id *router.ResolvedURL, r io.ReadSeeker, blobSize int6
 	return b, nil
 }
 
-func (s *Store) bundleCharms(ids []string) (map[string]charm.Charm, error) {
-	numIds := len(ids)
-	urls := make([]*charm.URL, 0, numIds)
-	idKeys := make([]string, 0, numIds)
+func (s *Store) bundleCharms(reqs []requiredCharm) (map[string]charm.Charm, error) {
+	numReqs := len(reqs)
+	urls := make([]*charm.URL, 0, numReqs)
+	idKeys := make([]string, 0, numReqs)
 	// TODO resolve ids concurrently.
-	for _, id := range ids {
-		url, err := charm.ParseURL(id)
+	for _, req := range reqs {
+		url, err := charm.ParseURL(req.charm)
 		if err != nil {
 			// Ignore this error. This will be caught in the bundle
 			// verification process (see bundleData.VerifyWithCharms) and will
 			// be returned to the user along with other bundle errors.
 			continue
 		}
-		e, err := s.FindBestEntity(url, params.NoChannel, map[string]int{})
+		e, err := s.FindBestEntity(url, req.channel, map[string]int{})
 		if err != nil {
 			if errgo.Cause(err) == params.ErrNotFound {
 				// Ignore this error too, for the same reasons
@@ -715,7 +715,7 @@ func (s *Store) bundleCharms(ids []string) (map[string]charm.Charm, error) {
 			return nil, err
 		}
 		urls = append(urls, e.URL)
-		idKeys = append(idKeys, id)
+		idKeys = append(idKeys, req.charm)
 	}
 	var entities []mongodoc.Entity
 	if err := s.DB.Entities().

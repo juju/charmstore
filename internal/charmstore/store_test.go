@@ -3326,16 +3326,16 @@ func (s *StoreSuite) TestBundleCharms(c *gc.C) {
 
 	tests := []struct {
 		about  string
-		ids    []string
+		reqs   []requiredCharm
 		charms map[string]charm.Charm
 	}{{
 		about: "no ids",
 	}, {
 		about: "fully qualified ids",
-		ids: []string{
-			"cs:~charmers/saucy/mysql-0",
-			"cs:~charmers/" + storetesting.SearchSeries[1] + "/riak-42",
-			"cs:~charmers/utopic/wordpress-47",
+		reqs: []requiredCharm{
+			{charm: "cs:~charmers/saucy/mysql-0"},
+			{charm: "cs:~charmers/" + storetesting.SearchSeries[1] + "/riak-42"},
+			{charm: "cs:~charmers/utopic/wordpress-47"},
 		},
 		charms: map[string]charm.Charm{
 			"cs:~charmers/saucy/mysql-0":                                mysql,
@@ -3344,30 +3344,36 @@ func (s *StoreSuite) TestBundleCharms(c *gc.C) {
 		},
 	}, {
 		about: "partial ids",
-		ids:   []string{"~charmers/utopic/wordpress", "~charmers/riak"},
+		reqs: []requiredCharm{
+			{charm: "~charmers/utopic/wordpress"},
+			{charm: "~charmers/riak"},
+		},
 		charms: map[string]charm.Charm{
 			"~charmers/riak":             riak,
 			"~charmers/utopic/wordpress": wordpress,
 		},
 	}, {
 		about: "charm not found",
-		ids:   []string{"utopic/no-such", "~charmers/mysql"},
+		reqs: []requiredCharm{
+			{charm: "utopic/no-such"},
+			{charm: "~charmers/mysql"},
+		},
 		charms: map[string]charm.Charm{
 			"~charmers/mysql": mysql,
 		},
 	}, {
 		about: "no charms found",
-		ids: []string{
-			"cs:~charmers/saucy/mysql-99",                               // Revision not present.
-			"cs:~charmers/" + storetesting.SearchSeries[0] + "/riak-42", // Series not present.
-			"cs:~charmers/utopic/django-47",                             // Name not present.
+		reqs: []requiredCharm{
+			{charm: "cs:~charmers/saucy/mysql-99"},                               // Revision not present.
+			{charm: "cs:~charmers/" + storetesting.SearchSeries[0] + "/riak-42"}, // Series not present.
+			{charm: "cs:~charmers/utopic/django-47"},                             // Name not present.
 		},
 	}, {
 		about: "repeated charms",
-		ids: []string{
-			"cs:~charmers/saucy/mysql",
-			"cs:~charmers/" + storetesting.SearchSeries[1] + "/riak-42",
-			"~charmers/mysql",
+		reqs: []requiredCharm{
+			{charm: "cs:~charmers/saucy/mysql"},
+			{charm: "cs:~charmers/" + storetesting.SearchSeries[1] + "/riak-42"},
+			{charm: "~charmers/mysql"},
 		},
 		charms: map[string]charm.Charm{
 			"cs:~charmers/saucy/mysql":                                  mysql,
@@ -3379,7 +3385,7 @@ func (s *StoreSuite) TestBundleCharms(c *gc.C) {
 	// Run the tests.
 	for i, test := range tests {
 		c.Logf("test %d: %s", i, test.about)
-		charms, err := store.bundleCharms(test.ids)
+		charms, err := store.bundleCharms(test.reqs)
 		c.Assert(err, gc.Equals, nil)
 		// Ensure the charms returned are what we expect.
 		c.Assert(charms, gc.HasLen, len(test.charms))
