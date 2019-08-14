@@ -3323,19 +3323,25 @@ func (s *StoreSuite) TestBundleCharms(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	err = store.Publish(rurl, nil, params.StableChannel)
 	c.Assert(err, gc.Equals, nil)
+	varnish := storetesting.Charms.CharmArchive(c.MkDir(), "varnish")
+	rurl = router.MustNewResolvedURL("cs:~charmers/trusty/varnish-2", 2)
+	err = store.AddCharmWithArchive(rurl, varnish)
+	c.Assert(err, gc.Equals, nil)
+	err = store.Publish(rurl, nil, params.EdgeChannel)
+	c.Assert(err, gc.Equals, nil)
 
 	tests := []struct {
 		about  string
-		ids    []string
+		reqs   []requiredCharm
 		charms map[string]charm.Charm
 	}{{
 		about: "no ids",
 	}, {
 		about: "fully qualified ids",
-		ids: []string{
-			"cs:~charmers/saucy/mysql-0",
-			"cs:~charmers/" + storetesting.SearchSeries[1] + "/riak-42",
-			"cs:~charmers/utopic/wordpress-47",
+		reqs: []requiredCharm{
+			{charm: "cs:~charmers/saucy/mysql-0"},
+			{charm: "cs:~charmers/" + storetesting.SearchSeries[1] + "/riak-42"},
+			{charm: "cs:~charmers/utopic/wordpress-47"},
 		},
 		charms: map[string]charm.Charm{
 			"cs:~charmers/saucy/mysql-0":                                mysql,
@@ -3344,42 +3350,56 @@ func (s *StoreSuite) TestBundleCharms(c *gc.C) {
 		},
 	}, {
 		about: "partial ids",
-		ids:   []string{"~charmers/utopic/wordpress", "~charmers/riak"},
+		reqs: []requiredCharm{
+			{charm: "~charmers/utopic/wordpress"},
+			{charm: "~charmers/riak"},
+		},
 		charms: map[string]charm.Charm{
 			"~charmers/riak":             riak,
 			"~charmers/utopic/wordpress": wordpress,
 		},
 	}, {
 		about: "charm not found",
-		ids:   []string{"utopic/no-such", "~charmers/mysql"},
+		reqs: []requiredCharm{
+			{charm: "utopic/no-such"},
+			{charm: "~charmers/mysql"},
+		},
 		charms: map[string]charm.Charm{
 			"~charmers/mysql": mysql,
 		},
 	}, {
 		about: "no charms found",
-		ids: []string{
-			"cs:~charmers/saucy/mysql-99",                               // Revision not present.
-			"cs:~charmers/" + storetesting.SearchSeries[0] + "/riak-42", // Series not present.
-			"cs:~charmers/utopic/django-47",                             // Name not present.
+		reqs: []requiredCharm{
+			{charm: "cs:~charmers/saucy/mysql-99"},                               // Revision not present.
+			{charm: "cs:~charmers/" + storetesting.SearchSeries[0] + "/riak-42"}, // Series not present.
+			{charm: "cs:~charmers/utopic/django-47"},                             // Name not present.
 		},
 	}, {
 		about: "repeated charms",
-		ids: []string{
-			"cs:~charmers/saucy/mysql",
-			"cs:~charmers/" + storetesting.SearchSeries[1] + "/riak-42",
-			"~charmers/mysql",
+		reqs: []requiredCharm{
+			{charm: "cs:~charmers/saucy/mysql"},
+			{charm: "cs:~charmers/" + storetesting.SearchSeries[1] + "/riak-42"},
+			{charm: "~charmers/mysql"},
 		},
 		charms: map[string]charm.Charm{
 			"cs:~charmers/saucy/mysql":                                  mysql,
 			"cs:~charmers/" + storetesting.SearchSeries[1] + "/riak-42": riak,
 			"~charmers/mysql":                                           mysql,
 		},
+	}, {
+		about: "charms with a preferred channel",
+		reqs: []requiredCharm{
+			{charm: "~charmers/varnish", channel: "edge"},
+		},
+		charms: map[string]charm.Charm{
+			"~charmers/varnish": varnish,
+		},
 	}}
 
 	// Run the tests.
 	for i, test := range tests {
 		c.Logf("test %d: %s", i, test.about)
-		charms, err := store.bundleCharms(test.ids)
+		charms, err := store.bundleCharms(test.reqs)
 		c.Assert(err, gc.Equals, nil)
 		// Ensure the charms returned are what we expect.
 		c.Assert(charms, gc.HasLen, len(test.charms))

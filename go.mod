@@ -29,7 +29,7 @@ require (
 	gopkg.in/errgo.v1 v1.0.0
 	gopkg.in/goose.v2 v2.0.0-20180816040309-cf9b64132d71
 	gopkg.in/httprequest.v1 v1.0.0-20180319125457-3531529dedf0
-	gopkg.in/juju/charm.v6 v6.0.0-20190725114015-b0e282572b09
+	gopkg.in/juju/charm.v6 v6.0.0-20190729113111-40ffcf7d10e5
 	gopkg.in/juju/charmrepo.v3 v3.0.1
 	gopkg.in/juju/jujusvg.v3 v3.0.0-20180629065738-1ebf5c5481e8
 	gopkg.in/juju/names.v2 v2.0.0-20180621093930-fd59336b4621 // indirect
