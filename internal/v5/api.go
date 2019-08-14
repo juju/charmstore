@@ -816,6 +816,11 @@ func (h *ReqHandler) metaStats(entity *mongodoc.Entity, id *router.ResolvedURL, 
 // GET id/meta/revision-info
 // https://github.com/juju/charmstore/blob/v5/docs/API.md#get-idmetarevision-info
 func (h *ReqHandler) metaRevisionInfo(id *router.ResolvedURL, path string, flags url.Values, req *http.Request) (interface{}, error) {
+	if h.Handler.config.DisableSlowMetadata {
+		return &params.RevisionInfoResponse{
+			Revisions: make([]*charm.URL, 0),
+		}, nil
+	}
 	mon := monitoring.NewMetaDuration("revision-info")
 	defer mon.Done()
 	searchURL := id.PreferredURL()
