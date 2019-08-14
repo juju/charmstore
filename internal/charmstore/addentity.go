@@ -675,6 +675,11 @@ func (s *Store) newBundle(id *router.ResolvedURL, r io.ReadSeeker, blobSize int6
 	if err != nil {
 		return nil, zipReadError(err, "cannot read bundle archive")
 	}
+
+	if b.ContainsOverlays() {
+		return nil, errgo.Notef(params.ErrInvalidEntity, "bundles with embedded overlays are not supported")
+	}
+
 	bundleData := b.Data()
 	charms, err := s.bundleCharms(bundleData.RequiredCharms())
 	if err != nil {

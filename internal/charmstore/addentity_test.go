@@ -68,6 +68,17 @@ func (s *AddEntitySuite) TestAddBundleDir(c *gc.C) {
 	s.checkAddBundle(c, bundleDir, router.MustNewResolvedURL("~charmers/bundle/wordpress-simple-2", 3))
 }
 
+func (s *AddEntitySuite) TestAddMultiDocBundleDir(c *gc.C) {
+	bundleDir := storetesting.Charms.BundleDir("wordpress-simple-multidoc")
+	store := s.newStore(c, true)
+	defer store.Close()
+
+	url := router.MustNewResolvedURL("~charmers/bundle/wordpress-simple-multidoc-1", -1)
+	err := store.AddBundleWithArchive(url, bundleDir)
+	c.Assert(err, gc.Not(gc.IsNil))
+	c.Assert(err, gc.ErrorMatches, ".*bundles with embedded overlays are not supported.*")
+}
+
 func (s *AddEntitySuite) TestAddBundleArchive(c *gc.C) {
 	bundleArchive, err := charm.ReadBundleArchive(
 		storetesting.Charms.BundleArchivePath(c.MkDir(), "wordpress-simple"),
