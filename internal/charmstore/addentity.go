@@ -675,8 +675,13 @@ func (s *Store) newBundle(id *router.ResolvedURL, r io.ReadSeeker, blobSize int6
 	if err != nil {
 		return nil, zipReadError(err, "cannot read bundle archive")
 	}
+
+	if b.ContainsOverlays() {
+		return nil, errgo.Notef(params.ErrInvalidEntity, "bundles with embedded overlays are not supported")
+	}
+
 	bundleData := b.Data()
-	charms, err := s.bundleCharms(bundleData.RequiredCharms())
+	charms, err := s.bundleCharms(requiredCharms(bundleData))
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot retrieve bundle charms")
 	}
@@ -687,20 +692,20 @@ func (s *Store) newBundle(id *router.ResolvedURL, r io.ReadSeeker, blobSize int6
 	return b, nil
 }
 
-func (s *Store) bundleCharms(ids []string) (map[string]charm.Charm, error) {
-	numIds := len(ids)
-	urls := make([]*charm.URL, 0, numIds)
-	idKeys := make([]string, 0, numIds)
+func (s *Store) bundleCharms(reqs []requiredCharm) (map[string]charm.Charm, error) {
+	numReqs := len(reqs)
+	urls := make([]*charm.URL, 0, numReqs)
+	idKeys := make([]string, 0, numReqs)
 	// TODO resolve ids concurrently.
-	for _, id := range ids {
-		url, err := charm.ParseURL(id)
+	for _, req := range reqs {
+		url, err := charm.ParseURL(req.charm)
 		if err != nil {
 			// Ignore this error. This will be caught in the bundle
 			// verification process (see bundleData.VerifyWithCharms) and will
 			// be returned to the user along with other bundle errors.
 			continue
 		}
-		e, err := s.FindBestEntity(url, params.NoChannel, map[string]int{})
+		e, err := s.FindBestEntity(url, req.channel, map[string]int{})
 		if err != nil {
 			if errgo.Cause(err) == params.ErrNotFound {
 				// Ignore this error too, for the same reasons
@@ -710,7 +715,7 @@ func (s *Store) bundleCharms(ids []string) (map[string]charm.Charm, error) {
 			return nil, err
 		}
 		urls = append(urls, e.URL)
-		idKeys = append(idKeys, id)
+		idKeys = append(idKeys, req.charm)
 	}
 	var entities []mongodoc.Entity
 	if err := s.DB.Entities().
@@ -888,4 +893,27 @@ func (e *entityCharm) Actions() *charm.Actions {
 
 func (e *entityCharm) Revision() int {
 	return e.URL.Revision
+}
+
+type requiredCharm struct {
+	charm   string
+	channel params.Channel
+}
+
+// requiredCharms returns a list of a bundle's charms and the preferred channel
+// for obtaining them.
+func requiredCharms(bd *charm.BundleData) []requiredCharm {
+	list := make([]requiredCharm, 0, len(bd.Applications))
+	for _, app := range bd.Applications {
+		list = append(list, requiredCharm{
+			charm:   app.Charm,
+			channel: params.Channel(app.Channel),
+		})
+	}
+
+	sort.Slice(list, func(a, b int) bool {
+		return list[a].charm < list[b].charm
+	})
+
+	return list
 }

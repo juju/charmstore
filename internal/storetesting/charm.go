@@ -33,6 +33,8 @@ type Bundle struct {
 	*Blob
 	data   *charm.BundleData
 	readMe string
+
+	containsOverlays bool
 }
 
 // Data implements charm.Bundle.Data.
@@ -45,17 +47,29 @@ func (b *Bundle) ReadMe() string {
 	return b.readMe
 }
 
+// ContainsOverlays implements charm.Bundle.
+func (b *Bundle) ContainsOverlays() bool {
+	return b.containsOverlays
+}
+
 // NewBundle returns a bundle implementation
 // that contains the given bundle data.
 func NewBundle(data *charm.BundleData) *Bundle {
+	return NewBundleWithOverlaysFlag(data, false)
+}
+
+// NewBundleWithOverlaysFlag returns a bundle implementation that contains the
+// given bundle data and sets its ContainsOverlays flag to the specified value.
+func NewBundleWithOverlaysFlag(data *charm.BundleData, containsOverlays bool) *Bundle {
 	dataYAML, err := yaml.Marshal(data)
 	if err != nil {
 		panic(err)
 	}
 	readMe := "boring"
 	return &Bundle{
-		data:   data,
-		readMe: readMe,
+		data:             data,
+		readMe:           readMe,
+		containsOverlays: containsOverlays,
 		Blob: NewBlob([]File{{
 			Name: "bundle.yaml",
 			Data: dataYAML,
