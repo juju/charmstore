@@ -247,6 +247,7 @@ func (p *Pool) requestStoreNB(always bool) (*Store, error) {
 		pool:      p,
 	}
 	store.Bakery = store.BakeryWithPolicy(p.config.RootKeyPolicy)
+	store.LongTermBakery = store.BakeryWithPolicy(p.config.LongTermRootKeyPolicy)
 	return store, nil
 }
 
@@ -264,12 +265,13 @@ func (s *Store) BakeryWithPolicy(policy mgostorage.Policy) *bakery.Service {
 // Store holds a connection to the underlying charm and blob
 // data stores that is appropriate for short term use.
 type Store struct {
-	DB        StoreDatabase
-	BlobStore *blobstore.Store
-	ES        *SearchIndex
-	Bakery    *bakery.Service
-	stats     *stats
-	pool      *Pool
+	DB             StoreDatabase
+	BlobStore      *blobstore.Store
+	ES             *SearchIndex
+	Bakery         *bakery.Service
+	LongTermBakery *bakery.Service
+	stats          *stats
+	pool           *Pool
 }
 
 // Copy returns a new store with a lifetime
@@ -792,6 +794,8 @@ var seriesScore = map[string]int{
 	"trusty":  1002,
 	"xenial":  1003,
 	"bionic":  1004,
+	// TODO: make this higher when focal is released
+	"focal":   0,
 	"quantal": 1,
 	"raring":  2,
 	"saucy":   3,
@@ -803,7 +807,7 @@ var seriesScore = map[string]int{
 	"artful":  9,
 	"cosmic":  10,
 	"disco":   11,
-	"eoan":    0, // TODO: make this higher when eoan is released
+	"eoan":    12,
 
 	// When we find a multi-series charm (no series) we
 	// will always choose it in preference to a series-specific

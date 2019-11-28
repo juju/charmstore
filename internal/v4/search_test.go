@@ -457,7 +457,7 @@ func (s *SearchSuite) TestSearchIncludeError(c *gc.C) {
 	// cs:riak will not be found because it is not visible to "everyone".
 	// cs:multi-series will be expanded to separate series.
 	// cs:wordpress-simple won't be found as it is a bundle
-	c.Assert(resp.Results, gc.HasLen, len(storetesting.SearchEntities)+len(storetesting.SearchSeries)-3)
+	c.Assert(resp.Results, gc.HasLen, len(storetesting.SearchEntities)+len(storetesting.SearchSeries)-4)
 
 	// Now update the entity to hold an invalid hash.
 	// The list should still work, but only return a single result.
@@ -495,7 +495,7 @@ func (s *SearchSuite) TestSearchIncludeError(c *gc.C) {
 	// cs:multi-series will be expanded to a result for each series.
 	// cs:wordpress will not be found because it has no manifest.
 	// cs:wordpress-simple won't be found as it is a bundle
-	c.Assert(resp.Results, gc.HasLen, len(storetesting.SearchEntities)+len(storetesting.SearchSeries)-4)
+	c.Assert(resp.Results, gc.HasLen, len(storetesting.SearchEntities)+len(storetesting.SearchSeries)-5)
 
 	c.Assert(tw.Log(), jc.LogMatches, []string{"cannot retrieve metadata for cs:" + storetesting.SearchSeries[0] + "/wordpress-23: cannot open archive data for cs:" + storetesting.SearchSeries[0] + "/wordpress-23: .*"})
 }

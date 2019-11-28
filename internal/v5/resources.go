@@ -152,7 +152,7 @@ func (h *ReqHandler) serveDownloadResourceDocker(id *router.ResolvedURL, r *mong
 // a docker instance to authenticate to the charm store and perform the given resource
 // operations.
 func (h *ReqHandler) dockerAuthPassword(id *router.ResolvedURL, resourceName string, ops ...string) (string, error) {
-	m, err := h.Store.Bakery.NewMacaroon([]checkers.Caveat{
+	m, err := h.Store.LongTermBakery.NewMacaroon([]checkers.Caveat{
 		{Condition: "is-docker-repo " + id.URL.User + "/" + id.URL.Name + "/" + resourceName},
 		checkers.AllowCaveat(ops...),
 	})

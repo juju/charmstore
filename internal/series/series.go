@@ -65,9 +65,10 @@ var Series = map[string]SeriesInfo{
 	"zesty":   {true, Ubuntu, false, 0},
 	"artful":  {true, Ubuntu, false, 0},
 	"bionic":  {true, Ubuntu, true, boostLTS1},
-	"cosmic":  {true, Ubuntu, false, boostS2},
-	"disco":   {true, Ubuntu, true, boostS1},
-	"eoan":    {true, Ubuntu, true, boostUnreleased}, // TODO make this higher (boostS1) when 19.10 released
+	"cosmic":  {true, Ubuntu, false, 0},
+	"disco":   {true, Ubuntu, true, boostS2},
+	"eoan":    {true, Ubuntu, true, boostS1},
+	"focal":   {true, Ubuntu, true, boostUnreleased},
 
 	// Windows
 	"win2012hvr2": {true, Windows, true, 1.1},

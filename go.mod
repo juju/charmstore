@@ -25,6 +25,7 @@ require (
 	github.com/prometheus/client_golang v0.0.0-20180319131721-d49167c4b9f3
 	github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af
 	golang.org/x/net v0.0.0-20181029044818-c44066c5c816
+	golang.org/x/sys v0.0.0-20191128015809-6d18c012aee9 // indirect
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
 	gopkg.in/errgo.v1 v1.0.0
 	gopkg.in/goose.v2 v2.0.0-20180816040309-cf9b64132d71

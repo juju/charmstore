@@ -21,8 +21,8 @@ import (
 	"gopkg.in/juju/charmstore.v5/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5/internal/dockerauth"
 	"gopkg.in/juju/charmstore.v5/internal/legacy"
-	"gopkg.in/juju/charmstore.v5/internal/v4"
-	"gopkg.in/juju/charmstore.v5/internal/v5"
+	v4 "gopkg.in/juju/charmstore.v5/internal/v4"
+	v5 "gopkg.in/juju/charmstore.v5/internal/v5"
 )
 
 // Versions of the API that can be served.
@@ -108,6 +108,10 @@ type ServerParams struct {
 	// RootKeyPolicy holds the default policy used when creating
 	// macaroon root keys.
 	RootKeyPolicy mgostorage.Policy
+
+	// LongTermRootKeyPolicy holds the default policy when
+	// creating long term macaroon root keys.
+	LongTermRootKeyPolicy mgostorage.Policy
 
 	// MinUploadPartSize holds the minimum size of
 	// an upload part. If it's zero, a default value will be used.

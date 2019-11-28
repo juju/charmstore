@@ -24,7 +24,6 @@ import (
 	"gopkg.in/juju/charm.v6"
 	"gopkg.in/juju/charmrepo.v3/csclient/params"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgostorage"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/macaroon.v2-unstable"
 	"gopkg.in/mgo.v2"
@@ -102,7 +101,7 @@ type ReqHandler struct {
 }
 
 const (
-	DelegatableMacaroonExpiry = time.Minute
+	DelegatableMacaroonExpiry = 7 * 24 * time.Hour
 	reqHandlerCacheSize       = 50
 )
 
@@ -1392,16 +1391,12 @@ func (h *ReqHandler) serveDelegatableMacaroon(_ http.Header, req *http.Request) 
 		return nil, errgo.WithCausef(nil, params.ErrForbidden, "delegatable macaroon is not obtainable using admin credentials (admin %v)", auth.Admin)
 	}
 
-	longTermBakery := h.Store.BakeryWithPolicy(mgostorage.Policy{
-		ExpiryDuration:   1e6 * time.Hour,     // 116 years...
-		GenerateInterval: 30 * 24 * time.Hour, // Roughly monthly.
-	})
 	// After this time, clients will be forced to renew the macaroon, even
 	// though it remains technically valid.
 	activeExpireTime := time.Now().Add(DelegatableMacaroonExpiry)
 
 	// TODO propagate expiry time from macaroons in request.
-	m, err := longTermBakery.NewMacaroon([]checkers.Caveat{
+	m, err := h.Store.LongTermBakery.NewMacaroon([]checkers.Caveat{
 		idmclient.UserDeclaration(auth.Username),
 		isEntityCaveat(ids),
 		activeTimeBeforeCaveat(activeExpireTime),
