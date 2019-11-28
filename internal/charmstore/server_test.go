@@ -141,7 +141,8 @@ func (s *ServerSuite) TestNewServerWithConfig(c *gc.C) {
 			AuthPassword:     "test-password",
 			IdentityLocation: "http://0.1.2.3",
 			RootKeyPolicy: mgostorage.Policy{
-				ExpiryDuration: defaultRootKeyExpiryDuration,
+				ExpiryDuration:   defaultRootKeyExpiryDuration,
+				GenerateInterval: defaultRootKeyGenerationDuration,
 			},
 		},
 	})

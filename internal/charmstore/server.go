@@ -108,6 +108,10 @@ type ServerParams struct {
 	// macaroon root keys.
 	RootKeyPolicy mgostorage.Policy
 
+	// LongTermRootKeyPolicy holds the default policy when
+	// creating long term macaroon root keys.
+	LongTermRootKeyPolicy mgostorage.Policy
+
 	// MinUploadPartSize holds the minimum size of
 	// an upload part. If it's zero, a default value will be used.
 	MinUploadPartSize int64
@@ -162,7 +166,12 @@ type ServerParams struct {
 	ReadOnly bool
 }
 
-const defaultRootKeyExpiryDuration = 24 * time.Hour
+const (
+	defaultRootKeyExpiryDuration             = 24 * time.Hour
+	defaultRootKeyGenerationDuration         = 24 * time.Hour
+	defaultLongTermRootKeyExpiryDuration     = 1e6 * time.Hour     // 116 years...
+	defaultLongTermRootKeyGenerationDuration = 30 * 24 * time.Hour //  a month
+)
 
 // NewServer returns a handler that serves the given charm store API
 // versions using db to store that charm store data.
@@ -192,6 +201,16 @@ func NewServer(db *mgo.Database, si *SearchIndex, config ServerParams, versions 
 	if config.RootKeyPolicy.ExpiryDuration == 0 {
 		config.RootKeyPolicy.ExpiryDuration = defaultRootKeyExpiryDuration
 	}
+	if config.RootKeyPolicy.GenerateInterval == 0 {
+		config.RootKeyPolicy.GenerateInterval = defaultRootKeyGenerationDuration
+	}
+	if config.LongTermRootKeyPolicy.ExpiryDuration == 0 {
+		config.LongTermRootKeyPolicy.ExpiryDuration = defaultLongTermRootKeyExpiryDuration
+	}
+	if config.LongTermRootKeyPolicy.GenerateInterval == 0 {
+		config.LongTermRootKeyPolicy.GenerateInterval = defaultLongTermRootKeyGenerationDuration
+	}
+
 	pool, err := NewPool(db, si, &bparams, config)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot make store")
