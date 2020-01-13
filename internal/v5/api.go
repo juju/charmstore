@@ -1086,6 +1086,14 @@ func (h *ReqHandler) metaPerm(entity *mongodoc.BaseEntity, id *router.ResolvedUR
 		return nil, errgo.Mask(err)
 	}
 	acls := entity.ChannelACLs[ch]
+
+	ok, err := h.auth.User.Allow(acls.Write)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	if !ok {
+		acls.Read = []string{h.auth.Username}
+	}
 	return params.PermResponse{
 		Read:  acls.Read,
 		Write: acls.Write,
