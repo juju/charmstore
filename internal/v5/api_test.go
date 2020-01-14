@@ -35,7 +35,7 @@ import (
 	"gopkg.in/juju/charmstore.v5/internal/router"
 	"gopkg.in/juju/charmstore.v5/internal/series"
 	"gopkg.in/juju/charmstore.v5/internal/storetesting"
-	"gopkg.in/juju/charmstore.v5/internal/v5"
+	v5 "gopkg.in/juju/charmstore.v5/internal/v5"
 )
 
 var testPublicKey = bakery.PublicKey{
@@ -381,15 +381,13 @@ var metaEndpoints = []metaEndpoint{{
 			return nil, err
 		}
 		return params.PermResponse{
-			Read:  acls.Read,
-			Write: acls.Write,
+			Read: acls.Read,
 		}, nil
 	},
 	checkURL: newResolvedURL("~bob/utopic/wordpress-2", -1),
 	assertCheckData: func(c *gc.C, data interface{}) {
 		c.Assert(data, gc.DeepEquals, params.PermResponse{
-			Read:  []string{params.Everyone},
-			Write: []string{"bob"},
+			Read: []string{params.Everyone},
 		})
 	},
 }, {
@@ -1102,8 +1100,8 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 		// published write perms to include an "admin" user.
 		// Because the entity isn't published yet, the unpublished channel ACLs
 		// will be changed.
-		s.assertPut(c, "precise/wordpress-23/meta/perm/read", []string{"bob"})
-		s.assertPut(c, "precise/wordpress-23/meta/perm/write", []string{"admin"})
+		s.assertPut(c, "precise/wordpress-23/meta/perm/read", []string{"bob", "mike"})
+		s.assertPut(c, "precise/wordpress-23/meta/perm/write", []string{"admin", "bob"})
 		// charmers no longer has permission.
 		s.assertGetIsUnauthorized(c, "precise/wordpress-23/meta/perm", `access denied for user "charmers"`)
 	})
@@ -1118,16 +1116,16 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 				Do:      bakeryDo(nil),
 				URL:     storeURL(u + "/meta/perm"),
 				ExpectBody: params.PermResponse{
-					Read:  []string{"bob"},
-					Write: []string{"admin"},
+					Read:  []string{"bob", "mike"},
+					Write: []string{"admin", "bob"},
 				},
 			})
 		}
 	})
 	s.assertChannelACLs(c, "precise/wordpress-23", map[params.Channel]mongodoc.ACL{
 		params.UnpublishedChannel: {
-			Read:  []string{"bob"},
-			Write: []string{"admin"},
+			Read:  []string{"bob", "mike"},
+			Write: []string{"admin", "bob"},
 		},
 		params.EdgeChannel: {
 			Read:  []string{"charmers"},
@@ -1156,6 +1154,9 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 		// Check that we aren't allowed to put to the newly published entity as bob.
 		s.assertPutIsUnauthorized(c, "~charmers/precise/wordpress/meta/perm/read?channel=edge", []string{}, `access denied for user "bob"`)
 	})
+	s.doAsUser("charmers", func() {
+		s.assertPut(c, "precise/wordpress-23/meta/perm/write", []string{"charmers", "bob"})
+	})
 
 	s.doAsUser("charmers", func() {
 		s.assertPut(c, "precise/wordpress-23/meta/perm/read", []string{"bob", "charlie"})
@@ -1169,7 +1170,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			URL:     storeURL("precise/wordpress-23/meta/perm"),
 			ExpectBody: params.PermResponse{
 				Read:  []string{"bob", "charlie"},
-				Write: []string{"charmers"},
+				Write: []string{"charmers", "bob"},
 			},
 		})
 		// The other revisions should still see the old ACLs.
@@ -1178,20 +1179,32 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Do:      bakeryDo(nil),
 			URL:     storeURL("precise/wordpress-24/meta/perm"),
 			ExpectBody: params.PermResponse{
-				Read:  []string{"bob"},
-				Write: []string{"admin"},
+				Read:  []string{"bob", "mike"},
+				Write: []string{"admin", "bob"},
+			},
+		})
+	})
+
+	s.doAsUser("mike", func() {
+		// Mike has no write access to the charm, so he can only see limited acls.
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler: s.srv,
+			Do:      bakeryDo(nil),
+			URL:     storeURL("precise/wordpress-24/meta/perm"),
+			ExpectBody: params.PermResponse{
+				Read: []string{"mike"},
 			},
 		})
 	})
 
 	s.assertChannelACLs(c, "precise/wordpress-23", map[params.Channel]mongodoc.ACL{
 		params.UnpublishedChannel: {
-			Read:  []string{"bob"},
-			Write: []string{"admin"},
+			Read:  []string{"bob", "mike"},
+			Write: []string{"admin", "bob"},
 		},
 		params.EdgeChannel: {
 			Read:  []string{"bob", "charlie"},
-			Write: []string{"charmers"},
+			Write: []string{"charmers", "bob"},
 		},
 		params.BetaChannel: {
 			Read:  []string{"charmers"},
@@ -1221,8 +1234,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Do:      bakeryDo(nil),
 			URL:     storeURL("~charmers/trusty/wordpress-1/meta/perm"),
 			ExpectBody: params.PermResponse{
-				Read:  []string{"charmers"},
-				Write: []string{"doris"},
+				Read: []string{"charmers"},
 			},
 		})
 	})
@@ -1234,8 +1246,8 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Do:      bakeryDo(nil),
 			URL:     storeURL("precise/wordpress-24/meta/perm"),
 			ExpectBody: params.PermResponse{
-				Read:  []string{"bob"},
-				Write: []string{"admin"},
+				Read:  []string{"bob", "mike"},
+				Write: []string{"admin", "bob"},
 			},
 		})
 
@@ -1246,19 +1258,19 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			URL:     storeURL("precise/wordpress-23/meta/perm"),
 			ExpectBody: params.PermResponse{
 				Read:  []string{"bob", "charlie"},
-				Write: []string{"charmers"},
+				Write: []string{"charmers", "bob"},
 			},
 		})
 	})
 
 	s.assertChannelACLs(c, "precise/wordpress-23", map[params.Channel]mongodoc.ACL{
 		params.UnpublishedChannel: {
-			Read:  []string{"bob"},
-			Write: []string{"admin"},
+			Read:  []string{"bob", "mike"},
+			Write: []string{"admin", "bob"},
 		},
 		params.EdgeChannel: {
 			Read:  []string{"bob", "charlie"},
-			Write: []string{"charmers"},
+			Write: []string{"charmers", "bob"},
 		},
 		params.BetaChannel: {
 			Read:  []string{"charmers"},
@@ -1283,12 +1295,12 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 
 	s.assertChannelACLs(c, "precise/wordpress-23", map[params.Channel]mongodoc.ACL{
 		params.UnpublishedChannel: {
-			Read:  []string{"bob"},
-			Write: []string{"admin"},
+			Read:  []string{"bob", "mike"},
+			Write: []string{"admin", "bob"},
 		},
 		params.EdgeChannel: {
 			Read:  []string{"bob", "charlie"},
-			Write: []string{"charmers"},
+			Write: []string{"charmers", "bob"},
 		},
 		params.BetaChannel: {
 			Read:  []string{"charmers"},
@@ -1306,19 +1318,18 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 
 	s.doAsUser("bob", func() {
 		s.assertGet(c, "wordpress/meta/perm", params.PermResponse{
-			Read:  []string{"bob", params.Everyone},
-			Write: []string{"doris"},
+			Read: []string{params.Everyone},
 		})
-		s.assertGet(c, "wordpress/meta/perm/read", []string{"bob", params.Everyone})
+		s.assertGet(c, "wordpress/meta/perm/read", []string{params.Everyone})
 	})
 	s.assertChannelACLs(c, "precise/wordpress-23", map[params.Channel]mongodoc.ACL{
 		params.UnpublishedChannel: {
-			Read:  []string{"bob"},
-			Write: []string{"admin"},
+			Read:  []string{"bob", "mike"},
+			Write: []string{"admin", "bob"},
 		},
 		params.EdgeChannel: {
 			Read:  []string{"bob", "charlie"},
-			Write: []string{"charmers"},
+			Write: []string{"charmers", "bob"},
 		},
 		params.BetaChannel: {
 			Read:  []string{"charmers"},
@@ -1359,12 +1370,12 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 
 	s.assertChannelACLs(c, "precise/wordpress-23", map[params.Channel]mongodoc.ACL{
 		params.UnpublishedChannel: {
-			Read:  []string{"bob"},
-			Write: []string{"admin"},
+			Read:  []string{"bob", "mike"},
+			Write: []string{"admin", "bob"},
 		},
 		params.EdgeChannel: {
 			Read:  []string{"bob", "charlie"},
-			Write: []string{"charmers"},
+			Write: []string{"charmers", "bob"},
 		},
 		params.BetaChannel: {
 			Read:  []string{"charmers"},
@@ -1387,12 +1398,12 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 	})
 	s.assertChannelACLs(c, "precise/wordpress-23", map[params.Channel]mongodoc.ACL{
 		params.UnpublishedChannel: {
-			Read:  []string{"bob"},
-			Write: []string{"admin"},
+			Read:  []string{"bob", "mike"},
+			Write: []string{"admin", "bob"},
 		},
 		params.EdgeChannel: {
 			Read:  []string{"bob", "charlie"},
-			Write: []string{"charmers"},
+			Write: []string{"charmers", "bob"},
 		},
 		params.BetaChannel: {
 			Read:  []string{"charmers"},
@@ -1417,12 +1428,12 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 	})
 	s.assertChannelACLs(c, "precise/wordpress-23", map[params.Channel]mongodoc.ACL{
 		params.UnpublishedChannel: {
-			Read:  []string{"bob"},
-			Write: []string{"admin"},
+			Read:  []string{"bob", "mike"},
+			Write: []string{"admin", "bob"},
 		},
 		params.EdgeChannel: {
 			Read:  []string{"bob", "charlie"},
-			Write: []string{"charmers"},
+			Write: []string{"charmers", "bob"},
 		},
 		params.BetaChannel: {
 			Read:  []string{"charmers"},
@@ -1467,12 +1478,12 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 	// to read a different channel.
 	s.doAsUser("bob", func() {
 		s.assertGet(c, "trusty/wordpress/meta/perm?channel=unpublished", params.PermResponse{
-			Read:  []string{"bob"},
-			Write: []string{"admin"},
+			Read:  []string{"bob", "mike"},
+			Write: []string{"admin", "bob"},
 		})
 		s.assertGet(c, "wordpress/meta/perm?channel=edge", params.PermResponse{
 			Read:  []string{"bob", "charlie"},
-			Write: []string{"charmers"},
+			Write: []string{"charmers", "bob"},
 		})
 	})
 
@@ -1493,12 +1504,12 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 	})
 	s.assertChannelACLs(c, "precise/wordpress-23", map[params.Channel]mongodoc.ACL{
 		params.UnpublishedChannel: {
-			Read:  []string{"bob"},
-			Write: []string{"admin"},
+			Read:  []string{"bob", "mike"},
+			Write: []string{"admin", "bob"},
 		},
 		params.EdgeChannel: {
 			Read:  []string{"bob", "charlie"},
-			Write: []string{"charmers"},
+			Write: []string{"charmers", "bob"},
 		},
 		params.BetaChannel: {
 			Read:  []string{"charmers"},
@@ -1514,7 +1525,11 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 		},
 	})
 	s.doAsUser("bob", func() {
-		s.assertGet(c, "trusty/wordpress/meta/perm/read?channel=unpublished", []string{"bob"})
+		s.assertGet(c, "trusty/wordpress/meta/perm/read?channel=unpublished", []string{"bob", "mike"})
+		s.assertGet(c, "trusty/wordpress/meta/perm/write?channel=unpublished", []string{"admin", "bob"})
+	})
+	s.doAsUser("mike", func() {
+		s.assertGet(c, "trusty/wordpress/meta/perm/read?channel=unpublished", []string{"mike"})
 	})
 }
 

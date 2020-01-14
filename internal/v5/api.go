@@ -1085,7 +1085,10 @@ func (h *ReqHandler) metaPerm(entity *mongodoc.BaseEntity, id *router.ResolvedUR
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	acls := entity.ChannelACLs[ch]
+	acls, err := h.visibleACL(entity.ChannelACLs[ch])
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
 	return params.PermResponse{
 		Read:  acls.Read,
 		Write: acls.Write,
@@ -1159,7 +1162,10 @@ func (h *ReqHandler) metaPermWithKey(entity *mongodoc.BaseEntity, id *router.Res
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	acls := entity.ChannelACLs[ch]
+	acls, err := h.visibleACL(entity.ChannelACLs[ch])
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
 	switch path {
 	case "/read":
 		return acls.Read, nil
@@ -1167,6 +1173,24 @@ func (h *ReqHandler) metaPermWithKey(entity *mongodoc.BaseEntity, id *router.Res
 		return acls.Write, nil
 	}
 	return nil, errgo.WithCausef(nil, params.ErrNotFound, "unknown permission")
+}
+
+func (h *ReqHandler) visibleACL(acls mongodoc.ACL) (mongodoc.ACL, error) {
+	if h.auth.User == nil {
+		return mongodoc.ACL{
+			Read: []string{"everyone"},
+		}, nil
+	}
+	ok, err := h.auth.User.Allow(acls.Write)
+	if err != nil {
+		return mongodoc.ACL{}, errgo.Notef(err, "cannot allow acls for user %q", h.auth.Username)
+	}
+	if !ok {
+		return mongodoc.ACL{
+			Read: []string{h.auth.Username},
+		}, nil
+	}
+	return acls, nil
 }
 
 // PUT id/meta/perm/key
