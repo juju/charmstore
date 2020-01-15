@@ -391,12 +391,14 @@ var metaEndpoints = []metaEndpoint{{
 		}
 		return params.PermResponse{
 			Read: acls.Read,
+			Write: []string{},
 		}, nil
 	},
 	checkURL: newResolvedURL("~bob/utopic/wordpress-2", -1),
 	assertCheckData: func(c *gc.C, data interface{}) {
 		c.Assert(data, gc.DeepEquals, params.PermResponse{
 			Read: []string{params.Everyone},
+			Write: []string{},
 		})
 	},
 }, {
@@ -773,6 +775,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			URL:     storeURL("precise/wordpress-24/meta/perm"),
 			ExpectBody: params.PermResponse{
 				Read: []string{"mike"},
+				Write: []string{},
 			},
 		})
 	})
@@ -814,6 +817,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			URL:     storeURL("~charmers/trusty/wordpress-1/meta/perm"),
 			ExpectBody: params.PermResponse{
 				Read: []string{"charmers"},
+				Write: []string{},
 			},
 		})
 	})
@@ -898,6 +902,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 	s.doAsUser("bob", func() {
 		s.assertGet(c, "wordpress/meta/perm", params.PermResponse{
 			Read: []string{params.Everyone},
+			Write: []string{},
 		})
 		s.assertGet(c, "wordpress/meta/perm/read", []string{params.Everyone})
 	})

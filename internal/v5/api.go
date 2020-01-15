@@ -1179,6 +1179,7 @@ func (h *ReqHandler) visibleACL(acls mongodoc.ACL) (mongodoc.ACL, error) {
 	if h.auth.User == nil {
 		return mongodoc.ACL{
 			Read: []string{"everyone"},
+			Write: []string{},
 		}, nil
 	}
 	ok, err := h.auth.User.Allow(acls.Write)
@@ -1188,6 +1189,7 @@ func (h *ReqHandler) visibleACL(acls mongodoc.ACL) (mongodoc.ACL, error) {
 	if !ok {
 		return mongodoc.ACL{
 			Read: []string{h.auth.Username},
+			Write: []string{},
 		}, nil
 	}
 	return acls, nil
