@@ -1085,7 +1085,7 @@ func (h *ReqHandler) metaPerm(entity *mongodoc.BaseEntity, id *router.ResolvedUR
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	acls, err := h.visibleACL(entity.ChannelACLs[ch])
+	acls, err := h.visibleACL(req, entity.ChannelACLs[ch])
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -1162,7 +1162,7 @@ func (h *ReqHandler) metaPermWithKey(entity *mongodoc.BaseEntity, id *router.Res
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	acls, err := h.visibleACL(entity.ChannelACLs[ch])
+	acls, err := h.visibleACL(req, entity.ChannelACLs[ch])
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -1175,24 +1175,40 @@ func (h *ReqHandler) metaPermWithKey(entity *mongodoc.BaseEntity, id *router.Res
 	return nil, errgo.WithCausef(nil, params.ErrNotFound, "unknown permission")
 }
 
-func (h *ReqHandler) visibleACL(acls mongodoc.ACL) (mongodoc.ACL, error) {
-	if h.auth.User == nil {
-		return mongodoc.ACL{
-			Read: []string{"everyone"},
-			Write: []string{},
-		}, nil
+func (h *ReqHandler) visibleACL(req *http.Request, acls mongodoc.ACL) (mongodoc.ACL, error) {
+	respForEveryone := mongodoc.ACL{
+		Read:  []string{"everyone"},
+		Write: []string{},
 	}
-	ok, err := h.auth.User.Allow(acls.Write)
+	auth := h.auth
+	// Authenticate the user if not authenticated already, in order to check
+	// write permissions as well.
+	if auth.User == nil {
+		var err error
+		auth, err = h.Authenticate(req)
+		if err != nil {
+			// The user cannot authenticate, but the entity was readable by everyone anyway.
+			return respForEveryone, nil
+		}
+	}
+	// Check whether the user has write permissions.
+	ok, err := auth.User.Allow(acls.Write)
 	if err != nil {
-		return mongodoc.ACL{}, errgo.Notef(err, "cannot allow acls for user %q", h.auth.Username)
+		return mongodoc.ACL{}, errgo.Notef(err, "cannot allow acls for user %q", auth.Username)
 	}
-	if !ok {
-		return mongodoc.ACL{
-			Read: []string{h.auth.Username},
-			Write: []string{},
-		}, nil
+	if ok {
+		// The user has write perms, so show real ACLs.
+		return acls, nil
 	}
-	return acls, nil
+	if isPublicACL(acls.Read) {
+		// The entity is explicitly readable by everyone, so return at least that information.
+		return respForEveryone, nil
+	}
+	// We only know that the user has access to this entity, so only show their own user name.
+	return mongodoc.ACL{
+		Read:  []string{auth.Username},
+		Write: []string{},
+	}, nil
 }
 
 // PUT id/meta/perm/key
