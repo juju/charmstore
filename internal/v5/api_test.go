@@ -1469,8 +1469,9 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Write: []string{"charmers"},
 		},
 		params.StableChannel: {
-			Read:  []string{"joe"},
-			Write: []string{},
+			Read: []string{"joe"},
+			// The write ACLs is still admin as we don't allow setting an empty slice.
+			Write: []string{"admin"},
 		},
 	})
 

@@ -1107,20 +1107,25 @@ func (h *ReqHandler) putMetaPerm(id *router.ResolvedURL, path string, val *json.
 		return errgo.Mask(err)
 	}
 	// TODO use only one UpdateField operation?
-	updater.UpdateField(string("channelacls."+ch+".read"), perms.Read, &audit.Entry{
-		Op:     audit.OpSetPerm,
-		Entity: &id.URL,
-		ACL: &audit.ACL{
-			Read: perms.Read,
-		},
-	})
-	updater.UpdateField(string("channelacls."+ch+".write"), perms.Write, &audit.Entry{
-		Op:     audit.OpSetPerm,
-		Entity: &id.URL,
-		ACL: &audit.ACL{
-			Write: perms.Write,
-		},
-	})
+	// Do not allow empty ACLs that could be send by previous bugged clients.
+	if len(perms.Read) > 0 {
+		updater.UpdateField(string("channelacls."+ch+".read"), perms.Read, &audit.Entry{
+			Op:     audit.OpSetPerm,
+			Entity: &id.URL,
+			ACL: &audit.ACL{
+				Read: perms.Read,
+			},
+		})
+	}
+	if len(perms.Write) > 0 {
+		updater.UpdateField(string("channelacls."+ch+".write"), perms.Write, &audit.Entry{
+			Op:     audit.OpSetPerm,
+			Entity: &id.URL,
+			ACL: &audit.ACL{
+				Write: perms.Write,
+			},
+		})
+	}
 	updater.UpdateSearch()
 	return nil
 }

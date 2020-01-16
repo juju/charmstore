@@ -34,8 +34,8 @@ import (
 	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
 	"gopkg.in/juju/charmstore.v5/internal/router"
 	"gopkg.in/juju/charmstore.v5/internal/storetesting"
-	"gopkg.in/juju/charmstore.v5/internal/v4"
-	"gopkg.in/juju/charmstore.v5/internal/v5"
+	v4 "gopkg.in/juju/charmstore.v5/internal/v4"
+	v5 "gopkg.in/juju/charmstore.v5/internal/v5"
 )
 
 var testPublicKey = bakery.PublicKey{
@@ -390,14 +390,14 @@ var metaEndpoints = []metaEndpoint{{
 			return nil, err
 		}
 		return params.PermResponse{
-			Read: acls.Read,
+			Read:  acls.Read,
 			Write: []string{},
 		}, nil
 	},
 	checkURL: newResolvedURL("~bob/utopic/wordpress-2", -1),
 	assertCheckData: func(c *gc.C, data interface{}) {
 		c.Assert(data, gc.DeepEquals, params.PermResponse{
-			Read: []string{params.Everyone},
+			Read:  []string{params.Everyone},
 			Write: []string{},
 		})
 	},
@@ -774,7 +774,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Do:      bakeryDo(nil),
 			URL:     storeURL("precise/wordpress-24/meta/perm"),
 			ExpectBody: params.PermResponse{
-				Read: []string{"mike"},
+				Read:  []string{"mike"},
 				Write: []string{},
 			},
 		})
@@ -816,7 +816,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Do:      bakeryDo(nil),
 			URL:     storeURL("~charmers/trusty/wordpress-1/meta/perm"),
 			ExpectBody: params.PermResponse{
-				Read: []string{"charmers"},
+				Read:  []string{"charmers"},
 				Write: []string{},
 			},
 		})
@@ -901,7 +901,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 
 	s.doAsUser("bob", func() {
 		s.assertGet(c, "wordpress/meta/perm", params.PermResponse{
-			Read: []string{params.Everyone},
+			Read:  []string{params.Everyone},
 			Write: []string{},
 		})
 		s.assertGet(c, "wordpress/meta/perm/read", []string{params.Everyone})
@@ -1028,8 +1028,9 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Write: []string{"charmers"},
 		},
 		params.StableChannel: {
-			Read:  []string{"joe"},
-			Write: []string{},
+			Read: []string{"joe"},
+			// The write ACLs is still admin as we don't allow setting an empty slice.
+			Write: []string{"admin"},
 		},
 	})
 
