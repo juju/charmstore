@@ -284,6 +284,7 @@ func (s *Store) Copy() *Store {
 	s1.DB = s.DB.clone()
 	s1.BlobStore = s.pool.newBlobStore(s1.DB)
 	s1.Bakery = s1.BakeryWithPolicy(s.pool.config.RootKeyPolicy)
+	s1.LongTermBakery = s1.BakeryWithPolicy(s.pool.config.LongTermRootKeyPolicy)
 
 	s.pool.mu.Lock()
 	s.pool.storeCount++
