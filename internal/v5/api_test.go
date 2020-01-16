@@ -380,15 +380,19 @@ var metaEndpoints = []metaEndpoint{{
 		if err != nil {
 			return nil, err
 		}
+		if url.URL.User != "charmers" {
+			acls.Read = []string{"everyone"}
+			acls.Write = []string{}
+		}
 		return params.PermResponse{
-			Read: acls.Read,
-			Write: []string{},
+			Read:  acls.Read,
+			Write: acls.Write,
 		}, nil
 	},
 	checkURL: newResolvedURL("~bob/utopic/wordpress-2", -1),
 	assertCheckData: func(c *gc.C, data interface{}) {
 		c.Assert(data, gc.DeepEquals, params.PermResponse{
-			Read: []string{params.Everyone},
+			Read:  []string{params.Everyone},
 			Write: []string{},
 		})
 	},
@@ -802,6 +806,17 @@ func (s *APISuite) addTestEntities(c *gc.C) []*router.ResolvedURL {
 
 func (s *APISuite) TestMetaEndpointsSingle(c *gc.C) {
 	s.idmServer.SetDefaultUser("charmers")
+	// Force a user authentication so that the test is more deterministic later.
+	do := bakeryDo(nil)
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		Do:      do,
+		URL:     storeURL("/whoami"),
+		ExpectBody: params.WhoAmIResponse{
+			User:   "charmers",
+			Groups: []string{},
+		},
+	})
 	urls := s.addTestEntities(c)
 	for i, ep := range metaEndpoints {
 		c.Logf("test %d. %s", i, ep.name)
@@ -819,7 +834,7 @@ func (s *APISuite) TestMetaEndpointsSingle(c *gc.C) {
 			if isNull(expectData) {
 				httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 					Handler:      s.srv,
-					Do:           bakeryDo(nil),
+					Do:           do,
 					URL:          storeURL(path),
 					ExpectStatus: http.StatusNotFound,
 					ExpectBody: params.Error{
@@ -831,7 +846,12 @@ func (s *APISuite) TestMetaEndpointsSingle(c *gc.C) {
 			}
 			tested = true
 			c.Logf("	path %q: %#v", url, path)
-			s.assertGet(c, path, expectData)
+			httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+				Handler:    s.srv,
+				Do:         do,
+				URL:        storeURL(path),
+				ExpectBody: expectData,
+			})
 		}
 		if !tested {
 			c.Errorf("endpoint %q is null for all endpoints, so is not properly tested", ep.name)
@@ -1194,7 +1214,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Do:      bakeryDo(nil),
 			URL:     storeURL("precise/wordpress-24/meta/perm"),
 			ExpectBody: params.PermResponse{
-				Read: []string{"mike"},
+				Read:  []string{"mike"},
 				Write: []string{},
 			},
 		})
@@ -1237,7 +1257,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Do:      bakeryDo(nil),
 			URL:     storeURL("~charmers/trusty/wordpress-1/meta/perm"),
 			ExpectBody: params.PermResponse{
-				Read: []string{"charmers"},
+				Read:  []string{"charmers"},
 				Write: []string{},
 			},
 		})
@@ -1322,7 +1342,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 
 	s.doAsUser("bob", func() {
 		s.assertGet(c, "wordpress/meta/perm", params.PermResponse{
-			Read: []string{params.Everyone},
+			Read:  []string{params.Everyone},
 			Write: []string{},
 		})
 		s.assertGet(c, "wordpress/meta/perm/read", []string{params.Everyone})
@@ -1449,8 +1469,9 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 			Write: []string{"charmers"},
 		},
 		params.StableChannel: {
-			Read:  []string{"joe"},
-			Write: []string{},
+			Read: []string{"joe"},
+			// The write ACLs is still admin as we don't allow setting an empty slice.
+			Write: []string{"admin"},
 		},
 	})
 
