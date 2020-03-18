@@ -419,6 +419,9 @@ func (s *Store) ensureIndexes() error {
 	}, {
 		s.DB.Revisions(),
 		mgo.Index{Key: []string{"baseurl"}},
+	}, {
+		s.DB.Entities(),
+		mgo.Index{Key: []string{"user", "name", "revision"}},
 	}}
 	for _, idx := range indexes {
 		err := idx.c.EnsureIndex(idx.i)
@@ -1629,7 +1632,7 @@ func (lq *ListQuery) Iter(fields map[string]int) *mgo.Iter {
 
 	return lq.store.DB.Entities().Pipe([]bson.D{
 		{{"$match", lq.filters}},
-		{{"$sort", bson.D{{"revision", 1}}}},
+		{{"$sort", bson.D{{"user", 1}, {"name", 1}, {"revision", 1}}}},
 		{{"$group", group}},
 		{{"$project", project}},
 	}).Iter()
