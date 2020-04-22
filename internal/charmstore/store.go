@@ -798,8 +798,7 @@ var seriesScore = map[string]int{
 	"trusty":  1002,
 	"xenial":  1003,
 	"bionic":  1004,
-	// TODO: make this higher when focal is released
-	"focal":   0,
+	"focal":   1005,
 	"quantal": 1,
 	"raring":  2,
 	"saucy":   3,

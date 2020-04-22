@@ -42,8 +42,12 @@ func (s *StoreSearchSuite) SetUpTest(c *gc.C) {
 }
 
 func (s *StoreSearchSuite) TearDownTest(c *gc.C) {
-	s.store.Close()
-	s.pool.Close()
+	if s.store != nil {
+		s.store.Close()
+	}
+	if s.pool != nil {
+		s.pool.Close()
+	}
 	s.IsolatedMgoESSuite.TearDownTest(c)
 }
 
@@ -779,7 +783,7 @@ func (s *StoreSearchSuite) TestSorting(c *gc.C) {
 		},
 	}, {
 		about:     "downloads ascending",
-		sortQuery: "downloads",
+		sortQuery: "downloads,name",
 		results: []storetesting.SearchEntity{
 			storetesting.SearchEntities["multi-series"],
 			storetesting.SearchEntities["wordpress"],
@@ -791,7 +795,7 @@ func (s *StoreSearchSuite) TestSorting(c *gc.C) {
 		},
 	}, {
 		about:     "downloads descending",
-		sortQuery: "-downloads",
+		sortQuery: "-downloads,name",
 		results: []storetesting.SearchEntity{
 			storetesting.SearchEntities["varnish"],
 			storetesting.SearchEntities["cloud-controller-worker-v2"],

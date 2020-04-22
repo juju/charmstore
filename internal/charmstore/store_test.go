@@ -69,7 +69,7 @@ var urlFindingTests = []struct {
 }, {
 	inStore: []string{"23 cs:~charmers/" + storetesting.SearchSeries[0] + "/wordpress-23", "24 cs:~charmers/" + storetesting.SearchSeries[1] + "/wordpress-24", "434 cs:~charmers/foo/varnish-434"},
 	expand:  "wordpress",
-	expect:  []string{"23 cs:~charmers/" + storetesting.SearchSeries[0] + "/wordpress-23", "24 cs:~charmers/" + storetesting.SearchSeries[1] + "/wordpress-24"},
+	expect:  []string{"24 cs:~charmers/" + storetesting.SearchSeries[1] + "/wordpress-24", "23 cs:~charmers/" + storetesting.SearchSeries[0] + "/wordpress-23"},
 }, {
 	inStore: []string{"23 cs:~charmers/" + storetesting.SearchSeries[0] + "/wordpress-23", "23 cs:~charmers/" + storetesting.SearchSeries[1] + "/wordpress-23", "24 cs:~charmers/" + storetesting.SearchSeries[1] + "/wordpress-24"},
 	expand:  "wordpress-23",
@@ -81,7 +81,7 @@ var urlFindingTests = []struct {
 }, {
 	inStore: []string{"cs:~user/" + storetesting.SearchSeries[0] + "/wordpress-23", "cs:~user/" + storetesting.SearchSeries[1] + "/wordpress-23"},
 	expand:  "~user/wordpress",
-	expect:  []string{"cs:~user/" + storetesting.SearchSeries[0] + "/wordpress-23", "cs:~user/" + storetesting.SearchSeries[1] + "/wordpress-23"},
+	expect:  []string{"cs:~user/" + storetesting.SearchSeries[1] + "/wordpress-23", "cs:~user/" + storetesting.SearchSeries[0] + "/wordpress-23"},
 }, {
 	inStore: []string{"23 cs:~charmers/" + storetesting.SearchSeries[0] + "/wordpress-23", "24 cs:~charmers/" + storetesting.SearchSeries[1] + "/wordpress-24", "434 cs:~charmers/foo/varnish-434"},
 	expand:  storetesting.SearchSeries[0] + "/wordpress-23",
@@ -284,7 +284,7 @@ func (s *StoreSuite) TestFindEntities(c *gc.C) {
 		}
 		c.Assert(gotEntities, gc.HasLen, len(expect))
 		for i, url := range expect {
-			c.Assert(gotEntities[i], jc.DeepEquals, &mongodoc.Entity{
+			c.Check(gotEntities[i], jc.DeepEquals, &mongodoc.Entity{
 				URL:            &url.URL,
 				PromulgatedURL: url.PromulgatedURL(),
 			}, gc.Commentf("index %d", i))

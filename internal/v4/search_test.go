@@ -259,7 +259,7 @@ func (s *SearchSuite) TestSuccessfulSearches(c *gc.C) {
 		),
 	}, {
 		about: "blank owner",
-		query: "owner=",
+		query: "owner=&limit=20",
 		results: storetesting.ResolvedURLs(
 			[]storetesting.SearchEntity{
 				storetesting.SearchEntities["multi-series"],
@@ -276,7 +276,7 @@ func (s *SearchSuite) TestSuccessfulSearches(c *gc.C) {
 		query: "name=mysql&skip=1",
 	}, {
 		about: "promulgated",
-		query: "promulgated=1",
+		query: "promulgated=1&limit=20",
 		results: storetesting.ResolvedURLs(
 			[]storetesting.SearchEntity{
 				storetesting.SearchEntities["multi-series"],
@@ -319,8 +319,9 @@ func (s *SearchSuite) TestSuccessfulSearches(c *gc.C) {
 		var sr params.SearchResponse
 		err := json.Unmarshal(rec.Body.Bytes(), &sr)
 		c.Assert(err, gc.Equals, nil)
-		c.Assert(sr.Results, gc.HasLen, len(test.results))
+		c.Logf("expected: %#v", test.results)
 		c.Logf("results: %s", rec.Body.Bytes())
+		c.Assert(sr.Results, gc.HasLen, len(test.results))
 		assertResultSet(c, sr, test.results)
 	}
 }
@@ -448,7 +449,7 @@ func (s *SearchSuite) TestSearchIncludeError(c *gc.C) {
 	// blobs.
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.srv,
-		URL:     storeURL("search?type=charm&include=manifest"),
+		URL:     storeURL("search?type=charm&include=manifest&limit=20"),
 	})
 	c.Assert(rec.Code, gc.Equals, http.StatusOK)
 	var resp params.SearchResponse
@@ -457,7 +458,7 @@ func (s *SearchSuite) TestSearchIncludeError(c *gc.C) {
 	// cs:riak will not be found because it is not visible to "everyone".
 	// cs:multi-series will be expanded to separate series.
 	// cs:wordpress-simple won't be found as it is a bundle
-	c.Assert(resp.Results, gc.HasLen, len(storetesting.SearchEntities)+len(storetesting.SearchSeries)-4)
+	c.Assert(resp.Results, gc.HasLen, len(storetesting.SearchEntities)+len(storetesting.SearchSeries)-3)
 
 	// Now update the entity to hold an invalid hash.
 	// The list should still work, but only return a single result.
@@ -485,7 +486,7 @@ func (s *SearchSuite) TestSearchIncludeError(c *gc.C) {
 
 	rec = httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.srv,
-		URL:     storeURL("search?type=charm&include=manifest"),
+		URL:     storeURL("search?type=charm&include=manifest&limit=20"),
 	})
 	c.Assert(rec.Code, gc.Equals, http.StatusOK)
 	resp = params.SearchResponse{}
@@ -495,7 +496,7 @@ func (s *SearchSuite) TestSearchIncludeError(c *gc.C) {
 	// cs:multi-series will be expanded to a result for each series.
 	// cs:wordpress will not be found because it has no manifest.
 	// cs:wordpress-simple won't be found as it is a bundle
-	c.Assert(resp.Results, gc.HasLen, len(storetesting.SearchEntities)+len(storetesting.SearchSeries)-5)
+	c.Assert(resp.Results, gc.HasLen, len(storetesting.SearchEntities)+len(storetesting.SearchSeries)-4)
 
 	c.Assert(tw.Log(), jc.LogMatches, []string{"cannot retrieve metadata for cs:" + storetesting.SearchSeries[0] + "/wordpress-23: cannot open archive data for cs:" + storetesting.SearchSeries[0] + "/wordpress-23: .*"})
 }
@@ -615,9 +616,9 @@ func (s *SearchSuite) TestSorting(c *gc.C) {
 		var sr params.SearchResponse
 		err := json.Unmarshal(rec.Body.Bytes(), &sr)
 		c.Assert(err, gc.Equals, nil)
+		c.Logf("results: %s", rec.Body.Bytes())
 		// Not using assertResultSet(c, sr, test.results) as it does sort internally
 		c.Assert(sr.Results, gc.HasLen, len(test.results), gc.Commentf("expected %#v", test.results))
-		c.Logf("results: %s", rec.Body.Bytes())
 		for i := range test.results {
 			c.Assert(sr.Results[i].Id.String(), gc.Equals, test.results[i].PreferredURL().String(), gc.Commentf("element %d", i))
 		}
