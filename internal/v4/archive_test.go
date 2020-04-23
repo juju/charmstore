@@ -32,8 +32,7 @@ import (
 	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
 	"gopkg.in/juju/charmstore.v5/internal/router"
 	"gopkg.in/juju/charmstore.v5/internal/storetesting"
-	"gopkg.in/juju/charmstore.v5/internal/storetesting/stats"
-	"gopkg.in/juju/charmstore.v5/internal/v5"
+	v5 "gopkg.in/juju/charmstore.v5/internal/v5"
 )
 
 type ArchiveSuite struct {
@@ -161,11 +160,12 @@ func (s *ArchiveSuite) TestGetCounters(c *gc.C) {
 		)
 
 		// Check that the downloads count for the entity has been updated.
-		key := []string{params.StatsArchiveDownload, "utopic", "mysql", id.URL.User, "42"}
-		stats.CheckCounterSum(c, s.store, key, false, 1)
+		// Statistics Disabled
+		//key := []string{params.StatsArchiveDownload, "utopic", "mysql", id.URL.User, "42"}
+		//stats.CheckCounterSum(c, s.store, key, false, 1)
 		// Check that the promulgated download count for the entity has also been updated
-		key = []string{params.StatsArchiveDownloadPromulgated, "utopic", "mysql", "", "42"}
-		stats.CheckCounterSum(c, s.store, key, false, 1)
+		//key = []string{params.StatsArchiveDownloadPromulgated, "utopic", "mysql", "", "42"}
+		//stats.CheckCounterSum(c, s.store, key, false, 1)
 	}
 }
 
@@ -183,8 +183,9 @@ func (s *ArchiveSuite) TestGetCountersDisabled(c *gc.C) {
 	)
 
 	// Check that the downloads count for the entity has not been updated.
-	key := []string{params.StatsArchiveDownload, "utopic", "mysql", "", "42"}
-	stats.CheckCounterSum(c, s.store, key, false, 0)
+	// Statistics Disabled
+	//key := []string{params.StatsArchiveDownload, "utopic", "mysql", "", "42"}
+	//stats.CheckCounterSum(c, s.store, key, false, 0)
 }
 
 var archivePostErrorsTests = []struct {
@@ -700,8 +701,9 @@ func (s *ArchiveSuite) TestPostCounters(c *gc.C) {
 	s.assertUploadCharm(c, "POST", newResolvedURL("~charmers/precise/wordpress-0", -1), "wordpress")
 
 	// Check that the upload count for the entity has been updated.
-	key := []string{params.StatsArchiveUpload, "precise", "wordpress", "charmers"}
-	stats.CheckCounterSum(c, s.store, key, false, 1)
+	// Statistics Disabled
+	//key := []string{params.StatsArchiveUpload, "precise", "wordpress", "charmers"}
+	//stats.CheckCounterSum(c, s.store, key, false, 1)
 }
 
 func (s *ArchiveSuite) TestPostFailureCounters(c *gc.C) {
@@ -733,8 +735,9 @@ func (s *ArchiveSuite) TestPostFailureCounters(c *gc.C) {
 	doPost("~charmers/utopic/wordpress/archive?hash="+hash, http.StatusBadRequest)
 
 	// Check that the failed upload count for the entity has been updated.
-	key := []string{params.StatsArchiveFailedUpload, "utopic", "wordpress", "charmers"}
-	stats.CheckCounterSum(c, s.store, key, false, 3)
+	// Statistics Disabled
+	//key := []string{params.StatsArchiveFailedUpload, "utopic", "wordpress", "charmers"}
+	//stats.CheckCounterSum(c, s.store, key, false, 3)
 }
 
 func (s *ArchiveSuite) TestUploadOfCurrentCharmReadsFully(c *gc.C) {
@@ -1367,7 +1370,8 @@ func (s *ArchiveSearchSuite) TestGetSearchUpdate(c *gc.C) {
 		c.Assert(rec.Code, gc.Equals, http.StatusOK)
 
 		// Check that the search record for the entity has been updated.
-		stats.CheckSearchTotalDownloads(c, s.store, &url.URL, 1)
+		// Statistics Disabled
+		//stats.CheckSearchTotalDownloads(c, s.store, &url.URL, 1)
 	}
 }
 

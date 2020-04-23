@@ -2203,18 +2203,18 @@ var metaStatsTests = []struct {
 		"utopic/django-42": {0: 1},
 	},
 	expectResponse: params.StatsResponse{
-		ArchiveDownloadCount: 1,
+		ArchiveDownloadCount: 0,
 		ArchiveDownload: params.StatsCount{
-			Total: 1,
-			Day:   1,
-			Week:  1,
-			Month: 1,
+			Total: 0,
+			Day:   0,
+			Week:  0,
+			Month: 0,
 		},
 		ArchiveDownloadAllRevisions: params.StatsCount{
-			Total: 1,
-			Day:   1,
-			Week:  1,
-			Month: 1,
+			Total: 0,
+			Day:   0,
+			Week:  0,
+			Month: 0,
 		},
 	},
 }, {
@@ -2224,12 +2224,12 @@ var metaStatsTests = []struct {
 		"utopic/django-42": {100: 1},
 	},
 	expectResponse: params.StatsResponse{
-		ArchiveDownloadCount: 1,
+		ArchiveDownloadCount: 0,
 		ArchiveDownload: params.StatsCount{
-			Total: 1,
+			Total: 0,
 		},
 		ArchiveDownloadAllRevisions: params.StatsCount{
-			Total: 1,
+			Total: 0,
 		},
 	},
 }, {
@@ -2239,14 +2239,14 @@ var metaStatsTests = []struct {
 		"utopic/wordpress-47": {20: 2, 25: 5},
 	},
 	expectResponse: params.StatsResponse{
-		ArchiveDownloadCount: 2 + 5,
+		ArchiveDownloadCount: 0,
 		ArchiveDownload: params.StatsCount{
-			Total: 2 + 5,
-			Month: 2 + 5,
+			Total: 0,
+			Month: 0,
 		},
 		ArchiveDownloadAllRevisions: params.StatsCount{
-			Total: 2 + 5,
-			Month: 2 + 5,
+			Total: 0,
+			Month: 0,
 		},
 	},
 }, {
@@ -2256,18 +2256,18 @@ var metaStatsTests = []struct {
 		"utopic/django-42": {100: 1, 12: 3, 8: 5, 4: 10, 2: 1, 0: 3},
 	},
 	expectResponse: params.StatsResponse{
-		ArchiveDownloadCount: 1 + 3 + 5 + 10 + 1 + 3,
+		ArchiveDownloadCount: 0,
 		ArchiveDownload: params.StatsCount{
-			Total: 1 + 3 + 5 + 10 + 1 + 3,
-			Day:   3,
-			Week:  10 + 1 + 3,
-			Month: 3 + 5 + 10 + 1 + 3,
+			Total: 0,
+			Day:   0,
+			Week:  0,
+			Month: 0,
 		},
 		ArchiveDownloadAllRevisions: params.StatsCount{
-			Total: 1 + 3 + 5 + 10 + 1 + 3,
-			Day:   3,
-			Week:  10 + 1 + 3,
-			Month: 3 + 5 + 10 + 1 + 3,
+			Total: 0,
+			Day:   0,
+			Week:  0,
+			Month: 0,
 		},
 	},
 }, {
@@ -2277,16 +2277,16 @@ var metaStatsTests = []struct {
 		"utopic/django-42": {200: 3, 27: 4, 3: 5},
 	},
 	expectResponse: params.StatsResponse{
-		ArchiveDownloadCount: 3 + 4 + 5,
+		ArchiveDownloadCount: 0,
 		ArchiveDownload: params.StatsCount{
-			Total: 3 + 4 + 5,
-			Week:  5,
-			Month: 4 + 5,
+			Total: 0,
+			Week:  0,
+			Month: 0,
 		},
 		ArchiveDownloadAllRevisions: params.StatsCount{
-			Total: 3 + 4 + 5,
-			Week:  5,
-			Month: 4 + 5,
+			Total: 0,
+			Week:  0,
+			Month: 0,
 		},
 	},
 }, {
@@ -2296,16 +2296,16 @@ var metaStatsTests = []struct {
 		"bundle/django-simple-2": {200: 3, 27: 4, 3: 5},
 	},
 	expectResponse: params.StatsResponse{
-		ArchiveDownloadCount: 3 + 4 + 5,
+		ArchiveDownloadCount: 0,
 		ArchiveDownload: params.StatsCount{
-			Total: 3 + 4 + 5,
-			Week:  5,
-			Month: 4 + 5,
+			Total: 0,
+			Week:  0,
+			Month: 0,
 		},
 		ArchiveDownloadAllRevisions: params.StatsCount{
-			Total: 3 + 4 + 5,
-			Week:  5,
-			Month: 4 + 5,
+			Total: 0,
+			Week:  0,
+			Month: 0,
 		},
 	},
 }, {
@@ -2317,16 +2317,16 @@ var metaStatsTests = []struct {
 		"trusty/mysql-0":  {200: 1, 14: 2, 1: 7},
 	},
 	expectResponse: params.StatsResponse{
-		ArchiveDownloadCount: 2 + 10,
+		ArchiveDownloadCount: 0,
 		ArchiveDownload: params.StatsCount{
-			Total: 2 + 10,
-			Week:  10,
-			Month: 2 + 10,
+			Total: 0,
+			Week:  0,
+			Month: 0,
 		},
 		ArchiveDownloadAllRevisions: params.StatsCount{
-			Total: 2 + 10,
-			Week:  10,
-			Month: 2 + 10,
+			Total: 0,
+			Week:  0,
+			Month: 0,
 		},
 	},
 }, {
@@ -2338,17 +2338,17 @@ var metaStatsTests = []struct {
 		"precise/rails-2": {6: 10, 0: 9},
 	},
 	expectResponse: params.StatsResponse{
-		ArchiveDownloadCount: 5 + 3 + 7,
+		ArchiveDownloadCount: 0,
 		ArchiveDownload: params.StatsCount{
-			Total: 5 + 3 + 7,
-			Week:  7,
-			Month: 3 + 7,
+			Total: 0,
+			Week:  0,
+			Month: 0,
 		},
 		ArchiveDownloadAllRevisions: params.StatsCount{
-			Total: (1 + 2) + (5 + 3 + 7) + (10 + 9),
-			Day:   0 + 0 + 9,
-			Week:  0 + 7 + (10 + 9),
-			Month: 0 + (3 + 7) + (10 + 9),
+			Total: 0,
+			Day:   0,
+			Week:  0,
+			Month: 0,
 		},
 	},
 }, {
@@ -2361,7 +2361,7 @@ var metaStatsTests = []struct {
 	},
 	expectResponse: params.StatsResponse{
 		ArchiveDownloadAllRevisions: params.StatsCount{
-			Total: 10,
+			Total: 0,
 		},
 	},
 }, {
@@ -2374,10 +2374,10 @@ var metaStatsTests = []struct {
 	},
 	expectResponse: params.StatsResponse{
 		ArchiveDownloadAllRevisions: params.StatsCount{
-			Total: (7 + 1 + 2 + 1) + (9 + 2),
-			Day:   1 + 2,
-			Week:  (2 + 1) + (9 + 2),
-			Month: (1 + 2 + 1) + (9 + 2),
+			Total: 0,
+			Day:   0,
+			Week:  0,
+			Month: 0,
 		},
 	},
 }, {
@@ -2388,16 +2388,16 @@ var metaStatsTests = []struct {
 		"~who/utopic/django-0": {2: 5},
 	},
 	expectResponse: params.StatsResponse{
-		ArchiveDownloadCount: 5,
+		ArchiveDownloadCount: 0,
 		ArchiveDownload: params.StatsCount{
-			Total: 5,
-			Week:  5,
-			Month: 5,
+			Total: 0,
+			Week:  0,
+			Month: 0,
 		},
 		ArchiveDownloadAllRevisions: params.StatsCount{
-			Total: 5,
-			Week:  5,
-			Month: 5,
+			Total: 0,
+			Week:  0,
+			Month: 0,
 		},
 	},
 }}

@@ -4,10 +4,7 @@
 package charmstore // import "gopkg.in/juju/charmstore.v5/internal/charmstore"
 
 import (
-	"fmt"
-	"sort"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -262,184 +259,15 @@ type Counter struct {
 
 // Counters aggregates and returns counter values according to the provided request.
 func (s *Store) Counters(req *CounterRequest) ([]Counter, error) {
-	tokensColl := s.DB.StatTokens()
-	countersColl := s.DB.StatCounters()
-
-	searchKey, err := s.stats.key(s.DB, req.Key, false)
-	if errgo.Cause(err) == params.ErrNotFound {
-		if !req.List {
-			return []Counter{{
-				Key:    req.Key,
-				Prefix: req.Prefix,
-				Count:  0,
-			}}, nil
-		}
+	// Return 0 value or not-present values for all statistics.
+	if req.List {
 		return nil, nil
 	}
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	var regex string
-	if req.Prefix {
-		regex = "^" + searchKey + ".+"
-	} else {
-		regex = "^" + searchKey + "$"
-	}
-
-	// This reduce function simply sums, for each emitted key, all the values found under it.
-	job := mgo.MapReduce{Reduce: "function(key, values) { return Array.sum(values); }"}
-	var emit string
-	switch req.By {
-	case ByDay:
-		emit = "emit(k+'@'+NumberInt(this.t/86400), this.c);"
-	case ByWeek:
-		emit = "emit(k+'@'+NumberInt(this.t/604800), this.c);"
-	default:
-		emit = "emit(k, this.c);"
-	}
-	if req.List && req.Prefix {
-		// For a search key "a:b:" matching a key "a:b:c:d:e:", this map function emits "a:b:c:*".
-		// For a search key "a:b:" matching a key "a:b:c:", it emits "a:b:c:".
-		// For a search key "a:b:" matching a key "a:b:", it emits "a:b:".
-		job.Scope = bson.D{{"searchKeyLen", len(searchKey)}}
-		job.Map = fmt.Sprintf(`
-			function() {
-				var k = this.k;
-				var i = k.indexOf(':', searchKeyLen)+1;
-				if (k.length > i)  { k = k.substr(0, i)+'*'; }
-				%s
-			}`, emit)
-	} else {
-		// For a search key "a:b:" matching a key "a:b:c:d:e:", this map function emits "a:b:*".
-		// For a search key "a:b:" matching a key "a:b:c:", it also emits "a:b:*".
-		// For a search key "a:b:" matching a key "a:b:", it emits "a:b:".
-		emitKey := searchKey
-		if req.Prefix {
-			emitKey += "*"
-		}
-		job.Scope = bson.D{{"emitKey", emitKey}}
-		job.Map = fmt.Sprintf(`
-			function() {
-				var k = emitKey;
-				%s
-			}`, emit)
-	}
-
-	var result []struct {
-		Key   string `bson:"_id"`
-		Value int64
-	}
-	var query, tquery bson.D
-	if !req.Start.IsZero() {
-		tquery = append(tquery, bson.DocElem{
-			Name:  "$gte",
-			Value: timeToStamp(req.Start),
-		})
-	}
-	if !req.Stop.IsZero() {
-		tquery = append(tquery, bson.DocElem{
-			Name:  "$lte",
-			Value: timeToStamp(req.Stop),
-		})
-	}
-	if len(tquery) == 0 {
-		query = bson.D{{"k", bson.D{{"$regex", regex}}}}
-	} else {
-		query = bson.D{{"k", bson.D{{"$regex", regex}}}, {"t", tquery}}
-	}
-	_, err = countersColl.Find(query).MapReduce(&job, &result)
-	if err != nil {
-		return nil, err
-	}
-	var counters []Counter
-	for i := range result {
-		key := result[i].Key
-		when := time.Time{}
-		if req.By != ByAll {
-			var stamp int64
-			if at := strings.Index(key, "@"); at != -1 && len(key) > at+1 {
-				stamp, _ = strconv.ParseInt(key[at+1:], 10, 32)
-				key = key[:at]
-			}
-			if stamp == 0 {
-				return nil, errgo.Newf("internal error: bad aggregated key: %q", result[i].Key)
-			}
-			switch req.By {
-			case ByDay:
-				stamp = stamp * 86400
-			case ByWeek:
-				// The +1 puts it at the end of the period.
-				stamp = (stamp + 1) * 604800
-			}
-			when = time.Unix(counterEpoch+stamp, 0).In(time.UTC)
-		}
-		ids := strings.Split(key, ":")
-		tokens := make([]string, 0, len(ids))
-		for i := 0; i < len(ids)-1; i++ {
-			if ids[i] == "*" {
-				continue
-			}
-			id, err := strconv.ParseInt(ids[i], 32, 32)
-			if err != nil {
-				return nil, errgo.Newf("store: invalid id: %q", ids[i])
-			}
-			token, found := s.stats.idToken(int(id))
-			if !found {
-				var t tokenId
-				err = tokensColl.FindId(id).One(&t)
-				if err == mgo.ErrNotFound {
-					return nil, errgo.Newf("store: internal error; token id not found: %d", id)
-				}
-				s.stats.cacheTokenId(t.Token, t.Id)
-				token = t.Token
-			}
-			tokens = append(tokens, token)
-		}
-		counter := Counter{
-			Key:    tokens,
-			Prefix: len(ids) > 0 && ids[len(ids)-1] == "*",
-			Count:  result[i].Value,
-			Time:   when,
-		}
-		counters = append(counters, counter)
-	}
-	if !req.List && len(counters) == 0 {
-		counters = []Counter{{Key: req.Key, Prefix: req.Prefix, Count: 0}}
-	} else if len(counters) > 1 {
-		sort.Sort(sortableCounters(counters))
-	}
-	return counters, nil
-}
-
-type sortableCounters []Counter
-
-func (s sortableCounters) Len() int      { return len(s) }
-func (s sortableCounters) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
-func (s sortableCounters) Less(i, j int) bool {
-	// Earlier times first.
-	if !s[i].Time.Equal(s[j].Time) {
-		return s[i].Time.Before(s[j].Time)
-	}
-	// Then larger counts first.
-	if s[i].Count != s[j].Count {
-		return s[j].Count < s[i].Count
-	}
-	// Then smaller/shorter keys first.
-	ki := s[i].Key
-	kj := s[j].Key
-	for n := range ki {
-		if n >= len(kj) {
-			return false
-		}
-		if ki[n] != kj[n] {
-			return ki[n] < kj[n]
-		}
-	}
-	if len(ki) < len(kj) {
-		return true
-	}
-	// Then full keys first.
-	return !s[i].Prefix && s[j].Prefix
+	return []Counter{{
+		Key:    req.Key,
+		Prefix: req.Prefix,
+		Count:  0,
+	}}, nil
 }
 
 // EntityStatsKey returns a stats key for the given charm or bundle
@@ -473,87 +301,8 @@ type AggregatedCounts struct {
 // ArchiveDownloadCounts calculates the aggregated download counts for
 // a charm or bundle.
 func (s *Store) ArchiveDownloadCounts(id *charm.URL, refresh bool) (thisRevision, allRevisions AggregatedCounts, err error) {
-	// Retrieve the aggregated stats.
-	fetchId := *id
-	fetch := func() (interface{}, error) {
-		return s.statsCacheFetch(&fetchId)
-	}
-
-	var v interface{}
-	if refresh {
-		s.pool.statsCache.Evict(fetchId.String())
-	}
-	v, err = s.pool.statsCache.Get(fetchId.String(), fetch)
-
-	if err != nil {
-		return AggregatedCounts{}, AggregatedCounts{}, errgo.Mask(err)
-	}
-	thisRevision = v.(AggregatedCounts)
-
-	// Only make second statsCache.Get call if we need to
-	if fetchId.Revision != -1 {
-		fetchId.Revision = -1
-		if refresh {
-			s.pool.statsCache.Evict(fetchId.String())
-		}
-		v, err = s.pool.statsCache.Get(fetchId.String(), fetch)
-
-		if err != nil {
-			return AggregatedCounts{}, AggregatedCounts{}, errgo.Mask(err)
-		}
-	}
-	allRevisions = v.(AggregatedCounts)
+	// Return 0 value counts for all archive downloads.
 	return
-}
-
-func (s *Store) statsCacheFetch(id *charm.URL) (interface{}, error) {
-	prefix := id.Revision == -1
-	kind := params.StatsArchiveDownload
-	if id.User == "" {
-		kind = params.StatsArchiveDownloadPromulgated
-	}
-	counts, err := s.aggregateStats(EntityStatsKey(id, kind), prefix)
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot get aggregated count for %q", id)
-	}
-	return counts, nil
-}
-
-// aggregatedStats returns the aggregated downloads counts for the given stats
-// key.
-func (s *Store) aggregateStats(key []string, prefix bool) (AggregatedCounts, error) {
-	var counts AggregatedCounts
-
-	req := CounterRequest{
-		Key:    key,
-		By:     ByDay,
-		Prefix: prefix,
-	}
-	results, err := s.Counters(&req)
-
-	if err != nil {
-		return counts, errgo.Notef(err, "cannot retrieve stats")
-	}
-
-	today := time.Now()
-	lastDay := today.AddDate(0, 0, -1)
-	lastWeek := today.AddDate(0, 0, -7)
-	lastMonth := today.AddDate(0, -1, 0)
-
-	// Aggregate the results.
-	for _, result := range results {
-		if result.Time.After(lastMonth) {
-			counts.LastMonth += result.Count
-			if result.Time.After(lastWeek) {
-				counts.LastWeek += result.Count
-				if result.Time.After(lastDay) {
-					counts.LastDay += result.Count
-				}
-			}
-		}
-		counts.Total += result.Count
-	}
-	return counts, nil
 }
 
 // IncrementDownloadCountsAsync updates the download statistics for entity id in both

@@ -36,11 +36,15 @@ func (s *StatsSuite) SetUpTest(c *gc.C) {
 }
 
 func (s *StatsSuite) TearDownTest(c *gc.C) {
-	s.store.Close()
+	if s.store != nil {
+		s.store.Close()
+	}
 	s.IsolatedMgoSuite.TearDownTest(c)
 }
 
 func (s *StatsSuite) TestSumCounters(c *gc.C) {
+	c.Skip("Statistics Disabled")
+
 	if !storetesting.MongoJSEnabled() {
 		c.Skip("MongoDB JavaScript not available")
 	}
@@ -118,6 +122,8 @@ func (s *StatsSuite) TestSumCounters(c *gc.C) {
 }
 
 func (s *StatsSuite) TestCountersReadOnlySum(c *gc.C) {
+	c.Skip("Statistics Disabled")
+
 	if !storetesting.MongoJSEnabled() {
 		c.Skip("MongoDB JavaScript not available")
 	}
@@ -134,6 +140,8 @@ func (s *StatsSuite) TestCountersReadOnlySum(c *gc.C) {
 }
 
 func (s *StatsSuite) TestCountersTokenCaching(c *gc.C) {
+	c.Skip("Statistics Disabled")
+
 	if !storetesting.MongoJSEnabled() {
 		c.Skip("MongoDB JavaScript not available")
 	}
@@ -193,6 +201,8 @@ func (s *StatsSuite) TestCountersTokenCaching(c *gc.C) {
 }
 
 func (s *StatsSuite) TestCounterTokenUniqueness(c *gc.C) {
+	c.Skip("Statistics Disabled")
+
 	if !storetesting.MongoJSEnabled() {
 		c.Skip("MongoDB JavaScript not available")
 	}
@@ -218,6 +228,8 @@ func (s *StatsSuite) TestCounterTokenUniqueness(c *gc.C) {
 }
 
 func (s *StatsSuite) TestListCounters(c *gc.C) {
+	c.Skip("Statistics Disabled")
+
 	if !storetesting.MongoJSEnabled() {
 		c.Skip("MongoDB JavaScript not available")
 	}
@@ -285,6 +297,8 @@ func (s *StatsSuite) TestListCounters(c *gc.C) {
 }
 
 func (s *StatsSuite) TestListCountersBy(c *gc.C) {
+	c.Skip("Statistics Disabled")
+
 	if !storetesting.MongoJSEnabled() {
 		c.Skip("MongoDB JavaScript not available")
 	}
@@ -559,6 +573,8 @@ var archiveDownloadCountsTests = []struct {
 }}
 
 func (s *StatsSuite) TestArchiveDownloadCounts(c *gc.C) {
+	c.Skip("Statistics Disabled")
+
 	for i, test := range archiveDownloadCountsTests {
 		c.Logf("%d: %s", i, test.about)
 		// Clear everything
@@ -604,6 +620,8 @@ func setDownloadCounts(c *gc.C, s *charmstore.Store, id *charm.URL, t time.Time,
 }
 
 func (s *StatsSuite) TestIncrementDownloadCounts(c *gc.C) {
+	c.Skip("Statistics Disabled")
+
 	ch := storetesting.Charms.CharmDir("wordpress")
 	id := charmstore.MustParseResolvedURL("0 ~charmers/trusty/wordpress-1")
 	err := s.store.AddCharmWithArchive(id, ch)
@@ -627,6 +645,8 @@ func (s *StatsSuite) TestIncrementDownloadCounts(c *gc.C) {
 }
 
 func (s *StatsSuite) TestIncrementDownloadCountsOnPromulgatedMultiSeriesCharm(c *gc.C) {
+	c.Skip("Statistics Disabled")
+
 	ch := storetesting.Charms.CharmDir("multi-series")
 	id := charmstore.MustParseResolvedURL("0 ~charmers/wordpress-1")
 	err := s.store.AddCharmWithArchive(id, ch)
@@ -650,6 +670,8 @@ func (s *StatsSuite) TestIncrementDownloadCountsOnPromulgatedMultiSeriesCharm(c 
 }
 
 func (s *StatsSuite) TestIncrementDownloadCountsOnIdWithPreferredSeries(c *gc.C) {
+	c.Skip("Statistics Disabled")
+
 	ch := storetesting.Charms.CharmDir("multi-series")
 	id := charmstore.MustParseResolvedURL("0 ~charmers/wordpress-1")
 	id.PreferredSeries = "trusty"
@@ -674,6 +696,8 @@ func (s *StatsSuite) TestIncrementDownloadCountsOnIdWithPreferredSeries(c *gc.C)
 }
 
 func (s *StatsSuite) TestIncrementDownloadCountsCaching(c *gc.C) {
+	c.Skip("Statistics Disabled")
+
 	ch := storetesting.Charms.CharmDir("wordpress")
 	id := charmstore.MustParseResolvedURL("0 ~charmers/trusty/wordpress-1")
 	err := s.store.AddCharmWithArchive(id, ch)

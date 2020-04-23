@@ -88,12 +88,11 @@ func (s *StoreSearchSuite) TestSuccessfulExport(c *gc.C) {
 			series = []string{"bundle"}
 		}
 		doc := SearchDoc{
-			Entity:         entity,
-			TotalDownloads: int64(ent.Downloads),
-			ReadACLs:       ent.ACL,
-			Series:         series,
-			AllSeries:      true,
-			SingleSeries:   ent.URL.Series != "",
+			Entity:       entity,
+			ReadACLs:     ent.ACL,
+			Series:       series,
+			AllSeries:    true,
+			SingleSeries: ent.URL.Series != "",
 		}
 		c.Assert(string(actual), jc.JSONEquals, doc)
 	}
@@ -781,30 +780,30 @@ func (s *StoreSearchSuite) TestSorting(c *gc.C) {
 			storetesting.SearchEntities["wordpress-simple"],
 			storetesting.SearchEntities["cloud-controller-worker-v2"],
 		},
-	}, {
-		about:     "downloads ascending",
-		sortQuery: "downloads,name",
-		results: []storetesting.SearchEntity{
-			storetesting.SearchEntities["multi-series"],
-			storetesting.SearchEntities["wordpress"],
-			storetesting.SearchEntities["wordpress-simple"],
-			storetesting.SearchEntities["squid-forwardproxy"],
-			storetesting.SearchEntities["mysql"],
-			storetesting.SearchEntities["cloud-controller-worker-v2"],
-			storetesting.SearchEntities["varnish"],
-		},
-	}, {
-		about:     "downloads descending",
-		sortQuery: "-downloads,name",
-		results: []storetesting.SearchEntity{
-			storetesting.SearchEntities["varnish"],
-			storetesting.SearchEntities["cloud-controller-worker-v2"],
-			storetesting.SearchEntities["mysql"],
-			storetesting.SearchEntities["squid-forwardproxy"],
-			storetesting.SearchEntities["wordpress-simple"],
-			storetesting.SearchEntities["multi-series"],
-			storetesting.SearchEntities["wordpress"],
-		},
+		//	}, {
+		//		about:     "downloads ascending",
+		//		sortQuery: "downloads,name",
+		//		results: []storetesting.SearchEntity{
+		//			storetesting.SearchEntities["multi-series"],
+		//			storetesting.SearchEntities["wordpress"],
+		//			storetesting.SearchEntities["wordpress-simple"],
+		//			storetesting.SearchEntities["squid-forwardproxy"],
+		//			storetesting.SearchEntities["mysql"],
+		//			storetesting.SearchEntities["cloud-controller-worker-v2"],
+		//			storetesting.SearchEntities["varnish"],
+		//		},
+		//	}, {
+		//		about:     "downloads descending",
+		//		sortQuery: "-downloads,name",
+		//		results: []storetesting.SearchEntity{
+		//			storetesting.SearchEntities["varnish"],
+		//			storetesting.SearchEntities["cloud-controller-worker-v2"],
+		//			storetesting.SearchEntities["mysql"],
+		//			storetesting.SearchEntities["squid-forwardproxy"],
+		//			storetesting.SearchEntities["wordpress-simple"],
+		//			storetesting.SearchEntities["multi-series"],
+		//			storetesting.SearchEntities["wordpress"],
+		//		},
 	}}
 	for i, test := range tests {
 		c.Logf("test %d. %s", i, test.about)

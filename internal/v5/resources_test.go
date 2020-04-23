@@ -1100,25 +1100,25 @@ func (s *ResourceSuite) TestDelete(c *gc.C) {
 	})
 
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler: s.srv,
-		Method: "DELETE",
-		URL: storeURL(fmt.Sprintf("%s/resource/someResource/1", id0.URL.Path())),
+		Handler:      s.srv,
+		Method:       "DELETE",
+		URL:          storeURL(fmt.Sprintf("%s/resource/someResource/1", id0.URL.Path())),
 		ExpectStatus: http.StatusOK,
-		Do: s.bakeryDoAsUser("charmers"),		
+		Do:           s.bakeryDoAsUser("charmers"),
 	})
 
 	// check we can't access version 1 anymore.
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler: s.srv,
-		Method: "GET",
-		URL: storeURL(fmt.Sprintf("%s/resource/someResource/1", id0.URL.Path())),
+		Handler:      s.srv,
+		Method:       "GET",
+		URL:          storeURL(fmt.Sprintf("%s/resource/someResource/1", id0.URL.Path())),
 		ExpectStatus: http.StatusNotFound,
 		ExpectBody: params.Error{
-			Code: "not found",
+			Code:    "not found",
 			Message: `cs:~charmers/precise/wordpress-0 has no "someResource/1" resource`,
 		},
-		Do: s.bakeryDoAsUser("charmers"),		
-	})	
+		Do: s.bakeryDoAsUser("charmers"),
+	})
 }
 
 func (s *ResourceSuite) TestDeleteNotFound(c *gc.C) {
@@ -1127,16 +1127,16 @@ func (s *ResourceSuite) TestDeleteNotFound(c *gc.C) {
 	s.addPublicCharm(c, storetesting.NewCharm(meta), id0)
 
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler: s.srv,
-		Method: "DELETE",
-		URL: storeURL(fmt.Sprintf("%s/resource/someResource/1", id0.URL.Path())),
+		Handler:      s.srv,
+		Method:       "DELETE",
+		URL:          storeURL(fmt.Sprintf("%s/resource/someResource/1", id0.URL.Path())),
 		ExpectStatus: http.StatusNotFound,
 		ExpectBody: params.Error{
-			Code: "not found",
+			Code:    "not found",
 			Message: `cs:~charmers/precise/wordpress-0 has no "someResource/1" resource`,
 		},
-		Do: s.bakeryDoAsUser("charmers"),		
-	})	
+		Do: s.bakeryDoAsUser("charmers"),
+	})
 }
 
 func (s *ResourceSuite) TestDeletePublished(c *gc.C) {
@@ -1161,16 +1161,16 @@ func (s *ResourceSuite) TestDeletePublished(c *gc.C) {
 	})
 
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler: s.srv,
-		Method: "DELETE",
-		URL: storeURL(fmt.Sprintf("%s/resource/someResource/0", id0.URL.Path())),
+		Handler:      s.srv,
+		Method:       "DELETE",
+		URL:          storeURL(fmt.Sprintf("%s/resource/someResource/0", id0.URL.Path())),
 		ExpectStatus: http.StatusForbidden,
 		ExpectBody: params.Error{
-			Code: "forbidden",
+			Code:    "forbidden",
 			Message: `cannot delete "cs:~charmers/precise/wordpress-0/someResource/0" because it is the current revision in channels [stable]`,
 		},
-		Do: s.bakeryDoAsUser("charmers"),		
-	})	
+		Do: s.bakeryDoAsUser("charmers"),
+	})
 }
 
 func (s *ResourceSuite) TestDeleteLastResource(c *gc.C) {
@@ -1179,14 +1179,14 @@ func (s *ResourceSuite) TestDeleteLastResource(c *gc.C) {
 	s.addPublicCharm(c, storetesting.NewCharm(meta), id0)
 
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler: s.srv,
-		Method: "DELETE",
-		URL: storeURL(fmt.Sprintf("%s/resource/someResource/0", id0.URL.Path())),
+		Handler:      s.srv,
+		Method:       "DELETE",
+		URL:          storeURL(fmt.Sprintf("%s/resource/someResource/0", id0.URL.Path())),
 		ExpectStatus: http.StatusForbidden,
 		ExpectBody: params.Error{
-			Code: "forbidden",
+			Code:    "forbidden",
 			Message: `cannot delete last revision of resource`,
 		},
-		Do: s.bakeryDoAsUser("charmers"),		
-	})	
+		Do: s.bakeryDoAsUser("charmers"),
+	})
 }
