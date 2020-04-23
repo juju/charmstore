@@ -39,6 +39,7 @@ const (
 	boostLTS1       = 1.125
 	boostLTS2       = 1.1125
 	boostLTS3       = 1.11
+	boostLTS4       = 1.109
 	boostS1         = 1.102
 	boostS2         = 1.101
 	boostS3         = 1.1
@@ -56,19 +57,19 @@ var Series = map[string]SeriesInfo{
 	"quantal": {true, Ubuntu, false, 0},
 	"raring":  {true, Ubuntu, false, 0},
 	"saucy":   {true, Ubuntu, false, 0},
-	"trusty":  {true, Ubuntu, true, boostLTS3},
+	"trusty":  {true, Ubuntu, true, boostLTS4},
 	"utopic":  {true, Ubuntu, false, 0},
 	"vivid":   {true, Ubuntu, false, 0},
 	"wily":    {true, Ubuntu, false, 0},
-	"xenial":  {true, Ubuntu, true, boostLTS2},
+	"xenial":  {true, Ubuntu, true, boostLTS3},
 	"yakkety": {true, Ubuntu, false, 0},
 	"zesty":   {true, Ubuntu, false, 0},
 	"artful":  {true, Ubuntu, false, 0},
-	"bionic":  {true, Ubuntu, true, boostLTS1},
+	"bionic":  {true, Ubuntu, true, boostLTS2},
 	"cosmic":  {true, Ubuntu, false, 0},
 	"disco":   {true, Ubuntu, true, boostS2},
 	"eoan":    {true, Ubuntu, true, boostS1},
-	"focal":   {true, Ubuntu, true, boostUnreleased},
+	"focal":   {true, Ubuntu, true, boostLTS1},
 
 	// Windows
 	"win2012hvr2": {true, Windows, true, 1.1},
