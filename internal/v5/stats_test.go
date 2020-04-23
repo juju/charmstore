@@ -17,7 +17,7 @@ import (
 
 	"gopkg.in/juju/charmstore.v5/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5/internal/storetesting"
-	"gopkg.in/juju/charmstore.v5/internal/v5"
+	v5 "gopkg.in/juju/charmstore.v5/internal/v5"
 )
 
 type StatsSuite struct {
@@ -32,6 +32,8 @@ func (s *StatsSuite) SetUpTest(c *gc.C) {
 }
 
 func (s *StatsSuite) TestServerStatsStatus(c *gc.C) {
+	c.Skip("Statistics Disabled")
+
 	tests := []struct {
 		path    string
 		status  int
@@ -93,6 +95,8 @@ func (s *StatsSuite) TestServerStatsStatus(c *gc.C) {
 }
 
 func (s *StatsSuite) TestServerStatsUpdate(c *gc.C) {
+	c.Skip("Statistics Disabled")
+
 	ref := charm.MustParseURL("~charmers/precise/wordpress-23")
 	tests := []struct {
 		path          string
@@ -162,6 +166,8 @@ func (s *StatsSuite) TestServerStatsUpdate(c *gc.C) {
 }
 
 func (s *StatsSuite) TestServerStatsArchiveDownloadOnPromulgatedEntity(c *gc.C) {
+	c.Skip("Statistics Disabled")
+
 	ref := charm.MustParseURL("~charmers/precise/wordpress-23")
 	path := "/stats/counter/archive-download:*"
 
@@ -202,6 +208,8 @@ func (s *StatsSuite) TestServerStatsArchiveDownloadOnPromulgatedEntity(c *gc.C) 
 }
 
 func (s *StatsSuite) TestServerStatsUpdateErrors(c *gc.C) {
+	c.Skip("Statistics Disabled")
+
 	ref := charm.MustParseURL("~charmers/precise/wordpress-23")
 	tests := []struct {
 		path          string
@@ -269,6 +277,8 @@ func (s *StatsSuite) TestServerStatsUpdateErrors(c *gc.C) {
 }
 
 func (s *StatsSuite) TestServerStatsUpdateNotPartOfStatsUpdateGroup(c *gc.C) {
+	c.Skip("Statistics Disabled")
+
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler: s.srv,
 		URL:     storeURL("stats/update"),
@@ -303,6 +313,8 @@ func (s *StatsSuite) TestServerStatsUpdateNotPartOfStatsUpdateGroup(c *gc.C) {
 }
 
 func (s *StatsSuite) TestServerStatsUpdatePartOfStatsUpdateGroup(c *gc.C) {
+	c.Skip("Statistics Disabled")
+
 	s.addPublicCharm(c, storetesting.Charms.CharmDir("wordpress"), newResolvedURL("~charmers/precise/wordpress-23", 23))
 
 	s.idmServer.AddUser("statsupdate", "statsupdate@cs")
@@ -322,6 +334,8 @@ func (s *StatsSuite) TestServerStatsUpdatePartOfStatsUpdateGroup(c *gc.C) {
 }
 
 func (s *StatsSuite) TestStatsCounter(c *gc.C) {
+	c.Skip("Statistics Disabled")
+
 	if !storetesting.MongoJSEnabled() {
 		c.Skip("MongoDB JavaScript not available")
 	}
@@ -360,6 +374,8 @@ func (s *StatsSuite) TestStatsCounter(c *gc.C) {
 }
 
 func (s *StatsSuite) TestStatsCounterList(c *gc.C) {
+	c.Skip("Statistics Disabled")
+
 	if !storetesting.MongoJSEnabled() {
 		c.Skip("MongoDB JavaScript not available")
 	}
@@ -446,6 +462,8 @@ func (s *StatsSuite) TestStatsCounterList(c *gc.C) {
 }
 
 func (s *StatsSuite) TestStatsCounterBy(c *gc.C) {
+	c.Skip("Statistics Disabled")
+
 	if !storetesting.MongoJSEnabled() {
 		c.Skip("MongoDB JavaScript not available")
 	}
@@ -653,6 +671,8 @@ func (s *StatsSuite) TestStatsCounterBy(c *gc.C) {
 }
 
 func (s *StatsSuite) TestStatsEnabled(c *gc.C) {
+	c.Skip("Statistics Disabled")
+
 	statsEnabled := func(url string) bool {
 		req, _ := http.NewRequest("GET", url, nil)
 		return v5.StatsEnabled(req)

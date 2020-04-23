@@ -28,7 +28,6 @@ import (
 	"gopkg.in/juju/charmstore.v5/internal/legacy"
 	"gopkg.in/juju/charmstore.v5/internal/router"
 	"gopkg.in/juju/charmstore.v5/internal/storetesting"
-	"gopkg.in/juju/charmstore.v5/internal/storetesting/stats"
 )
 
 var serverParams = charmstore.ServerParams{
@@ -282,20 +281,21 @@ func (s *APISuite) TestCharmInfoCounters(c *gc.C) {
 	requestInfo("precise/django-0", 2)
 
 	// The charm-info count for the promulgated charm has been updated.
-	key := []string{params.StatsCharmInfo, "utopic", "wordpress"}
-	stats.CheckCounterSum(c, s.store, key, false, 4)
+	// Statistics Disabled
+	//key := []string{params.StatsCharmInfo, "utopic", "wordpress"}
+	//stats.CheckCounterSum(c, s.store, key, false, 4)
 
 	// The charm-info count for the user owned charm has been updated.
-	key = []string{params.StatsCharmInfo, "trusty", "wordpress", "who"}
-	stats.CheckCounterSum(c, s.store, key, false, 3)
+	//key = []string{params.StatsCharmInfo, "trusty", "wordpress", "who"}
+	//stats.CheckCounterSum(c, s.store, key, false, 3)
 
 	// The charm-missing count for the missing charm has been updated.
-	key = []string{params.StatsCharmMissing, "precise", "django"}
-	stats.CheckCounterSum(c, s.store, key, false, 2)
+	//key = []string{params.StatsCharmMissing, "precise", "django"}
+	//stats.CheckCounterSum(c, s.store, key, false, 2)
 
 	// The charm-info count for the missing charm is still zero.
-	key = []string{params.StatsCharmInfo, "precise", "django"}
-	stats.CheckCounterSum(c, s.store, key, false, 0)
+	//key = []string{params.StatsCharmInfo, "precise", "django"}
+	//stats.CheckCounterSum(c, s.store, key, false, 0)
 }
 
 func (s *APISuite) TestAPIInfoWithGatedCharm(c *gc.C) {
