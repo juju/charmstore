@@ -12,7 +12,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"reflect"
-	"strconv"
 	"strings"
 	"time"
 
@@ -34,6 +33,7 @@ import (
 	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
 	"gopkg.in/juju/charmstore.v5/internal/router"
 	"gopkg.in/juju/charmstore.v5/internal/storetesting"
+	"gopkg.in/juju/charmstore.v5/internal/storetesting/stats"
 	v4 "gopkg.in/juju/charmstore.v5/internal/v4"
 	v5 "gopkg.in/juju/charmstore.v5/internal/v5"
 )
@@ -2203,18 +2203,18 @@ var metaStatsTests = []struct {
 		"utopic/django-42": {0: 1},
 	},
 	expectResponse: params.StatsResponse{
-		ArchiveDownloadCount: 0,
+		ArchiveDownloadCount: 1,
 		ArchiveDownload: params.StatsCount{
-			Total: 0,
-			Day:   0,
-			Week:  0,
-			Month: 0,
+			Total: 1,
+			Day:   1,
+			Week:  1,
+			Month: 1,
 		},
 		ArchiveDownloadAllRevisions: params.StatsCount{
-			Total: 0,
-			Day:   0,
-			Week:  0,
-			Month: 0,
+			Total: 1,
+			Day:   1,
+			Week:  1,
+			Month: 1,
 		},
 	},
 }, {
@@ -2224,12 +2224,12 @@ var metaStatsTests = []struct {
 		"utopic/django-42": {100: 1},
 	},
 	expectResponse: params.StatsResponse{
-		ArchiveDownloadCount: 0,
+		ArchiveDownloadCount: 1,
 		ArchiveDownload: params.StatsCount{
-			Total: 0,
+			Total: 1,
 		},
 		ArchiveDownloadAllRevisions: params.StatsCount{
-			Total: 0,
+			Total: 1,
 		},
 	},
 }, {
@@ -2239,14 +2239,14 @@ var metaStatsTests = []struct {
 		"utopic/wordpress-47": {20: 2, 25: 5},
 	},
 	expectResponse: params.StatsResponse{
-		ArchiveDownloadCount: 0,
+		ArchiveDownloadCount: 7,
 		ArchiveDownload: params.StatsCount{
-			Total: 0,
-			Month: 0,
+			Total: 7,
+			Month: stats.ThisMonth(map[int]int{20: 2, 25: 5}),
 		},
 		ArchiveDownloadAllRevisions: params.StatsCount{
-			Total: 0,
-			Month: 0,
+			Total: 7,
+			Month: stats.ThisMonth(map[int]int{20: 2, 25: 5}),
 		},
 	},
 }, {
@@ -2256,18 +2256,18 @@ var metaStatsTests = []struct {
 		"utopic/django-42": {100: 1, 12: 3, 8: 5, 4: 10, 2: 1, 0: 3},
 	},
 	expectResponse: params.StatsResponse{
-		ArchiveDownloadCount: 0,
+		ArchiveDownloadCount: 23,
 		ArchiveDownload: params.StatsCount{
-			Total: 0,
-			Day:   0,
-			Week:  0,
-			Month: 0,
+			Total: 23,
+			Day:   3,
+			Week:  stats.ThisWeek(map[int]int{100: 1, 12: 3, 8: 5, 4: 10, 2: 1, 0: 3}),
+			Month: stats.ThisMonth(map[int]int{100: 1, 12: 3, 8: 5, 4: 10, 2: 1, 0: 3}),
 		},
 		ArchiveDownloadAllRevisions: params.StatsCount{
-			Total: 0,
-			Day:   0,
-			Week:  0,
-			Month: 0,
+			Total: 23,
+			Day:   3,
+			Week:  stats.ThisWeek(map[int]int{100: 1, 12: 3, 8: 5, 4: 10, 2: 1, 0: 3}),
+			Month: stats.ThisMonth(map[int]int{100: 1, 12: 3, 8: 5, 4: 10, 2: 1, 0: 3}),
 		},
 	},
 }, {
@@ -2277,16 +2277,16 @@ var metaStatsTests = []struct {
 		"utopic/django-42": {200: 3, 27: 4, 3: 5},
 	},
 	expectResponse: params.StatsResponse{
-		ArchiveDownloadCount: 0,
+		ArchiveDownloadCount: 12,
 		ArchiveDownload: params.StatsCount{
-			Total: 0,
-			Week:  0,
-			Month: 0,
+			Total: 12,
+			Week:  stats.ThisWeek(map[int]int{200: 3, 27: 4, 3: 5}),
+			Month: stats.ThisMonth(map[int]int{200: 3, 27: 4, 3: 5}),
 		},
 		ArchiveDownloadAllRevisions: params.StatsCount{
-			Total: 0,
-			Week:  0,
-			Month: 0,
+			Total: 12,
+			Week:  stats.ThisWeek(map[int]int{200: 3, 27: 4, 3: 5}),
+			Month: stats.ThisMonth(map[int]int{200: 3, 27: 4, 3: 5}),
 		},
 	},
 }, {
@@ -2296,16 +2296,16 @@ var metaStatsTests = []struct {
 		"bundle/django-simple-2": {200: 3, 27: 4, 3: 5},
 	},
 	expectResponse: params.StatsResponse{
-		ArchiveDownloadCount: 0,
+		ArchiveDownloadCount: 12,
 		ArchiveDownload: params.StatsCount{
-			Total: 0,
-			Week:  0,
-			Month: 0,
+			Total: 12,
+			Week:  stats.ThisWeek(map[int]int{200: 3, 27: 4, 3: 5}),
+			Month: stats.ThisMonth(map[int]int{200: 3, 27: 4, 3: 5}),
 		},
 		ArchiveDownloadAllRevisions: params.StatsCount{
-			Total: 0,
-			Week:  0,
-			Month: 0,
+			Total: 12,
+			Week:  stats.ThisWeek(map[int]int{200: 3, 27: 4, 3: 5}),
+			Month: stats.ThisMonth(map[int]int{200: 3, 27: 4, 3: 5}),
 		},
 	},
 }, {
@@ -2317,16 +2317,16 @@ var metaStatsTests = []struct {
 		"trusty/mysql-0":  {200: 1, 14: 2, 1: 7},
 	},
 	expectResponse: params.StatsResponse{
-		ArchiveDownloadCount: 0,
+		ArchiveDownloadCount: 12,
 		ArchiveDownload: params.StatsCount{
-			Total: 0,
-			Week:  0,
-			Month: 0,
+			Total: 12,
+			Week:  stats.ThisWeek(map[int]int{20: 2, 6: 10}),
+			Month: stats.ThisMonth(map[int]int{20: 2, 6: 10}),
 		},
 		ArchiveDownloadAllRevisions: params.StatsCount{
-			Total: 0,
-			Week:  0,
-			Month: 0,
+			Total: 12,
+			Week:  stats.ThisWeek(map[int]int{20: 2, 6: 10}),
+			Month: stats.ThisMonth(map[int]int{20: 2, 6: 10}),
 		},
 	},
 }, {
@@ -2338,17 +2338,25 @@ var metaStatsTests = []struct {
 		"precise/rails-2": {6: 10, 0: 9},
 	},
 	expectResponse: params.StatsResponse{
-		ArchiveDownloadCount: 0,
+		ArchiveDownloadCount: 15,
 		ArchiveDownload: params.StatsCount{
-			Total: 0,
-			Week:  0,
-			Month: 0,
+			Total: 15,
+			Week:  stats.ThisWeek(map[int]int{100: 5, 10: 3, 2: 7}),
+			Month: stats.ThisMonth(map[int]int{100: 5, 10: 3, 2: 7}),
 		},
 		ArchiveDownloadAllRevisions: params.StatsCount{
-			Total: 0,
-			Day:   0,
-			Week:  0,
-			Month: 0,
+			Total: 37,
+			Day:   9,
+			Week: stats.ThisWeek(
+				map[int]int{300: 1, 200: 2},
+				map[int]int{100: 5, 10: 3, 2: 7},
+				map[int]int{6: 10, 0: 9},
+			),
+			Month: stats.ThisMonth(
+				map[int]int{300: 1, 200: 2},
+				map[int]int{100: 5, 10: 3, 2: 7},
+				map[int]int{6: 10, 0: 9},
+			),
 		},
 	},
 }, {
@@ -2361,7 +2369,7 @@ var metaStatsTests = []struct {
 	},
 	expectResponse: params.StatsResponse{
 		ArchiveDownloadAllRevisions: params.StatsCount{
-			Total: 0,
+			Total: 10,
 		},
 	},
 }, {
@@ -2374,10 +2382,16 @@ var metaStatsTests = []struct {
 	},
 	expectResponse: params.StatsResponse{
 		ArchiveDownloadAllRevisions: params.StatsCount{
-			Total: 0,
-			Day:   0,
-			Week:  0,
-			Month: 0,
+			Total: 22,
+			Day:   3,
+			Week: stats.ThisWeek(
+				map[int]int{31: 7, 10: 1, 3: 2, 0: 1},
+				map[int]int{6: 9, 0: 2},
+			),
+			Month: stats.ThisMonth(
+				map[int]int{31: 7, 10: 1, 3: 2, 0: 1},
+				map[int]int{6: 9, 0: 2},
+			),
 		},
 	},
 }, {
@@ -2388,24 +2402,21 @@ var metaStatsTests = []struct {
 		"~who/utopic/django-0": {2: 5},
 	},
 	expectResponse: params.StatsResponse{
-		ArchiveDownloadCount: 0,
+		ArchiveDownloadCount: 5,
 		ArchiveDownload: params.StatsCount{
-			Total: 0,
-			Week:  0,
-			Month: 0,
+			Total: 5,
+			Week:  stats.ThisWeek(map[int]int{2: 5}),
+			Month: stats.ThisMonth(map[int]int{2: 5}),
 		},
 		ArchiveDownloadAllRevisions: params.StatsCount{
-			Total: 0,
-			Week:  0,
-			Month: 0,
+			Total: 5,
+			Week:  stats.ThisWeek(map[int]int{2: 5}),
+			Month: stats.ThisMonth(map[int]int{2: 5}),
 		},
 	},
 }}
 
 func (s *APISuite) TestMetaStats(c *gc.C) {
-	if !storetesting.MongoJSEnabled() {
-		c.Skip("MongoDB JavaScript not available")
-	}
 	today := time.Now()
 	for i, test := range metaStatsTests {
 		c.Logf("test %d: %s", i, test.about)
@@ -2430,17 +2441,9 @@ func (s *APISuite) TestMetaStats(c *gc.C) {
 			// Simulate the entity was downloaded at the specified dates.
 			for daysAgo, downloads := range downloadsPerDay {
 				date := today.AddDate(0, 0, -daysAgo)
-				key := []string{params.StatsArchiveDownload, url.URL.Series, url.URL.Name, url.URL.User, strconv.Itoa(url.URL.Revision)}
 				for i := 0; i < downloads; i++ {
-					err := s.store.IncCounterAtTime(key, date)
+					err := s.store.IncrementDownloadCountsAtTime(url, date)
 					c.Assert(err, gc.Equals, nil)
-				}
-				if url.PromulgatedRevision > -1 {
-					key := []string{params.StatsArchiveDownloadPromulgated, url.URL.Series, url.URL.Name, "", strconv.Itoa(url.PromulgatedRevision)}
-					for i := 0; i < downloads; i++ {
-						err := s.store.IncCounterAtTime(key, date)
-						c.Assert(err, gc.Equals, nil)
-					}
 				}
 			}
 		}
@@ -2450,7 +2453,7 @@ func (s *APISuite) TestMetaStats(c *gc.C) {
 		// Clean up the collections.
 		_, err := s.store.DB.Entities().RemoveAll(nil)
 		c.Assert(err, gc.Equals, nil)
-		_, err = s.store.DB.StatCounters().RemoveAll(nil)
+		_, err = s.store.DB.DownloadCounts().RemoveAll(nil)
 		c.Assert(err, gc.Equals, nil)
 	}
 }

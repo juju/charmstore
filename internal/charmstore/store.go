@@ -46,7 +46,6 @@ type Pool struct {
 	db     StoreDatabase
 	es     *SearchIndex
 	bakery *bakery.Service
-	stats  stats
 	run    *parallel.Run
 
 	// statsCache holds a cache of AggregatedCounts
@@ -243,7 +242,6 @@ func (p *Pool) requestStoreNB(always bool) (*Store, error) {
 		DB:        db,
 		BlobStore: p.newBlobStore(db),
 		ES:        p.es,
-		stats:     &p.stats,
 		pool:      p,
 	}
 	store.Bakery = store.BakeryWithPolicy(p.config.RootKeyPolicy)
@@ -270,7 +268,6 @@ type Store struct {
 	ES             *SearchIndex
 	Bakery         *bakery.Service
 	LongTermBakery *bakery.Service
-	stats          *stats
 	pool           *Pool
 }
 
@@ -353,12 +350,6 @@ func (s *Store) ensureIndexes() error {
 		c *mgo.Collection
 		i mgo.Index
 	}{{
-		s.DB.StatCounters(),
-		mgo.Index{Key: []string{"k", "t"}, Unique: true},
-	}, {
-		s.DB.StatTokens(),
-		mgo.Index{Key: []string{"t"}, Unique: true},
-	}, {
 		s.DB.Entities(),
 		mgo.Index{Key: []string{"baseurl"}},
 	}, {
@@ -422,6 +413,12 @@ func (s *Store) ensureIndexes() error {
 	}, {
 		s.DB.Entities(),
 		mgo.Index{Key: []string{"user", "name", "revision"}},
+	}, {
+		s.DB.DownloadCounts(),
+		mgo.Index{Key: []string{"id", "period"}},
+	}, {
+		s.DB.DownloadCounts(),
+		mgo.Index{Key: []string{"expires"}, Sparse: true, ExpireAfter: time.Hour},
 	}}
 	for _, idx := range indexes {
 		err := idx.c.EnsureIndex(idx.i)
@@ -1422,22 +1419,29 @@ func (s StoreDatabase) Migrations() *mgo.Collection {
 	return s.C("migrations")
 }
 
+// Macaroons returns the Mongo collection where macaroon root keys are
+// stored.
 func (s StoreDatabase) Macaroons() *mgo.Collection {
 	return s.C("macaroons")
+}
+
+// DownloadCounts returns the Mongo collection where download counts are
+// stored.
+func (s StoreDatabase) DownloadCounts() *mgo.Collection {
+	return s.C("download_counts")
 }
 
 // allCollections holds for each collection used by the charm store a
 // function returns that collection.
 var allCollections = []func(StoreDatabase) *mgo.Collection{
 	StoreDatabase.BaseEntities,
+	StoreDatabase.DownloadCounts,
 	StoreDatabase.Entities,
 	StoreDatabase.Logs,
 	StoreDatabase.Macaroons,
 	StoreDatabase.Migrations,
 	StoreDatabase.Resources,
 	StoreDatabase.Revisions,
-	StoreDatabase.StatCounters,
-	StoreDatabase.StatTokens,
 }
 
 // Collections returns a slice of all the collections used

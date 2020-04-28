@@ -359,3 +359,20 @@ func copyURL(u *charm.URL) *charm.URL {
 	u1 := *u
 	return &u1
 }
+
+// A DownloadCount stores a download count for a particular charm over a
+// particular period.
+type DownloadCount struct {
+	// ID contains the ID the download count is for.
+	ID string
+
+	// Period contains the time period this count is for.
+	Period string
+
+	// Count contains the current count.
+	Count int64
+
+	// Expires contains the time at which this count is no longer
+	// needed.
+	Expires *time.Time `bson:"expires,omitempty"`
+}

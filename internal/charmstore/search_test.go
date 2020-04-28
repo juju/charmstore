@@ -88,11 +88,12 @@ func (s *StoreSearchSuite) TestSuccessfulExport(c *gc.C) {
 			series = []string{"bundle"}
 		}
 		doc := SearchDoc{
-			Entity:       entity,
-			ReadACLs:     ent.ACL,
-			Series:       series,
-			AllSeries:    true,
-			SingleSeries: ent.URL.Series != "",
+			Entity:         entity,
+			ReadACLs:       ent.ACL,
+			Series:         series,
+			AllSeries:      true,
+			SingleSeries:   ent.URL.Series != "",
+			TotalDownloads: int64(ent.Downloads),
 		}
 		c.Assert(string(actual), jc.JSONEquals, doc)
 	}
