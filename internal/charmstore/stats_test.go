@@ -4,16 +4,12 @@
 package charmstore_test
 
 import (
-	"strconv"
-	"sync"
 	"time"
 
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6"
-	"gopkg.in/juju/charmrepo.v3/csclient/params"
-	"gopkg.in/mgo.v2/bson"
 
 	"gopkg.in/juju/charmstore.v5/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5/internal/router"
@@ -40,408 +36,6 @@ func (s *StatsSuite) TearDownTest(c *gc.C) {
 		s.store.Close()
 	}
 	s.IsolatedMgoSuite.TearDownTest(c)
-}
-
-func (s *StatsSuite) TestSumCounters(c *gc.C) {
-	c.Skip("Statistics Disabled")
-
-	if !storetesting.MongoJSEnabled() {
-		c.Skip("MongoDB JavaScript not available")
-	}
-
-	req := charmstore.CounterRequest{Key: []string{"a"}}
-	cs, err := s.store.Counters(&req)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(cs, gc.DeepEquals, []charmstore.Counter{{Key: req.Key, Count: 0}})
-
-	for i := 0; i < 10; i++ {
-		err := s.store.IncCounter([]string{"a", "b", "c"})
-		c.Assert(err, gc.Equals, nil)
-	}
-	for i := 0; i < 7; i++ {
-		s.store.IncCounter([]string{"a", "b"})
-		c.Assert(err, gc.Equals, nil)
-	}
-	for i := 0; i < 3; i++ {
-		s.store.IncCounter([]string{"a", "z", "b"})
-		c.Assert(err, gc.Equals, nil)
-	}
-
-	tests := []struct {
-		key    []string
-		prefix bool
-		result int64
-	}{
-		{[]string{"a", "b", "c"}, false, 10},
-		{[]string{"a", "b"}, false, 7},
-		{[]string{"a", "z", "b"}, false, 3},
-		{[]string{"a", "b", "c"}, true, 0},
-		{[]string{"a", "b", "c", "d"}, false, 0},
-		{[]string{"a", "b"}, true, 10},
-		{[]string{"a"}, true, 20},
-		{[]string{"b"}, true, 0},
-	}
-
-	for _, t := range tests {
-		c.Logf("Test: %#v\n", t)
-		req = charmstore.CounterRequest{Key: t.key, Prefix: t.prefix}
-		cs, err := s.store.Counters(&req)
-		c.Assert(err, gc.Equals, nil)
-		c.Assert(cs, gc.DeepEquals, []charmstore.Counter{{Key: t.key, Prefix: t.prefix, Count: t.result}})
-	}
-
-	// High-level interface works. Now check that the data is
-	// stored correctly.
-	counters := s.store.DB.StatCounters()
-	docs1, err := counters.Count()
-	c.Assert(err, gc.Equals, nil)
-	if docs1 != 3 && docs1 != 4 {
-		c.Errorf("Expected 3 or 4 docs in counters collection, got %d", docs1)
-	}
-
-	// Hack times so that the next operation adds another document.
-	err = counters.Update(nil, bson.D{{"$set", bson.D{{"t", 1}}}})
-	c.Check(err, gc.Equals, nil)
-
-	err = s.store.IncCounter([]string{"a", "b", "c"})
-	c.Assert(err, gc.Equals, nil)
-
-	docs2, err := counters.Count()
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(docs2, gc.Equals, docs1+1)
-
-	req = charmstore.CounterRequest{Key: []string{"a", "b", "c"}}
-	cs, err = s.store.Counters(&req)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(cs, gc.DeepEquals, []charmstore.Counter{{Key: req.Key, Count: 11}})
-
-	req = charmstore.CounterRequest{Key: []string{"a"}, Prefix: true}
-	cs, err = s.store.Counters(&req)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(cs, gc.DeepEquals, []charmstore.Counter{{Key: req.Key, Prefix: true, Count: 21}})
-}
-
-func (s *StatsSuite) TestCountersReadOnlySum(c *gc.C) {
-	c.Skip("Statistics Disabled")
-
-	if !storetesting.MongoJSEnabled() {
-		c.Skip("MongoDB JavaScript not available")
-	}
-
-	// Summing up an unknown key shouldn't add the key to the database.
-	req := charmstore.CounterRequest{Key: []string{"a", "b", "c"}}
-	_, err := s.store.Counters(&req)
-	c.Assert(err, gc.Equals, nil)
-
-	tokens := s.Session.DB("juju").C("stat.tokens")
-	n, err := tokens.Count()
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(n, gc.Equals, 0)
-}
-
-func (s *StatsSuite) TestCountersTokenCaching(c *gc.C) {
-	c.Skip("Statistics Disabled")
-
-	if !storetesting.MongoJSEnabled() {
-		c.Skip("MongoDB JavaScript not available")
-	}
-
-	assertSum := func(i int, want int64) {
-		req := charmstore.CounterRequest{Key: []string{strconv.Itoa(i)}}
-		cs, err := s.store.Counters(&req)
-		c.Assert(err, gc.Equals, nil)
-		c.Assert(cs[0].Count, gc.Equals, want)
-	}
-	assertSum(100000, 0)
-
-	const genSize = 1024
-
-	// All of these will be cached, as we have two generations
-	// of genSize entries each.
-	for i := 0; i < genSize*2; i++ {
-		err := s.store.IncCounter([]string{strconv.Itoa(i)})
-		c.Assert(err, gc.Equals, nil)
-	}
-
-	// Now go behind the scenes and corrupt all the tokens.
-	tokens := s.store.DB.StatTokens()
-	iter := tokens.Find(nil).Iter()
-	var t struct {
-		Id    int    "_id"
-		Token string "t"
-	}
-	for iter.Next(&t) {
-		err := tokens.UpdateId(t.Id, bson.M{"$set": bson.M{"t": "corrupted" + t.Token}})
-		c.Assert(err, gc.Equals, nil)
-	}
-	c.Assert(iter.Err(), gc.IsNil)
-
-	// We can consult the counters for the cached entries still.
-	// First, check that the newest generation is good.
-	for i := genSize; i < genSize*2; i++ {
-		assertSum(i, 1)
-	}
-
-	// Now, we can still access a single entry of the older generation,
-	// but this will cause the generations to flip and thus the rest
-	// of the old generation will go away as the top half of the
-	// entries is turned into the old generation.
-	assertSum(0, 1)
-
-	// Now we've lost access to the rest of the old generation.
-	for i := 1; i < genSize; i++ {
-		assertSum(i, 0)
-	}
-
-	// But we still have all of the top half available since it was
-	// moved into the old generation.
-	for i := genSize; i < genSize*2; i++ {
-		assertSum(i, 1)
-	}
-}
-
-func (s *StatsSuite) TestCounterTokenUniqueness(c *gc.C) {
-	c.Skip("Statistics Disabled")
-
-	if !storetesting.MongoJSEnabled() {
-		c.Skip("MongoDB JavaScript not available")
-	}
-
-	var wg0, wg1 sync.WaitGroup
-	wg0.Add(10)
-	wg1.Add(10)
-	for i := 0; i < 10; i++ {
-		go func() {
-			wg0.Done()
-			wg0.Wait()
-			defer wg1.Done()
-			err := s.store.IncCounter([]string{"a"})
-			c.Check(err, gc.Equals, nil)
-		}()
-	}
-	wg1.Wait()
-
-	req := charmstore.CounterRequest{Key: []string{"a"}}
-	cs, err := s.store.Counters(&req)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(cs[0].Count, gc.Equals, int64(10))
-}
-
-func (s *StatsSuite) TestListCounters(c *gc.C) {
-	c.Skip("Statistics Disabled")
-
-	if !storetesting.MongoJSEnabled() {
-		c.Skip("MongoDB JavaScript not available")
-	}
-
-	incs := [][]string{
-		{"c", "b", "a"}, // Assign internal id c < id b < id a, to make sorting slightly trickier.
-		{"a"},
-		{"a", "c"},
-		{"a", "b"},
-		{"a", "b", "c"},
-		{"a", "b", "c"},
-		{"a", "b", "e"},
-		{"a", "b", "d"},
-		{"a", "f", "g"},
-		{"a", "f", "h"},
-		{"a", "i"},
-		{"a", "i", "j"},
-		{"k", "l"},
-	}
-	for _, key := range incs {
-		err := s.store.IncCounter(key)
-		c.Assert(err, gc.Equals, nil)
-	}
-
-	tests := []struct {
-		prefix []string
-		result []charmstore.Counter
-	}{
-		{
-			[]string{"a"},
-			[]charmstore.Counter{
-				{Key: []string{"a", "b"}, Prefix: true, Count: 4},
-				{Key: []string{"a", "f"}, Prefix: true, Count: 2},
-				{Key: []string{"a", "b"}, Prefix: false, Count: 1},
-				{Key: []string{"a", "c"}, Prefix: false, Count: 1},
-				{Key: []string{"a", "i"}, Prefix: false, Count: 1},
-				{Key: []string{"a", "i"}, Prefix: true, Count: 1},
-			},
-		}, {
-			[]string{"a", "b"},
-			[]charmstore.Counter{
-				{Key: []string{"a", "b", "c"}, Prefix: false, Count: 2},
-				{Key: []string{"a", "b", "d"}, Prefix: false, Count: 1},
-				{Key: []string{"a", "b", "e"}, Prefix: false, Count: 1},
-			},
-		}, {
-			[]string{"z"},
-			[]charmstore.Counter(nil),
-		},
-	}
-
-	// Use a different store to exercise cache filling.
-	pool, err := charmstore.NewPool(s.store.DB.Database, nil, nil, charmstore.ServerParams{})
-	c.Assert(err, gc.Equals, nil)
-	st := pool.Store()
-	defer st.Close()
-	pool.Close()
-
-	for i := range tests {
-		req := &charmstore.CounterRequest{Key: tests[i].prefix, Prefix: true, List: true}
-		result, err := st.Counters(req)
-		c.Assert(err, gc.Equals, nil)
-		c.Assert(result, gc.DeepEquals, tests[i].result)
-	}
-}
-
-func (s *StatsSuite) TestListCountersBy(c *gc.C) {
-	c.Skip("Statistics Disabled")
-
-	if !storetesting.MongoJSEnabled() {
-		c.Skip("MongoDB JavaScript not available")
-	}
-
-	incs := []struct {
-		key []string
-		day int
-	}{
-		{[]string{"a"}, 1},
-		{[]string{"a"}, 1},
-		{[]string{"b"}, 1},
-		{[]string{"a", "b"}, 1},
-		{[]string{"a", "c"}, 1},
-		{[]string{"a"}, 3},
-		{[]string{"a", "b"}, 3},
-		{[]string{"b"}, 9},
-		{[]string{"b"}, 9},
-		{[]string{"a", "c", "d"}, 9},
-		{[]string{"a", "c", "e"}, 9},
-		{[]string{"a", "c", "f"}, 9},
-	}
-
-	day := func(i int) time.Time {
-		return time.Date(2012, time.May, i, 0, 0, 0, 0, time.UTC)
-	}
-
-	for i, inc := range incs {
-		t := day(inc.day)
-		// Ensure each entry is unique by adding
-		// a sufficient increment for each test.
-		t = t.Add(time.Duration(i) * charmstore.StatsGranularity)
-
-		err := s.store.IncCounterAtTime(inc.key, t)
-		c.Assert(err, gc.Equals, nil)
-	}
-
-	tests := []struct {
-		request charmstore.CounterRequest
-		result  []charmstore.Counter
-	}{
-		{
-			charmstore.CounterRequest{
-				Key:    []string{"a"},
-				Prefix: false,
-				List:   false,
-				By:     charmstore.ByDay,
-			},
-			[]charmstore.Counter{
-				{Key: []string{"a"}, Prefix: false, Count: 2, Time: day(1)},
-				{Key: []string{"a"}, Prefix: false, Count: 1, Time: day(3)},
-			},
-		}, {
-			charmstore.CounterRequest{
-				Key:    []string{"a"},
-				Prefix: true,
-				List:   false,
-				By:     charmstore.ByDay,
-			},
-			[]charmstore.Counter{
-				{Key: []string{"a"}, Prefix: true, Count: 2, Time: day(1)},
-				{Key: []string{"a"}, Prefix: true, Count: 1, Time: day(3)},
-				{Key: []string{"a"}, Prefix: true, Count: 3, Time: day(9)},
-			},
-		}, {
-			charmstore.CounterRequest{
-				Key:    []string{"a"},
-				Prefix: true,
-				List:   false,
-				By:     charmstore.ByDay,
-				Start:  day(2),
-			},
-			[]charmstore.Counter{
-				{Key: []string{"a"}, Prefix: true, Count: 1, Time: day(3)},
-				{Key: []string{"a"}, Prefix: true, Count: 3, Time: day(9)},
-			},
-		}, {
-			charmstore.CounterRequest{
-				Key:    []string{"a"},
-				Prefix: true,
-				List:   false,
-				By:     charmstore.ByDay,
-				Stop:   day(4),
-			},
-			[]charmstore.Counter{
-				{Key: []string{"a"}, Prefix: true, Count: 2, Time: day(1)},
-				{Key: []string{"a"}, Prefix: true, Count: 1, Time: day(3)},
-			},
-		}, {
-			charmstore.CounterRequest{
-				Key:    []string{"a"},
-				Prefix: true,
-				List:   false,
-				By:     charmstore.ByDay,
-				Start:  day(3),
-				Stop:   day(8),
-			},
-			[]charmstore.Counter{
-				{Key: []string{"a"}, Prefix: true, Count: 1, Time: day(3)},
-			},
-		}, {
-			charmstore.CounterRequest{
-				Key:    []string{"a"},
-				Prefix: true,
-				List:   true,
-				By:     charmstore.ByDay,
-			},
-			[]charmstore.Counter{
-				{Key: []string{"a", "b"}, Prefix: false, Count: 1, Time: day(1)},
-				{Key: []string{"a", "c"}, Prefix: false, Count: 1, Time: day(1)},
-				{Key: []string{"a", "b"}, Prefix: false, Count: 1, Time: day(3)},
-				{Key: []string{"a", "c"}, Prefix: true, Count: 3, Time: day(9)},
-			},
-		}, {
-			charmstore.CounterRequest{
-				Key:    []string{"a"},
-				Prefix: true,
-				List:   false,
-				By:     charmstore.ByWeek,
-			},
-			[]charmstore.Counter{
-				{Key: []string{"a"}, Prefix: true, Count: 3, Time: day(6)},
-				{Key: []string{"a"}, Prefix: true, Count: 3, Time: day(13)},
-			},
-		}, {
-			charmstore.CounterRequest{
-				Key:    []string{"a"},
-				Prefix: true,
-				List:   true,
-				By:     charmstore.ByWeek,
-			},
-			[]charmstore.Counter{
-				{Key: []string{"a", "b"}, Prefix: false, Count: 2, Time: day(6)},
-				{Key: []string{"a", "c"}, Prefix: false, Count: 1, Time: day(6)},
-				{Key: []string{"a", "c"}, Prefix: true, Count: 3, Time: day(13)},
-			},
-		},
-	}
-
-	for _, test := range tests {
-		result, err := s.store.Counters(&test.request)
-		c.Assert(err, gc.Equals, nil)
-		c.Assert(result, gc.DeepEquals, test.result)
-	}
 }
 
 type testStatsEntity struct {
@@ -573,55 +167,36 @@ var archiveDownloadCountsTests = []struct {
 }}
 
 func (s *StatsSuite) TestArchiveDownloadCounts(c *gc.C) {
-	c.Skip("Statistics Disabled")
-
 	for i, test := range archiveDownloadCountsTests {
 		c.Logf("%d: %s", i, test.about)
 		// Clear everything
-		charmstore.StatsCacheEvictAll(s.store)
 		s.store.DB.Entities().RemoveAll(nil)
-		s.store.DB.StatCounters().RemoveAll(nil)
+		s.store.DB.DownloadCounts().RemoveAll(nil)
 		for _, charm := range test.charms {
 			ch := storetesting.Charms.CharmDir(charm.id.URL.Name)
 			err := s.store.AddCharmWithArchive(charm.id, ch)
 			c.Assert(err, gc.Equals, nil)
-			url := charm.id.URL
 			now := time.Now()
-			setDownloadCounts(c, s.store, &url, now, charm.lastDay)
-			setDownloadCounts(c, s.store, &url, now.Add(-2*24*time.Hour), charm.lastWeek)
-			setDownloadCounts(c, s.store, &url, now.Add(-10*24*time.Hour), charm.lastMonth)
-			setDownloadCounts(c, s.store, &url, now.Add(-100*24*time.Hour), charm.total)
-			if charm.id.PromulgatedRevision > -1 {
-				url.Revision = charm.id.PromulgatedRevision
-				url.User = ""
-				setDownloadCounts(c, s.store, &url, now, charm.lastDay)
-				setDownloadCounts(c, s.store, &url, now.Add(-2*24*time.Hour), charm.lastWeek)
-				setDownloadCounts(c, s.store, &url, now.Add(-10*24*time.Hour), charm.lastMonth)
-				setDownloadCounts(c, s.store, &url, now.Add(-100*24*time.Hour), charm.total)
-			}
+			setDownloadCounts(c, s.store, charm.id, now, charm.lastDay)
+			setDownloadCounts(c, s.store, charm.id, lastWeekTime(now), charm.lastWeek)
+			setDownloadCounts(c, s.store, charm.id, lastMonthTime(now), charm.lastMonth)
+			setDownloadCounts(c, s.store, charm.id, now.Add(-100*24*time.Hour), charm.total)
 		}
-		thisRevision, allRevisions, err := s.store.ArchiveDownloadCounts(test.id, true)
+		thisRevision, allRevisions, err := s.store.ArchiveDownloadCounts(test.id)
 		c.Assert(err, gc.Equals, nil)
 		c.Assert(thisRevision, jc.DeepEquals, test.expectThisRevision)
 		c.Assert(allRevisions, jc.DeepEquals, test.expectAllRevisions)
 	}
 }
 
-func setDownloadCounts(c *gc.C, s *charmstore.Store, id *charm.URL, t time.Time, n int) {
-	kind := params.StatsArchiveDownload
-	if id.User == "" {
-		kind = params.StatsArchiveDownloadPromulgated
-	}
-	key := charmstore.EntityStatsKey(id, kind)
+func setDownloadCounts(c *gc.C, s *charmstore.Store, id *router.ResolvedURL, t time.Time, n int) {
 	for i := 0; i < n; i++ {
-		err := s.IncCounterAtTime(key, t)
+		err := s.IncrementDownloadCountsAtTime(id, t)
 		c.Assert(err, gc.Equals, nil)
 	}
 }
 
 func (s *StatsSuite) TestIncrementDownloadCounts(c *gc.C) {
-	c.Skip("Statistics Disabled")
-
 	ch := storetesting.Charms.CharmDir("wordpress")
 	id := charmstore.MustParseResolvedURL("0 ~charmers/trusty/wordpress-1")
 	err := s.store.AddCharmWithArchive(id, ch)
@@ -634,19 +209,17 @@ func (s *StatsSuite) TestIncrementDownloadCounts(c *gc.C) {
 		LastMonth: 1,
 		Total:     1,
 	}
-	thisRevision, allRevisions, err := s.store.ArchiveDownloadCounts(charm.MustParseURL("~charmers/trusty/wordpress-1"), true)
+	thisRevision, allRevisions, err := s.store.ArchiveDownloadCounts(charm.MustParseURL("~charmers/trusty/wordpress-1"))
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(thisRevision, jc.DeepEquals, expect)
 	c.Assert(allRevisions, jc.DeepEquals, expect)
-	thisRevision, allRevisions, err = s.store.ArchiveDownloadCounts(charm.MustParseURL("trusty/wordpress-0"), true)
+	thisRevision, allRevisions, err = s.store.ArchiveDownloadCounts(charm.MustParseURL("trusty/wordpress-0"))
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(thisRevision, jc.DeepEquals, expect)
 	c.Assert(allRevisions, jc.DeepEquals, expect)
 }
 
 func (s *StatsSuite) TestIncrementDownloadCountsOnPromulgatedMultiSeriesCharm(c *gc.C) {
-	c.Skip("Statistics Disabled")
-
 	ch := storetesting.Charms.CharmDir("multi-series")
 	id := charmstore.MustParseResolvedURL("0 ~charmers/wordpress-1")
 	err := s.store.AddCharmWithArchive(id, ch)
@@ -659,19 +232,17 @@ func (s *StatsSuite) TestIncrementDownloadCountsOnPromulgatedMultiSeriesCharm(c 
 		LastMonth: 1,
 		Total:     1,
 	}
-	thisRevision, allRevisions, err := s.store.ArchiveDownloadCounts(charm.MustParseURL("~charmers/wordpress-1"), true)
+	thisRevision, allRevisions, err := s.store.ArchiveDownloadCounts(charm.MustParseURL("~charmers/wordpress-1"))
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(thisRevision, jc.DeepEquals, expect)
 	c.Assert(allRevisions, jc.DeepEquals, expect)
-	thisRevision, allRevisions, err = s.store.ArchiveDownloadCounts(charm.MustParseURL("wordpress-0"), true)
+	thisRevision, allRevisions, err = s.store.ArchiveDownloadCounts(charm.MustParseURL("wordpress-0"))
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(thisRevision, jc.DeepEquals, expect)
 	c.Assert(allRevisions, jc.DeepEquals, expect)
 }
 
 func (s *StatsSuite) TestIncrementDownloadCountsOnIdWithPreferredSeries(c *gc.C) {
-	c.Skip("Statistics Disabled")
-
 	ch := storetesting.Charms.CharmDir("multi-series")
 	id := charmstore.MustParseResolvedURL("0 ~charmers/wordpress-1")
 	id.PreferredSeries = "trusty"
@@ -685,48 +256,30 @@ func (s *StatsSuite) TestIncrementDownloadCountsOnIdWithPreferredSeries(c *gc.C)
 		LastMonth: 1,
 		Total:     1,
 	}
-	thisRevision, allRevisions, err := s.store.ArchiveDownloadCounts(charm.MustParseURL("~charmers/wordpress-1"), true)
+	thisRevision, allRevisions, err := s.store.ArchiveDownloadCounts(charm.MustParseURL("~charmers/wordpress-1"))
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(thisRevision, jc.DeepEquals, expect)
 	c.Assert(allRevisions, jc.DeepEquals, expect)
-	thisRevision, allRevisions, err = s.store.ArchiveDownloadCounts(charm.MustParseURL("wordpress-0"), true)
+	thisRevision, allRevisions, err = s.store.ArchiveDownloadCounts(charm.MustParseURL("wordpress-0"))
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(thisRevision, jc.DeepEquals, expect)
 	c.Assert(allRevisions, jc.DeepEquals, expect)
 }
 
-func (s *StatsSuite) TestIncrementDownloadCountsCaching(c *gc.C) {
-	c.Skip("Statistics Disabled")
+// lastWeekTime calculates a time that is in the current week, but not in
+// the current day.
+func lastWeekTime(t time.Time) time.Time {
+	if t.Weekday() == time.Monday {
+		return t.AddDate(0, 0, 1)
+	}
+	return t.AddDate(0, 0, -1)
+}
 
-	ch := storetesting.Charms.CharmDir("wordpress")
-	id := charmstore.MustParseResolvedURL("0 ~charmers/trusty/wordpress-1")
-	err := s.store.AddCharmWithArchive(id, ch)
-	c.Assert(err, gc.Equals, nil)
-	err = s.store.IncrementDownloadCounts(id)
-	c.Assert(err, gc.Equals, nil)
-	expect := charmstore.AggregatedCounts{
-		LastDay:   1,
-		LastWeek:  1,
-		LastMonth: 1,
-		Total:     1,
+// lastMonthTime calculates a time that is in the current month, but not in
+// the current week.
+func lastMonthTime(t time.Time) time.Time {
+	if t.Day() > 14 {
+		return t.AddDate(0, 0, -14)
 	}
-	expectAfter := charmstore.AggregatedCounts{
-		LastDay:   2,
-		LastWeek:  2,
-		LastMonth: 2,
-		Total:     2,
-	}
-	thisRevision, allRevisions, err := s.store.ArchiveDownloadCounts(charm.MustParseURL("~charmers/trusty/wordpress-1"), false)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(thisRevision, jc.DeepEquals, expect)
-	c.Assert(allRevisions, jc.DeepEquals, expect)
-	err = s.store.IncrementDownloadCounts(id)
-	thisRevision, allRevisions, err = s.store.ArchiveDownloadCounts(charm.MustParseURL("~charmers/trusty/wordpress-1"), false)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(thisRevision, jc.DeepEquals, expect)
-	c.Assert(allRevisions, jc.DeepEquals, expect)
-	thisRevision, allRevisions, err = s.store.ArchiveDownloadCounts(charm.MustParseURL("~charmers/trusty/wordpress-1"), true)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(thisRevision, jc.DeepEquals, expectAfter)
-	c.Assert(allRevisions, jc.DeepEquals, expectAfter)
+	return t.AddDate(0, 0, 14)
 }

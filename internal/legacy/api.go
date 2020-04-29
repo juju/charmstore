@@ -82,8 +82,7 @@ import (
 	"gopkg.in/juju/charmstore.v5/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
 	"gopkg.in/juju/charmstore.v5/internal/router"
-	"gopkg.in/juju/charmstore.v5/internal/v4"
-	"gopkg.in/juju/charmstore.v5/internal/v5"
+	v4 "gopkg.in/juju/charmstore.v5/internal/v4"
 )
 
 type Handler struct {
@@ -222,14 +221,8 @@ func (h *reqHandler) serveCharmInfo(_ http.Header, req *http.Request) (interface
 			if err != nil {
 				c.Errors = append(c.Errors, err.Error())
 			}
-			if v5.StatsEnabled(req) {
-				h.store.IncCounterAsync(charmStatsKey(curl, params.StatsCharmInfo))
-			}
 		} else {
 			c.Errors = append(c.Errors, err.Error())
-			if curl != nil && v5.StatsEnabled(req) {
-				h.store.IncCounterAsync(charmStatsKey(curl, params.StatsCharmMissing))
-			}
 		}
 	}
 	return response, nil
@@ -306,9 +299,6 @@ func (h *reqHandler) serveCharmEvent(_ http.Header, req *http.Request) (interfac
 			c.Revision = entity.Revision
 		}
 		c.Time = entity.UploadTime.UTC().Format(time.RFC3339)
-		if v5.StatsEnabled(req) {
-			h.store.IncCounterAsync(charmStatsKey(id, params.StatsCharmEvent))
-		}
 	}
 	return response, nil
 }

@@ -766,33 +766,10 @@ func (h *ReqHandler) metaStats(entity *mongodoc.Entity, id *router.ResolvedURL, 
 	mon := monitoring.NewMetaDuration("stats")
 	defer mon.Done()
 	// Retrieve the aggregated downloads count for the specific revision.
-	refresh, err := router.ParseBool(flags.Get("refresh"))
-	if err != nil {
-		return charmstore.SearchParams{}, badRequestf(err, "invalid refresh parameter")
-	}
-
 	preferredURL := id.PreferredURL()
-	counts, countsAllRevisions, err := h.Store.ArchiveDownloadCounts(preferredURL, refresh)
+	counts, countsAllRevisions, err := h.Store.ArchiveDownloadCounts(preferredURL)
 	if err != nil {
 		return nil, errgo.Mask(err)
-	}
-	if entity.Series == "" {
-		// Concatenate all the supported series for a multi-series entity.
-		for _, series := range entity.SupportedSeries {
-			preferredURL.Series = series
-			countsSeries, countsAllRevisionsSeries, err := h.Store.ArchiveDownloadCounts(preferredURL, refresh)
-			if err != nil {
-				return nil, errgo.Mask(err)
-			}
-			counts.Total += countsSeries.Total
-			counts.LastDay += countsSeries.LastDay
-			counts.LastWeek += countsSeries.LastWeek
-			counts.LastMonth += countsSeries.LastMonth
-			countsAllRevisions.Total += countsAllRevisionsSeries.Total
-			countsAllRevisions.LastDay += countsAllRevisionsSeries.LastDay
-			countsAllRevisions.LastWeek += countsAllRevisionsSeries.LastWeek
-			countsAllRevisions.LastMonth += countsAllRevisionsSeries.LastMonth
-		}
 	}
 	// Return the response.
 	return &params.StatsResponse{

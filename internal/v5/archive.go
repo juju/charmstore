@@ -142,24 +142,10 @@ func (h *ReqHandler) serveDeleteArchive(id *router.ResolvedURL, w http.ResponseW
 	if err := h.Store.DeleteEntity(id); err != nil {
 		return errgo.NoteMask(err, fmt.Sprintf("cannot delete %q", id.PreferredURL()), errgo.Is(params.ErrNotFound), errgo.Is(params.ErrForbidden))
 	}
-	h.Store.IncCounterAsync(charmstore.EntityStatsKey(&id.URL, params.StatsArchiveDelete))
 	return nil
 }
 
-func (h *ReqHandler) updateStatsArchiveUpload(id *charm.URL, err *error) {
-	// Upload stats don't include revision: it is assumed that each
-	// entity revision is only uploaded once.
-	id.Revision = -1
-	kind := params.StatsArchiveUpload
-	if *err != nil {
-		kind = params.StatsArchiveFailedUpload
-	}
-	h.Store.IncCounterAsync(charmstore.EntityStatsKey(id, kind))
-}
-
 func (h *ReqHandler) servePostArchive(id *charm.URL, w http.ResponseWriter, req *http.Request) (err error) {
-	defer h.updateStatsArchiveUpload(id, &err)
-
 	if id.Revision != -1 {
 		return badRequestf(nil, "revision specified, but should not be specified")
 	}
@@ -227,7 +213,6 @@ func (h *ReqHandler) servePostArchive(id *charm.URL, w http.ResponseWriter, req 
 }
 
 func (h *ReqHandler) servePutArchive(id *charm.URL, w http.ResponseWriter, req *http.Request) (err error) {
-	defer h.updateStatsArchiveUpload(id, &err)
 	if id.Revision == -1 {
 		return badRequestf(nil, "revision not specified")
 	}

@@ -32,6 +32,7 @@ import (
 	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
 	"gopkg.in/juju/charmstore.v5/internal/router"
 	"gopkg.in/juju/charmstore.v5/internal/storetesting"
+	"gopkg.in/juju/charmstore.v5/internal/storetesting/stats"
 	v5 "gopkg.in/juju/charmstore.v5/internal/v5"
 )
 
@@ -137,38 +138,6 @@ func (s *ArchiveSuite) TestGetElidesSeriesFromMultiSeriesCharmMetadata(c *gc.C) 
 	c.Assert(gotMeta, jc.DeepEquals, chMeta)
 }
 
-func (s *ArchiveSuite) TestGetCounters(c *gc.C) {
-	if !storetesting.MongoJSEnabled() {
-		c.Skip("MongoDB JavaScript not available")
-	}
-
-	for i, id := range []*router.ResolvedURL{
-		newResolvedURL("~who/utopic/mysql-42", 42),
-	} {
-		c.Logf("test %d: %s", i, id)
-
-		ch := storetesting.NewCharm(nil)
-		s.addPublicCharm(c, ch, id)
-
-		// Download the charm archive using the API, which should increment
-		// the download counts.
-		s.assertArchiveDownload(
-			c,
-			id.URL.Path(),
-			nil,
-			ch.Bytes(),
-		)
-
-		// Check that the downloads count for the entity has been updated.
-		// Statistics Disabled
-		//key := []string{params.StatsArchiveDownload, "utopic", "mysql", id.URL.User, "42"}
-		//stats.CheckCounterSum(c, s.store, key, false, 1)
-		// Check that the promulgated download count for the entity has also been updated
-		//key = []string{params.StatsArchiveDownloadPromulgated, "utopic", "mysql", "", "42"}
-		//stats.CheckCounterSum(c, s.store, key, false, 1)
-	}
-}
-
 func (s *ArchiveSuite) TestGetCountersDisabled(c *gc.C) {
 	id := newResolvedURL("~charmers/utopic/mysql-42", 42)
 	ch := storetesting.NewCharm(nil)
@@ -183,9 +152,7 @@ func (s *ArchiveSuite) TestGetCountersDisabled(c *gc.C) {
 	)
 
 	// Check that the downloads count for the entity has not been updated.
-	// Statistics Disabled
-	//key := []string{params.StatsArchiveDownload, "utopic", "mysql", "", "42"}
-	//stats.CheckCounterSum(c, s.store, key, false, 0)
+	stats.CheckSearchTotalDownloads(c, s.store, &id.URL, 0)
 }
 
 var archivePostErrorsTests = []struct {
@@ -691,53 +658,6 @@ func (s *ArchiveSuite) TestPostInvalidBundleData(c *gc.C) {
 		`"application \"wordpress\" refers to non-existent charm \"wordpress\"",` +
 		`"relation [\"foo:db\" \"mysql:server\"] refers to application \"foo\" not defined in this bundle"]`
 	s.assertCannotUpload(c, "~charmers/bundle/wordpress", f, http.StatusBadRequest, params.ErrInvalidEntity, expectErr)
-}
-
-func (s *ArchiveSuite) TestPostCounters(c *gc.C) {
-	if !storetesting.MongoJSEnabled() {
-		c.Skip("MongoDB JavaScript not available")
-	}
-
-	s.assertUploadCharm(c, "POST", newResolvedURL("~charmers/precise/wordpress-0", -1), "wordpress")
-
-	// Check that the upload count for the entity has been updated.
-	// Statistics Disabled
-	//key := []string{params.StatsArchiveUpload, "precise", "wordpress", "charmers"}
-	//stats.CheckCounterSum(c, s.store, key, false, 1)
-}
-
-func (s *ArchiveSuite) TestPostFailureCounters(c *gc.C) {
-	if !storetesting.MongoJSEnabled() {
-		c.Skip("MongoDB JavaScript not available")
-	}
-
-	hash, _ := hashOf(invalidZip())
-	doPost := func(url string, expectCode int) {
-		rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
-			Handler: s.srv,
-			URL:     storeURL(url),
-			Method:  "POST",
-			Header: http.Header{
-				"Content-Type": {"application/zip"},
-			},
-			Body:     invalidZip(),
-			Username: testUsername,
-			Password: testPassword,
-		})
-		c.Assert(rec.Code, gc.Equals, expectCode, gc.Commentf("body: %s", rec.Body.Bytes()))
-	}
-
-	// Send a first invalid request (revision specified).
-	doPost("~charmers/utopic/wordpress-42/archive", http.StatusBadRequest)
-	// Send a second invalid request (no hash).
-	doPost("~charmers/utopic/wordpress/archive", http.StatusBadRequest)
-	// Send a third invalid request (invalid zip).
-	doPost("~charmers/utopic/wordpress/archive?hash="+hash, http.StatusBadRequest)
-
-	// Check that the failed upload count for the entity has been updated.
-	// Statistics Disabled
-	//key := []string{params.StatsArchiveFailedUpload, "utopic", "wordpress", "charmers"}
-	//stats.CheckCounterSum(c, s.store, key, false, 3)
 }
 
 func (s *ArchiveSuite) TestUploadOfCurrentCharmReadsFully(c *gc.C) {
@@ -1351,10 +1271,6 @@ func (s *ArchiveSearchSuite) SetUpTest(c *gc.C) {
 }
 
 func (s *ArchiveSearchSuite) TestGetSearchUpdate(c *gc.C) {
-	if !storetesting.MongoJSEnabled() {
-		c.Skip("MongoDB JavaScript not available")
-	}
-
 	for i, id := range []string{"~charmers/bionic/mysql-42", "~who/bionic/mysql-42"} {
 		c.Logf("test %d: %s", i, id)
 		url := newResolvedURL(id, -1)
@@ -1370,8 +1286,7 @@ func (s *ArchiveSearchSuite) TestGetSearchUpdate(c *gc.C) {
 		c.Assert(rec.Code, gc.Equals, http.StatusOK)
 
 		// Check that the search record for the entity has been updated.
-		// Statistics Disabled
-		//stats.CheckSearchTotalDownloads(c, s.store, &url.URL, 1)
+		stats.CheckSearchTotalDownloads(c, s.store, &url.URL, 1)
 	}
 }
 
