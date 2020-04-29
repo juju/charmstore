@@ -5,12 +5,12 @@ import (
 	"net/http"
 	"sort"
 
+	"github.com/juju/charm/v7"
+	"github.com/juju/charmrepo/v5/csclient/params"
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charm.v6"
-	"gopkg.in/juju/charmrepo.v3/csclient/params"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 

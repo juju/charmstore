@@ -11,11 +11,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/juju/charm/v7"
+	"github.com/juju/charmrepo/v5/csclient/params"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/juju/charm.v6"
-	"gopkg.in/juju/charmrepo.v3/csclient/params"
 	"gopkg.in/mgo.v2/bson"
 
 	"gopkg.in/juju/charmstore.v5/internal/blobstore"

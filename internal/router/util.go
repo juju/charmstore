@@ -11,11 +11,11 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/juju/charmrepo/v5/csclient/params"
 	"github.com/juju/loggo"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/juju/charmrepo.v3/csclient/params"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 )
 

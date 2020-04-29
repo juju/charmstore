@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/juju/charmrepo/v5/csclient/params"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/juju/charmrepo.v3/csclient/params"
 	"gopkg.in/juju/charmstore.v5/internal/storetesting"
 )
 

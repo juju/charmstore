@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/juju/charm/v7"
+	"github.com/juju/charmrepo/v5/csclient/params"
 	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/idmtest"
 	"github.com/juju/loggo"
@@ -15,8 +17,6 @@ import (
 	"github.com/juju/testing/httptesting"
 	"github.com/julienschmidt/httprouter"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/juju/charm.v6"
-	"gopkg.in/juju/charmrepo.v3/csclient/params"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
@@ -26,8 +26,8 @@ import (
 	"gopkg.in/juju/charmstore.v5/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5/internal/router"
 	"gopkg.in/juju/charmstore.v5/internal/storetesting"
-	"gopkg.in/juju/charmstore.v5/internal/v4"
-	"gopkg.in/juju/charmstore.v5/internal/v5"
+	v4 "gopkg.in/juju/charmstore.v5/internal/v4"
+	v5 "gopkg.in/juju/charmstore.v5/internal/v5"
 )
 
 var mgoLogger = loggo.GetLogger("mgo")

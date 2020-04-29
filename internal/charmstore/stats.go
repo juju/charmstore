@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/juju/charm/v7"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charm.v6"
 	"gopkg.in/mgo.v2/bson"
 
 	"gopkg.in/juju/charmstore.v5/internal/mongodoc"

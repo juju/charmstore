@@ -15,6 +15,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/juju/charm/v7"
+	"github.com/juju/charmrepo/v5/csclient/params"
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
@@ -22,8 +24,6 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/juju/charm.v6"
-	"gopkg.in/juju/charmrepo.v3/csclient/params"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
 	"gopkg.in/juju/charmstore.v5/audit"

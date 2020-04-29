@@ -15,12 +15,12 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/juju/charm/v7"
+	"github.com/juju/charmrepo/v5/csclient/params"
 	"github.com/juju/utils/parallel"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	charm "gopkg.in/juju/charm.v6"
-	"gopkg.in/juju/charmrepo.v3/csclient/params"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
 	"gopkg.in/juju/charmstore.v5/internal/monitoring"
