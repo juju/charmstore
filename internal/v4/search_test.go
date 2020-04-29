@@ -638,8 +638,6 @@ func (s *SearchSuite) TestSortUnsupportedField(c *gc.C) {
 }
 
 func (s *SearchSuite) TestDownloadsBoost(c *gc.C) {
-	c.Skip("Statistics Disabled")
-
 	charmDownloads := map[string]int{
 		"mysql":     0,
 		"wordpress": 1,

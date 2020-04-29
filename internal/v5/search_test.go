@@ -20,7 +20,7 @@ import (
 	"gopkg.in/juju/charmstore.v5/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5/internal/router"
 	"gopkg.in/juju/charmstore.v5/internal/storetesting"
-	"gopkg.in/juju/charmstore.v5/internal/v5"
+	v5 "gopkg.in/juju/charmstore.v5/internal/v5"
 )
 
 type SearchSuite struct {
@@ -801,8 +801,6 @@ func (s *SearchSuite) TestSortUnsupportedField(c *gc.C) {
 }
 
 func (s *SearchSuite) TestDownloadsBoost(c *gc.C) {
-	c.Skip("Statistics Disabled")
-
 	charmDownloads := map[string]int{
 		"mysql":     0,
 		"wordpress": 1,
