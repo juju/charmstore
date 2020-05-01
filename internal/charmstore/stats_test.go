@@ -64,14 +64,14 @@ var archiveDownloadCountsTests = []struct {
 	id: charm.MustParseURL("~charmers/trusty/wordpress-0"),
 	expectThisRevision: charmstore.AggregatedCounts{
 		LastDay:   1,
-		LastWeek:  3,
-		LastMonth: 6,
+		LastWeek:  weekCount(1, 2),
+		LastMonth: monthCount(1, 2, 3),
 		Total:     10,
 	},
 	expectAllRevisions: charmstore.AggregatedCounts{
 		LastDay:   1,
-		LastWeek:  3,
-		LastMonth: 6,
+		LastWeek:  weekCount(1, 2),
+		LastMonth: monthCount(1, 2, 3),
 		Total:     10,
 	},
 }, {
@@ -92,14 +92,14 @@ var archiveDownloadCountsTests = []struct {
 	id: charm.MustParseURL("~charmers/trusty/wordpress-1"),
 	expectThisRevision: charmstore.AggregatedCounts{
 		LastDay:   2,
-		LastWeek:  5,
-		LastMonth: 9,
+		LastWeek:  weekCount(2, 3),
+		LastMonth: monthCount(2, 3, 4),
 		Total:     14,
 	},
 	expectAllRevisions: charmstore.AggregatedCounts{
 		LastDay:   3,
-		LastWeek:  8,
-		LastMonth: 15,
+		LastWeek:  weekCount(1+2, 2+3),
+		LastMonth: monthCount(1+2, 2+3, 3+4),
 		Total:     24,
 	},
 }, {
@@ -114,14 +114,14 @@ var archiveDownloadCountsTests = []struct {
 	id: charm.MustParseURL("trusty/wordpress-0"),
 	expectThisRevision: charmstore.AggregatedCounts{
 		LastDay:   1,
-		LastWeek:  3,
-		LastMonth: 6,
+		LastWeek:  weekCount(1, 2),
+		LastMonth: monthCount(1, 2, 3),
 		Total:     10,
 	},
 	expectAllRevisions: charmstore.AggregatedCounts{
 		LastDay:   1,
-		LastWeek:  3,
-		LastMonth: 6,
+		LastWeek:  weekCount(1, 2),
+		LastMonth: monthCount(1, 2, 3),
 		Total:     10,
 	},
 }, {
@@ -154,14 +154,14 @@ var archiveDownloadCountsTests = []struct {
 	id: charm.MustParseURL("trusty/wordpress-1"),
 	expectThisRevision: charmstore.AggregatedCounts{
 		LastDay:   4,
-		LastWeek:  44,
-		LastMonth: 444,
+		LastWeek:  weekCount(4, 40),
+		LastMonth: monthCount(4, 40, 400),
 		Total:     4444,
 	},
 	expectAllRevisions: charmstore.AggregatedCounts{
 		LastDay:   5,
-		LastWeek:  55,
-		LastMonth: 555,
+		LastWeek:  weekCount(1+4, 10+40),
+		LastMonth: monthCount(1+4, 10+40, 100+400),
 		Total:     5555,
 	},
 }}
@@ -178,9 +178,9 @@ func (s *StatsSuite) TestArchiveDownloadCounts(c *gc.C) {
 			c.Assert(err, gc.Equals, nil)
 			now := time.Now()
 			setDownloadCounts(c, s.store, charm.id, now, charm.lastDay)
-			setDownloadCounts(c, s.store, charm.id, lastWeekTime(now), charm.lastWeek)
-			setDownloadCounts(c, s.store, charm.id, lastMonthTime(now), charm.lastMonth)
-			setDownloadCounts(c, s.store, charm.id, now.Add(-100*24*time.Hour), charm.total)
+			setDownloadCounts(c, s.store, charm.id, now.AddDate(0, 0, -1), charm.lastWeek)
+			setDownloadCounts(c, s.store, charm.id, now.AddDate(0, 0, -7), charm.lastMonth)
+			setDownloadCounts(c, s.store, charm.id, now.AddDate(0, 0, -100), charm.total)
 		}
 		thisRevision, allRevisions, err := s.store.ArchiveDownloadCounts(test.id)
 		c.Assert(err, gc.Equals, nil)
@@ -266,20 +266,29 @@ func (s *StatsSuite) TestIncrementDownloadCountsOnIdWithPreferredSeries(c *gc.C)
 	c.Assert(allRevisions, jc.DeepEquals, expect)
 }
 
-// lastWeekTime calculates a time that is in the current week, but not in
-// the current day.
-func lastWeekTime(t time.Time) time.Time {
-	if t.Weekday() == time.Monday {
-		return t.AddDate(0, 0, 1)
+// weekCount calculates how many of the added statistics count as being
+// in the current week. A week starts on a Monday so only a day count
+// will fit into the current week, otherwise the day and week count are
+// used.
+func weekCount(day, week int) int64 {
+	if time.Now().Weekday() == time.Monday {
+		return int64(day)
 	}
-	return t.AddDate(0, 0, -1)
+	return int64(day + week)
 }
 
-// lastMonthTime calculates a time that is in the current month, but not in
-// the current week.
-func lastMonthTime(t time.Time) time.Time {
-	if t.Day() > 14 {
-		return t.AddDate(0, 0, -14)
+// monthCount calculates how many of the added statistics count as being
+// in the current week. The week count is added to the database 1 day ago
+// and the month count 7 days ago. These counts aren't included if they
+// occured in the previous month.
+func monthCount(day, week, month int) int64 {
+	dom := time.Now().Day()
+	switch {
+	case dom == 1:
+		return int64(day)
+	case dom < 7:
+		return int64(day + week)
+	default:
+		return int64(day + week + month)
 	}
-	return t.AddDate(0, 0, 14)
 }
