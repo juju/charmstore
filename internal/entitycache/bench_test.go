@@ -3,7 +3,7 @@ package entitycache_test
 import (
 	"testing"
 
-	"gopkg.in/juju/charm.v6"
+	"github.com/juju/charm/v7"
 
 	"gopkg.in/juju/charmstore.v5/internal/entitycache"
 	"gopkg.in/juju/charmstore.v5/internal/mongodoc"

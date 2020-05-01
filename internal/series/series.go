@@ -70,7 +70,7 @@ var Series = map[string]SeriesInfo{
 	"disco":   {true, Ubuntu, true, boostS2},
 	"eoan":    {true, Ubuntu, true, boostS1},
 	"focal":   {true, Ubuntu, true, boostLTS1},
-	"groovy":   {true, Ubuntu, true, boostUnreleased},
+	"groovy":  {true, Ubuntu, true, boostUnreleased},
 
 	// Windows
 	"win2012hvr2": {true, Windows, true, 1.1},

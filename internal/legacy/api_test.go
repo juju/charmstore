@@ -14,13 +14,16 @@ import (
 	"os"
 	"time"
 
+	"github.com/juju/charm/v7"
+	"github.com/juju/charmrepo/v5"
+	"github.com/juju/charmrepo/v5/csclient/params"
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/juju/charm.v6"
-	"gopkg.in/juju/charmrepo.v3"
-	"gopkg.in/juju/charmrepo.v3/csclient/params"
+	charm6 "gopkg.in/juju/charm.v6"
+	charmrepo3 "gopkg.in/juju/charmrepo.v3"
+	charmrepo3params "gopkg.in/juju/charmrepo.v3/csclient/params"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
@@ -122,9 +125,9 @@ func (s *APISuite) TestPostNotAllowed(c *gc.C) {
 		Method:       "POST",
 		URL:          "/charm/precise/wordpress",
 		ExpectStatus: http.StatusMethodNotAllowed,
-		ExpectBody: params.Error{
-			Code:    params.ErrMethodNotAllowed,
-			Message: params.ErrMethodNotAllowed.Error(),
+		ExpectBody: charmrepo3params.Error{
+			Code:    charmrepo3params.ErrMethodNotAllowed,
+			Message: charmrepo3params.ErrMethodNotAllowed.Error(),
 		},
 	})
 }
@@ -134,8 +137,8 @@ func (s *APISuite) TestCharmArchiveUnresolvedURL(c *gc.C) {
 		Handler:      s.srv,
 		URL:          "/charm/wordpress",
 		ExpectStatus: http.StatusNotFound,
-		ExpectBody: params.Error{
-			Code:    params.ErrNotFound,
+		ExpectBody: charmrepo3params.Error{
+			Code:    charmrepo3params.ErrNotFound,
 			Message: `no matching charm or bundle for cs:wordpress`,
 		},
 	})
@@ -235,7 +238,7 @@ func (s *APISuite) TestServeCharmInfo(c *gc.C) {
 			"$set", bson.D{{"extrainfo", test.extrainfo}},
 		}})
 		c.Assert(err, gc.Equals, nil)
-		expectInfo := charmrepo.InfoResponse{
+		expectInfo := charmrepo3.InfoResponse{
 			CanonicalURL: test.canonical,
 			Sha256:       test.sha,
 			Revision:     test.revision,
@@ -248,7 +251,7 @@ func (s *APISuite) TestServeCharmInfo(c *gc.C) {
 			Handler:      s.srv,
 			URL:          "/charm-info?charms=" + test.url,
 			ExpectStatus: http.StatusOK,
-			ExpectBody: map[string]charmrepo.InfoResponse{
+			ExpectBody: map[string]charmrepo3.InfoResponse{
 				test.url: expectInfo,
 			},
 		})
@@ -313,12 +316,13 @@ func (s *APISuite) TestCharmPackageGet(c *gc.C) {
 	srv := httptest.NewServer(s.srv)
 	defer srv.Close()
 
-	s.PatchValue(&charmrepo.CacheDir, c.MkDir())
-	s.PatchValue(&charmrepo.LegacyStore.BaseURL, srv.URL)
+	s.PatchValue(&charmrepo3.CacheDir, c.MkDir())
+	s.PatchValue(&charmrepo3.LegacyStore.BaseURL, srv.URL)
 
-	ch, err := charmrepo.LegacyStore.Get(&wordpressURL.URL)
+	url := charm6.URL(wordpressURL.URL)
+	ch, err := charmrepo3.LegacyStore.Get(&url)
 	c.Assert(err, gc.Equals, nil)
-	chArchive := ch.(*charm.CharmArchive)
+	chArchive := ch.(*charm6.CharmArchive)
 
 	data, err := ioutil.ReadFile(chArchive.Path)
 	c.Assert(err, gc.Equals, nil)
@@ -334,12 +338,12 @@ func (s *APISuite) TestCharmPackageCharmInfo(c *gc.C) {
 
 	srv := httptest.NewServer(s.srv)
 	defer srv.Close()
-	s.PatchValue(&charmrepo.LegacyStore.BaseURL, srv.URL)
+	s.PatchValue(&charmrepo3.LegacyStore.BaseURL, srv.URL)
 
-	resp, err := charmrepo.LegacyStore.Info(wordpressURL.PreferredURL(), mysqlURL.PreferredURL(), notFoundURL)
+	resp, err := charmrepo3.LegacyStore.Info(wordpressURL.PreferredURL(), mysqlURL.PreferredURL(), notFoundURL)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(resp, gc.HasLen, 3)
-	c.Assert(resp, jc.DeepEquals, []*charmrepo.InfoResponse{{
+	c.Assert(resp, jc.DeepEquals, []*charmrepo3.InfoResponse{{
 		CanonicalURL: wordpressURL.String(),
 		Sha256:       wordpressSHA256,
 	}, {

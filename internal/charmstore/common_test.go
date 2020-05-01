@@ -4,9 +4,9 @@
 package charmstore
 
 import (
+	"github.com/juju/charm/v7"
+	"github.com/juju/charmrepo/v5/csclient/params"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/juju/charm.v6"
-	"gopkg.in/juju/charmrepo.v3/csclient/params"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 
 	"gopkg.in/juju/charmstore.v5/internal/router"

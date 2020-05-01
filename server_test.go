@@ -8,10 +8,10 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/juju/charmrepo/v5/csclient/params"
 	jujutesting "github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/juju/charmrepo.v3/csclient/params"
 
 	"gopkg.in/juju/charmstore.v5"
 	"gopkg.in/juju/charmstore.v5/internal/storetesting"

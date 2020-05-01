@@ -6,7 +6,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/juju/httpprof"
+	pprof "github.com/juju/httpprof"
 	"golang.org/x/net/context"
 
 	"gopkg.in/juju/charmstore.v5/internal/router"

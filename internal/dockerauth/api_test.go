@@ -19,6 +19,9 @@ import (
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/juju/charm/v7"
+	"github.com/juju/charm/v7/resource"
+	"github.com/juju/charmrepo/v5/csclient/params"
 	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/idmtest"
 	jujutesting "github.com/juju/testing"
@@ -27,9 +30,6 @@ import (
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	httprequest "gopkg.in/httprequest.v1"
-	charm "gopkg.in/juju/charm.v6"
-	"gopkg.in/juju/charm.v6/resource"
-	"gopkg.in/juju/charmrepo.v3/csclient/params"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	macaroon "gopkg.in/macaroon.v2-unstable"
@@ -39,7 +39,7 @@ import (
 	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
 	"gopkg.in/juju/charmstore.v5/internal/router"
 	"gopkg.in/juju/charmstore.v5/internal/storetesting"
-	"gopkg.in/juju/charmstore.v5/internal/v5"
+	v5 "gopkg.in/juju/charmstore.v5/internal/v5"
 )
 
 type APISuite struct {

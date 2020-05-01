@@ -16,10 +16,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/juju/charm/v7/resource"
+	"github.com/juju/charmrepo/v5/csclient/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/juju/charm.v6/resource"
-	"gopkg.in/juju/charmrepo.v3/csclient/params"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	macaroon "gopkg.in/macaroon.v2-unstable"
 

@@ -4,10 +4,10 @@
 package storetesting // import "gopkg.in/juju/charmstore.v5/internal/storetesting"
 
 import (
+	"github.com/juju/charm/v7"
+	"github.com/juju/charmrepo/v5/csclient/params"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/juju/charm.v6"
-	"gopkg.in/juju/charmrepo.v3/csclient/params"
 	"gopkg.in/mgo.v2"
 
 	"gopkg.in/juju/charmstore.v5/internal/mongodoc"

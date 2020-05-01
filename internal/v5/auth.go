@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/juju/charmrepo/v5/csclient/params"
 	"github.com/juju/idmclient"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charmrepo.v3/csclient/params"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"

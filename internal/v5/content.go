@@ -12,11 +12,12 @@ import (
 	"path"
 	"strings"
 
+	"github.com/juju/charm/v7"
+	"github.com/juju/charmrepo/v5/csclient/params"
+	"github.com/juju/jujusvg/v4"
 	"github.com/juju/xml"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charm.v6"
-	"gopkg.in/juju/charmrepo.v3/csclient/params"
-	"gopkg.in/juju/jujusvg.v3"
 
 	"gopkg.in/juju/charmstore.v5/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
@@ -36,15 +37,13 @@ func (h *ReqHandler) serveDiagram(id *router.ResolvedURL, w http.ResponseWriter,
 
 	var urlErr error
 	// TODO consider what happens when a charm's SVG does not exist.
-	canvas, err := jujusvg.NewFromBundle(entity.BundleData, func(id *charm.URL) string {
-		// TODO change jujusvg so that the iconURL function can
-		// return an error.
+	canvas, err := jujusvg.NewFromBundle(context.Background(), entity.BundleData, func(_ context.Context, id *charm.URL) (string, error) {
 		absPath := h.Handler.rootPath + "/" + id.Path() + "/icon.svg"
 		p, err := router.RelativeURLPath(req.RequestURI, absPath)
 		if err != nil {
-			urlErr = errgo.Notef(err, "cannot make relative URL from %q and %q", req.RequestURI, absPath)
+			return "", errgo.Notef(err, "cannot make relative URL from %q and %q", req.RequestURI, absPath)
 		}
-		return p
+		return p, nil
 	}, nil)
 	if err != nil {
 		return errgo.Notef(err, "cannot create canvas")
