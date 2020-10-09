@@ -12,15 +12,15 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/juju/charm/v7"
-	"github.com/juju/charm/v7/resource"
-	"github.com/juju/charmrepo/v5/csclient/params"
+	"github.com/juju/charm/v8/resource"
+	"github.com/juju/charmrepo/v6/csclient/params"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 
 	"gopkg.in/juju/charmstore.v5/internal/blobstore"
+	"gopkg.in/juju/charmstore.v5/internal/charm"
 	"gopkg.in/juju/charmstore.v5/internal/storetesting"
 )
 

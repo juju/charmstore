@@ -16,8 +16,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/juju/charm/v7/resource"
-	"github.com/juju/charmrepo/v5/csclient/params"
+	"github.com/juju/charm/v8/resource"
+	"github.com/juju/charmrepo/v6/csclient/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"

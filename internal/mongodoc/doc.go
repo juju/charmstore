@@ -6,10 +6,11 @@ package mongodoc // import "gopkg.in/juju/charmstore.v5/internal/mongodoc"
 import (
 	"time"
 
-	"github.com/juju/charm/v7"
-	"github.com/juju/charmrepo/v5/csclient/params"
+	"github.com/juju/charmrepo/v6/csclient/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2/bson"
+
+	"gopkg.in/juju/charmstore.v5/internal/charm"
 )
 
 // Entity holds the in-database representation of charm or bundle's

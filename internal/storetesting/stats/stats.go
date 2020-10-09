@@ -6,9 +6,9 @@ package stats // import "gopkg.in/juju/charmstore.v5/internal/storetesting/stats
 import (
 	"time"
 
-	"github.com/juju/charm/v7"
 	gc "gopkg.in/check.v1"
 
+	"gopkg.in/juju/charmstore.v5/internal/charm"
 	"gopkg.in/juju/charmstore.v5/internal/charmstore"
 )
 

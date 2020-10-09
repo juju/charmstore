@@ -6,8 +6,8 @@ package mongodoc_test
 import (
 	"time"
 
-	"github.com/juju/charm/v7"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/juju/charmstore.v5/internal/charm"
 
 	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
 )

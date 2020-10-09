@@ -9,8 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juju/charm/v7"
-	"github.com/juju/charmrepo/v5/csclient/params"
+	"github.com/juju/charmrepo/v6/csclient/params"
 	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/idmtest"
 	"github.com/juju/loggo"
@@ -29,6 +28,7 @@ import (
 	"gopkg.in/mgo.v2"
 
 	"gopkg.in/juju/charmstore.v5/internal/blobstore"
+	"gopkg.in/juju/charmstore.v5/internal/charm"
 	"gopkg.in/juju/charmstore.v5/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5/internal/router"
 	"gopkg.in/juju/charmstore.v5/internal/storetesting"

@@ -9,12 +9,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/juju/charm/v7"
-	"github.com/juju/charmrepo/v5/csclient/params"
+	"github.com/juju/charmrepo/v6/csclient/params"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 
+	"gopkg.in/juju/charmstore.v5/internal/charm"
 	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
 )
 
@@ -458,13 +458,13 @@ var postLogsErrorsTests = []struct {
 	expectCode:    params.ErrBadRequest,
 }, {
 	about:         "invalid log level",
-	body:          makeByteLogs(rawMessage("message"), params.LogLevel(42), params.IngestionType, nil),
+	body:          makeByteLogs(rawMessage("message"), params.LogLevel("42"), params.IngestionType, nil),
 	expectStatus:  http.StatusBadRequest,
 	expectMessage: "invalid log level",
 	expectCode:    params.ErrBadRequest,
 }, {
 	about:         "invalid log type",
-	body:          makeByteLogs(rawMessage("message"), params.WarningLevel, params.LogType(42), nil),
+	body:          makeByteLogs(rawMessage("message"), params.WarningLevel, params.LogType("42"), nil),
 	expectStatus:  http.StatusBadRequest,
 	expectMessage: "invalid log type",
 	expectCode:    params.ErrBadRequest,

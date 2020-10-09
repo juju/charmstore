@@ -15,8 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juju/charm/v7"
-	"github.com/juju/charmrepo/v5/csclient/params"
+	"github.com/juju/charmrepo/v6/csclient/params"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
@@ -28,6 +27,7 @@ import (
 
 	"gopkg.in/juju/charmstore.v5/audit"
 	"gopkg.in/juju/charmstore.v5/elasticsearch"
+	"gopkg.in/juju/charmstore.v5/internal/charm"
 	"gopkg.in/juju/charmstore.v5/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5/internal/entitycache"
 	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
@@ -150,7 +150,7 @@ var metaEndpoints = []metaEndpoint{{
 	get:       entityFieldGetter("BundleData"),
 	checkURL:  newResolvedURL("cs:~charmers/bundle/wordpress-simple-42", 42),
 	assertCheckData: func(c *gc.C, data interface{}) {
-		c.Assert(data.(*charm.BundleData).Applications["wordpress"].Charm, gc.Equals, "wordpress")
+		c.Assert(data.(*charm.BundleData).Applications["wordpress"].Charm, gc.Equals, "cs:wordpress")
 	},
 }, {
 	name:      "bundle-unit-count",
@@ -967,7 +967,7 @@ var metaPublishedTests = []struct {
 	entity: storetesting.NewBundle(&charm.BundleData{
 		Applications: map[string]*charm.ApplicationSpec{
 			"wordpress": {
-				Charm: "~charmers/precise/wordpress",
+				Charm: "cs:~charmers/precise/wordpress",
 			},
 		},
 	}),

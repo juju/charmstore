@@ -10,9 +10,9 @@ import (
 	"io"
 	"strings"
 
-	"github.com/juju/charm/v7"
-	"github.com/juju/charm/v7/resource"
-	"github.com/juju/charmrepo/v5/testing"
+	"github.com/juju/charm/v8"
+	"github.com/juju/charm/v8/resource"
+	"github.com/juju/charmrepo/v6/testing"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/yaml.v2"
 
