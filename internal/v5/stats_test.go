@@ -7,11 +7,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/juju/charm/v7"
-	"github.com/juju/charmrepo/v5/csclient/params"
+	"github.com/juju/charmrepo/v6/csclient/params"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 
+	"gopkg.in/juju/charmstore.v5/internal/charm"
 	"gopkg.in/juju/charmstore.v5/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5/internal/storetesting"
 	v5 "gopkg.in/juju/charmstore.v5/internal/v5"

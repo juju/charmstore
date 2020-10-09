@@ -6,10 +6,10 @@ package v4 // import "gopkg.in/juju/charmstore.v5/internal/v4"
 import (
 	"net/http"
 
-	"github.com/juju/charm/v7"
-	"github.com/juju/charmrepo/v5/csclient/params"
+	"github.com/juju/charmrepo/v6/csclient/params"
 	"gopkg.in/errgo.v1"
 
+	"gopkg.in/juju/charmstore.v5/internal/charm"
 	"gopkg.in/juju/charmstore.v5/internal/router"
 	v5 "gopkg.in/juju/charmstore.v5/internal/v5"
 )

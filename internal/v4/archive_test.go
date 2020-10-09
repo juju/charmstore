@@ -19,15 +19,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/juju/charm/v7"
-	"github.com/juju/charmrepo/v5/csclient/params"
-	charmtesting "github.com/juju/charmrepo/v5/testing"
+	"github.com/juju/charmrepo/v6/csclient/params"
+	charmtesting "github.com/juju/charmrepo/v6/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/mgo.v2/bson"
 
 	"gopkg.in/juju/charmstore.v5/internal/blobstore"
+	"gopkg.in/juju/charmstore.v5/internal/charm"
 	"gopkg.in/juju/charmstore.v5/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
 	"gopkg.in/juju/charmstore.v5/internal/router"
@@ -654,8 +654,8 @@ func (s *ArchiveSuite) TestPostInvalidBundleData(c *gc.C) {
 	// Here we exercise both bundle internal verification (bad relation) and
 	// validation with respect to charms (wordpress and mysql are missing).
 	expectErr := `bundle verification failed: [` +
-		`"application \"mysql\" refers to non-existent charm \"mysql\"",` +
-		`"application \"wordpress\" refers to non-existent charm \"wordpress\"",` +
+		`"application \"mysql\" refers to non-existent charm \"cs:mysql\"",` +
+		`"application \"wordpress\" refers to non-existent charm \"cs:wordpress\"",` +
 		`"relation [\"foo:db\" \"mysql:server\"] refers to application \"foo\" not defined in this bundle"]`
 	s.assertCannotUpload(c, "~charmers/bundle/wordpress", f, http.StatusBadRequest, params.ErrInvalidEntity, expectErr)
 }

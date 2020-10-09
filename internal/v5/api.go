@@ -15,8 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juju/charm/v7"
-	"github.com/juju/charmrepo/v5/csclient/params"
+	"github.com/juju/charmrepo/v6/csclient/params"
 	"github.com/juju/idmclient"
 	"github.com/juju/loggo"
 	"github.com/juju/mempool"
@@ -31,6 +30,7 @@ import (
 
 	"gopkg.in/juju/charmstore.v5/audit"
 	"gopkg.in/juju/charmstore.v5/internal/cache"
+	"gopkg.in/juju/charmstore.v5/internal/charm"
 	"gopkg.in/juju/charmstore.v5/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5/internal/entitycache"
 	"gopkg.in/juju/charmstore.v5/internal/mongodoc"

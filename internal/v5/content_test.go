@@ -13,13 +13,13 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/juju/charm/v7"
-	"github.com/juju/charmrepo/v5/csclient/params"
+	"github.com/juju/charmrepo/v6/csclient/params"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	"github.com/juju/xml"
 	gc "gopkg.in/check.v1"
 
+	"gopkg.in/juju/charmstore.v5/internal/charm"
 	"gopkg.in/juju/charmstore.v5/internal/storetesting"
 	v5 "gopkg.in/juju/charmstore.v5/internal/v5"
 )
@@ -68,14 +68,14 @@ func (s *APISuite) TestServeDiagram(c *gc.C) {
 	bundle := storetesting.NewBundle(&charm.BundleData{
 		Applications: map[string]*charm.ApplicationSpec{
 			"wordpress": {
-				Charm: "wordpress",
+				Charm: "cs:wordpress",
 				Annotations: map[string]string{
 					"gui-x": "100",
 					"gui-y": "200",
 				},
 			},
 			"mysql": {
-				Charm: "utopic/mysql-23",
+				Charm: "cs:utopic/mysql-23",
 				Annotations: map[string]string{
 					"gui-x": "200",
 					"gui-y": "200",
@@ -135,10 +135,10 @@ func (s *APISuite) TestServeDiagramNoPosition(c *gc.C) {
 		&charm.BundleData{
 			Applications: map[string]*charm.ApplicationSpec{
 				"wordpress": {
-					Charm: "wordpress",
+					Charm: "cs:wordpress",
 				},
 				"mysql": {
-					Charm: "utopic/mysql-23",
+					Charm: "cs:utopic/mysql-23",
 					Annotations: map[string]string{
 						"gui-x": "200",
 						"gui-y": "200",

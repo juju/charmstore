@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juju/charm/v7"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
@@ -17,6 +16,7 @@ import (
 	"gopkg.in/retry.v1"
 
 	"gopkg.in/juju/charmstore.v5/internal/blobstore"
+	"gopkg.in/juju/charmstore.v5/internal/charm"
 	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
 	"gopkg.in/juju/charmstore.v5/internal/router"
 	"gopkg.in/juju/charmstore.v5/internal/storetesting"

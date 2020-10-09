@@ -15,8 +15,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/juju/charm/v7"
-	"github.com/juju/charmrepo/v5/csclient/params"
+	"github.com/juju/charmrepo/v6/csclient/params"
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
@@ -27,6 +26,7 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
 	"gopkg.in/juju/charmstore.v5/audit"
+	"gopkg.in/juju/charmstore.v5/internal/charm"
 )
 
 type RouterSuite struct {
@@ -771,7 +771,7 @@ var routerGetTests = []struct {
 	expectStatus:              http.StatusBadRequest,
 	expectBody: params.Error{
 		Code:    params.ErrBadRequest,
-		Message: `charm or bundle URL has invalid form: "~user/bad-wolf/wily/wordpress-42"`,
+		Message: `charm or bundle URL has invalid form: "cs:~user/bad-wolf/wily/wordpress-42"`,
 	},
 	monitorEndpoint: "/meta/foo",
 }, {
@@ -859,7 +859,7 @@ var routerGetTests = []struct {
 	expectStatus:              http.StatusBadRequest,
 	expectBody: params.Error{
 		Code:    params.ErrBadRequest,
-		Message: `charm or bundle URL has invalid form: "staging/trusty/django"`,
+		Message: `charm or bundle URL has invalid form: "cs:staging/trusty/django"`,
 	},
 	monitorEndpoint: "/meta/any",
 }, {
@@ -1087,7 +1087,7 @@ var routerGetTests = []struct {
 	expectStatus: http.StatusNotFound,
 	expectBody: params.Error{
 		Code:    params.ErrNotFound,
-		Message: `cannot parse URL "robots.txt": name "robots.txt" not valid`,
+		Message: `cannot parse URL "cs:robots.txt": name "robots.txt" not valid`,
 	},
 	monitorEndpoint: "",
 }, {
@@ -1098,7 +1098,7 @@ var routerGetTests = []struct {
 	expectStatus:              http.StatusBadRequest,
 	expectBody: params.Error{
 		Code:    params.ErrBadRequest,
-		Message: `cannot parse URL "robots.txt": name "robots.txt" not valid`,
+		Message: `cannot parse URL "cs:robots.txt": name "robots.txt" not valid`,
 	},
 	monitorEndpoint: "/meta/foo",
 }}
@@ -2065,10 +2065,10 @@ var splitIdTests = []struct {
 	expectURL: "cs:~user/wordpress",
 }, {
 	path:        "",
-	expectError: `cannot parse URL "": name "" not valid`,
+	expectError: `cannot parse URL "cs:": name "" not valid`,
 }, {
 	path:        "~foo-bar-/wordpress",
-	expectError: `charm or bundle URL has invalid user name: "~foo-bar-/wordpress"`,
+	expectError: `charm or bundle URL has invalid user name: "cs:~foo-bar-/wordpress"`,
 }}
 
 func (s *RouterSuite) TestSplitId(c *gc.C) {

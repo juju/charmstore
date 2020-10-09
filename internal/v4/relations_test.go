@@ -11,14 +11,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/juju/charm/v7"
-	"github.com/juju/charmrepo/v5/csclient/params"
+	"github.com/juju/charmrepo/v6/csclient/params"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/mgo.v2/bson"
 
 	"gopkg.in/juju/charmstore.v5/internal/blobstore"
+	"gopkg.in/juju/charmstore.v5/internal/charm"
 	"gopkg.in/juju/charmstore.v5/internal/router"
 	"gopkg.in/juju/charmstore.v5/internal/storetesting"
 )
@@ -303,27 +303,27 @@ var metaBundlesContainingBundles = map[string]charm.Bundle{
 		"cs:trusty/memcached-2",
 	}),
 	"42 ~charmers/bundle/django-generic-42": relationTestingBundle([]string{
-		"django",
-		"django",
-		"utopic/mysql-1",
-		"trusty/memcached",
+		"cs:django",
+		"cs:django",
+		"cs:utopic/mysql-1",
+		"cs:trusty/memcached",
 	}),
 	"0 ~charmers/bundle/useless-0": relationTestingBundle([]string{
 		"cs:utopic/wordpress-42",
-		"precise/mediawiki-10",
+		"cs:precise/mediawiki-10",
 	}),
 	"46 ~charmers/bundle/mediawiki-simple-46": relationTestingBundle([]string{
-		"precise/mediawiki-0",
+		"cs:precise/mediawiki-0",
 	}),
 	"47 ~charmers/bundle/mediawiki-simple-47": relationTestingBundle([]string{
-		"precise/mediawiki-0",
-		"mysql",
+		"cs:precise/mediawiki-0",
+		"cs:mysql",
 	}),
 	"48 ~charmers/bundle/mediawiki-simple-48": relationTestingBundle([]string{
-		"precise/mediawiki-0",
+		"cs:precise/mediawiki-0",
 	}),
 	"~bob/bundle/bobthebundle-2": relationTestingBundle([]string{
-		"precise/mediawiki-0",
+		"cs:precise/mediawiki-0",
 	}),
 }
 

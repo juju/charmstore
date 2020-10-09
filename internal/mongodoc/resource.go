@@ -6,8 +6,9 @@ package mongodoc // import "gopkg.in/juju/charmstore.v5/internal/mongodoc"
 import (
 	"time"
 
-	"github.com/juju/charm/v7"
 	"gopkg.in/errgo.v1"
+
+	"gopkg.in/juju/charmstore.v5/internal/charm"
 )
 
 // Resource holds the in-database representation of a charm resource at a

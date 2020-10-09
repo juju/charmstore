@@ -6,8 +6,8 @@ package storetesting
 import (
 	"sort"
 
-	"github.com/juju/charm/v7"
-	"github.com/juju/charmrepo/v5/csclient/params"
+	"github.com/juju/charm/v8"
+	"github.com/juju/charmrepo/v6/csclient/params"
 
 	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
 	"gopkg.in/juju/charmstore.v5/internal/router"

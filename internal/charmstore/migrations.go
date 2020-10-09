@@ -7,12 +7,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juju/charm/v7"
 	"github.com/juju/utils/parallel"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
+	"gopkg.in/juju/charmstore.v5/internal/charm"
 	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
 )
 

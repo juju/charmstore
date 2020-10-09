@@ -15,8 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juju/charm/v7"
-	"github.com/juju/charmrepo/v5/csclient/params"
+	"github.com/juju/charmrepo/v6/csclient/params"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
@@ -28,6 +27,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"gopkg.in/juju/charmstore.v5/elasticsearch"
+	"gopkg.in/juju/charmstore.v5/internal/charm"
 	"gopkg.in/juju/charmstore.v5/internal/charmstore"
 	"gopkg.in/juju/charmstore.v5/internal/entitycache"
 	"gopkg.in/juju/charmstore.v5/internal/mongodoc"
@@ -159,7 +159,7 @@ var metaEndpoints = []metaEndpoint{{
 		c.Assert(ok, gc.Equals, true)
 		charm, ok := wordpress.(map[string]interface{})["Charm"]
 		c.Assert(ok, gc.Equals, true)
-		c.Assert(charm.(string), gc.Equals, "wordpress")
+		c.Assert(charm.(string), gc.Equals, "cs:wordpress")
 	},
 }, {
 	name:      "bundle-unit-count",
