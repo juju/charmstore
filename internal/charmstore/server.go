@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/juju/idmclient"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/worker.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
@@ -268,7 +268,7 @@ func NewServer(db *mgo.Database, si *SearchIndex, config ServerParams, versions 
 }
 
 func prometheusHandler() http.Handler {
-	h := prometheus.Handler()
+	h := promhttp.Handler()
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		// Use prometheus to monitor its own requests...
 		monReq := monitoring.NewRequest(req, "prometheus")

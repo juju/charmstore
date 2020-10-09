@@ -17,8 +17,8 @@ require (
 	github.com/juju/utils v0.0.0-20200424103611-54ececcc5fc7
 	github.com/juju/xml v0.0.0-20160224194805-b5bf18ebd8b8
 	github.com/juju/zip v0.0.0-20160205105221-f6b1e93fa2e2
-	github.com/julienschmidt/httprouter v1.1.1-0.20151013225520-77a895ad01eb
-	github.com/prometheus/client_golang v0.0.0-20180319131721-d49167c4b9f3
+	github.com/julienschmidt/httprouter v1.2.0
+	github.com/prometheus/client_golang v1.7.1
 	github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af
 	golang.org/x/net v0.0.0-20200904194848-62affa334b73
 	gopkg.in/check.v1 v1.0.0-20200902074654-038fdea0a05b
