@@ -1559,6 +1559,21 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 	})
 }
 
+func (s *APISuite) TestMetaPermGetAsAdmin(c *gc.C) {
+	for _, u := range []*router.ResolvedURL{
+		newResolvedURL("~charmers/precise/wordpress-23", 23),
+		newResolvedURL("~charmers/precise/wordpress-24", 24),
+		newResolvedURL("~charmers/trusty/wordpress-1", 1),
+	} {
+		err := s.store.AddCharmWithArchive(u, storetesting.NewCharm(nil))
+		c.Assert(err, gc.Equals, nil)
+	}
+	s.assertGetAsAdmin(c, "~charmers/precise/wordpress-24/meta/perm", params.PermResponse{
+		Read:  []string{"charmers"},
+		Write: []string{"charmers"},
+	})
+}
+
 func (s *APISuite) TestMetaPermPutUnauthorized(c *gc.C) {
 	id := "precise/wordpress-23"
 	s.addPublicCharmFromRepo(c, "wordpress", newResolvedURL("~charmers/"+id, 23))

@@ -429,12 +429,25 @@ func (s *commonSuite) assertPut0(c *gc.C, url string, val interface{}, asAdmin b
 }
 
 func (s *commonSuite) assertGet(c *gc.C, url string, expectVal interface{}) {
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+	s.assertGet0(c, url, expectVal, false)
+}
+
+func (s *commonSuite) assertGetAsAdmin(c *gc.C, url string, expectVal interface{}) {
+	s.assertGet0(c, url, expectVal, true)
+}
+
+func (s *commonSuite) assertGet0(c *gc.C, url string, expectVal interface{}, asAdmin bool) {
+	p := httptesting.JSONCallParams{
 		Handler:    s.srv,
 		Do:         bakeryDo(nil),
 		URL:        storeURL(url),
 		ExpectBody: expectVal,
-	})
+	}
+	if asAdmin {
+		p.Username = testUsername
+		p.Password = testPassword
+	}
+	httptesting.AssertJSONCall(c, p)
 }
 
 // assertGetIsUnauthorized asserts that a GET to the given URL results
