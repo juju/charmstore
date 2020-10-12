@@ -1165,7 +1165,7 @@ func (h *ReqHandler) visibleACL(req *http.Request, acls mongodoc.ACL) (mongodoc.
 	auth := h.auth
 	// Authenticate the user if not authenticated already, in order to check
 	// write permissions as well.
-	if auth.User == nil {
+	if !auth.Admin && auth.User == nil {
 		var err error
 		auth, err = h.Authenticate(req)
 		if err != nil {
@@ -1174,9 +1174,13 @@ func (h *ReqHandler) visibleACL(req *http.Request, acls mongodoc.ACL) (mongodoc.
 		}
 	}
 	// Check whether the user has write permissions.
-	ok, err := auth.User.Allow(acls.Write)
-	if err != nil {
-		return mongodoc.ACL{}, errgo.Notef(err, "cannot allow acls for user %q", auth.Username)
+	ok := auth.Admin
+	if !ok {
+		var err error
+		ok, err = auth.User.Allow(acls.Write)
+		if err != nil {
+			return mongodoc.ACL{}, errgo.Notef(err, "cannot allow acls for user %q", auth.Username)
+		}
 	}
 	if ok {
 		// The user has write perms, so show real ACLs.
