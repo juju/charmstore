@@ -67,10 +67,11 @@ var Series = map[string]SeriesInfo{
 	"artful":  {true, Ubuntu, false, 0},
 	"bionic":  {true, Ubuntu, true, boostLTS2},
 	"cosmic":  {true, Ubuntu, false, 0},
-	"disco":   {true, Ubuntu, true, boostS2},
-	"eoan":    {true, Ubuntu, true, boostS1},
+	"disco":   {true, Ubuntu, false, 0},
+	"eoan":    {true, Ubuntu, true, boostS2},
 	"focal":   {true, Ubuntu, true, boostLTS1},
-	"groovy":  {true, Ubuntu, true, boostUnreleased},
+	"groovy":  {true, Ubuntu, true, boostS1},
+	"hirsute": {true, Ubuntu, true, boostUnreleased},
 
 	// Windows
 	"win2012hvr2": {true, Windows, true, 1.1},

@@ -808,8 +808,9 @@ var seriesScore = map[string]int{
 	"cosmic":  10,
 	"disco":   11,
 	"eoan":    12,
-	// TODO: make this higher when groovy is released
-	"groovy": 0,
+	"goovy":   13,
+	// TODO: make this higher when hirsute is released
+	"hirsute": 0,
 
 	// When we find a multi-series charm (no series) we
 	// will always choose it in preference to a series-specific
