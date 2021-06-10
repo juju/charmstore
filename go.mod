@@ -17,14 +17,14 @@ require (
 	github.com/juju/utils v0.0.0-20200424103611-54ececcc5fc7
 	github.com/juju/xml v0.0.0-20160224194805-b5bf18ebd8b8
 	github.com/juju/zip v0.0.0-20160205105221-f6b1e93fa2e2
-	github.com/julienschmidt/httprouter v1.2.0
+	github.com/julienschmidt/httprouter v1.3.0
 	github.com/prometheus/client_golang v1.7.1
 	github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af
 	golang.org/x/net v0.0.0-20200904194848-62affa334b73
 	gopkg.in/check.v1 v1.0.0-20200902074654-038fdea0a05b
 	gopkg.in/errgo.v1 v1.0.1
 	gopkg.in/goose.v2 v2.0.0-20180816040309-cf9b64132d71
-	gopkg.in/httprequest.v1 v1.1.1
+	gopkg.in/httprequest.v1 v1.2.1
 	gopkg.in/juju/charm.v6 v6.0.0-20200220135436-5217f4ff9d6d
 	gopkg.in/juju/charmrepo.v3 v3.0.1
 	gopkg.in/juju/worker.v1 v1.0.0-20191018043616-19a698a7150f
