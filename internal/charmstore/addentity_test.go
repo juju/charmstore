@@ -375,11 +375,11 @@ func (s *AddEntitySuite) TestUploadBundleWithCharmsFromDifferentChannels(c *gc.C
 		Name: "bundle.yaml",
 		Data: []byte(`
 services:
-  dummy-in-edge:
-    charm: cs:~charmers/bionic/dummy
+  sample-in-edge:
+    charm: cs:~charmers/bionic/sample
     channel: edge
-  other-dummy-in-beta:
-    charm: cs:~charmers/bionic/other-dummy
+  other-sample-in-beta:
+    charm: cs:~charmers/bionic/other-sample
     channel: beta
   wordpress:
     charm: wordpress
@@ -399,14 +399,14 @@ services:
 	err = store.Publish(rurl, nil, params.StableChannel)
 	c.Assert(err, gc.Equals, nil)
 
-	dummy := storetesting.Charms.CharmArchive(c.MkDir(), "dummy")
-	rurl = router.MustNewResolvedURL("cs:~charmers/bionic/dummy-1", 1)
-	err = store.AddCharmWithArchive(rurl, dummy)
+	sample := storetesting.Charms.CharmArchive(c.MkDir(), "sample")
+	rurl = router.MustNewResolvedURL("cs:~charmers/bionic/sample-1", 1)
+	err = store.AddCharmWithArchive(rurl, sample)
 	c.Assert(err, gc.Equals, nil)
 	err = store.Publish(rurl, nil, params.EdgeChannel)
 	c.Assert(err, gc.Equals, nil)
-	rurl = router.MustNewResolvedURL("cs:~charmers/bionic/other-dummy-1", 1)
-	err = store.AddCharmWithArchive(rurl, dummy)
+	rurl = router.MustNewResolvedURL("cs:~charmers/bionic/other-sample-1", 1)
+	err = store.AddCharmWithArchive(rurl, sample)
 	c.Assert(err, gc.Equals, nil)
 	err = store.Publish(rurl, nil, params.BetaChannel)
 	c.Assert(err, gc.Equals, nil)
