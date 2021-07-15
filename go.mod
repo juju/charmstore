@@ -32,7 +32,7 @@ require (
 	gopkg.in/macaroon.v2-unstable v2.0.0-20180309131217-66ab28d0d56f
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0-20170531180850-df99d62fd42d
-	gopkg.in/retry.v1 v1.0.2
+	gopkg.in/retry.v1 v1.0.3
 	gopkg.in/tomb.v2 v2.0.0-20161208151619-d5d1b5820637
 	gopkg.in/yaml.v2 v2.4.0
 )
