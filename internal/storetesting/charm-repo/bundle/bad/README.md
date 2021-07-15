@@ -1,1 +1,1 @@
-A dummy bundle
+A sample bundle

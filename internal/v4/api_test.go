@@ -91,7 +91,7 @@ type metaEndpoint struct {
 	// get returns the expected data for the endpoint.
 	get metaEndpointExpectedValueGetter
 
-	// checkURL holds one URL to sanity check data against.
+	// checkURL holds one URL to check data against.
 	checkURL *router.ResolvedURL
 
 	// assertCheckData holds a function that will be used to check that
@@ -191,7 +191,7 @@ var metaEndpoints = []metaEndpoint{{
 	name:      "charm-actions",
 	exclusive: charmOnly,
 	get:       entityFieldGetter("CharmActions"),
-	checkURL:  newResolvedURL("~charmers/precise/dummy-10", 10),
+	checkURL:  newResolvedURL("~charmers/precise/sample-10", 10),
 	assertCheckData: func(c *gc.C, data interface{}) {
 		c.Assert(data.(*charm.Actions).ActionSpecs["snapshot"].Description, gc.Equals, "Take a snapshot of the database.")
 	},
@@ -581,7 +581,7 @@ var testEntities = []*router.ResolvedURL{
 	// A stock bundle.
 	newResolvedURL("cs:~charmers/bundle/wordpress-simple-42", 42),
 	// A charm with some actions.
-	newResolvedURL("cs:~charmers/precise/dummy-10", 10),
+	newResolvedURL("cs:~charmers/precise/sample-10", 10),
 	// A charm with some tags.
 	newResolvedURL("cs:~charmers/utopic/category-2", 2),
 	// A charm with a different user.
@@ -768,7 +768,7 @@ func (s *APISuite) TestMetaPerm(c *gc.C) {
 	})
 
 	s.doAsUser("mike", func() {
-		// Mike has no write access to the charm, so he can only see limited acls.
+		// Mike has no write access to the charm, so they can only see limited acls.
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 			Handler: s.srv,
 			Do:      bakeryDo(nil),
@@ -1506,15 +1506,15 @@ func (s *APISuite) TestMetaAnyWithNoIncludesAndNoEntity(c *gc.C) {
 }
 
 // In this test we rely on the charm.v2 testing repo package and
-// dummy charm that has actions included.
+// sample charm that has actions included.
 func (s *APISuite) TestMetaCharmActions(c *gc.C) {
-	url, dummy := s.addPublicCharmFromRepo(c, "dummy", newResolvedURL("cs:~charmers/precise/dummy-10", 10))
-	s.assertGet(c, "precise/dummy-10/meta/charm-actions", dummy.Actions())
-	s.assertGet(c, "precise/dummy-10/meta/any?include=charm-actions",
+	url, sample := s.addPublicCharmFromRepo(c, "sample", newResolvedURL("cs:~charmers/precise/sample-10", 10))
+	s.assertGet(c, "precise/sample-10/meta/charm-actions", sample.Actions())
+	s.assertGet(c, "precise/sample-10/meta/any?include=charm-actions",
 		params.MetaAnyResponse{
 			Id: url.PreferredURL(),
 			Meta: map[string]interface{}{
-				"charm-actions": dummy.Actions(),
+				"charm-actions": sample.Actions(),
 			},
 		},
 	)

@@ -7,7 +7,7 @@ tags:
 resources:
   for-store:
     type: file
-    filename: dummy.tgz
+    filename: placeholder.tgz
     description: One line that is useful when operators need to push it.
   for-install:
     type: file

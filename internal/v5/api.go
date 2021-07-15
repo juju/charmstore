@@ -747,7 +747,7 @@ func (h *ReqHandler) metaTags(entity *mongodoc.Entity, id *router.ResolvedURL, p
 	case id.URL.Series == "bundle":
 		tags = entity.BundleData.Tags
 	case len(entity.CharmMeta.Tags) > 0:
-		// TODO only return whitelisted tags.
+		// TODO only return approved tags.
 		tags = entity.CharmMeta.Tags
 	default:
 		tags = entity.CharmMeta.Categories

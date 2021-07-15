@@ -1,5 +1,5 @@
 name: all-hooks
-summary: "That's a dummy charm with hook scrips for all types of hooks."
+summary: "That's a sample charm with hook scrips for all types of hooks."
 description: "This is a longer description."
 provides:
   foo:
@@ -9,4 +9,4 @@ requires:
     interface: fake
 peers:
   self:
-    interface: dummy
+    interface: placeholder

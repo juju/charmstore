@@ -657,7 +657,7 @@ func (s *ArchiveSuite) TestPostEntityClearsCanIngest(c *gc.C) {
 	s.assertUploadCharm(c, "PUT", id, "wordpress", nil)
 	s.setPublic(c, id)
 
-	// Sanity check that can-ingest is false after the initial PUT.
+	// Check that can-ingest is false after the initial PUT.
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler: s.srv,
 		URL:     storeURL(id.URL.Path() + "/meta/can-ingest"),
@@ -684,7 +684,7 @@ func (s *ArchiveSuite) TestPostEntityWithIngestDoesNotClearCanIngest(c *gc.C) {
 	s.assertUploadCharm(c, "PUT", id, "wordpress", nil)
 	s.setPublic(c, id)
 
-	// Sanity check that can-ingest is false after the initial PUT.
+	// Check that can-ingest is false after the initial PUT.
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler: s.srv,
 		URL:     storeURL(id.URL.Path() + "/meta/can-ingest"),

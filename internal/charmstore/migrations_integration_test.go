@@ -129,7 +129,7 @@ var migrationHistory = []versionSpec{{
 			return errgo.Mask(err)
 		}
 
-		// Sanity check that we really did trigger the bug.
+		// Check that we really did trigger the bug.
 		err = db.C("entities").Find(bson.D{{
 			"promulgated-url", "cs:development/precise/promulgated-1",
 		}}).One(new(interface{}))

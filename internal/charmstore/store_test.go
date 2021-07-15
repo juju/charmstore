@@ -948,7 +948,7 @@ func (s *StoreSuite) TestOpenBlobPreV5(c *gc.C) {
 
 	c.Assert(preV5Ch.Meta().Series, gc.HasLen, 0)
 
-	// Sanity check that the series really are in the post-v5 blob.
+	// Check that the series really are in the post-v5 blob.
 	blob, err = store.OpenBlob(url)
 	c.Assert(err, gc.Equals, nil)
 	defer blob.Close()
@@ -4330,7 +4330,7 @@ func (s *StoreSuite) TestGC(c *gc.C) {
 		keep:  false,
 	})
 
-	// First sanity-check we can get all the blobs.
+	// First check we can get all the blobs.
 	for _, info := range blobs {
 		r, _, err := store.BlobStore.Open(info.hash, nil)
 		c.Assert(err, gc.Equals, nil, gc.Commentf("%s", info.about))

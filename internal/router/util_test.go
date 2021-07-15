@@ -137,7 +137,7 @@ var relativeURLTests = []struct {
 func (*utilSuite) TestRelativeURL(c *gc.C) {
 	for i, test := range relativeURLTests {
 		c.Logf("test %d: %q %q", i, test.base, test.target)
-		// Sanity check the test itself.
+		// Check the test is valid.
 		if test.expectError == "" {
 			baseURL := &url.URL{Path: test.base}
 			expectURL := &url.URL{Path: test.expect}
