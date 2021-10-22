@@ -1196,8 +1196,6 @@ func (s *ArchiveSuite) assertArchiveFileContents(c *gc.C, zipFile *zip.ReadClose
 	c.Assert(rec.Body.Bytes(), gc.DeepEquals, expectBytes)
 	headers := rec.Header()
 	c.Assert(headers.Get("Content-Length"), gc.Equals, strconv.Itoa(len(expectBytes)))
-	// We only have text files in the charm repository used for tests.
-	c.Assert(headers.Get("Content-Type"), gc.Equals, "text/plain; charset=utf-8")
 	assertCacheControl(c, rec.Header(), true)
 }
 
