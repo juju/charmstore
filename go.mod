@@ -1,9 +1,9 @@
 module gopkg.in/juju/charmstore.v5
 
-go 1.14
+go 1.16
 
 require (
-	github.com/dgrijalva/jwt-go v0.0.0-20160705203006-01aeca54ebda
+	github.com/golang-jwt/jwt/v4 v4.1.0
 	github.com/gorilla/handlers v0.0.0-20170224193955-13d73096a474
 	github.com/juju/charm/v8 v8.0.0-20200925053015-07d39c0154ac
 	github.com/juju/charmrepo/v6 v6.0.0-20200817155725-120bd7a8b1ed

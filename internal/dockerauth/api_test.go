@@ -18,7 +18,7 @@ import (
 	"net/http/httptest"
 	"time"
 
-	jwt "github.com/dgrijalva/jwt-go"
+	jwt "github.com/golang-jwt/jwt/v4"
 	"github.com/juju/charm/v8/resource"
 	"github.com/juju/charmrepo/v6/csclient/params"
 	"github.com/juju/idmclient"
@@ -76,8 +76,9 @@ func (s *APISuite) newServer(c *gc.C, cert *x509.Certificate, key crypto.Signer)
 		DockerRegistryAuthCertificates: []*x509.Certificate{
 			cert,
 		},
-		IdentityLocation: idmServer.URL.String(),
-		PublicKeyLocator: idmServer,
+		DockerRegistryTokenDuration: time.Hour,
+		IdentityLocation:            idmServer.URL.String(),
+		PublicKeyLocator:            idmServer,
 	}, map[string]charmstore.NewAPIHandlerFunc{
 		"docker-registry": dockerauth.NewAPIHandler,
 		"v5":              v5.NewAPIHandler,
