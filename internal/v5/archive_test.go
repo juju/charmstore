@@ -17,6 +17,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path"
 	"sort"
 	"strconv"
 	"strings"
@@ -1164,25 +1165,24 @@ func (s *ArchiveSuite) TestArchiveFileGet(c *gc.C) {
 	s.assertArchiveFileContents(c, zipFile, "~charmers/utopic/all-hooks-0/archive/hooks/install")
 }
 
+func (s *ArchiveSuite) TestSymLinkArchiveFileGet(c *gc.C) {
+	ch := storetesting.Charms.CharmArchive(c.MkDir(), "all-hooks")
+	id := newResolvedURL("cs:~charmers/utopic/all-hooks-0", 0)
+	s.addPublicCharm(c, ch, id)
+	zipFile, err := zip.OpenReader(ch.Path)
+	c.Assert(err, gc.Equals, nil)
+	defer zipFile.Close()
+
+	// Check a file in a subdirectory.
+	s.assertArchiveFileContents(c, zipFile, "~charmers/utopic/all-hooks-0/archive/hooks/foo-relation-departed")
+}
+
 // assertArchiveFileContents checks that the response returned by the
 // serveArchiveFile endpoint is correct for the given archive and URL path.
 func (s *ArchiveSuite) assertArchiveFileContents(c *gc.C, zipFile *zip.ReadCloser, path string) {
 	// For example: trusty/django/archive/hooks/install -> hooks/install.
 	filePath := strings.SplitN(path, "/archive/", 2)[1]
-
-	// Retrieve the expected bytes.
-	var expectBytes []byte
-	for _, file := range zipFile.File {
-		if file.Name == filePath {
-			r, err := file.Open()
-			c.Assert(err, gc.Equals, nil)
-			defer r.Close()
-			expectBytes, err = ioutil.ReadAll(r)
-			c.Assert(err, gc.Equals, nil)
-			break
-		}
-	}
-	c.Assert(expectBytes, gc.Not(gc.HasLen), 0)
+	expectBytes := retrieveExpectedBytes(c, zipFile, filePath)
 
 	// Make the request.
 	url := storeURL(path)
@@ -1193,10 +1193,29 @@ func (s *ArchiveSuite) assertArchiveFileContents(c *gc.C, zipFile *zip.ReadClose
 
 	// Ensure the response is what we expect.
 	c.Assert(rec.Code, gc.Equals, http.StatusOK)
-	c.Assert(rec.Body.Bytes(), gc.DeepEquals, expectBytes)
+	c.Assert(string(rec.Body.Bytes()), gc.DeepEquals, string(expectBytes))
 	headers := rec.Header()
 	c.Assert(headers.Get("Content-Length"), gc.Equals, strconv.Itoa(len(expectBytes)))
 	assertCacheControl(c, rec.Header(), true)
+}
+
+func retrieveExpectedBytes(c *gc.C, zipFile *zip.ReadCloser, filePath string) (expectBytes []byte) {
+	for _, file := range zipFile.File {
+		if file.Name == filePath {
+			r, err := file.Open()
+			c.Assert(err, gc.Equals, nil)
+			defer r.Close()
+			expectBytes, err = ioutil.ReadAll(r)
+			c.Assert(err, gc.Equals, nil)
+			if file.Mode()&os.ModeSymlink != 0 {
+				newPath := path.Join(path.Dir(filePath), string(expectBytes))
+				return retrieveExpectedBytes(c, zipFile, newPath)
+			}
+			break
+		}
+	}
+	c.Assert(expectBytes, gc.Not(gc.HasLen), 0)
+	return expectBytes
 }
 
 func (s *ArchiveSuite) TestDelete(c *gc.C) {
