@@ -10,7 +10,7 @@ require (
 	github.com/juju/httpprof v0.0.0-20141217160036-14bf14c30767
 	github.com/juju/idmclient v0.0.0-20161107140250-fb1dc7175251
 	github.com/juju/jujusvg/v5 v5.0.0
-	github.com/juju/loggo v0.0.0-20200526014432-9ce3a2e09b5e
+	github.com/juju/loggo v1.0.0
 	github.com/juju/mempool v0.0.0-20160205104927-24974d6c264f
 	github.com/juju/mgomonitor v0.0.0-20181029151116-52206bb0cd31
 	github.com/juju/testing v0.0.0-20200923013621-75df6121fbb0
