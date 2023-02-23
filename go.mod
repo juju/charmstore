@@ -19,7 +19,7 @@ require (
 	github.com/juju/zip v0.0.0-20160205105221-f6b1e93fa2e2
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/prometheus/client_golang v1.11.0
-	github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af
+	github.com/rogpeppe/fastuuid v1.2.0
 	golang.org/x/net v0.0.0-20200904194848-62affa334b73
 	gopkg.in/check.v1 v1.0.0-20200902074654-038fdea0a05b
 	gopkg.in/errgo.v1 v1.0.1
