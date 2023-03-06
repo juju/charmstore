@@ -20,7 +20,7 @@ require (
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/prometheus/client_golang v1.11.0
 	github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af
-	golang.org/x/net v0.0.0-20200904194848-62affa334b73
+	golang.org/x/net v0.8.0
 	gopkg.in/check.v1 v1.0.0-20200902074654-038fdea0a05b
 	gopkg.in/errgo.v1 v1.0.1
 	gopkg.in/goose.v2 v2.0.0-20180816040309-cf9b64132d71
