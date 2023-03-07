@@ -4,7 +4,7 @@ go 1.16
 
 require (
 	github.com/golang-jwt/jwt/v4 v4.1.0
-	github.com/gorilla/handlers v0.0.0-20170224193955-13d73096a474
+	github.com/gorilla/handlers v1.5.1
 	github.com/juju/charm/v8 v8.0.0-20200925053015-07d39c0154ac
 	github.com/juju/charmrepo/v6 v6.0.0-20200817155725-120bd7a8b1ed
 	github.com/juju/httpprof v0.0.0-20141217160036-14bf14c30767
